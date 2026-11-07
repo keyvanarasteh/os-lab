@@ -1,7 +1,4 @@
-# Kurumsal Ağ Topolojisi ve Güvenlik Mimarisi (Siber Güvenlik Şirketi)
-
-> Contributed by `U*** B***` ([@ufuk888](https://github.com/ufuk888)) · BGT207 Güvenlik Duvarı Çözümleri · 2026-2027 Güz midterm project.
-> Student names are masked on purpose. Converted from the student's Turkish document. The original has no rule table and one or two models per site, so the rules are derived from its stated policy and the extra alternatives are reviewer-added.
+# 🌐 Kurumsal Ağ Topolojisi ve Güvenlik Mimarisi Dokümantasyonu
 
 Küresel ölçekte siber güvenlik çözümleri sunan şirketimiz; İstanbul merkezli genel müdürlük yapısı, Sivas'taki 7/24 Güvenlik Operasyon Merkezi (SOC) ve Ar-Ge üssü, Ankara'daki Siber Güvenlik Eğitim Akademisi ve Dubai'deki uluslararası ticaret ofisi olmak üzere dört ana lokasyonda faaliyet göstermektedir. Kurumlara yönelik uçtan uca, hem ofansif hem de defansif güvenlik hizmetleri sağlayan firmamızın temel faaliyet alanları arasında; Avrupa ve Orta Doğu (MEA) bölgelerine özel operasyonlar yürüten Fiziksel Sızma Testi (Red Team) faaliyetleri, sürekli ağ izleme ve tehdit analizi, siber güvenlik yazılımları geliştirme süreçleri ve stajyer programlarıyla sektöre yeni uzmanlar kazandıran akademik eğitim hizmetleri yer almaktadır.
 ---
@@ -136,3 +133,5 @@ SOC ekibinin analiz yapabilmesi için tüm trafiğin (SSL şifreli trafik dahil)
 ### Katman 3: Uç Nokta İzleme (EDR/XDR) ve Zero Trust
 * **Agent Tabanlı İzleme:** Ağ tarafındaki izolasyon (VLAN segmentasyonu) sağlandıktan sonra, Muhasebe, Ar-Ge ve Yönetim cihazlarına **Sysmon ve Wazuh Agent** kurularak loglar SOC'a yönlendirilir.
 * **Zero Trust Segmentasyonu:** Özellikle Ankara şubesindeki Stajyer VLAN'inin (VLAN 20), şirket iç ağındaki (10.x.x.x) diğer hiçbir VLAN'e erişemeyeceği garanti altına alınmıştır. Bu ağa sadece internet çıkış izni verilmiştir.
+
+  
