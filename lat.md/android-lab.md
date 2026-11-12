@@ -67,10 +67,23 @@ report generator [[android-lab/lab/scripts/app_reporter.py]], the MobSF client
 [[android-lab/lab/scripts/apk_patcher.py]]. Prebuilt Frida hooks are in
 [[android-lab/lab/hooks]].
 
+## Frida inventory
+
+[[console/frida_inventory.py]] answers "what can Frida attach to right now?" as one JSON document.
+
+It wraps `frida-ls-devices` and `frida-ps`, labels each device with its
+transport (local, USB or TCP) and lists processes for local and USB devices, or
+for one named target. It is read-only: it passes only listing flags and never
+attaches, spawns or starts a frida-server. A TCP target must be a literal
+loopback, private or link-local address; hostnames and public addresses are
+refused before any tool runs. A missing tool or a failed listing is recorded in
+the document's `errors` (exit code 1) instead of raising, and a command that
+times out is stopped together with its child processes.
+
 ## Tests
 
 The lab ships a pytest suite in [[android-lab/lab/tests]].
 
 It covers the analyzer, reporter, MobSF client, secret scanner, patcher, flow
-parser, agentic engine and web UI, and runs in CI — see
+parser, agentic engine, web UI and the Frida inventory, and runs in CI — see
 [[tooling#Local test runner]].
