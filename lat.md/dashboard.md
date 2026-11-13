@@ -56,6 +56,10 @@ the lab. Lab starts require the token returned by the plan preview. See
 
 ## Source navigation
 
+Cleanup Lab navigation links to scan, results, leftovers and history in
+[[dashboard/src/views/cleanup/pages.tsx]]. The public route explains that the
+engine is local, while the local app uses typed cleanup jobs and a confirm step.
+
 [[dashboard/src/views/source/pages.tsx]] provides localized Source Lab routes and
 uses the existing shell for mobile navigation and themes. The sidebar and
 Spotlight include Source destinations; record search reads private file-backed

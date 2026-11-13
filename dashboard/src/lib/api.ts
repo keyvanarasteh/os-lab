@@ -145,6 +145,71 @@ export interface Hook {
   code: string;
 }
 
+export interface CleanupStatus {
+  state: LabState;
+  platform?: { id: string; label: string; supported: boolean };
+  reasons: string[];
+  requirements: { id: string; label: string; found: boolean; hint: string; detail: string }[];
+  capabilities: { id: string; label: string; found: boolean; detail: string }[];
+}
+export interface CleanupEntry {
+  id: string; name: string; category: string; risk: string; hint: string; impact: string;
+  defaultSelected: boolean; needsPrivilege: boolean;
+  paths: { template: string; path: string | null; reason: string; source?: string }[];
+}
+export interface CleanupScan {
+  cancelled: boolean;
+  entries: { id: string; name: string; category: string; risk: string; sizeBytes: number; files: number; folders: number; unreadable: string[]; paths: { path: string | null; reason: string; source?: string; sizeBytes: number; error: string | null }[] }[];
+  totals: { sizeBytes: number; files: number; folders: number; unreadable: number };
+}
+export interface CleanupPlan {
+  planId: string; mode: CleanupMode; expiresAt: number; shredPolicy?: "one-pass" | "three-pass"; shredLimitation?: string;
+  items: { entryId: string; entryName: string; path: string | null; status: string; code: string; reason: string; source?: string; sizeBytes: number; files: number; folders: number }[];
+  totals: { ready: number; skipped: number; bytes: number };
+}
+export interface CleanupResult {
+  planId: string; mode: CleanupMode; cancelled: boolean;
+  results: { entryId: string; entryName: string; path: string | null; status: string; code: string; reason: string; source?: string; error: string | null; bytes: number; trashPath: string | null }[];
+  totals: { items: number; trashed: number; deleted: number; shredded?: number; skipped: number; failed: number; bytes: number };
+}
+export type CleanupMode = "trash" | "delete" | "shred";
+export interface CleanupSettings { shredPolicy: "off" | "one-pass" | "three-pass"; shredLimitation: string }
+export interface CleanupJob {
+  id: string; kind: "scan" | "plan" | "clean"; state: "running" | "done" | "cancelled" | "failed";
+  request: { entryIds?: string[]; mode?: CleanupMode; planId?: string };
+  progress: Record<string, string | number> | null;
+  result: CleanupScan | CleanupPlan | CleanupResult | null;
+  error: string | null;
+}
+export interface CleanupHistory { entries: { id: number; result: CleanupResult; hmac: string }[]; total: number; verified: boolean }
+
+export interface CleanupContainerCapabilities {
+  available: boolean; engine: "docker" | "podman" | null; reason: string;
+  actions: { id: string; risk: string; defaultSelected: false; pruneArgv: string[] }[];
+}
+export interface CleanupContainerPreview {
+  previewId: string; actionId: string; engine: "docker" | "podman"; risk: string;
+  candidateCount: number; candidates: Record<string, unknown>[]; command: string[]; expiresAt: number;
+}
+export interface CleanupContainerResult {
+  actionId: string; engine: string; status: "completed" | "failed"; error?: string;
+  candidateCount?: number; command?: string[]; output?: string; bytesRemoved: number | null;
+}
+export interface CleanupVMInventory {
+  cancelled: boolean;
+  items: { id: string; name: string; path: string; sizeBytes: number; sizeOnDiskBytes: number | null; files: number; reportOnly: true }[];
+  unavailable: { id: string; root: string | null; reason: string }[];
+}
+export interface CleanupAuxJob<T> {
+  id: string; kind: "container-prune" | "vm-scan" | "leftovers"; state: "running" | "done" | "cancelled" | "failed";
+  result: T | null; error: string | null;
+}
+export interface CleanupCrossLeftovers {
+  available: boolean; reason?: string; cancelled: boolean;
+  items: { id: string; name: string; path: string; status: string; confidence: number; rule: string; sizeBytes: number; sizeOnDiskBytes: number | null; reportOnly: true }[];
+  inventorySources?: string[]; inventoryErrors?: string[]; unreadable?: string[];
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -202,6 +267,23 @@ export interface AppUpdateState {
 }
 
 export const api = {
+  cleanupStatus: () => call<CleanupStatus>("/api/cleanup/status"),
+  cleanupCatalog: () => call<{ platform: string; entries: CleanupEntry[] }>("/api/cleanup/catalog"),
+  cleanupHistory: () => call<CleanupHistory>("/api/cleanup/history"),
+  cleanupSettings: () => call<CleanupSettings>("/api/cleanup/settings"),
+  cleanupUpdateSettings: (shredPolicy: CleanupSettings["shredPolicy"]) => post<CleanupSettings>("/api/cleanup/settings", { shredPolicy }),
+  cleanupJobs: () => call<{ jobs: CleanupJob[] }>("/api/cleanup/jobs"),
+  cleanupScan: (entryIds: string[]) => post<CleanupJob>("/api/cleanup/scan", { entryIds }),
+  cleanupPlan: (entryIds: string[], mode: CleanupMode) => post<CleanupJob>("/api/cleanup/plan", { entryIds, mode }),
+  cleanupClean: (planId: string) => post<CleanupJob>("/api/cleanup/clean", { planId }),
+  cleanupJob: (id: string) => call<CleanupJob>(`/api/cleanup/jobs/${encodeURIComponent(id)}`),
+  cleanupCancel: (id: string) => post<CleanupJob>(`/api/cleanup/jobs/${encodeURIComponent(id)}/cancel`),
+  cleanupContainers: () => call<CleanupContainerCapabilities>("/api/cleanup/containers"),
+  cleanupContainerPreview: (actionId: string) => post<CleanupContainerPreview>("/api/cleanup/containers/preview", { actionId }),
+  cleanupContainerPrune: (previewId: string) => post<CleanupAuxJob<CleanupContainerResult>>("/api/cleanup/containers/prune", { previewId }),
+  cleanupVMScan: () => post<CleanupAuxJob<CleanupVMInventory>>("/api/cleanup/vms/scan"),
+  cleanupCrossLeftovers: () => post<CleanupAuxJob<CleanupCrossLeftovers>>("/api/cleanup/leftovers/scan"),
+  cleanupAuxJob: <T>(id: string) => call<CleanupAuxJob<T>>(`/api/cleanup/jobs/${encodeURIComponent(id)}`),
   health: () => call<{ status: string; version: string; console: boolean }>("/api/health"),
   host: () => call<{ host: HostInfo; labs: LabStatus[] }>("/api/host"),
   capabilities: () => call<CapabilityCatalog>("/api/capabilities"),

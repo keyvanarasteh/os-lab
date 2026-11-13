@@ -276,11 +276,12 @@ def measure_path(path, *, cancel=None, seen_inodes=None, progress=None):
     return report
 
 
-def _path_report(template, path, reason, *, missing=False, symlink=False):
+def _path_report(template, path, reason, *, missing=False, symlink=False, source="catalog"):
     return {
         "template": template,
         "path": path,
         "reason": reason,
+        "source": source,
         "missing": missing,
         "symlink": symlink,
         "sizeBytes": 0,
@@ -345,7 +346,7 @@ def scan_catalog(
                     _path_report(item["template"], None, item["reason"], missing=True)
                 )
                 continue
-            report = _path_report(item["template"], item["path"], "")
+            report = _path_report(item["template"], item["path"], "", source=item.get("source", "catalog"))
             result["paths"].append(report)
             pending.append(report)
 

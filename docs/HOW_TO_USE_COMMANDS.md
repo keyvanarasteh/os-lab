@@ -15,6 +15,7 @@ Usage:
   ./labctl <lab> <command> [options]
   ./labctl all <command> [options]
   ./labctl ui [--port N]      Open the web console (default port 5050)
+  ./labctl cleanup <command>  Cleanup Lab readiness (see below)
 
 Labs:
   win | windows      Windows VM lab (win-lab/)
@@ -22,6 +23,7 @@ Labs:
   ios | ios-lab      iOS/macOS lab (ios-lab/); native macOS uses make -C ios-lab mac-*
   linux | lin        Linux VM lab (linux-lab/)
   source             Local source/package analysis (source-lab/)
+  cleanup            Cleanup Lab disk scan/clean engine (cleanup-lab/)
   all                Run a command for Linux-host labs
 
 Commands:
@@ -69,6 +71,10 @@ Profiles:
   android:  lightweight, development, performance
   ios:      lightweight, development, performance
   linux:    lightweight, development, performance
+
+Cleanup Lab commands (read-only; scanning and cleaning arrive with CLN-03/CLN-13):
+  ./labctl cleanup status [--json]   One-screen readiness summary; exit 0 ready, 1 problem
+  ./labctl cleanup doctor [--json]   Every check, path and hint
 
 Examples:
   ./labctl win profile use lightweight

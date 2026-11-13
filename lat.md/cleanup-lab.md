@@ -11,8 +11,9 @@ typed layers over it.
 
 The package lives in [[cleanup-lab/engine/cleanup_lab]]. `readiness`, `paths`, the
 catalog loader (CLN-02), the scan job (CLN-03), the safety guard (CLN-12) and the
-plan → clean executor (CLN-13) and audit history (CLN-15) exist now. One module, `safety.py`,
-guards every destructive call, so no other module may delete, move or shred.
+plan → clean executor (CLN-13) and audit history (CLN-15) exist now. `safety.py`
+guards filesystem deletion and moves; CLN-08's daemon prune actions use a
+separate typed, single-use preview guard.
 
 Target paths are data, never code: every platform path, risk class, owning process
 and privilege flag belongs in `cleanup-lab/catalog/*.json` (CLN-02). Per-OS
@@ -29,6 +30,26 @@ usage error, matching [[lat.md/labctl.md]].
 
 ## Catalog
 
+CLN-05 adds [[cleanup-lab/catalog/browser.json]] for Chrome, Edge, Brave,
+Opera, Vivaldi, Firefox and Safari.
+
+The `profile-glob` detector expands every matching profile path from catalog
+data. Chrome history and extension traces carry `privacy` risk and are never
+pre-selected; every browser names its owning process for the running-app guard.
+
+CLN-06 adds [[cleanup-lab/catalog/developers.json]] with per-OS developer cache
+defaults, credentials and toolchains.
+
+The catalog reports binary presence through `shutil.which` without a shell.
+Shell functions are tracked by their directories. Credential entries are never
+pre-selected; toolchains and local clusters have `cleanable: false` and the
+plan skips them. CLN-25 resolves developer caches from an environment variable,
+an allowlisted fixed-argument tool probe (five-second timeout), or the catalog
+default. Invalid probe output falls back safely. The catalog, scan, plan and
+result records identify the chosen source for each path.
+The cleanup results and plan pages display that source beside the resolved path.
+
+
 Target paths are data. One JSON file per family under `cleanup-lab/catalog`, validated
 against `schema.json`.
 
@@ -40,6 +61,83 @@ guess. [[cleanup-lab/PARITY.md]] maps every Qleaner detector id to a catalog id 
 why it was dropped, and [[cleanup-lab/catalog/README.md]] documents the format.
 
 ## Scan job
+
+CLN-08 offers container and VM detection through typed console endpoints.
+
+[[cleanup-lab/engine/cleanup_lab/containers.py]] reports a responsive Docker
+engine or falls back to Podman. It loads fixed preview/prune argv from
+[[cleanup-lab/catalog/actions/containers.json]], checks those arguments against
+an allowlist, and hides actions when neither engine responds. A preview records
+candidate JSON and expires after ten minutes; execution re-previews and refuses
+changed candidates. `POST /api/cleanup/containers/prune` accepts only a single-use
+preview id, runs as a job and appends its result to the signed audit history.
+Volumes are high risk and never pre-selected. `bytesRemoved` remains null when
+the engine does not provide a trustworthy byte count.
+
+[[cleanup-lab/engine/cleanup_lab/vms.py]] inventories configured VirtualBox,
+VMware, Parallels and UTM locations from [[cleanup-lab/catalog/actions/vms.json]].
+Each found bundle is measured read-only and marked `reportOnly`; the API has no
+VM deletion action.
+[[dashboard/src/views/cleanup/extra-tools.tsx]] shows only actions offered by
+the live container engine. It requires a candidate preview before confirmation,
+shows risk, command and errors, and reports VM bundles without a delete control.
+Public Pages does not request these endpoints.
+
+CLN-04 adds system temp, crash, font and Spotlight catalog entries on the
+applicable operating systems. The regular scan remains read-only.
+
+Temp roots enumerate immediate candidates after filtering locks, small files
+and symlinks. Spotlight expands indexes on mounted macOS volumes. Shared temp
+and Spotlight entries require a later privileged clean flow.
+
+CLN-11 adds read-only package review suggestions.
+
+[[cleanup-lab/engine/cleanup_lab/packages.py]] powers `POST /api/cleanup/packages/scan`, which
+accepts no argv or paths and returns a job. Homebrew's `autoremove --dry-run`
+identifies unneeded dependencies; pip's `list --not-required --format=json`
+and RubyGems' local list identify top-level packages for review. Each result
+includes an exact uninstall argv as a preview, but this API has no uninstall
+execution endpoint. Missing tools are hidden and parser errors are reported.
+
+CLN-09 adds read-only macOS leftover signatures and a typed scan job.
+
+CLN-10 extends the same identity rules to Linux and Windows. On Linux,
+[[cleanup-lab/engine/cleanup_lab/leftovers_cross.py]] queries available dpkg,
+rpm, Flatpak and Snap inventories with fixed argv and scans configured XDG
+config/share/cache roots. On Windows, it reads uninstall registry keys without
+launching a command and scans Roaming and Local AppData. The roots are in
+[[cleanup-lab/catalog/signatures/cross-platform-leftovers.json]]. If an inventory
+fails, unmatched candidates remain `unknown`; all findings are report-only.
+`POST /api/cleanup/leftovers/scan` dispatches by host OS and accepts no paths.
+On Linux and Windows, [[dashboard/src/views/cleanup/cross-leftovers.tsx]] uses
+that typed job from the leftovers page. It shows inventory sources and errors,
+confidence, paths and unreadable items without offering a delete action.
+
+[[cleanup-lab/engine/cleanup_lab/leftovers_macos.py]] reads installed app bundle
+ids and optional team ids from `Info.plist` with `plistlib`. It checks candidate
+folders under the configured [[cleanup-lab/catalog/signatures/macos-leftovers.json]]
+roots by exact bundle id or dotted child, whole team prefix, or normalized app
+name. It reports confidence and evidence for potential orphans, hidden apps and
+large app data; an empty app inventory produces `unknown` instead of an orphan
+claim. `POST /api/cleanup/leftovers/macos/scan` accepts no paths and returns a
+job. Every finding is report-only; the endpoint cannot clean it.
+
+CLN-07 adds a read-only project sweep and an Xcode simulator inventory.
+
+[[cleanup-lab/deep-roots.json]] defines selectable root ids; the console accepts
+only those ids through `POST /api/cleanup/deep-scan`, with an optional
+`minIdleDays` filter, and exposes availability through `GET /api/cleanup/deep-roots`.
+The engine stops descending
+at a proved `node_modules` or Rust/Maven `target`, measures it without following
+links, and reports ecosystem, regeneration hint and project directory age.
+`GET /api/cleanup/simulators` reads Xcode's JSON device list with fixed argv,
+flags unavailable devices and measures each device directory under the configured
+[[cleanup-lab/simulator-roots.json]] root. These are detection results, not
+cleanup targets. CLN-24 replaces the first three project checks with marker-verified
+signatures from [[cleanup-lab/catalog/signatures/projects.json]].
+[[cleanup-lab/engine/cleanup_lab/artifacts.py]] validates the signature data,
+refuses symlink markers, checks `CACHEDIR.TAG`, and reports the project's newest
+marker age with the ecosystem and regeneration hint.
 
 [[cleanup-lab/engine/cleanup_lab/scan.py]] measures the catalog's resolved paths
 read-only, with progress and cancel.
@@ -86,11 +184,43 @@ decide `ready`, `needs-setup` or `unavailable`. The detector catalog, the native
 scan backend and the tools on `PATH` are optional capabilities, so a missing one
 never blocks a scan.
 
-`/cleanup/` will render that probe in the dashboard shell, offering only Re-check and
-saying in words that cleaning is not wired yet; until that page lands,
-`labctl cleanup status` and `GET /api/cleanup/status` are how to read it. Public Pages
-has no engine, so the page will explain that instead of polling, per
+The desktop launcher selects Python 3.11 or newer to satisfy Cleanup Lab. If the
+host has only an older interpreter, its Get Python action installs an app-managed
+Python 3.12 before the local console starts.
+
+`/cleanup/` renders that probe in the dashboard shell, with scan, plan and clean
+actions only when the engine is ready. Public Pages has no engine, so the page
+explains local installation without polling, per
 [[lat.md/ux-readiness.md]].
+
+## Dashboard pages
+
+[[dashboard/src/views/cleanup/pages.tsx]] renders the compact default dashboard at
+`/cleanup/`: one read-only catalog scan, measured suggestions, plan review,
+confirmation, progress and a result summary.
+
+The recommended preset uses default-selected, nonprivileged entries outside
+high/privacy/credentials risk. The extended preset adds other low/medium risk
+entries. Both use the same expiring Trash plan. Detailed catalog selection and
+delete mode remain at `/cleanup/scan/`.
+
+The page renders
+category results at `/cleanup/results/`, skipped/failed and unreadable items at
+`/cleanup/leftovers/`, and verified audit records at `/cleanup/history/`.
+
+The typed client is in [[dashboard/src/lib/api.ts]]. Each action shows its own
+error; the confirm step names the planned item count, size and mode, and a
+changed selection, expired plan or used plan requires a new preview. Trash is
+the default.
+
+The local app polls only while a job runs. Public Pages renders the routes without
+engine calls or destructive controls. All eight route sets are built, including
+the seven translated locales.
+
+The advanced scan page also exposes the private shred policy, initially off.
+Shred plans require an enabled one-pass or three-pass policy and show the
+storage limitation in the plan and confirmation. The result reports shredded
+items separately from ordinary Trash and delete outcomes.
 
 ## Console API
 

@@ -24,6 +24,7 @@ from __future__ import annotations
 import csv
 import io
 import os
+import glob
 import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -297,10 +298,20 @@ def entry_roots(entry, *, env=None, platform=None):
     env = os.environ if env is None else env
     target = platform or platform_id()
     roots = []
-    for template in entry.get("paths", {}).get(target, []):
-        path, _reason = expand(template, target, env)
-        if path:
-            roots.append(os.path.realpath(path))
+    detector = entry.get("detector")
+    if detector == "spotlight" or detector == "tool" and entry.get("cacheEnv"):
+        from .catalog import resolve as catalog_resolve
+        roots = [os.path.realpath(item["path"]) for item in catalog_resolve(entry, target, env) if item["path"]]
+    else:
+        for template in entry.get("paths", {}).get(target, []):
+            path, _reason = expand(template, target, env)
+            if path:
+                if entry.get("detector") == "profile-glob":
+                    prefix = path.split("*", 1)[0].split("?", 1)[0].split("[", 1)[0]
+                    root = prefix.rstrip(os.sep) if glob.has_magic(path) else os.path.dirname(path)
+                    roots.append(os.path.realpath(root))
+                else:
+                    roots.append(os.path.realpath(path))
     return roots
 
 
@@ -326,6 +337,26 @@ def check_target(
         path = validate_managed_path(raw, home=home)
     except PathPolicyError as exc:
         return Verdict(False, None, str(exc), privileged, exc.code)
+    if entry.get("detector") == "profile-glob":
+        direct = False
+        for template in entry.get("paths", {}).get(platform or platform_id(), []):
+            expanded, _ = expand(template, platform or platform_id(), os.environ if env is None else env)
+            if not expanded:
+                continue
+            prefix = expanded.split("*", 1)[0].split("?", 1)[0].split("[", 1)[0]
+            prefix = prefix.rstrip(os.sep) if glob.has_magic(expanded) else os.path.dirname(expanded)
+            try:
+                relative = os.path.relpath(os.path.abspath(raw), os.path.abspath(prefix))
+            except ValueError:
+                continue
+            if relative == os.pardir or relative.startswith(os.pardir + os.sep):
+                continue
+            expected = os.path.normcase(os.path.join(os.path.realpath(prefix), relative))
+            if os.path.normcase(path) == expected:
+                direct = True
+                break
+        if not direct:
+            return Verdict(False, path, "Browser path traverses a symlink outside its catalog target.", privileged, "outside-root")
     if not os.path.lexists(canonical(raw, home=home)):
         return Verdict(False, path, "Path no longer exists.", privileged, "missing")
     roots = entry_roots(entry, env=env, platform=platform)

@@ -25,7 +25,7 @@ const tasks: CleanupTask[] = [
       "cleanup-lab/ engine package (Python stdlib), `labctl cleanup status|doctor`, a read-only readiness probe in the console, and a /cleanup/ page in the existing dashboard shell (sidebar entry, ready / needs-setup / unavailable states).",
     deliverables: [
       "status/doctor never write; GET /api/cleanup/status",
-      "/cleanup/ page built from existing dashboard components, all seven locale catalogs",
+      "/cleanup/ page built from existing dashboard components, all active locale catalogs",
       "lat.md/cleanup-lab.md node; `lat check` passes",
     ],
     targetPaths: ["cleanup-lab/", "console/", "labctl", "dashboard/src/pages/cleanup/", "lat.md/"],
@@ -197,7 +197,7 @@ const tasks: CleanupTask[] = [
     effort: "Medium",
     summary:
       "Dashboard pages for the scan job, results by category and leftovers, built from the existing dashboard components and docs/UX_READINESS.md: preview before run, disabled while a job runs, error next to the failed action, explicit loading/empty/error states. Do not copy Qleaner's styling.",
-    deliverables: ["React islands using dashboard/src/lib/api.ts", "e2e test with a mocked API", "Strings in all seven locales"],
+    deliverables: ["React islands using dashboard/src/lib/api.ts", "e2e test with a mocked API", "Strings in all active locales"],
     targetPaths: ["dashboard/src/pages/cleanup/", "dashboard/src/views/cleanup/", "dashboard/src/lib/api.ts"],
   },
   {
@@ -280,7 +280,7 @@ const tasks: CleanupTask[] = [
     deliverables: [
       "Scan root chosen from validated roots (validate_scan_root), not free text",
       "Large folders paginated or virtualised; usable at phone width",
-      "All seven locale catalogs; scripted screenshots",
+      "All active locale catalogs; scripted screenshots",
     ],
     targetPaths: ["dashboard/src/pages/cleanup/", "dashboard/src/views/cleanup/", "console/"],
     reference: "cleanup-lab/reference/README.md",

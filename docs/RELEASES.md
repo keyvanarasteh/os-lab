@@ -29,6 +29,35 @@ The script reads assets from `app/out/<version>` when present, otherwise downloa
 release with `gh`, verifies every SHA-256 through `app/scripts/build-update-manifest.mjs`, and
 uploads `latest.json` to the `app-updates` prerelease.
 
+## 0.3.3
+
+- Make Cleanup Lab's default page a compact scan, recommendation, plan review,
+  confirmation, progress and report flow. The scan measures every available
+  catalog category without deleting anything. The recommended preset selects
+  only measured, default-selected, nonprivileged low/medium-risk items; privacy,
+  credentials and high-risk items stay outside it.
+- Keep individual catalog controls and permanent-delete mode on the advanced
+  `/cleanup/scan/` page. Results, leftovers and audit history remain available.
+- Include translations for all seven supported locales. Windows installers in
+  this release are unsigned by Authenticode, with SHA-256 files and detached
+  updater signatures, under the owner's prior approval.
+
+## 0.3.2
+
+- Require Python 3.11 or newer in the desktop launcher, matching Cleanup Lab's
+  runtime requirement. If the host only has an older Python, **Get Python**
+  installs the app-managed Python 3.12 before the console starts.
+- Replace the checkout-specific Cleanup Lab readiness hint with instructions
+  that also apply to installed desktop builds.
+
+## 0.3.1
+
+- Bundle the Cleanup Lab engine and catalog in the desktop app so the merged
+  scan, plan, clean, results, leftovers and audit history pages work in an
+  installed build. The dashboard includes the merged system, browser, developer,
+  deep sweep, container/VM and leftover detectors.
+- This release is for installed-app testing. Later Cleanup Lab tasks remain open.
+
 ## 0.3.0
 
 - Add Source Lab: portable five-platform static analysis, signed evidence,

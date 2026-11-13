@@ -2,6 +2,7 @@
 import { SourceDocs } from "../../views/source/docs";
 import { SOURCE_DOCS, sourceDocHtml } from "../../lib/source-docs";
 import SourcePage, { type SourcePageId } from "../../views/source/pages";
+import CleanupPage, { CLEANUP_PAGES, type CleanupPageId } from "../../views/cleanup/pages";
 import Base from "../../layouts/Base.astro";
 import HostPage from "../../views/host-page";
 import JobsPage from "../../views/jobs-page";
@@ -24,7 +25,7 @@ export function getStaticPaths() {
   const labs = ["android", "windows", "linux", "ios", "macos", "source"];
   const androidPages = ["", "analytics", "console", "providers", "sitemap", "workflows"];
   const sourcePages = ["", "analyzer", "evidence", "deep-analysis", "pipeline", "brain", "sources", "settings/runtime"];
-  const routes = ["source/docs", ...SOURCE_DOCS.map(doc => `source/docs/${doc.slug}`),...sourcePages.map(page => page ? `source/${page}` : "source"),"", "jobs", "contribute", "how-to-use", "feedback", "content", "health", "legal", ...LEGAL_DOCS.map((doc) => `legal/${doc.slug}`), ...labs.map((lab) => `labs/${lab}`), ...androidPages.map((page) => page ? `android/${page}` : "android")];
+  const routes = [...CLEANUP_PAGES.map(page => page ? `cleanup/${page}` : "cleanup"), "source/docs", ...SOURCE_DOCS.map(doc => `source/docs/${doc.slug}`),...sourcePages.map(page => page ? `source/${page}` : "source"),"", "jobs", "contribute", "how-to-use", "feedback", "content", "health", "legal", ...LEGAL_DOCS.map((doc) => `legal/${doc.slug}`), ...labs.map((lab) => `labs/${lab}`), ...androidPages.map((page) => page ? `android/${page}` : "android")];
   return FIREWALL_LOCALES.filter((locale) => locale !== "en").flatMap((locale) =>
     routes.map((rest) => ({ params: { locale, rest } }))
   );
@@ -46,7 +47,8 @@ const sourceFiles = import.meta.glob<{ compiledContent: () => Promise<string> }>
 const sourceEntry = sourceDoc && Object.entries(sourceFiles).find(([path]) => path.endsWith(`/${sourceDoc.file}`));
 const sourceHtml = sourceEntry ? sourceDocHtml(await sourceEntry[1].compiledContent(), locale) : "";
 const sourcePage = sourceDoc ? null : rest === "source" ? "" : rest.startsWith("source/") ? rest.slice(7) : null;
-const title = sourceDoc ? `Source Lab · ${sourceDoc.title}` : sourcePage !== null ? "Source Lab" : rest === "" ? "This computer" : rest === "jobs" ? "Jobs" : rest === "contribute" ? "Contribute" : rest === "how-to-use" ? "How to use" : rest === "feedback" ? "Feedback" : rest === "content" ? "Content updates" : rest === "health" ? "Health check" : doc ? doc.title : rest === "legal" ? "Legal" : lab ? labTitle[lab] : androidTitle[rest] ?? "os-lab";
+const cleanupPage = rest === "cleanup" ? "" : rest.startsWith("cleanup/") ? rest.slice(8) as CleanupPageId : null;
+const title = cleanupPage !== null ? "Cleanup Lab" : sourceDoc ? `Source Lab · ${sourceDoc.title}` : sourcePage !== null ? "Source Lab" : rest === "" ? "This computer" : rest === "jobs" ? "Jobs" : rest === "contribute" ? "Contribute" : rest === "how-to-use" ? "How to use" : rest === "feedback" ? "Feedback" : rest === "content" ? "Content updates" : rest === "health" ? "Health check" : doc ? doc.title : rest === "legal" ? "Legal" : lab ? labTitle[lab] : androidTitle[rest] ?? "os-lab";
 ---
 <Base title={title} description={doc?.description} lang={locale}>
   {rest === "" && <HostPage client:only="react" />}
@@ -61,6 +63,7 @@ const title = sourceDoc ? `Source Lab · ${sourceDoc.title}` : sourcePage !== nu
   {lab && <LabPage lab={lab} client:only="react" />}
   {sourceDoc && <SourceDocs html={sourceHtml} slug={sourceDoc.slug} client:only="react" />}
   {sourcePage !== null && <SourcePage page={sourcePage as SourcePageId} client:only="react" />}
+  {cleanupPage !== null && <CleanupPage page={cleanupPage} client:only="react" />}
   {rest === "android" && <OverviewPage client:only="react" />}
   {rest === "android/analytics" && <AnalyticsPage client:only="react" />}
   {rest === "android/console" && <ConsolePage client:only="react" />}

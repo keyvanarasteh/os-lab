@@ -67,7 +67,7 @@ if [ -n "$BASE" ]; then
   export BASE
   find "$OUT" -type f \( -name '*.html' -o -name '*.js' -o -name '*.css' \) -print0 |
     xargs -0 perl -pi -e '
-      s!(["\x27`(=])/(tr|de|fr|es|it|fa|ar|source|how-to-use|feedback|firewall|android|labs|jobs|contribute|legal|apk-lab|favicon\.svg|_astro)(?=[/"\x27`#?)\s>])!$1$ENV{BASE}/$2!g;
+      s!(["\x27`(=])/(tr|de|fr|es|it|fa|ar|source|cleanup|how-to-use|feedback|firewall|android|labs|jobs|contribute|legal|apk-lab|favicon\.svg|_astro)(?=[/"\x27`#?)\s>])!$1$ENV{BASE}/$2!g;
       s{(href=["\x27]|href:\s*["\x27])/(?=["\x27])}{$1$ENV{BASE}/}g;
     '
 fi
@@ -75,9 +75,9 @@ fi
 # ---- 3. keep only routes usable without the local console ----
 for path in "$OUT"/*; do
   case "$(basename "$path")" in
-    index.html|404.html|favicon.svg|_astro|firewall|source|how-to-use|contribute|legal|feedback|.nojekyll) ;;
+    index.html|404.html|favicon.svg|_astro|firewall|source|cleanup|how-to-use|contribute|legal|feedback|.nojekyll) ;;
     tr|de|fr|es|it|fa|ar)
-      find "$path" -mindepth 1 -maxdepth 1 ! -name index.html ! -name firewall ! -name source ! -name how-to-use ! -name contribute ! -name legal ! -name feedback -exec rm -rf {} + ;;
+      find "$path" -mindepth 1 -maxdepth 1 ! -name index.html ! -name firewall ! -name source ! -name cleanup ! -name how-to-use ! -name contribute ! -name legal ! -name feedback -exec rm -rf {} + ;;
     *) rm -rf "$path" ;;
   esac
 done

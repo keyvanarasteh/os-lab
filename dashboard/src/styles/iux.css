@@ -284,6 +284,16 @@
       translate: -100% 0;
     }
   }
+  @media (pointer: coarse) {
+    .iux-btn,
+    .iux-touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    .iux-input {
+      min-height: 44px;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .iux-drawer[open] {
       animation: none;

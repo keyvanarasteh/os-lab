@@ -15,7 +15,7 @@ function Tabs({ active }: { active?: LegalSlug }) {
           key={doc.slug}
           href={legalHref(doc.slug)}
           aria-current={doc.slug === active ? "page" : undefined}
-          className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+          className={`iux-touch-target inline-flex items-center rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors ${
             doc.slug === active
               ? "bg-[#f36c21] text-white"
               : "border border-(--iux-border) bg-(--iux-card) text-(--iux-muted-foreground) hover:text-(--iux-foreground)"

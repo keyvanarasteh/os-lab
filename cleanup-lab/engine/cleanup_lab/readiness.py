@@ -159,7 +159,7 @@ def probe(root=None, env=None, sys_platform=None, version=None):
             "python",
             "Python 3.11 or newer",
             python[:2] >= MIN_PYTHON,
-            "labctl cleanup prefers the checkout's .venv; install Python 3.11 or newer.",
+            "Use Python 3.11 or newer. In the desktop launcher, choose Get Python to install a managed copy.",
             ".".join(str(part) for part in python),
         ),
         _requirement(

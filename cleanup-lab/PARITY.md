@@ -61,7 +61,7 @@ follows a symlink out of its top-level path.
 | `trash` | `system.trash` | CLN-02 (seed) | Never pre-selected: emptying the Trash is permanent. Qleaner scans `~/.Trash`, `~/.local/share/Trash/files` and `C:\$Recycle.Bin`; the Windows path needs a privileged read (CLN-20), so it gets its own entry there. |
 | `temp_files` | `system.temp` | CLN-04 | `std::env::temp_dir()`; Qleaner only emits it on Windows. |
 | `local_temp` | `system.local-temp` | CLN-04 | `%LOCALAPPDATA%\Temp`. |
-| `tmp_{base}_{name}` (instance) | `system.temp` | CLN-04 | From `detect_temp_data`: `$TMPDIR`, `/private/tmp`, `/private/var/folders`, `~/.tmp`, `~/tmp`; skips `.lock`, `.sock`, `.pid` and items under 1 KiB. `/private/tmp` and `/private/var/folders` are read-only scans; cleaning needs a privileged plan. |
+| `tmp_{base}_{name}` (instance) | `system.temp` / `system.shared-temp` | CLN-04 | From `detect_temp_data`: `$TMPDIR`, `/private/tmp`, `/private/var/folders`, `~/.tmp`, `~/tmp`; skips `.lock`, `.sock`, `.pid` and regular files under 1 KiB. Shared roots are never pre-selected and cleaning needs a privileged plan. |
 | `crash_{name}` (instance) | `system.crash-reports` | CLN-04 | `~/Library/Logs/DiagnosticReports`, `~/Library/Logs/CrashReporter`, `~/.local/share/apport`. |
 | `font_cache_{name}` (instance) | `system.font-caches` | CLN-04 | `~/Library/Caches/com.apple.ATS`, `~/.cache/fontconfig`. |
 | `spotlight_{vol_name}` (instance) | `system.spotlight-index` | CLN-04 | `.Spotlight-V100` per volume; `needsPrivilege: true` on macOS (CLN-20 rebuilds it). |
@@ -144,7 +144,23 @@ never pre-selected (rule 5). Toolchains carry `risk: high` and are relocate-only
 | Qleaner id | Catalog id | Task | Notes |
 |---|---|---|---|
 | `deep_node_modules` | `projects.node-modules` | CLN-07, CLN-24 | Matched by marker files (`package.json`), not by name. Qleaner matches the folder name only. |
-| `deep_rust_targets` | `projects.rust-target` | CLN-07, CLN-24 | `Cargo.toml` or `pom.xml` proof; a folder called `target` without one is not offered. |
+| `deep_rust_targets` | `projects.rust-target` | CLN-07, CLN-24 | Requires `Cargo.toml`; a folder called `target` without one is not offered. |
+| Maven `target` | `projects.maven-target` | CLN-24 | Requires `pom.xml`. |
+| Gradle `.gradle` | `projects.gradle-cache` | CLN-24 | Requires Gradle build/settings marker. |
+| Gradle `build` | `projects.gradle-build` | CLN-24 | Requires Gradle build marker. |
+| Python virtualenv | `projects.python-venv` | CLN-24 | Requires inner `pyvenv.cfg`. |
+| Python tox | `projects.python-tox` | CLN-24 | Requires tox or Python project marker. |
+| Python bytecode | `projects.python-pycache` | CLN-24 | Requires Python project marker. |
+| Next.js build | `projects.next-build` | CLN-24 | Requires `package.json`. |
+| Nuxt build | `projects.nuxt-build` | CLN-24 | Requires Nuxt config. |
+| SvelteKit build | `projects.svelte-kit` | CLN-24 | Requires Svelte config. |
+| JS tool cache | `projects.js-tool-cache` | CLN-24 | Requires `package.json`. |
+| Dart tool cache | `projects.dart-tool` | CLN-24 | Requires `pubspec.yaml`. |
+| SwiftPM build | `projects.swiftpm-build` | CLN-24 | Requires `Package.swift`. |
+| Zig build | `projects.zig-cache` | CLN-24 | Requires `build.zig`. |
+| Elixir build | `projects.elixir-build` | CLN-24 | Requires `mix.exs`. |
+| Terraform providers | `projects.terraform-providers` | CLN-24 | Requires Terraform source marker. |
+| Tagged cache | `projects.cachedir-tag` | CLN-24 | Requires valid `CACHEDIR.TAG` signature. |
 
 Roots come from the console as validated ids (CLN-07), never as free-form paths.
 
@@ -193,6 +209,11 @@ Qleaner's substring comparisons.
 Linux and Windows have no Qleaner equivalent (its scan returns immediately there);
 CLN-10 adds `leftovers.linux.*` and `leftovers.windows.*` with the same
 confidence model.
+
+| Platform | Catalog ids | Inventory evidence |
+|---|---|---|
+| Linux | `leftovers.linux.config`, `.share`, `.cache` | dpkg, rpm, Flatpak and Snap package/application names |
+| Windows | `leftovers.windows.appdata`, `.localappdata` | Read-only uninstall registry display names and keys |
 
 ## Packages
 

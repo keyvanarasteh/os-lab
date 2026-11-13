@@ -19,10 +19,14 @@ const repo = resolve(here, "..", "..");
 const out = resolve(here, "..", "src-tauri", "resources", "os-lab");
 
 // Tracked top-level paths the console and the labs need at run time.
-export const INCLUDE = ["labctl", "console", "source-lab", "android-lab", "linux-lab", "win-lab", "ios-lab", "firewall-lab", "docs/legal", "LICENSE"];
+export const INCLUDE = ["labctl", "console", "source-lab", "cleanup-lab", "android-lab", "linux-lab", "win-lab", "ios-lab", "firewall-lab", "docs/legal", "LICENSE"];
 
 // These are the entry points used by the installed console and every supported lab path.
 export const REQUIRED = [
+  "cleanup-lab/engine/cleanup_lab/__init__.py",
+  "cleanup-lab/engine/cleanup_lab/cli.py",
+  "cleanup-lab/catalog/schema.json",
+  "cleanup-lab/catalog/system.json",
   "source-lab/engine/source_lab/import_legacy.py",
   "source-lab/acceptance.py",
   "source-lab/run.py", "source-lab/list_inputs.py", "source-lab/contracts/schema.json",

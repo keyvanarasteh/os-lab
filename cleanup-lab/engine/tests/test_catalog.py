@@ -104,11 +104,11 @@ class LoadTest(unittest.TestCase):
     def test_repository_catalog_loads(self):
         entries = catalog.load(ROOT, BASE_ENV)
         ids = [entry["id"] for entry in entries]
-        self.assertEqual(
-            ids, ["system.user-caches", "system.user-logs", "system.trash"], "file order, family order"
-        )
-        self.assertTrue(all(entry["family"] == "system" for entry in entries))
-        self.assertTrue(all(entry["file"] == "system.json" for entry in entries))
+        self.assertEqual(ids[:2], ["browser.chrome.cache", "browser.chrome.history"])
+        self.assertEqual(ids[-9:], ['system.user-caches', 'system.user-logs', 'system.trash', 'system.temp', 'system.local-temp', 'system.shared-temp', 'system.crash-reports', 'system.font-caches', 'system.spotlight-index'])
+        self.assertEqual(len(ids), 65)
+        self.assertEqual({entry["family"] for entry in entries}, {"browser", "developers", "system"})
+        self.assertEqual({entry["file"] for entry in entries}, {"browser.json", "developers.json", "system.json"})
 
     def test_for_platform_filters_without_dropping_the_entry(self):
         with tempfile.TemporaryDirectory() as base:
@@ -146,6 +146,8 @@ class LoadTest(unittest.TestCase):
             (demo(paths={"beos": ["/x"]}), "unknown platform"),
             (demo(extra="x"), "unknown key"),
             (demo(owningProcesses="Chrome"), "owningProcesses must be a list"),
+            (demo(toolName="/bin/echo"), "toolName must be an executable name"),
+            (demo(cleanable="no"), "cleanable must be a boolean"),
         ]
         for entry, message in cases:
             with self.subTest(message=message, entry=entry):
@@ -173,7 +175,7 @@ class LoadTest(unittest.TestCase):
             report = catalog.report(base, "linux", env)
             paths = report["entries"][0]["paths"]
             self.assertEqual(paths[0], {"template": "${XDG_CACHE_HOME}/x", "path": None,
-                                        "reason": "${XDG_CACHE_HOME} is not set"})
+                                        "reason": "${XDG_CACHE_HOME} is not set", "source": "catalog"})
             self.assertEqual(paths[1]["path"], os.path.join(env["HOME"], "y"))
 
 

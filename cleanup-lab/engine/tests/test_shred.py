@@ -47,6 +47,16 @@ class ShredTests(unittest.TestCase):
         self.assertEqual(result['totals']['shredded'], 1)
         self.assertFalse(self.cache.exists())
 
+    def test_policy_change_stales_confirmed_plan(self):
+        settings.update('one-pass', env=self.env, platform='macos')
+        target = self.cache / 'file'
+        target.write_bytes(b'secret')
+        plan = self.build()
+        settings.update('off', env=self.env, platform='macos')
+        with self.assertRaisesRegex(clean.PlanError, 'policy changed'):
+            clean.execute_plan(plan, clean.verify_plan(plan), env=self.env, platform='macos')
+        self.assertEqual(target.read_bytes(), b'secret')
+
     def test_three_pass_patterns(self):
         path = self.cache / 'file'
         path.write_bytes(b'abc')

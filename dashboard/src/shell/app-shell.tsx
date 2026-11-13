@@ -11,6 +11,7 @@ import {
   AndroidLogoIcon,
   AppleLogoIcon,
   BookOpenIcon,
+  BroomIcon,
   CircleIcon,
   CpuIcon,
   DesktopTowerIcon,
@@ -63,6 +64,7 @@ export function sectionHref(id: string): string {
   if (id === "how-to-use") return localized("/how-to-use/");
   if (id === "feedback") return localized("/feedback/");
   if (id === "content") return localized("/content/");
+  if (id.startsWith("cleanup-")) return localized(`/cleanup/${id === "cleanup-scan" ? "" : id.slice(8) + "/"}`);
   if (id === "firewall") {
     const locale = typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname);
     return firewallPath(locale);
@@ -103,6 +105,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
       { id: "host", label: "Home", icon: <DesktopTowerIcon size={16} /> },
       { id: "firewall", label: copy[locale].lab, icon: <FireIcon size={16} /> },
       { id: "source-overview", label: "Source Lab", icon: LAB_ICON.source() },
+      { id: "cleanup-scan", label: "Cleanup Lab", icon: <BroomIcon size={16} /> },
       { id: "feedback", label: "Feedback", icon: <ChatCircleTextIcon size={16} /> },
       { id: "repo", label: "Repository", icon: <BookOpenIcon size={16} /> }
     ] },
@@ -157,6 +160,13 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
             { id: "source-deep-analysis", label: "Deep analysis" }, { id: "source-pipeline", label: "Pipeline" },
             { id: "source-brain", label: "Brain" }, { id: "source-sources", label: "Sources" },
             { id: "source-settings/runtime", label: "Runtime settings" }, { id: "source-docs", label: "Documentation" }
+          ] },
+        { id: "cleanup", label: "Cleanup Lab", icon: <BroomIcon size={16} />,
+          children: [
+            { id: "cleanup-scan", label: "Scan & clean" },
+            { id: "cleanup-results", label: "Results" },
+            { id: "cleanup-leftovers", label: "Leftovers" },
+            { id: "cleanup-history", label: "History" }
           ] },
         ...(labShown(labs, "ios", activeId) ? [labItem("ios", "iOS Lab")] : []),
         ...(labShown(labs, "windows", activeId) ? [labItem("windows", "Windows Lab")] : []),
