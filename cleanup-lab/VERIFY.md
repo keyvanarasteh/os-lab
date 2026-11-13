@@ -511,3 +511,31 @@ because this worktree has no `node_modules` and no dashboard source changed.
 
 The `/cleanup/` plain settings controls depend on CLN-16's page branch and remain
 for that integration. No dashboard source changed in this PR.
+
+## CLN-18 — scheduled dry-run scans
+
+Branch `codex/cln-18-scheduled-scans`, stacked on CLN-17. Cron validation,
+private CRUD store, and a console-lifetime runner claim each due local minute
+once. The runner launches scan jobs only, records a compact result, and never
+calls plan or clean. It does not replay missed minutes after the console stops.
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 124 tests — OK
+$ uv run --with pytest python -m pytest android-lab/lab/tests/test_cleanup_console.py -q
+12 passed
+$ PATH=/Volumes/Projects/iQ/os-lab/.venv-test/bin:$PATH ./scripts/run-tests.sh --no-venv
+7 passed, 1 failed, 1 skipped
+$ /Volumes/Projects/iQ/os-lab/.venv-test/bin/python -m pytest android-lab/lab/tests/test_web_ui.py::test_post_requires_oslab_header -q
+1 passed
+$ lat check
+All checks passed
+```
+
+The broader gate had the six documented host/baseline Android failures and one
+connection reset in `test_post_requires_oslab_header`; that test passed alone
+immediately after. Cleanup Lab, Source Lab, Rust, shell, smoke and graph stages
+passed. Dashboard checks were skipped because this worktree has no dependencies
+and no dashboard source changed.
+
+The plain schedules section on `/cleanup/` depends on CLN-16's page branch.

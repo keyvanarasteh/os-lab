@@ -145,6 +145,38 @@ def test_ignore_rule_crud_and_plan_enforcement(tmp_path, monkeypatch):
     assert caught.value.status == 404
 
 
+def test_scheduled_scan_crud_and_runner(tmp_path, monkeypatch):
+    target = catalog_cache_target(tmp_path, monkeypatch)
+    with open(os.path.join(target, "report.bin"), "wb") as handle:
+        handle.write(b"report")
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    assert api.get("/api/cleanup/schedules", {})["schedules"] == []
+    row = api.post("/api/cleanup/schedules", {"cron": "* * * * *",
+                                            "entryIds": ["system.user-caches"]})
+    assert row["enabled"] is True
+    jobs = cleanup_api.run_due_schedules(REPO_ROOT, now=60)
+    assert len(jobs) == 1
+    assert jobs[0].kind == "scan"
+    assert jobs[0].request["scheduleId"] == row["id"]
+    wait_done(jobs[0])
+    assert cleanup_api.run_due_schedules(REPO_ROOT, now=61) == []
+    deadline = time.time() + 5
+    while api.get("/api/cleanup/schedules", {})["schedules"][0]["lastRun"] is None and time.time() < deadline:
+        time.sleep(0.01)
+    report = api.get("/api/cleanup/schedules", {})["schedules"][0]["lastRun"]
+    assert report["state"] == "done"
+    assert report["totals"]["sizeBytes"] == 6
+    api.post("/api/cleanup/schedules/{0}/toggle".format(row["id"]), {"enabled": False})
+    assert cleanup_api.run_due_schedules(REPO_ROOT, now=120) == []
+    assert api.post("/api/cleanup/schedules/{0}/delete".format(row["id"]), {}) == {"deleted": row["id"]}
+    for body in ({"cron": "bad", "entryIds": ["system.user-caches"]},
+                 {"cron": "* * * * *", "entryIds": ["nope"]},
+                 {"cron": "* * * * *", "entryIds": ["system.user-caches"], "command": "rm"}):
+        with pytest.raises(cleanup_api.CleanupError) as caught:
+            api.post("/api/cleanup/schedules", body)
+        assert caught.value.status == 400
+
+
 def test_the_scan_request_accepts_catalog_ids_only():
     api = cleanup_api.CleanupAPI(REPO_ROOT)
     refused = [

@@ -109,6 +109,15 @@ adds a typed rule, and `POST /api/cleanup/rules/<id>/update|delete` changes one.
 Later tasks add volumes (CLN-28) and runtimes (CLN-29) here, each typed and validated again by the
 engine.
 
+[[cleanup-lab/engine/cleanup_lab/schedules.py]] keeps scan-only schedules in a
+private store. Five-field cron expressions use the host's local time. The web
+console starts a background hook that claims each due minute once and launches
+an ordinary scan job; its last result is persisted. Stopped consoles do not
+replay missed minutes. `GET /api/cleanup/schedules` lists schedules;
+`POST /api/cleanup/schedules` adds one with catalog detector ids, and
+`POST /api/cleanup/schedules/<id>/toggle|delete` changes it. A schedule cannot
+start a plan or clean job.
+
 ## Safety
 
 The eight rules in the README are the acceptance criteria for every task.

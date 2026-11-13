@@ -693,6 +693,8 @@ def main():
     server_address = ("127.0.0.1", port)
     httpd = ThreadingHTTPServer(server_address, LabHttpHandler)
     httpd.daemon_threads = True
+    if cleanup_api is not None:
+        cleanup_api.start_schedule_runner(REPO_ROOT)
     print(f"=== 🛡️ os-lab web console running ===")
     print(f"URL: http://127.0.0.1:{port}")
     print("Press Ctrl+C to stop.")
