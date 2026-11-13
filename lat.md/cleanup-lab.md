@@ -11,7 +11,7 @@ typed layers over it.
 
 The package lives in [[cleanup-lab/engine/cleanup_lab]]. `readiness`, `paths`, the
 catalog loader (CLN-02), the scan job (CLN-03), the safety guard (CLN-12) and the
-plan → clean executor (CLN-13) and audit history (CLN-15) exist now. One module, `safety.py`,
+plan → clean executor (CLN-13), audit history (CLN-15) and ignore rules (CLN-17) exist now. One module, `safety.py`,
 guards every destructive call, so no other module may delete, move or shred.
 
 Target paths are data, never code: every platform path, risk class, owning process
@@ -63,6 +63,12 @@ reason. `POST /api/cleanup/plan` names catalog ids and an optional mode; `POST
 is a failed item, never a silent delete, and bytes are counted only when the
 original is gone.
 
+[[cleanup-lab/engine/cleanup_lab/rules.py]] keeps path, extension and glob ignore
+rules in a private JSON file. Scan walks omit matching paths. A plan skips a
+catalog target when the target or any descendant matches, so cleaning a parent
+cannot remove an ignored child. The plan records a digest of the rules and a rule
+change makes confirmation stale; execution checks again before each item.
+
 ## Readiness
 
 `readiness.py` reports what the engine can do on this host without writing anything.
@@ -98,8 +104,9 @@ verified runs from the private SQLite store. The store writes each completed
 clean result with path, bytes, mode and outcome, chaining records with
 HMAC-SHA256 and a random per-install key. `labctl cleanup history --verify`
 checks the full chain and exits 1 on tampering. History is durable across console
-restarts. Later tasks add ignore rules (CLN-17),
-volumes (CLN-28) and runtimes (CLN-29) here, each typed and validated again by the
+restarts. `GET /api/cleanup/rules` lists private ignore rules; `POST` to that route
+adds a typed rule, and `POST /api/cleanup/rules/<id>/update|delete` changes one.
+Later tasks add volumes (CLN-28) and runtimes (CLN-29) here, each typed and validated again by the
 engine.
 
 ## Safety

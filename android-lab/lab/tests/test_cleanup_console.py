@@ -104,6 +104,47 @@ def test_a_scan_job_measures_the_catalog_paths(tmp_path, monkeypatch):
     assert [row["id"] for row in listed["jobs"]] == [job.id]
 
 
+def test_ignore_rule_crud_and_plan_enforcement(tmp_path, monkeypatch):
+    target = catalog_cache_target(tmp_path, monkeypatch)
+    ignored = os.path.join(target, "keep.bin")
+    with open(ignored, "wb") as handle:
+        handle.write(b"keep")
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+
+    assert api.get("/api/cleanup/rules", {})["rules"] == []
+    rule = api.post("/api/cleanup/rules", {"kind": "extension", "value": ".bin"})
+    assert rule["enabled"] is True
+    assert api.get("/api/cleanup/rules", {})["rules"] == [rule]
+    scanned = wait_done(api.post("/api/cleanup/scan", {"entryIds": ["system.user-caches"]}))
+    report = scanned.result["entries"][0]["paths"][0]
+    assert report["sizeBytes"] == 0
+    assert ignored in report["ignored"]
+    plan = wait_done(api.post("/api/cleanup/plan", {"entryIds": ["system.user-caches"]}))
+    assert plan.result["items"][0]["code"] == "ignored"
+    assert plan.result["totals"]["ready"] == 0
+
+    updated = api.post("/api/cleanup/rules/{0}/update".format(rule["id"]), {"enabled": False})
+    assert updated["enabled"] is False
+    ready = wait_done(api.post("/api/cleanup/plan", {"entryIds": ["system.user-caches"]}))
+    assert ready.result["totals"]["ready"] == 1
+    api.post("/api/cleanup/rules/{0}/update".format(rule["id"]), {"enabled": True})
+    refused = wait_for(api.post("/api/cleanup/clean", {"planId": ready.result["planId"]}), "failed")
+    assert "Ignore rules changed" in refused.error
+    assert os.path.exists(ignored)
+    assert api.post("/api/cleanup/rules/{0}/delete".format(rule["id"]), {}) == {"deleted": rule["id"]}
+    assert api.get("/api/cleanup/rules", {})["rules"] == []
+
+    for body in ({"kind": "extension", "value": ".bin", "command": "rm"},
+                 {"kind": "path", "value": "relative"},
+                 {"kind": "extension", "value": "bin"}):
+        with pytest.raises(cleanup_api.CleanupError) as caught:
+            api.post("/api/cleanup/rules", body)
+        assert caught.value.status == 400
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/rules/nope/delete", {})
+    assert caught.value.status == 404
+
+
 def test_the_scan_request_accepts_catalog_ids_only():
     api = cleanup_api.CleanupAPI(REPO_ROOT)
     refused = [
