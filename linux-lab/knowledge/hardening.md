@@ -66,10 +66,24 @@ no complete candidate-origin analysis or cache freshness is asserted.
 
 PASS applies only to a named check; WARN means incomplete evidence or review,
 FAIL means a baseline violation, SKIP explains unsupported/omitted work.
-Audit exit codes: 0 no FAIL (WARN may remain), 1 baseline violations, 2
-usage/platform/execution failure. JSON schema version 1 records UTC time,
-exit code and status/check/detail findings. Redirect output only if you explicitly
-want a report file; audit does not create one automatically.
+Audit exit codes:
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Complete audit without FAIL (WARN may remain). |
+| 1 | Complete audit with baseline violations (FAIL). |
+| 2 | Usage, platform or collector error, or an incomplete audit. |
+
+An audit is complete only when the collector exits 0/1, its output ends with
+exactly one `Summary: N FAIL, M WARN` line, N/M equal the reported FAIL/WARN
+findings and the exit code matches them. A collector that stops inside a check
+reports `[FAIL] execution: audit stopped before completion` and exits 2; partial
+findings are never presented as a baseline result. JSON schema version 1
+records UTC time, `exit_code`, `complete`, `error`, per-status `summary` counts
+and status/check/detail findings. With `--format json`, platform and collector
+errors are valid JSON too (`exit_code` 2, `complete` false, `error` set).
+Redirect output only if you explicitly want a report file; audit does not
+create one automatically.
 
 ## Plan before any repair
 
@@ -103,12 +117,24 @@ Available repairs:
   may install updates under the existing policy; consent covers that consequence.
 - `ufw-ssh-rule`: add one TCP allow rule from one explicit client IP to an
   attributed actual SSH listener. No subnet, wildcard or command expression is
-  accepted. Snapshot user.rules/user6.rules and standard UFW control/default/before/after
-  configuration files, and verify UFW's generated rule, tagged with
-  a unique `OS-30:<run-id>` comment. An equivalent pre-existing rule is left
-  untouched rather than retagged.
-  Do not activate UFW, change default policies, reset/delete existing rules or
-  assert that an earlier deny was overridden. Duplicate rules may be a UFW no-op.
+  accepted. Existing rules are classified with UFW's own identity fields:
+  direction, interfaces, addresses, ports, apps and protocol identify a rule;
+  action, log type and comment do not. Plan and apply use the same classifier:
+  - an allow rule for the same connection is reported as
+    `[SKIP] ufw-ssh-rule: equivalent allow rule ...` and left untouched, never retagged;
+  - a deny, reject or limit rule for the same connection is refused before any
+    change, because `ufw allow` would silently replace it in place ("Rule updated");
+  - rules differing in direction (`out`), interface (`in on ...`), source port,
+    app, destination, port or protocol are distinct: UFW appends the new rule
+    and leaves them unchanged;
+  - an unparseable rule that names the management source is refused.
+
+  Apply re-reads the rule list and status and repeats the classification
+  immediately before `ufw allow`. Snapshot user.rules/user6.rules and standard
+  UFW control/default/before/after configuration files, and verify UFW's
+  generated rule, tagged with a unique `OS-30:<run-id>` comment. Do not activate
+  UFW, change default policies, reset/delete existing rules or assert that an
+  earlier deny elsewhere in the rule order was overridden.
 
 After reviewing the repair plan, replace `plan` with `apply`
 and enter exactly `APPLY OS-30`. Both input and output must be TTYs. Piped answers,
@@ -116,9 +142,17 @@ and enter exactly `APPLY OS-30`. Both input and output must be TTYs. Piped answe
 is no automatic privilege escalation, command-string input or environment
 variable root override.
 Arguments and preconditions are checked before confirmation; state is rechecked
-immediately after confirmation and before mutation. Already-satisfied permissions
-or timer state are no-ops. Apply exits 0 for verified selected repairs/no-op,
-2 for refusal/failure, 130 for interruption; this does not assert a clean audit.
+immediately after confirmation and before mutation. Already-satisfied permissions,
+timer state or an equivalent UFW rule are SKIP no-ops. Apply exit codes (none of
+them asserts a clean audit):
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Selected repairs applied and verified, or all already satisfied (SKIP). |
+| 2 | Refused, or failed; this run's proven changes were reversed (manifest status `failed`). |
+| 129 | SIGHUP (for example a dropped SSH session) during apply; see below. |
+| 130 | Ctrl-C at the confirmation prompt (nothing changed) or SIGINT during apply. |
+| 143 | SIGTERM during apply; see below. |
 
 Snapshots and manifest are retained in root-only `/var/backups/os-30/repair-*`.
 Schema-2 manifests record the run ID, selected operations, original snapshots
@@ -128,13 +162,73 @@ nonblocking repair lock prevents simultaneous OS-30 application/rollback.
 Single-link regular files and no-follow file descriptors prevent linked-path
 permission operations. No automatic recursive ownership changes occur.
 
-On failure, restore changed permission modes and the previous disabled timer
-state when safe. Concurrent changes are not overwritten. If a UFW addition
-cannot be verified, report possible partial application and the backup path;
-**no automatic rule deletion/reset during apply failure** is attempted. An
-administrator must review saved and current rules before manual recovery. Failed
-or unfinished apply journals cannot be used by the new rollback command: they
-lack a complete verified post-state. Backup failure stops before repairs.
+### Failure and interruption during apply
+
+While apply runs, SIGINT, SIGTERM and SIGHUP are recorded instead of killing
+the process in the middle of a command or file update. Apply stops at the next
+checkpoint between steps and reverses only what is proven to be this run's
+change:
+
+- a permission mode, only if the file still has its original or its new mode
+  with unchanged content, owner and group;
+- the timer, only if this run enabled it (disabled again, never stopped/started);
+- the UFW rule, only if this run's single `OS-30:<run-id>` rule was already
+  verified and the complete rule list and status still equal the recorded
+  post-addition state. It is deleted by its exact rule specification, never by
+  number or reset. An unverified addition is left in place and reported.
+
+Concurrent changes are never overwritten. The manifest records status `failed`
+(error) or `interrupted` (signal) and a `recovery` object with the signal name,
+the error, and `reverted`/`unreverted` items. The printed message names the
+backup path and anything not reverted. A signal arriving after the final
+checkpoint leaves a fully applied run (`applied`) with a warning. SIGKILL, power
+loss or a kernel crash cannot be intercepted and leave status `applying`; the
+UFW rule identity is journaled before `ufw allow` for that case. Manifests with
+status `failed`, `interrupted` or `applying` are not rollback evidence: use the
+manual recovery below. Backup failure stops before repairs.
+
+### Manual recovery of an unfinished apply run
+
+Use this only for a run whose manifest status is `applying`, `failed` or
+`interrupted`; `rollback` refuses those. Work as root in a console or `tmux`,
+one item at a time. Never copy snapshot contents back: OS-30 changes only modes,
+timer enablement and at most one UFW rule. Do not edit the manifest to make
+rollback accept it.
+
+1. Read the run's status and recovery record:
+
+   ```bash
+   sudo ls -1d /var/backups/os-30/repair-*
+   sudo python3 -m json.tool /var/backups/os-30/repair-<run-id>/manifest.json
+   ```
+
+   Modes are decimal (420 = 0644, 384 = 0600). `recovery.unreverted`, when
+   present, lists what still needs review; `recovery.reverted` was already done.
+2. For each `files[]` entry with `"operation": "mode"` that is not in
+   `recovery.reverted`, compare the current state with the recorded original:
+
+   ```bash
+   sudo stat -c '%a %u %g %h' <path>; sudo sha256sum <path>
+   ```
+
+   Only when owner, group and SHA-256 equal the recorded `uid`, `gid` and
+   `sha256`, the link count is 1 and the mode is the original or 600, restore
+   the original: `sudo chmod <original mode in octal> <path>`. Anything else
+   means an administrator changed the file: leave it. After SSH files run
+   `sudo sshd -t`.
+3. Timer: only if `timer_before` is `disabled` and
+   `systemctl is-enabled apt-daily-upgrade.timer` prints `enabled`, run
+   `sudo systemctl disable apt-daily-upgrade.timer` (no stop/start).
+4. UFW: run `sudo ufw show added`. The pre-run list is `ufw.before.rules` in
+   the manifest, or `sudo diff /var/backups/os-30/repair-<run-id>/<backup>
+   /etc/ufw/user.rules` for the `files[]` entry of `/etc/ufw/user.rules`. If the
+   only difference is one rule ending in `comment 'OS-30:<run-id>'`, delete
+   exactly that rule:
+   `sudo ufw delete allow from <source> to any port <port> proto tcp comment 'OS-30:<run-id>'`.
+   Never use `ufw reset` or numbered deletion; any other difference needs an
+   administrator decision.
+5. Re-run `sudo python3 linux-lab/scripts/harden_check.py audit` and keep the
+   backup directory as evidence.
 
 These selected repairs do not make a server fully hardened. Disabling root or
 password access, locking accounts and activating UFW remain outside automatic
@@ -201,12 +295,24 @@ without schema-2 post-state remain available for manual inspection but cannot be
 automatically migrated into trusted rollback evidence. Do not hand-edit journals
 to bypass refusal checks.
 
+Rollback exit codes:
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Run restored, or an already rolled back run repeated as a no-op. |
+| 2 | Refused before changes, partial rollback (UFW untouched), or stopped after a command failure or Ctrl-C during restoration; the journal allows a safe retry. |
+| 130 | Ctrl-C at the confirmation prompt; nothing changed. |
+
+Rollback does not intercept SIGTERM/SIGHUP. If one terminates it, the shell
+usually reports 143/129; the per-operation journal makes a repeated
+`rollback <run-id>` resume the remaining steps or report a no-op.
+
 ## Tests and evidence
 
-The current focused integration run passed **97 tests** with fake OS commands
-and temporary files. Actual commands and
-results for the integration revision are recorded in `VERIFY.md`; they are
-separate from historical local and operator-reported UTM checks.
+Focused tests use fake OS commands and temporary files. The latest recorded run
+(test count, tested base commit and patch, operating system, Python version and
+result) is in `VERIFY.md`; it is separate from historical local and
+operator-reported UTM checks.
 
 ```bash
 python3 -m unittest discover -s linux-lab/tests -v
@@ -216,8 +322,9 @@ bash -n linux-lab/scripts/hardening.sh
 
 Bash audit tests use command mocks. Python repair tests use a fake OS boundary and
 temporary files, including backup/postcondition/rollback/refusal scenarios. Real
-PTY tests exercise consent against fake operations. None mutate actual SSH, apt,
-accounts or UFW. Test dependencies may be provisioned before running offline tests;
+PTY tests exercise consent against fake operations. Interruption tests deliver
+real SIGTERM/SIGHUP signals to a forked test process that runs fake operations.
+None mutate actual SSH, apt, accounts or UFW. Test dependencies may be provisioned before running offline tests;
 tests themselves must not download dependencies or query external services.
 The repository runner retains its existing dependency preparation; with network
 access prohibited, use the focused unittest command unless dependencies are

@@ -205,8 +205,9 @@ Run focused offline tests with
 profile: an existing root-owned 0644 config can already pass audit.
 Share only synthetic fixtures or sanitized summaries, not raw server audit output.
 
-Current focused integration verification: **97 tests passed** using fake system
-commands and temporary files; see `VERIFY.md` for commands and evidence limits.
+Current focused verification: **114 tests passed** using fake system commands
+and temporary files (uncommitted fixes on `bdcc521`, Ubuntu 24.04.3 on WSL2,
+Python 3.12.3); see `VERIFY.md` for commands and evidence limits.
 
 ### Salt okunur audit özeti
 

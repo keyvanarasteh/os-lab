@@ -10,7 +10,10 @@ Missing/empty collector code and an execution producing no findings are refused.
 Audit is the default. It does not modify configuration, refresh package lists,
 install updates, restart services or change firewall rules. Commands use a fixed
 system PATH; `.env` and host-forwarded SSH ports are not used. Output is available
-as text or versioned JSON with PASS, FAIL, WARN and SKIP findings.
+as text or versioned JSON with PASS, FAIL, WARN and SKIP findings. Exit 0/1 is
+reported only for a complete collector run whose final summary matches its
+findings and exit code; truncated or inconsistent output exits 2. With
+`--format json`, platform and collector errors are also valid JSON.
 
 ## Audit coverage
 
@@ -33,11 +36,20 @@ input/output TTYs and the exact phrase `APPLY OS-30`. Supported repairs are:
   is not automatically remediation of an existing FAIL.
 - An explicit non-root user's existing authorized_keys mode to 0600.
 - Enablement of an installed unattended-upgrade timer without starting it.
-- One management-IP allow rule to an attributed actual SSH port.
+- One management-IP allow rule to an attributed actual SSH port. Existing rules
+  are classified by UFW's identity fields in both plan and apply: an equivalent
+  allow rule is a SKIP; a deny/reject/limit rule for the same connection is
+  refused before any change (UFW would replace it); rules differing in
+  direction, interface or source port stay unchanged. Apply repeats the check
+  immediately before `ufw allow`.
 
 Apply retains private snapshots and schema-2 manifests under
 `/var/backups/os-30/repair-<run-id>`, including verified post-state. Shared locking,
 no-follow file access, target allowlists and drift checks protect repair/recovery.
+SIGINT/SIGTERM/SIGHUP during apply stop at a checkpoint, reverse only this run's
+proven changes and record status `interrupted` with reverted/unreverted items
+(exit 130/143/129). Manual recovery for unfinished runs is documented in
+`linux-lab/knowledge/hardening.md`.
 
 ```text
 sudo python3 linux-lab/scripts/harden_check.py rollback <run-id>
@@ -88,7 +100,16 @@ local runs are labeled separately and are not presented as new executions.
 
 ## Current focused verification
 
-The latest pre-delivery run of
+Latest run: uncommitted working tree on base commit `bdcc521`, Ubuntu 24.04.3
+LTS on WSL2 (x86_64), Python 3.12.3: `python3 -m unittest discover -s
+linux-lab/tests -v` passed **114 tests**, exit 0. The patch hash, environment
+details and a reverse check (the new regression tests fail on unpatched
+`bdcc521`) are in `VERIFY.md`. This is mock/fixture evidence on x86_64, not a
+live UTM ARM64 apply/rollback.
+
+### Historical pre-commit verification (before `bdcc521`)
+
+The pre-delivery run of
 `python3 -m unittest discover -s linux-lab/tests -v` passed **97 tests in 52.513s**,
 exit 0, after restoring the test-runner cd guard. Python/Bash syntax, existing ShellCheck and both
 working-tree/index whitespace checks passed. The existing collector source was

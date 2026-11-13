@@ -1,5 +1,63 @@
 # OS-30 verification
 
+## Current focused regression: OS-30 fixes on `bdcc521` (2026-11-13)
+
+Tested tree: base commit `bdcc521981f0825310aee6f712c6d64b1ab12b70`
+(`feat/os-30-hardening-checker`) plus the **uncommitted** OS-30 fixes in
+`linux-lab/scripts/` and `linux-lab/tests/` (5 files, 730 insertions, 85
+deletions). Nothing was committed or pushed, so there is no commit hash for the
+fixes themselves. The applied patch is `git diff -- linux-lab/scripts
+linux-lab/tests` with SHA-256
+`19e8e4a2b2cd7ff3e456196d23bebe4d43c24003495a2c22472ab5efcd3fe0c4`.
+Documentation changes are not part of that hash.
+
+Environment: Ubuntu 24.04.3 LTS on WSL2, kernel
+`6.6.87.2-microsoft-standard-WSL2`, x86_64; Python 3.12.3; GNU bash
+5.2.21(1)-release. Tests ran as an unprivileged user in a fresh LF clone
+outside the Windows checkout (`git clone --depth 1` of the branch, then
+`git apply` of the patch).
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Baseline, unpatched `bdcc521` | `python3 -m unittest discover -s linux-lab/tests` | 97 tests, OK, exit 0 |
+| Fixed tree | `python3 -m unittest discover -s linux-lab/tests -v` | **114 tests, OK, exit 0** (34.5 s) |
+| Reverse check: new tests only, on unpatched `bdcc521` | same | FAILED (26 failures, 13 errors), exit 1, as intended |
+| Syntax | `bash -n linux-lab/scripts/hardening.sh`; `bash -n scripts/run-tests.sh` | passed |
+| Whitespace | `git diff --check` | passed |
+
+The 114 tests are 27 Bash collector tests, 47 Python repair/CLI/guard/PTY/audit
+tests and 40 rollback/terminal tests. The 17 new regression tests cover:
+
+- UFW: same-connection deny/reject/limit (with or without log/comment) refused
+  in plan and apply with no `ufw` mutation; an equivalent allow shown as SKIP and
+  never retagged; rules differing in direction, interface, source port,
+  protocol, source address or route kept unchanged while one new rule is
+  appended; an unparseable rule naming the source refused; a conflicting rule
+  appearing after the permission change detected by the recheck immediately
+  before `ufw allow`, with the permission change reversed.
+- Interruption: real SIGTERM and SIGHUP delivered to a forked test process
+  during apply reverse the mode and timer changes and record status
+  `interrupted` with reverted/unreverted items. A verified run-tagged UFW rule is
+  removed by its exact specification; an unverified addition is left and
+  reported. CLI exit codes are 130/129/143. `interrupted`, `failed` and `applying`
+  manifests are refused by rollback with a pointer to manual recovery.
+- Audit: truncated output, a summary count mismatch, a summary that is not
+  last or is duplicated, an exit-code mismatch, unexpected exit codes and a
+  killed collector all exit 2 in text and JSON. Platform and collector errors
+  produce valid JSON. A real collector stopping inside a check exits 2 instead
+  of 1. Text and JSON agree on real collector output for four mock scenarios.
+- Socket attribution: Bash attributes every `ssh.socket` `Listen` entry, both
+  one per line and on a single line, and yields the same ports as
+  `listening_ports()` in Python.
+
+Not run: ShellCheck (no executable in this environment; nothing was installed),
+the full repository runner (its preparation can install dependencies) and
+`lat check`. Evidence boundary: everything above uses fake commands, temporary
+files and an x86_64 WSL2 kernel. It is not a live Ubuntu 24.04 ARM64 UTM run.
+Live apply and rollback remain unverified, and real UFW rule rendering and
+replacement behaviour are verified only against the upstream ufw source and the
+test fake.
+
 ## Historical local regression
 
 Environment: macOS, branch `feat/os-30-hardening-checker`.
@@ -87,7 +145,7 @@ use synthetic fixtures or sanitized summaries and distinguish reported lab
 checks from mocked apply/rollback evidence. Do not copy raw server audit output
 or identifying account, address, hostname, local-path or key material.
 
-## Current integration checks
+## Pre-commit integration checks (historical, before `bdcc521`)
 
 Scope: the canonical Python entry point, companion audit-only Bash collector,
 selected repair/rollback operations and focused tests. The Python entry point
