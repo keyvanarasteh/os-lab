@@ -56,7 +56,7 @@ the finding and the decision are in the session log.
 | CLN-25 | pending | — | — | — | — | none |
 | CLN-26 | pending | — | — | — | — | none |
 | CLN-27 | pending | — | — | — | — | none |
-| CLN-28 | pending | — | — | `/cleanup/` volumes card | console side only | none |
+| CLN-28 | in progress (this PR) | — | — | plain `/cleanup/` volumes card after CLN-16 lands | read-only engine and API first | none |
 | CLN-29 | pending | — | — | — | — | none |
 
 No CLN task has a student reservation or open student PR: `grep -rl CLN-

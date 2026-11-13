@@ -23,6 +23,7 @@ import cleanup_api  # noqa: E402
 from cleanup_lab import catalog as catalog_module  # noqa: E402
 from cleanup_lab import paths as paths_module  # noqa: E402
 from cleanup_lab import privileged as privileged_module  # noqa: E402
+from cleanup_lab import volumes as volumes_module  # noqa: E402
 
 
 def wait_for(job, state=None, timeout=10):
@@ -194,6 +195,18 @@ def test_privileged_contract_requires_preview_and_audits_result(monkeypatch):
     result = api.post("/api/cleanup/privileged/run", {"planId": preview["planId"]})
     assert result["mode"] == "privileged"
     assert api.get("/api/cleanup/history", {})["total"] == 1
+
+
+def test_volumes_endpoint_is_read_only_and_rejects_queries(monkeypatch):
+    monkeypatch.setattr(volumes_module, "report", lambda: {
+        "platform": "linux", "thresholdPercent": 85, "homeVolume": "/",
+        "volumes": [{"mountPoint": "/", "pressure": False, "home": True}],
+    })
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    assert api.get("/api/cleanup/volumes", {})["volumes"][0]["home"] is True
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.get("/api/cleanup/volumes", {"path": ["/tmp"]})
+    assert caught.value.status == 400
 
 
 def test_the_scan_request_accepts_catalog_ids_only():
