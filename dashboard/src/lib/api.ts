@@ -168,7 +168,7 @@ export interface CleanupPlan {
   totals: { ready: number; skipped: number; bytes: number };
 }
 export interface CleanupResult {
-  planId: string; mode: CleanupMode; cancelled: boolean;
+  planId: string; mode: CleanupMode; cancelled: boolean; shredPolicy?: "one-pass" | "three-pass"; shredLimitation?: string;
   results: { entryId: string; entryName: string; path: string | null; status: string; code: string; reason: string; source?: string; error: string | null; bytes: number; trashPath: string | null }[];
   totals: { items: number; trashed: number; deleted: number; shredded?: number; skipped: number; failed: number; bytes: number };
 }

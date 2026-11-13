@@ -885,6 +885,7 @@ def execute_plan(
     plan,
     measures,
     *,
+    root=None,
     env=None,
     platform=None,
     cancel=None,
@@ -967,6 +968,13 @@ def execute_plan(
                     entry = plan.entries.get(item["entryId"])
                     if entry is None:
                         raise CleanError("The catalog entry for this shred plan is missing.")
+                    if root is not None:
+                        try:
+                            current_entry = next((row for row in load(root, env) if row["id"] == item["entryId"]), None)
+                        except Exception as exc:
+                            raise CleanError("The current detector catalog could not be checked: {0}".format(exc)) from exc
+                        if current_entry != entry:
+                            raise CleanError("The detector catalog changed; build a new shred plan.")
                     verdict = safety.check_target(path, entry, env=env, platform=target)
                     if not verdict.ok:
                         raise CleanError("Shred guard refused the item: {0}".format(verdict.reason))
@@ -1014,6 +1022,7 @@ def execute_plan(
     return {
         "planId": plan.id,
         "mode": plan.mode,
+        **({"shredPolicy": plan.payload["shredPolicy"], "shredLimitation": plan.payload["shredLimitation"]} if plan.mode == "shred" else {}),
         "platform": target,
         "startedAt": started,
         "finishedAt": finished,

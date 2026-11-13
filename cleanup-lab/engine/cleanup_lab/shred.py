@@ -35,7 +35,7 @@ def _overwrite(path, passes, *, random_bytes=os.urandom, cancel=None):
     before = os.lstat(path)
     if not stat.S_ISREG(before.st_mode) or before.st_nlink > 1:
         raise OSError("Only regular files with one link can be shredded")
-    flags = os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
     fd = os.open(path, flags)
     try:
         opened = os.fstat(fd)

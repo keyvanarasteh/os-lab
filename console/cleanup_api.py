@@ -432,7 +432,7 @@ class CleanupJobStore:
         try:
             measures = clean.verify_plan(plan, cancel=job.cancel)
             result = clean.execute_plan(
-                plan, measures, cancel=job.cancel, progress_callback=update
+                plan, measures, root=root, cancel=job.cancel, progress_callback=update
             )
             job.result = result
             job.progress = result["progress"]
@@ -573,7 +573,11 @@ class CleanupAPI:
                 raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
         if path == "/api/cleanup/settings":
             _query(query)
-            return _module(self.root, "settings").read()
+            policy = _module(self.root, "settings")
+            try:
+                return policy.read()
+            except policy.SettingsError as exc:
+                raise CleanupError(500, str(exc)) from exc
         if path == "/api/cleanup/containers":
             _query(query)
             return _module(self.root, "containers").capabilities(self.root)
@@ -610,10 +614,14 @@ class CleanupAPI:
             return JOBS.start_scan(self.root, body)
         if path == "/api/cleanup/settings":
             _object_body(body, "settings")
+            settings = _module(self.root, "settings")
             policy = body.get("shredPolicy")
-            if policy not in _module(self.root, "settings").POLICIES:
+            if policy not in settings.POLICIES:
                 raise CleanupError(400, "shredPolicy must be off, one-pass or three-pass")
-            return _module(self.root, "settings").update(policy)
+            try:
+                return settings.update(policy)
+            except settings.SettingsError as exc:
+                raise CleanupError(500, str(exc)) from exc
         if path == "/api/cleanup/vms/scan":
             _object_body(body, "vm-scan")
             return JOBS.start_vm_scan(self.root)

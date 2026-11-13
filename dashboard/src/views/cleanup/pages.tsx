@@ -207,7 +207,7 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
           {(status?.platform?.id === "linux" || status?.platform?.id === "windows") && <CrossPlatformLeftovers />}
           </>}
           {page === "history" && <Section title="Audit history" description="Verified cleanup runs stored on this computer.">
-            {!history?.entries.length ? <Empty>No cleanup runs recorded yet.</Empty> : history.entries.map((entry) => <div key={entry.id} className="border-b border-(--iux-border) py-3"><strong>Run #{entry.id} · {entry.result.mode}</strong><p>{bytes(entry.result.totals.bytes)} · {entry.result.totals.items} items · {entry.result.cancelled ? "cancelled" : "finished"}</p>{entry.result.results.map((item, index) => <p key={index} className="break-all text-sm"><span translate="no">{item.path}</span> · {item.status} · {bytes(item.bytes)}</p>)}</div>)}
+            {!history?.entries.length ? <Empty>No cleanup runs recorded yet.</Empty> : history.entries.map((entry) => <div key={entry.id} className="border-b border-(--iux-border) py-3"><strong>Run #{entry.id} · {entry.result.mode}{entry.result.shredPolicy ? ` · ${entry.result.shredPolicy}` : ""}</strong><p>{bytes(entry.result.totals.bytes)} · {entry.result.totals.items} items · {entry.result.cancelled ? "cancelled" : "finished"}</p>{entry.result.results.map((item, index) => <p key={index} className="break-all text-sm"><span translate="no">{item.path}</span> · {item.status} · {bytes(item.bytes)}</p>)}</div>)}
           </Section>}
         </>}
     </main>
