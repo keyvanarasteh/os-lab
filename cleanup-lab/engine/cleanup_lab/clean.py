@@ -48,6 +48,7 @@ from dataclasses import dataclass
 
 from . import safety
 from . import scan
+from . import rules
 from .catalog import load, resolve as catalog_resolve
 from .paths import platform_id, trash_dir
 
@@ -100,6 +101,7 @@ class Plan:
     payload: dict | None
     fingerprints: dict
     progress: dict
+    rule_env: dict | None = None
 
     def to_dict(self):
         return self.payload
@@ -386,6 +388,8 @@ def build_plan(
     clock = time.time if clock is None else clock
     env = os.environ if env is None else env
     target = platform or platform_id()
+    rule_data = rules.read(env=env, platform=target)
+    ignore = rules.matcher(rule_data)
     if mode not in MODES:
         raise PlanError("mode must be one of {0}".format(", ".join(MODES)))
     if (
@@ -431,6 +435,10 @@ def build_plan(
                     _plan_item(entry, template, None, "skipped", mode=mode, code="no-path", reason=reason)
                 )
                 continue
+            if ignore.matches(path):
+                items.append(_plan_item(entry, template, path, "skipped", mode=mode,
+                                        code="ignored", reason="Ignored by a Cleanup Lab rule."))
+                continue
             if privileged:
                 items.append(
                     _plan_item(
@@ -450,6 +458,11 @@ def build_plan(
                         code=verdict.code, reason=verdict.reason,
                     )
                 )
+                continue
+            ignored_descendant = rules.first_ignored(verdict.path, ignore)
+            if ignored_descendant is not None:
+                items.append(_plan_item(entry, template, verdict.path, "skipped", mode=mode,
+                                        code="ignored", reason="Contains ignored path: {0}".format(ignored_descendant)))
                 continue
             if verdict.path in seen_paths:
                 items.append(
@@ -491,6 +504,7 @@ def build_plan(
             payload=None,
             fingerprints={},
             progress=progress.final_cancelled(),
+            rule_env=dict(env),
         )
 
     fingerprints = {}
@@ -533,6 +547,7 @@ def build_plan(
         "expiresAt": built_at + PLAN_TTL,
         "ttlSeconds": PLAN_TTL,
         "mode": mode,
+        "rulesDigest": rules.digest(rule_data),
         "platform": target,
         "items": items,
         "totals": {
@@ -552,6 +567,7 @@ def build_plan(
         payload=payload,
         fingerprints=fingerprints,
         progress=progress.final(),
+        rule_env=dict(env),
     )
 
 
@@ -569,7 +585,7 @@ def _run_walks(pending, walk_one, *, workers):
 # ── Verification: the plan expires when the items change ────────────────────
 
 
-def verify_plan(plan, *, cancel=None, clock=None):
+def verify_plan(plan, *, cancel=None, clock=None, env=None, platform=None):
     """Re-measure every ready item right before the run; any change expires the plan.
 
     Returns ``{path: measure}`` — the numbers the run credits when an item is
@@ -577,10 +593,15 @@ def verify_plan(plan, *, cancel=None, clock=None):
     ``cancelled``) without touching anything.
     """
     clock = time.time if clock is None else clock
+    env = plan.rule_env if env is None else env
     if plan.mode not in MODES:
         raise PlanError("The plan names an unknown mode.", "plan-invalid")
     if plan.expires_at < clock():
         raise PlanError("This plan expired; build a new one.", "expired")
+    if plan.payload.get("rulesDigest") != rules.digest(rules.read(
+        env=env, platform=platform or plan.payload["platform"]
+    )):
+        raise PlanError("Ignore rules changed; build a new plan.", "stale")
     measures = {}
     for item in plan.payload["items"]:
         if item["status"] != "ready":
@@ -886,7 +907,7 @@ def execute_plan(
     """
     clock = time.time if clock is None else clock
     target = platform or platform_id()
-    env = os.environ if env is None else env
+    env = (plan.rule_env or os.environ) if env is None else env
     items = plan.payload["items"]
     trash_target = trash_dir(env, target)
     started = clock()
@@ -921,6 +942,10 @@ def execute_plan(
                     reason="The clean was cancelled before this item.",
                 )
             )
+            counts["skipped"] += 1
+        elif rules.digest(rules.read(env=env, platform=target)) != plan.payload.get("rulesDigest"):
+            results.append(_result_item(item, "skipped", code="ignored",
+                                        reason="Ignore rules changed or now match this item."))
             counts["skipped"] += 1
         else:
             path = item["path"]

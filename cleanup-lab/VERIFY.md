@@ -484,3 +484,30 @@ source console mutation guard, and web UI preview status): 6 failed, 158 passed,
 ## CLN-04 … CLN-29
 
 Each task appends its own section when it lands.
+
+## CLN-17 — enforced ignore rules
+
+Branch `codex/cln-17-ignore-rules`, stacked on CLN-15. Private rule store and
+typed CRUD API accept `path`, `extension` and `glob` rules. Scans omit matching
+paths. Plans skip any catalog parent containing an ignored descendant. A rules
+change expires a plan before cleaning and execution rechecks between items.
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 122 tests — OK
+$ uv run --with pytest python -m pytest android-lab/lab/tests/test_cleanup_console.py -q
+11 passed
+$ PATH=/Volumes/Projects/iQ/os-lab/.venv-test/bin:$PATH ./scripts/run-tests.sh --no-venv
+7 passed, 1 failed, 1 skipped
+$ lat check
+All checks passed
+```
+
+The broader gate has the same six Android failures recorded for CLN-13/15
+(three architecture-specific update fixtures, JADX on this host, Source Lab
+mutation guard, and the web UI preview status). It passes the Cleanup Lab,
+Source Lab, Rust, shell, smoke and graph stages. Dashboard checks are skipped
+because this worktree has no `node_modules` and no dashboard source changed.
+
+The `/cleanup/` plain settings controls depend on CLN-16's page branch and remain
+for that integration. No dashboard source changed in this PR.

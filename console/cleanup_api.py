@@ -37,6 +37,8 @@ SCAN_KEYS = ("entryIds", "workers")
 PLAN_KEYS = ("entryIds", "workers", "mode")
 #: The only key a clean request may carry: which confirmed plan to run.
 CLEAN_KEYS = ("planId",)
+RULE_ADD_KEYS = ("kind", "value", "enabled")
+RULE_UPDATE_KEYS = RULE_ADD_KEYS
 #: Engine ``PlanError.code`` → HTTP status on the plan → clean namespace.
 PLAN_STATUS = {
     "plan-invalid": 400,
@@ -46,7 +48,9 @@ PLAN_STATUS = {
     "used": 409,
     "cancelled": 409,
 }
-BODY_KEYS = {"scan": SCAN_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS}
+BODY_KEYS = {"scan": SCAN_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS,
+             "rule-add": RULE_ADD_KEYS, "rule-update": RULE_UPDATE_KEYS,
+             "rule-delete": ()}
 
 
 class CleanupError(ValueError):
@@ -415,6 +419,9 @@ class CleanupAPI:
                 return catalog.report(self.root)
             except catalog.CatalogError as exc:
                 raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+        if path == "/api/cleanup/rules":
+            _query(query)
+            return _module(self.root, "rules").read()
         if path == "/api/cleanup/history":
             _query(query)
             try:
@@ -440,6 +447,29 @@ class CleanupAPI:
         if path == "/api/cleanup/scan":
             _object_body(body, "scan")
             return JOBS.start_scan(self.root, body)
+        if path == "/api/cleanup/rules":
+            _object_body(body, "rule-add")
+            try:
+                return _module(self.root, "rules").add(body.get("kind"), body.get("value"),
+                                                          enabled=body.get("enabled", True))
+            except ValueError as exc:
+                raise CleanupError(400, str(exc)) from exc
+        rule_parts = path.strip("/").split("/")
+        if len(rule_parts) == 5 and rule_parts[:3] == ["api", "cleanup", "rules"]:
+            rule_id, action = rule_parts[3], rule_parts[4]
+            rules = _module(self.root, "rules")
+            try:
+                if action == "update":
+                    _object_body(body, "rule-update")
+                    if not body:
+                        raise CleanupError(400, "Rule update needs a field")
+                    return rules.update(rule_id, **body)
+                if action == "delete":
+                    _object_body(body, "rule-delete")
+                    return rules.delete(rule_id)
+            except rules.RulesError as exc:
+                status = 404 if str(exc) == "Ignore rule not found" else 400
+                raise CleanupError(status, str(exc)) from exc
         if path == "/api/cleanup/plan":
             _object_body(body, "plan")
             return JOBS.start_plan(self.root, body)

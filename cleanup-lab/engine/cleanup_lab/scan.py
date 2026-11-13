@@ -32,6 +32,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from .catalog import load, resolve
 from .paths import platform_id
+from . import rules
 
 PROGRESS_INTERVAL = 0.12  # seconds between progress callbacks (qrust-scan: 120 ms)
 DEFAULT_WORKERS = 4
@@ -158,7 +159,7 @@ def _claim_inode(seen, stat):
     return True
 
 
-def _walk(root, *, cancel, seen_inodes, progress):
+def _walk(root, *, cancel, seen_inodes, progress, ignore=None):
     """Depth-first ``lstat`` walk of one top-level directory. Never follows links.
 
     Returns ``(counters, aborted)``; ``aborted`` is true when the cancel fired.
@@ -169,6 +170,7 @@ def _walk(root, *, cancel, seen_inodes, progress):
         "files": 0,
         "folders": 0,
         "unreadable": [],
+        "ignored": [],
     }
     has_blocks = False
     poll = 0
@@ -196,6 +198,9 @@ def _walk(root, *, cancel, seen_inodes, progress):
             if _cancelled(cancel):
                 return counters, True
         for child in listing:
+            if ignore is not None and ignore.matches(child.path):
+                counters["ignored"].append(child.path)
+                continue
             try:
                 stat = child.stat(follow_symlinks=False)
             except OSError:
@@ -222,7 +227,7 @@ def _walk(root, *, cancel, seen_inodes, progress):
     return counters, False
 
 
-def measure_path(path, *, cancel=None, seen_inodes=None, progress=None):
+def measure_path(path, *, cancel=None, seen_inodes=None, progress=None, ignore=None):
     """Size one top-level path read-only. Returns its report dict.
 
     The report never raises: an unreadable or vanished path is described, and a
@@ -238,9 +243,14 @@ def measure_path(path, *, cancel=None, seen_inodes=None, progress=None):
         "files": 0,
         "folders": 0,
         "unreadable": [],
+        "ignored": [],
         "error": None,
         "measured": False,
     }
+    if ignore is not None and ignore.matches(path):
+        report["reason"] = "Ignored by a Cleanup Lab rule."
+        report["ignored"] = [path]
+        return report
     try:
         stat = os.lstat(path)
     except FileNotFoundError:
@@ -269,7 +279,7 @@ def measure_path(path, *, cancel=None, seen_inodes=None, progress=None):
         if on_disk is not None:
             report["sizeOnDiskBytes"] = on_disk
         return report
-    counters, aborted = _walk(path, cancel=cancel, seen_inodes=seen_inodes, progress=progress)
+    counters, aborted = _walk(path, cancel=cancel, seen_inodes=seen_inodes, progress=progress, ignore=ignore)
     report.update(counters, measured=not aborted)
     if aborted:
         report["reason"] = "The scan was cancelled while measuring this path."
@@ -288,6 +298,7 @@ def _path_report(template, path, reason, *, missing=False, symlink=False):
         "files": 0,
         "folders": 0,
         "unreadable": [],
+        "ignored": [],
         "error": None,
         "measured": False,
     }
@@ -313,6 +324,7 @@ def scan_catalog(
     """
     env = os.environ if env is None else env
     target = platform or platform_id()
+    ignore = rules.matcher(rules.read(env=env, platform=target))
     started = time.time()
     workers = DEFAULT_WORKERS if workers is None else int(workers)
     if workers < 1 or workers > MAX_WORKERS:
@@ -347,6 +359,10 @@ def scan_catalog(
                 continue
             report = _path_report(item["template"], item["path"], "")
             result["paths"].append(report)
+            if ignore.matches(item["path"]):
+                report["reason"] = "Ignored by a Cleanup Lab rule."
+                report["ignored"] = [item["path"]]
+                continue
             pending.append(report)
 
     progress = _Progress(len(pending), progress_callback)
@@ -354,7 +370,8 @@ def scan_catalog(
     cancelled_seen = _cancelled(cancel)
 
     def run_one(report):
-        return measure_path(report["path"], cancel=cancel, seen_inodes=seen_inodes, progress=progress)
+        return measure_path(report["path"], cancel=cancel, seen_inodes=seen_inodes, progress=progress,
+                            ignore=ignore)
 
     if len(pending) == 1 or workers == 1:
         for report in pending:
