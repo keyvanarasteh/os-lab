@@ -1119,3 +1119,28 @@ def monitor(root: str, lab: str, host: dict | None = None) -> dict:
             for n in names]
     overall = "running" if running and len(running) == len(rows) else "partial" if running else "stopped"
     return {"lab": lab, "state": overall, "runtime": runtime, "containers": rows, "checkedAt": time.time()}
+
+
+def dropper_audit(root: str, target: str | None = None, rehearse: bool = False) -> dict:
+    """Run the PENT-15 two-stage 'clean dropper' detector on a scoped path under root."""
+    rel_target = target if target is not None else os.path.join("scripts", "analysis", "dropper_lab")
+    real_root = os.path.realpath(root)
+    scoped_target = _scoped(root, rel_target)
+    if not os.path.exists(scoped_target):
+        raise PlanError("Dropper analysis target does not exist: " + rel_target)
+    if os.path.islink(os.path.join(root, rel_target)):
+        raise PlanError("Symlink targets are not allowed in dropper_audit: " + rel_target)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from scripts.analysis import dropper_detect
+
+    try:
+        report = dropper_detect.scan_path(scoped_target, scope_root=real_root)
+    except ValueError as exc:
+        raise PlanError(str(exc)) from exc
+    if rehearse:
+        from scripts.analysis.dropper_lab.stage2_server import run_lab_rehearsal
+
+        report["rehearsal"] = run_lab_rehearsal(allow_exec=True)
+    return report
+
