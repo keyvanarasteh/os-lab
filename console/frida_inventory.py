@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Frida device and process inventory (PENT-09): read-only, JSON out.
 
-Wraps the two Frida listing commands taught in class, `frida-ls-devices` and
-`frida-ps`, and merges their output into one document the console and agents
+Does what the two Frida listing commands taught in class do, `frida-ls-devices`
+and `frida-ps`, and merges the result into one document the console and agents
 can read: which devices Frida sees, over which transport (local / USB / TCP),
-and which processes on them could be attached to.
+and which processes on them could be attached to. It asks the `frida` Python
+module when that is installed and runs the two commands otherwise (`--backend`).
 
 It only lists. It never attaches, spawns, injects or kills, and it starts no
 frida-server. A TCP target must be a loopback or private (RFC 1918) lab
@@ -28,11 +29,12 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
 
 SCHEMA = "oslab.frida-inventory/1"
 TOOLS = ("frida-ls-devices", "frida-ps")
-DEFAULT_TIMEOUT = 30  # frida-ls-devices alone takes ~5s while it waits for USB enumeration
+DEFAULT_TIMEOUT = 20
 DEFAULT_PORT = 27042
 
 # Frida's device "Type" column -> the transport a student would name it by.
@@ -236,26 +238,119 @@ def parse_processes(text):
 
 # --- Inventory -----------------------------------------------------------------
 
-def list_devices(runner=run_tool, timeout=DEFAULT_TIMEOUT):
-    tool = find_tool("frida-ls-devices")
-    if not tool:
-        raise ToolError("frida-ls-devices not found (pip install frida-tools)")
-    return parse_devices(runner([tool], timeout))
+class CliBackend:
+    """Lists through the `frida-ls-devices` and `frida-ps` commands."""
+
+    name = "cli"
+
+    def __init__(self, runner=run_tool, timeout=DEFAULT_TIMEOUT):
+        self.runner = runner
+        self.timeout = timeout
+
+    def devices(self):
+        tool = find_tool("frida-ls-devices")
+        if not tool:
+            raise ToolError("frida-ls-devices not found (pip install frida-tools)")
+        return parse_devices(self.runner([tool], self.timeout))
+
+    def processes(self, device_id, host=None, apps=False):
+        tool = find_tool("frida-ps")
+        if not tool:
+            raise ToolError("frida-ps not found (pip install frida-tools)")
+        argv = [tool, *(["-H", host] if host else ["-D", device_id]), "-j", "-e"]
+        if apps:
+            argv.append("-a")
+        return parse_processes(self.runner(argv, self.timeout))
 
 
-def list_processes(selector, apps=False, runner=run_tool, timeout=DEFAULT_TIMEOUT):
-    """List processes for one target; `selector` is frida-ps's own device flags."""
-    tool = find_tool("frida-ps")
-    if not tool:
-        raise ToolError("frida-ps not found (pip install frida-tools)")
-    argv = [tool, *selector, "-j", "-e"]
-    if apps:
-        argv.append("-a")
-    return parse_processes(runner(argv, timeout))
+class ApiBackend:
+    """Lists through the `frida` Python module, the calls the two commands make themselves.
+
+    Preferred when the module is importable: `frida-ls-devices` draws a live
+    terminal UI that needs a console and waits on every device, so it cannot be
+    relied on from a script or a service.
+    """
+
+    name = "api"
+
+    def __init__(self, frida, timeout=DEFAULT_TIMEOUT):
+        self.frida = frida
+        self.timeout = timeout
+
+    def _call(self, what, func):
+        """Run one Frida call on a worker so a silent device cannot block the inventory."""
+        box = {}
+
+        def work():
+            try:
+                box["value"] = func()
+            except Exception as exc:  # frida raises its own error types
+                box["error"] = exc
+
+        worker = threading.Thread(target=work, daemon=True)
+        worker.start()
+        worker.join(self.timeout)
+        if worker.is_alive():
+            raise ToolError(f"{what} timed out after {self.timeout}s")
+        if "error" in box:
+            raise ToolError(f"{what} failed: {box['error']}")
+        return box["value"]
+
+    def _os(self, device):
+        try:
+            info = self._call("os query", device.query_system_parameters).get("os", {})
+        except ToolError:
+            return None
+        return " ".join(str(part) for part in (info.get("name"), info.get("version")) if part) or None
+
+    def devices(self):
+        found = []
+        for device in self._call("device listing", self.frida.enumerate_devices):
+            kind = str(device.type).lower()
+            found.append({
+                "id": str(device.id),
+                "type": kind,
+                "transport": TRANSPORTS.get(kind, kind or "unknown"),
+                "name": str(device.name or ""),
+                # Only devices that are really there: a `remote` stub has no server to ask.
+                "os": self._os(device) if kind in ("local", "usb") else None,
+            })
+        return found
+
+    def processes(self, device_id, host=None, apps=False):
+        def work():
+            if host:
+                device = self.frida.get_device_manager().add_remote_device(host)
+            else:
+                device = self.frida.get_device(device_id, timeout=self.timeout)
+            if apps:
+                return [{"pid": app.pid or None, "name": app.name, "identifier": app.identifier}
+                        for app in device.enumerate_applications() if app.pid]
+            return [{"pid": proc.pid, "name": proc.name} for proc in device.enumerate_processes()]
+
+        return parse_processes(json.dumps(self._call("process listing", work)))
 
 
-def build_inventory(usb=False, device=None, host=None, apps=False, processes=True,
-                    name_filter=None, runner=run_tool, timeout=DEFAULT_TIMEOUT, now=None):
+def load_frida():
+    """Return the `frida` module when it is installed for this interpreter, else None."""
+    try:
+        import frida
+    except ImportError:
+        return None
+    return frida
+
+
+def pick_backend(choice="auto", runner=run_tool, timeout=DEFAULT_TIMEOUT):
+    frida = load_frida() if choice in ("auto", "api") else None
+    if frida is not None:
+        return ApiBackend(frida, timeout)
+    if choice == "api":
+        raise ToolError("the frida Python module is not installed (pip install frida-tools)")
+    return CliBackend(runner, timeout)
+
+
+def build_inventory(usb=False, device=None, host=None, apps=False, processes=True, name_filter=None,
+                    backend="auto", runner=run_tool, timeout=DEFAULT_TIMEOUT, now=None):
     """Collect the inventory document. Raises ScopeError for an out-of-scope target.
 
     With no target chosen, processes are listed for local and USB devices only:
@@ -271,8 +366,15 @@ def build_inventory(usb=False, device=None, host=None, apps=False, processes=Tru
 
     errors = []
     tools = {name: {"found": bool(find_tool(name)), "path": find_tool(name)} for name in TOOLS}
+    frida = load_frida()
+    tools["frida-python"] = {"found": frida is not None, "version": getattr(frida, "__version__", None)}
     try:
-        devices = list_devices(runner, timeout)
+        lister = pick_backend(backend, runner, timeout)
+    except ToolError as exc:
+        lister = None
+        errors.append({"stage": "backend", "message": str(exc)})
+    try:
+        devices = lister.devices() if lister else []
     except ToolError as exc:
         devices = []
         errors.append({"stage": "devices", "message": str(exc)})
@@ -293,12 +395,11 @@ def build_inventory(usb=False, device=None, host=None, apps=False, processes=Tru
         entry["processes"] = None
         entry["processCount"] = None
         entry["error"] = None
-        wanted = processes and (host or device or entry["type"] in ("local", "usb"))
+        wanted = processes and lister and (host or device or entry["type"] in ("local", "usb"))
         if not wanted:
             continue
-        selector = ["-H", host] if host else ["-D", entry["id"]]
         try:
-            found = list_processes(selector, apps, runner, timeout)
+            found = lister.processes(entry["id"], host, apps)
         except ToolError as exc:
             entry["error"] = str(exc)
             errors.append({"stage": "processes", "device": entry["id"], "message": str(exc)})
@@ -313,6 +414,7 @@ def build_inventory(usb=False, device=None, host=None, apps=False, processes=Tru
         "schema": SCHEMA,
         "generatedAt": stamp,
         "readOnly": True,
+        "backend": lister.name if lister else None,
         "query": {"usb": bool(usb), "device": device, "host": host, "apps": bool(apps),
                   "processes": bool(processes), "filter": name_filter},
         "tools": tools,
@@ -343,7 +445,9 @@ def build_parser():
     parser.add_argument("--no-processes", action="store_true", help="list devices only")
     parser.add_argument("-f", "--filter", metavar="TEXT", help="keep processes whose name or identifier contains TEXT")
     parser.add_argument("-t", "--timeout", type=int, default=DEFAULT_TIMEOUT, metavar="SEC",
-                        help=f"per-command timeout (default {DEFAULT_TIMEOUT})")
+                        help=f"per-listing timeout (default {DEFAULT_TIMEOUT})")
+    parser.add_argument("--backend", choices=("auto", "api", "cli"), default="auto",
+                        help="api = frida Python module, cli = frida-ls-devices/frida-ps; auto prefers api")
     parser.add_argument("-o", "--out", metavar="FILE", help="also write the JSON to FILE")
     parser.add_argument("--compact", action="store_true", help="single-line JSON")
     return parser
@@ -357,7 +461,8 @@ def main(argv=None, runner=run_tool):
     try:
         inventory = build_inventory(
             usb=args.usb, device=args.device, host=args.host, apps=args.apps,
-            processes=not args.no_processes, name_filter=args.filter, runner=runner, timeout=args.timeout,
+            processes=not args.no_processes, name_filter=args.filter, backend=args.backend,
+            runner=runner, timeout=args.timeout,
         )
     except ScopeError as exc:
         print(f"error: {exc}", file=sys.stderr)

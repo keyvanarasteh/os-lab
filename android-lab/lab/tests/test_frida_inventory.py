@@ -7,7 +7,9 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -65,9 +67,66 @@ class FakeRunner:
         return [call for call in self.calls if "frida-ps" in os.path.basename(call[0])]
 
 
+class FakeDevice:
+    def __init__(self, id, type, name, os_info=None, processes=(), apps=(), fail=None):
+        self.id, self.type, self.name = id, type, name
+        self._os, self._processes, self._apps, self._fail = os_info, processes, apps, fail
+        self.calls = []
+
+    def query_system_parameters(self):
+        self.calls.append("query_system_parameters")
+        return {"os": self._os} if self._os else {}
+
+    def enumerate_processes(self):
+        self.calls.append("enumerate_processes")
+        if self._fail:
+            raise self._fail
+        return [SimpleNamespace(pid=pid, name=name) for pid, name in self._processes]
+
+    def enumerate_applications(self):
+        self.calls.append("enumerate_applications")
+        return [SimpleNamespace(pid=pid, name=name, identifier=ident) for pid, name, ident in self._apps]
+
+
+class FakeFrida:
+    """Stands in for the `frida` module: only the listing calls exist, so anything else would fail."""
+
+    __version__ = "0.0-test"
+
+    def __init__(self, devices):
+        self._devices = {device.id: device for device in devices}
+        self.remote_hosts = []
+
+    def enumerate_devices(self):
+        return list(self._devices.values())
+
+    def get_device(self, device_id, timeout=0):
+        return self._devices[device_id]
+
+    def get_device_manager(self):
+        return self
+
+    def add_remote_device(self, host):
+        self.remote_hosts.append(host)
+        return self._devices["socket"]
+
+
+def fake_frida(**socket_kwargs):
+    return FakeFrida([
+        FakeDevice("local", "local", "Local System", {"name": "Windows", "version": "10.0.26300"},
+                   processes=[(412, "hedef"), (5840, "My Lab App")]),
+        FakeDevice("emulator-5554", "usb", "Android Emulator 5554", {"name": "Android", "version": "14"},
+                   processes=[(2114, "Lab Bank")],
+                   apps=[(2114, "Lab Bank", "com.testlab.bank"), (0, "Settings", "com.android.settings")]),
+        FakeDevice("socket", "remote", "Local Socket", processes=[(77, "lab-target")], **socket_kwargs),
+    ])
+
+
 @pytest.fixture(autouse=True)
 def tools_present(monkeypatch):
+    """CLI tools "installed", frida module absent: tests opt into the API backend explicitly."""
     monkeypatch.setattr(fi, "find_tool", lambda name: "/lab/bin/" + name)
+    monkeypatch.setattr(fi, "load_frida", lambda: None)
 
 
 # --- parsing -------------------------------------------------------------------
@@ -213,6 +272,67 @@ def test_missing_tools_are_reported_instead_of_raising(monkeypatch):
 def test_more_than_one_target_is_a_usage_error():
     with pytest.raises(fi.ScopeError):
         fi.build_inventory(usb=True, host="127.0.0.1", runner=FakeRunner())
+
+
+# --- frida module backend ------------------------------------------------------
+
+def test_api_backend_is_preferred_when_frida_is_importable(monkeypatch):
+    frida = fake_frida()
+    monkeypatch.setattr(fi, "load_frida", lambda: frida)
+    runner = FakeRunner()
+    inv = fi.build_inventory(runner=runner)
+    assert inv["backend"] == "api" and runner.calls == []
+    assert inv["tools"]["frida-python"] == {"found": True, "version": "0.0-test"}
+    by_id = {d["id"]: d for d in inv["devices"]}
+    assert by_id["local"]["os"] == "Windows 10.0.26300" and by_id["emulator-5554"]["transport"] == "USB"
+    assert by_id["local"]["processes"] == [{"pid": 412, "name": "hedef"}, {"pid": 5840, "name": "My Lab App"}]
+    assert by_id["socket"]["processes"] is None and by_id["socket"]["os"] is None
+    assert inv["summary"] == {"devices": 3, "usb": 1, "tcp": 1, "processes": 3}
+
+
+def test_api_backend_never_touches_an_unnamed_remote_device(monkeypatch):
+    frida = fake_frida()
+    monkeypatch.setattr(fi, "load_frida", lambda: frida)
+    fi.build_inventory()
+    assert frida.get_device("socket").calls == [] and frida.remote_hosts == []
+
+
+def test_api_backend_lists_running_apps_with_identifier(monkeypatch):
+    monkeypatch.setattr(fi, "load_frida", fake_frida)
+    inv = fi.build_inventory(usb=True, apps=True)
+    assert inv["devices"][0]["processes"] == [{"pid": 2114, "name": "Lab Bank", "identifier": "com.testlab.bank"}]
+
+
+def test_api_backend_host_goes_through_the_scope_guard(monkeypatch):
+    frida = fake_frida()
+    monkeypatch.setattr(fi, "load_frida", lambda: frida)
+    with pytest.raises(fi.ScopeError):
+        fi.build_inventory(host="8.8.8.8")
+    assert frida.remote_hosts == []
+    inv = fi.build_inventory(host="192.168.56.101")
+    assert frida.remote_hosts == ["192.168.56.101:27042"]
+    assert inv["devices"][0]["processes"] == [{"pid": 77, "name": "lab-target"}]
+
+
+def test_api_backend_records_a_failed_listing(monkeypatch):
+    monkeypatch.setattr(fi, "load_frida", lambda: fake_frida(fail=RuntimeError("unable to connect")))
+    inv = fi.build_inventory(host="127.0.0.1")
+    assert inv["devices"][0]["error"] == "process listing failed: unable to connect"
+
+
+def test_api_backend_times_out_on_a_silent_device():
+    release = threading.Event()
+    backend = fi.ApiBackend(SimpleNamespace(enumerate_devices=lambda: release.wait(30)), timeout=1)
+    with pytest.raises(fi.ToolError, match="device listing timed out after 1s"):
+        backend.devices()
+    release.set()
+
+
+def test_backend_choice(monkeypatch):
+    assert fi.build_inventory(backend="api", runner=FakeRunner())["errors"][0]["stage"] == "backend"
+    monkeypatch.setattr(fi, "load_frida", fake_frida)
+    runner = FakeRunner()
+    assert fi.build_inventory(backend="cli", runner=runner)["backend"] == "cli" and runner.calls
 
 
 # --- run_tool and CLI ----------------------------------------------------------
