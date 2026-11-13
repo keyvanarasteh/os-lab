@@ -23,8 +23,8 @@ the committed `dashboard/dist` differs from a fresh build.
 Android and Source Lab have independent automated test suites.
 
 It lives in [[android-lab/lab/tests]] (analyzer, reporter, MobSF client, secret
-scanner, patcher, flow parser, agentic engine, web UI, and the host engine in
-[[console/oslab.py]]). Shell scripts across the
+scanner, patcher, flow parser, agentic engine, `frida-trace` call-map builder,
+web UI, and the host engine in [[console/oslab.py]]). Shell scripts across the
 VM labs are kept `bash -n` clean and use `set -euo pipefail`.
 The [[source-lab]] engine tests run in their own process from
 [[source-lab/engine]] so their imports cannot collide with Android tests.

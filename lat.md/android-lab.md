@@ -63,8 +63,10 @@ They include the deep analyzer [[android-lab/lab/scripts/app_analyzer.py]], the
 report generator [[android-lab/lab/scripts/app_reporter.py]], the MobSF client
 [[android-lab/lab/scripts/mobsf_client.py]], the secret scanner
 [[android-lab/lab/scripts/secret_scanner.py]], the agentic Frida-hook generator
-[[android-lab/lab/scripts/agentic_engine.py]] and the APK patcher
-[[android-lab/lab/scripts/apk_patcher.py]]. Prebuilt Frida hooks are in
+[[android-lab/lab/scripts/agentic_engine.py]], the APK patcher
+[[android-lab/lab/scripts/apk_patcher.py]] and the `frida-trace` auto-tracer and
+call-map builder [[android-lab/lab/scripts/trace_runner.py]]. Prebuilt Frida hooks
+and the `frida-trace` hook runner [[android-lab/lab/hooks/trace_runner.py]] are in
 [[android-lab/lab/hooks]].
 
 ## Tests
@@ -72,5 +74,6 @@ report generator [[android-lab/lab/scripts/app_reporter.py]], the MobSF client
 The lab ships a pytest suite in [[android-lab/lab/tests]].
 
 It covers the analyzer, reporter, MobSF client, secret scanner, patcher, flow
-parser, agentic engine and web UI, and runs in CI — see
+parser, agentic engine, `frida-trace` call-map builder
+([[android-lab/lab/tests/test_trace_runner.py]]) and web UI, and runs in CI — see
 [[tooling#Local test runner]].

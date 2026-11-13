@@ -170,6 +170,13 @@ def main():
     flows_parser = subparsers.add_parser("parse-flows", help="Parse mitmproxy flows")
     flows_parser.add_argument("--file", default=os.path.join(ARTIFACTS_DIR, "flows.mitm"), help="Path to flows.mitm")
 
+    trace_parser = subparsers.add_parser("trace", help="Trace target functions with frida-trace into a JSON call map")
+    trace_parser.add_argument("--target", default="com.testlab.vulnerable", help="Target package/process name or PID")
+    trace_parser.add_argument("--include", action="append", default=[], help="Symbol glob to trace (repeatable)")
+    trace_parser.add_argument("--simulate", action="store_true", help="Run offline against built-in 05.10 lab trace fixture")
+    trace_parser.add_argument("--out", default=os.path.join(ARTIFACTS_DIR, "traces", "call-map.json"), help="Output JSON call map")
+    trace_parser.add_argument("--session-log", default=os.path.join(ARTIFACTS_DIR, "traces", "trace-session.md"), help="Output session log")
+
     subparsers.add_parser("clean", help="Clean artifacts directory")
 
 
@@ -223,6 +230,14 @@ def main():
     elif args.command == "parse-flows":
         flow_parser = os.path.join(SCRIPTS_DIR, "mitm_flow_parser.py")
         subprocess.run([sys.executable, flow_parser, args.file])
+    elif args.command == "trace":
+        tracer = os.path.join(SCRIPTS_DIR, "trace_runner.py")
+        cmd = [sys.executable, tracer, "--target", args.target, "--out", args.out, "--session-log", args.session_log]
+        for pat in args.include:
+            cmd.extend(["-i", pat])
+        if args.simulate:
+            cmd.append("--simulate")
+        subprocess.run(cmd, check=True)
 
 
     elif args.command == "clean":

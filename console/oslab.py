@@ -111,7 +111,7 @@ def tools_for_host(os_name: str) -> list[tuple[str, str]]:
 
 
 LABCTL_ACTIONS = ["status", "doctor", "urls", "logs", "monitor", "start", "stop", "restart",
-                  "profile", "resize", "setup", "backup", "service-install", "service-uninstall"]
+                  "profile", "resize", "trace", "setup", "backup", "service-install", "service-uninstall"]
 MAC_ACTIONS = ["status", "doctor", "setup", "start", "stop", "appium-install", "appium-start", "appium-stop"]
 
 ACTION_INFO = {
@@ -130,6 +130,7 @@ ACTION_INFO = {
     "restart": ("Restart", "Recreate the stack from the current configuration."),
     "profile": ("Apply profile", "Write a profile preset (lightweight/development/performance) to .env."),
     "resize": ("Resize", "Change CPU/RAM (and disk for Windows) in .env; restart to apply."),
+    "trace": ("Trace functions", "Trace a lab target's functions with frida-trace and save a JSON call map and annotated session log."),
     "setup": ("Install dependencies", "Install the host prerequisites for this lab."),
     "backup": ("Backup", "Write a guest backup archive into the lab's backups/ folder."),
     "service-install": ("Install boot service", "Start this lab automatically at boot (systemd)."),
@@ -152,6 +153,7 @@ PRIVILEGED = {"setup", "service-install", "service-uninstall"}
 SECRET_PARTS = ("PASSWORD", "SECRET", "TOKEN", "API_KEY", "PRIVATE_KEY", "CREDENTIAL")
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+SAFE_GLOB = re.compile(r"^[A-Za-z0-9_.*?!:\[\]+-]{1,128}$")
 SIZE = re.compile(r"^[1-9][0-9]{0,5}[MmGgTt]?$")
 
 
@@ -446,7 +448,7 @@ def actions_for(lab: str, provider: str | None) -> list[dict]:
     if provider == "native-macos":
         names = MAC_ACTIONS
     elif provider:
-        names = [a for a in LABCTL_ACTIONS if not (a == "backup" and lab == "android")]
+        names = [a for a in LABCTL_ACTIONS if not (a == "backup" and lab == "android") and not (a == "trace" and lab != "android")]
         if provider == "macos-containers":
             names = [a for a in names if a not in PRIVILEGED]
     else:
@@ -641,7 +643,7 @@ def plan(root: str, request: dict, host: dict | None = None) -> dict:
     if request.get("lab") == "source":
         import source_control
         return source_control.plan(root, request)
-    allowed = {"lab", "action", "profile", "cpus", "ram", "disk", "device", "wslDistro", "backup"}
+    allowed = {"lab", "action", "profile", "cpus", "ram", "disk", "device", "wslDistro", "backup", "target", "glob"}
     unknown = set(request) - allowed
     if unknown:
         raise PlanError("Unknown request fields: " + ", ".join(sorted(unknown)))
@@ -667,6 +669,9 @@ def plan(root: str, request: dict, host: dict | None = None) -> dict:
     for key in ("cpus", "ram", "disk", "device"):
         if request.get(key) not in (None, "") and action != "resize":
             raise PlanError("Resource parameters are only accepted by resize")
+    for key in ("target", "glob"):
+        if request.get(key) not in (None, "") and action != "trace":
+            raise PlanError("Trace parameters are only accepted by trace")
     if request.get("backup"):
         raise PlanError("Restore is not available from the web console; use the lab's scripts/restore.sh")
 
@@ -752,6 +757,28 @@ def plan(root: str, request: dict, host: dict | None = None) -> dict:
                 if len(args) == 3:
                     raise PlanError("Choose a resource to resize")
                 effects.append("Writes resource configuration to .env. Restart to apply; guest disks only grow.")
+            elif action == "trace":
+                args.append("trace")
+                trace_target = request.get("target")
+                if trace_target not in (None, ""):
+                    if (
+                        not isinstance(trace_target, str)
+                        or not SAFE_NAME.match(trace_target)
+                        or trace_target.startswith("-")
+                        or trace_target.lower() in ("init", "systemd", "sshd", "launchd", "0", "1")
+                    ):
+                        raise PlanError("Invalid trace target")
+                    args += ["--target", trace_target]
+                trace_glob = request.get("glob")
+                if trace_glob not in (None, ""):
+                    if (
+                        not isinstance(trace_glob, str)
+                        or not SAFE_GLOB.match(trace_glob)
+                        or (trace_glob.startswith("-") and not trace_glob.startswith("-["))
+                    ):
+                        raise PlanError("Invalid symbol glob")
+                    args += ["--include", trace_glob]
+                effects.append("Traces target functions via frida-trace and saves a JSON call map and annotated session log in artifacts/traces/.")
             else:
                 args.append(action)
             if profile:

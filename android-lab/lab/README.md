@@ -94,6 +94,7 @@ new device profile.
 | `wf1 APK=` | static workflow (MobSF + JADX) |
 | `wf2 APK= [PKG=]` | dynamic workflow (emulator + mitm + frida) |
 | `hook PKG= HOOK=` | attach a Frida hook to a running app |
+| `trace [PKG=] [GLOB=]` | run `frida-trace` auto-tracer (`hooks/trace_runner.py`) and save JSON call map + session log |
 | `report` | collect logs/status/flows into `artifacts/` |
 | `clean` | wipe `artifacts/` |
 
@@ -116,9 +117,10 @@ lab/
 │   ├── report.sh          # artifact sweep
 │   ├── install-service.sh # systemd unit for boot start
 │   └── uninstall-service.sh
-├── hooks/                 # Frida scripts (educational bypasses)
+├── hooks/                 # Frida scripts (educational bypasses & auto-tracer)
 │   ├── ssl-pinning-bypass.js
-│   └── root-detection-bypass.js
+│   ├── root-detection-bypass.js
+│   └── trace_runner.py    # frida-trace wrapper & JSON call-map builder (PENT-06)
 ├── apks/                  # drop APKs here (gitignored)
 ├── frida/                 # drop frida-server-<ver>-android-x86_64 here (gitignored)
 └── artifacts/             # all reports, sources, captures (gitignored)

@@ -62,6 +62,7 @@ Commands:
   shell [service] [--adb]       Shell into the guest or tools container
   urls                          Print access URLs
   resize [options]              Change CPU/RAM/disk/device
+  trace [options]               Trace target functions with frida-trace into a JSON call map + session log
   service install|uninstall     Install/remove the systemd boot unit
   service status                Show the systemd unit state
   version                       Print version
@@ -998,6 +999,36 @@ cmd_service() {
   esac
 }
 
+cmd_trace() {
+  local py="${OSLAB_TRACE_PYTHON:-}"
+  if [ -z "$py" ]; then
+    if [ -x "$ROOT/.venv/bin/python" ]; then
+      py="$ROOT/.venv/bin/python"
+    elif [ -x "$ROOT/.venv-test/bin/python" ]; then
+      py="$ROOT/.venv-test/bin/python"
+    elif command -v python3 >/dev/null 2>&1; then
+      py="python3"
+    else
+      py="python"
+    fi
+  fi
+  local base_dir="${LAB_DIR:-$ROOT/android-lab/lab}"
+  local has_out=0 has_log=0 has_help=0 arg
+  for arg in "$@"; do
+    case "$arg" in
+      -o|--out|--out=*|--json|--emit-handler|--emit-handler=*) has_out=1 ;;
+      --session-log|--session-log=*) has_log=1 ;;
+      -h|--help) has_help=1 ;;
+    esac
+  done
+  local extra_args=()
+  if [ "$has_help" = "0" ]; then
+    [ "$has_out" = "0" ] && extra_args+=("--out" "$base_dir/artifacts/traces/call-map.json")
+    [ "$has_log" = "0" ] && extra_args+=("--session-log" "$base_dir/artifacts/traces/trace-session.md")
+  fi
+  exec "$py" "$ROOT/android-lab/lab/hooks/trace_runner.py" "${extra_args[@]}" "$@"
+}
+
 cmd_all() {
   local cmd="${1:-}"
   shift || true
@@ -1080,6 +1111,7 @@ main() {
     -h|--help|help) usage; exit 0 ;;
     version|--version) printf 'labctl 1.0.0\n'; exit 0 ;;
     ui|console) shift; cmd_ui "$@"; return ;;
+    trace) shift; cmd_trace "$@"; return ;;
   esac
   local target="$1"
   shift
@@ -1114,6 +1146,7 @@ main() {
     shell) cmd_shell "$@" ;;
     urls) cmd_urls "$@" ;;
     resize) cmd_resize "$@" ;;
+    trace) cmd_trace "$@" ;;
     service) cmd_service "$@" ;;
     -h|--help|help|'') usage ;;
     *) die "unknown command for $LAB: $cmd (run ./labctl --help)" ;;
