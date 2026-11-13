@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "slug": "dogu-teknoloji",
+  "name": "Doğu Teknoloji",
+  "sector": "Technology",
+  "author": { "name": "EfeDogu1", "course": "BGT207", "github": "EfeDogu1" },
+  "summary": "Doğu Teknoloji, bilişim, yazılım, üretim destek ve dijital dönüşüm hizmetleri üreten çok uluslu bir teknoloji grubudur. Mersin, Adana, İstanbul ve Almanya'da faaliyet gösteren şirketin merkez ve şubelerinde çalışanlar, yazılım ekibi, Ar-Ge ve sunucu katmanları ayrı ağ segmentlerinde tutulur. Özel yazılım servisleri, ERP, e-posta, sanal masaüstleri ve genel web servisleri DMZ ve ara katmanlarda yayınlanır; yönetsel erişim yalnızca VPN üzerinden yapılır. İzleme ve güvenlik olayları merkezi SIEM ve Telegram alarm kanalı ile yönetilir.",
+  "branches": [
+    {
+      "id": "mersin-hq",
+      "name": "Mersin Genel Merkez",
+      "role": "headquarters",
+      "location": "Mersin, TR",
+      "population": { "staff": 100, "software": 20, "rnd": 15 },
+      "network": {
+        "cidr": "10.10.0.0/16",
+        "dmz": true,
+        "vlans": [
+          { "id": 10, "name": "staff", "cidr": "10.10.0.0/22", "note": "Ofis çalışanları, telefon ve yazıcı ağları." },
+          { "id": 20, "name": "rnd", "cidr": "10.10.16.0/22", "note": "Ar-Ge ve test ortamı; doğrudan internet erişimi yoktur." },
+          { "id": 30, "name": "software", "cidr": "10.10.24.0/22", "note": "Geliştirici istasyonları, git ve CI/CD çalıştırıcıları." },
+          { "id": 40, "name": "servers", "cidr": "10.10.32.0/22", "note": "ERP, dosya sunucuları, e-posta, VPN ve iç servisler." },
+          { "id": 50, "name": "guest", "cidr": "10.10.48.0/23", "note": "Misafir ve ziyaretçi erişimi; ayrılmış ve kısıtlı." },
+          { "id": 90, "name": "dmz", "cidr": "10.10.254.0/24", "note": "Web, portal ve dışarı açılan servisler." },
+          { "id": 99, "name": "management", "cidr": "10.10.255.0/24", "note": "Yönetim, firewall ve switch erişimi; yalnızca VPN." }
+        ]
+      },
+      "bandwidth": { "downMbps": 2000, "upMbps": 2000, "drivers": ["ERP", "VoIP", "email", "git", "CI/CD", "cloud backup", "video meetings", "R&D sync"] },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": { "product": "FortiGate 200F", "vendor": "Fortinet", "throughputGbps": 2.5, "priceUsd": 7000, "reason": "2 Gbps bağlantı ve IPS/UTM ile çalışan güvenlik profili için yeterli başlık alanı sağlar; merkez şube için hem SD-WAN hem de yönetim kolaylığı sunar." },
+          "alternatives": [
+            { "product": "Palo Alto PA-850", "vendor": "Palo Alto Networks", "throughputGbps": 1.9, "priceUsd": 10000, "reason": "Yüksek performanslıdır ancak 2 Gbps güvenlik profili için daha dar bir tampon bırakır." },
+            { "product": "Sophos XGS 3300", "vendor": "Sophos", "throughputGbps": 2.8, "priceUsd": 8500, "reason": "İyi UTM ve raporlama sunar; lisans maliyeti ve kullanım kolaylığı açısından FortiGate'e yakın ama daha pahalıdır." },
+            { "product": "Check Point 1590", "vendor": "Check Point", "throughputGbps": 2.3, "priceUsd": 11000, "reason": "Güçlü güvenlik yönetimi sunar; toplam maliyet ve kurulum karmaşıklığı daha yüksektir." },
+            { "product": "pfSense Plus (Netgate 6100)", "vendor": "Netgate", "throughputGbps": 18.6, "priceUsd": 2200, "reason": "Fiyat performans açısından güçlüdür; ancak kurumsal yönetim, UTM desteği ve tek merkezli operasyon bakımından FortiGate'e göre daha düşük operasyonel kolaylık sunar." }
+          ],
+          "rules": [
+            { "action": "allow", "direction": "in", "proto": "tcp", "port": 443, "from": "any", "to": "dmz", "note": "Müşteri ve çalışan erişimi için DMZ içindeki web ve portal için HTTPS açık tutulur." },
+            { "action": "allow", "direction": "in", "proto": "tcp", "port": 80, "from": "any", "to": "dmz", "note": "HTTP trafiği 443'e yönlendirilir; doğrudan iç servisleri açmaz." },
+            { "action": "allow", "direction": "out", "proto": "udp", "port": 123, "to": "ntp-pool", "note": "Zaman senkronizasyonu; loglar ve sertifikalar için gereklidir." },
+            { "action": "allow", "direction": "in", "proto": "udp", "port": "67:68", "from": "staff", "to": "dhcp", "note": "İç ağlarda DHCP erişimi açıktır; IP dağıtımı olmazsa kullanıcılar ve sunucular ağda kalamaz." },
+            { "action": "allow", "direction": "forward", "proto": "any", "from": "staff", "to": "servers", "note": "Çalışanlar ERP, dosya ve e-posta servislerine erişebilmelidir; diğer ağlara erişim daha kısıtlıdır." },
+            { "action": "deny", "direction": "in", "proto": "any", "from": "any", "to": "management", "note": "Yönetim VLAN'i yalnızca VPN ile erişilebilir; herkese açık yönetim erişimi güvenlik riski doğurur." },
+            { "action": "reject", "direction": "in", "proto": "tcp", "port": 22, "from": "any", "to": "any", "note": "Public SSH reddedilir; gerçek yönetim erişimi bastion ve VPN üzerinden yapılır." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adana-branch",
+      "name": "Adana Şube",
+      "role": "branch",
+      "location": "Adana, TR",
+      "population": { "staff": 200, "software": 30, "rnd": 10 },
+      "network": {
+        "cidr": "10.20.0.0/16",
+        "dmz": true,
+        "vlans": [
+          { "id": 10, "name": "staff", "cidr": "10.20.0.0/22", "note": "Şube personeli ve ofis cihazları." },
+          { "id": 20, "name": "rnd", "cidr": "10.20.16.0/22", "note": "Müşteri odaklı test ve proje geliştirme ortamı." },
+          { "id": 30, "name": "software", "cidr": "10.20.24.0/22", "note": "Yazılım ekibi ve test makineleri." },
+          { "id": 40, "name": "servers", "cidr": "10.20.32.0/22", "note": "Şube sunucuları ve yerel uygulamalar." },
+          { "id": 50, "name": "guest", "cidr": "10.20.48.0/23", "note": "Misafir ağları ve cihazlar." },
+          { "id": 90, "name": "dmz", "cidr": "10.20.254.0/24", "note": "Şube web ve dışarı açılan servisler." },
+          { "id": 99, "name": "management", "cidr": "10.20.255.0/24", "note": "VPN erişimi ile yönetim." }
+        ]
+      },
+      "bandwidth": { "downMbps": 1200, "upMbps": 1200, "drivers": ["ERP", "email", "VoIP", "CI/CD", "cloud backup", "web browsing"] },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": { "product": "FortiGate 100F", "vendor": "Fortinet", "throughputGbps": 1.6, "priceUsd": 5000, "reason": "Şube büyüklüğüne göre 1.2 Gbps bağlantı için uygun, operasyonel olarak merkezle aynı güvenlik yönetimini paylaşır." },
+          "alternatives": [
+            { "product": "Palo Alto PA-440", "vendor": "Palo Alto Networks", "throughputGbps": 0.6, "priceUsd": 6000, "reason": "Güçlü güvenlik, ancak 1.2 Gbps için fazla dar bir sınır bırakır." },
+            { "product": "Sophos XGS 2300", "vendor": "Sophos", "throughputGbps": 1.4, "priceUsd": 6500, "reason": "Uygun performans sunar; lisans yükü yüksektir." },
+            { "product": "Check Point 1530", "vendor": "Check Point", "throughputGbps": 0.7, "priceUsd": 7000, "reason": "İyi güvenlik altyapısı, ancak net performans daha düşüktür." },
+            { "product": "pfSense Plus (Netgate 4200)", "vendor": "Netgate", "throughputGbps": 9.9, "priceUsd": 1800, "reason": "Pahalı lisans gerektirmeyen alternatif; ancak kurumsal işletme ve UTM konsol bütünlüğü zayıftır." }
+          ],
+          "rules": [
+            { "action": "allow", "direction": "in", "proto": "tcp", "port": 443, "from": "any", "to": "dmz", "note": "Müşteriye ve çalışanlara web servisleri için HTTPS güvenli erişim sunulur." },
+            { "action": "allow", "direction": "out", "proto": "udp", "port": 123, "to": "ntp-pool", "note": "Zaman senkronizasyonu." },
+            { "action": "allow", "direction": "in", "proto": "udp", "port": "67:68", "from": "staff", "to": "dhcp", "note": "İç ağda DHCP yoksa cihazlar ağda kalamaz; bu nedenle açık tutulur." },
+            { "action": "allow", "direction": "forward", "proto": "any", "from": "staff", "to": "servers", "note": "Şebe sunucularına erişim gerçek iş akışı için gereklidir." },
+            { "action": "deny", "direction": "forward", "proto": "any", "from": "guest", "to": "staff", "note": "Misafir ağından iç ofis ağlarına geçiş yasaklanır." },
+            { "action": "deny", "direction": "in", "proto": "any", "from": "any", "to": "management", "note": "Yönetim VLAN'i yalnızca VPN ve bastion üzerinden erişilebilir." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "istanbul-branch",
+      "name": "İstanbul Şube",
+      "role": "branch",
+      "location": "İstanbul, TR",
+      "population": { "staff": 400, "software": 80, "rnd": 30 },
+      "network": {
+        "cidr": "10.30.0.0/16",
+        "dmz": true,
+        "vlans": [
+          { "id": 10, "name": "staff", "cidr": "10.30.0.0/22", "note": "İstanbul ofis çalışanları." },
+          { "id": 20, "name": "rnd", "cidr": "10.30.16.0/22", "note": "Ar-Ge laboratuvarı ve deneysel geliştirmeler." },
+          { "id": 30, "name": "software", "cidr": "10.30.24.0/22", "note": "Yazılım ve operasyon ekipleri." },
+          { "id": 40, "name": "servers", "cidr": "10.30.32.0/22", "note": "Kurumsal sistemler ve uygulamalar." },
+          { "id": 50, "name": "guest", "cidr": "10.30.48.0/23", "note": "Ziyaretçi ve müşteri erişimi." },
+          { "id": 90, "name": "dmz", "cidr": "10.30.254.0/24", "note": "Kamuya açık servisler ve portal." },
+          { "id": 99, "name": "management", "cidr": "10.30.255.0/24", "note": "VPN üzerinden yönetim erişimi." }
+        ]
+      },
+      "bandwidth": { "downMbps": 2000, "upMbps": 2000, "drivers": ["ERP", "email", "video meetings", "software updates", "cloud backup", "VoIP", "git"] },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": { "product": "FortiGate 200F", "vendor": "Fortinet", "throughputGbps": 2.5, "priceUsd": 7000, "reason": "Şirketin en büyük şubesi olarak 2 Gbps internet hattı için hem güvenlik performansı hem de tek merkezli yönetim sağlar." },
+          "alternatives": [
+            { "product": "Palo Alto PA-850", "vendor": "Palo Alto Networks", "throughputGbps": 1.9, "priceUsd": 10000, "reason": "İyi güvenlik; fakat 2 Gbps hattı için başlık alanı daha dar." },
+            { "product": "Sophos XGS 3300", "vendor": "Sophos", "throughputGbps": 2.8, "priceUsd": 8500, "reason": "Güçlü UTM; ancak lisans maliyeti yüksek." },
+            { "product": "Check Point 1590", "vendor": "Check Point", "throughputGbps": 2.3, "priceUsd": 11000, "reason": "Yönetim ve güvenlik sağlıyor; maliyet ve kurulum karmaşıklığı daha yüksektir." },
+            { "product": "pfSense Plus (Netgate 6100)", "vendor": "Netgate", "throughputGbps": 18.6, "priceUsd": 2200, "reason": "Yüksek performans; ancak kurumsal destek ve tek merkezli yönetim zayıflar." }
+          ],
+          "rules": [
+            { "action": "allow", "direction": "in", "proto": "tcp", "port": 443, "from": "any", "to": "dmz", "note": "Müşteri ve çalışan erişimi için DMZ web servisleri açılır." },
+            { "action": "allow", "direction": "out", "proto": "udp", "port": 123, "to": "ntp-pool", "note": "NTP ve zaman senkronizasyonu." },
+            { "action": "allow", "direction": "in", "proto": "udp", "port": "67:68", "from": "staff", "to": "dhcp", "note": "İç ağlarda DHCP açık kalmazsa cihazlar IP alamaz." },
+            { "action": "allow", "direction": "forward", "proto": "any", "from": "staff", "to": "servers", "note": "İç uygulamaların erişimi için gereklidir." },
+            { "action": "deny", "direction": "forward", "proto": "any", "from": "guest", "to": "staff", "note": "Misafir ağından iç çalışan ağlarına geçiş kapatılır." },
+            { "action": "deny", "direction": "in", "proto": "any", "from": "any", "to": "management", "note": "Yönetim erişimi sadece VPN bastion üzerinden sağlanır." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "germany-branch",
+      "name": "Almanya Şube",
+      "role": "branch",
+      "location": "Hamburg, DE",
+      "population": { "staff": 200, "software": 40, "rnd": 10 },
+      "network": {
+        "cidr": "10.40.0.0/16",
+        "dmz": true,
+        "vlans": [
+          { "id": 10, "name": "staff", "cidr": "10.40.0.0/22", "note": "Almanya ofis çalışanları." },
+          { "id": 20, "name": "rnd", "cidr": "10.40.16.0/22", "note": "İş geliştirme ve yerel test ortamı." },
+          { "id": 30, "name": "software", "cidr": "10.40.24.0/22", "note": "Geliştirici ve uygulama sunucuları." },
+          { "id": 40, "name": "servers", "cidr": "10.40.32.0/22", "note": "Yerel servisler ve veritabanı katmanı." },
+          { "id": 50, "name": "guest", "cidr": "10.40.48.0/23", "note": "Misafir ve ziyaretçi ağları." },
+          { "id": 90, "name": "dmz", "cidr": "10.40.254.0/24", "note": "Dış servisler ve interaktif uygulamalar." },
+          { "id": 99, "name": "management", "cidr": "10.40.255.0/24", "note": "Yalnızca VPN üzerinden erişim." }
+        ]
+      },
+      "bandwidth": { "downMbps": 1200, "upMbps": 1200, "drivers": ["ERP", "email", "VoIP", "video conferences", "cloud backup", "software updates"] },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": { "product": "FortiGate 100F", "vendor": "Fortinet", "throughputGbps": 1.6, "priceUsd": 5000, "reason": "Almanya şubesi için 1.2 Gbps hattı üzerinde güvenlik dayanımı ve merkez ile tutarlı operasyonel yönetim sağlar." },
+          "alternatives": [
+            { "product": "Palo Alto PA-440", "vendor": "Palo Alto Networks", "throughputGbps": 0.6, "priceUsd": 6000, "reason": "İyi güvenlik, fakat hattın üzerinde daha dar bir tampon bırakır." },
+            { "product": "Sophos XGS 2300", "vendor": "Sophos", "throughputGbps": 1.4, "priceUsd": 6500, "reason": "İyi UTM, ancak lisans maliyetleri yüksektir." },
+            { "product": "Check Point 1530", "vendor": "Check Point", "throughputGbps": 0.7, "priceUsd": 7000, "reason": "Sebekeler için güvenlik iyi; operasyonel maliyet ve kurulum daha yüksektir." },
+            { "product": "pfSense Plus (Netgate 4200)", "vendor": "Netgate", "throughputGbps": 9.9, "priceUsd": 1800, "reason": "Fiyat performans açısından güçlü; fakat kurumsal güvenlik yönetimi ve canlı destek daha zayıftır." }
+          ],
+          "rules": [
+            { "action": "allow", "direction": "in", "proto": "tcp", "port": 443, "from": "any", "to": "dmz", "note": "Dışarıdan erişim için web ve portal HTTPS açık tutulur." },
+            { "action": "allow", "direction": "out", "proto": "udp", "port": 123, "to": "ntp-pool", "note": "Zaman senkronizasyonu ve log tutarlılığı için gereklidir." },
+            { "action": "allow", "direction": "in", "proto": "udp", "port": "67:68", "from": "staff", "to": "dhcp", "note": "İç ağlardaki DHCP erişimi olmazsa cihazlar ağda kalamaz." },
+            { "action": "allow", "direction": "forward", "proto": "any", "from": "staff", "to": "servers", "note": "Şube operasyonları için ERP ve dosya sunucularına erişim gerekir." },
+            { "action": "deny", "direction": "forward", "proto": "any", "from": "guest", "to": "staff", "note": "Misafir ağından iç ofis ağlarına erişim yasaktır." },
+            { "action": "deny", "direction": "in", "proto": "any", "from": "any", "to": "management", "note": "Yönetim erişimi yalnızca VPN üzerinden yapılır; SSH açık değildir." }
+          ]
+        }
+      ]
+    }
+  ],
+  "remoteAccess": {
+    "type": "role-based-vpn",
+    "note": "Kurumsal erişim için public SSH kullanılmaz. Tüm yöneticiler bastion üzerinden role-based VPN ile yönetim VLAN'lerine bağlanır; kullanıcılar yetki bazlı erişim profilleri kullanır. Şube yöneticileri için ayrı profil, uygulama bazlı erişim ve MFA uygulanır."
+  },
+  "monitoring": {
+    "siem": "Wazuh tabanlı merkezi SIEM + log koruma ve olay korelasyonu",
+    "owner": "Ağ Güvenliği Sorumlusu ve merkez SOC tarafından izlenir; her şube için ayrı operasyon sorumlusu vardır.",
+    "alertSink": "Telegram güvenlik kanalı + e-posta uyarıları + SIEM panosu",
+    "appVsSecurity": "Uygulama erişim ve servis durumu ops/kullanıcı kanalında izlenir; güvenlik olayları ayrı SOC kanalında toplanır."
+  },
+  "cveWatch": [
+    { "id": "CVE-2024-4577", "product": "PHP-CGI / web uygulama stack", "status": "investigating", "note": "Öncelikle web uygulama ve PHP sunucu sürüm kontrolü yapılır; temel güvenlik duvarı tek başına uygulama katmanı açıklarını durdurmaz." }
+  ]
+}
