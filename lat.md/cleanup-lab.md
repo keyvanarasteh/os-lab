@@ -124,6 +124,19 @@ replay missed minutes. `GET /api/cleanup/schedules` lists schedules;
 `POST /api/cleanup/schedules/<id>/toggle|delete` changes it. A schedule cannot
 start a plan or clean job.
 
+[[cleanup-lab/engine/cleanup_lab/privileged.py]] permits only four fixed
+maintenance actions: Linux archived-journal vacuum, APT archive cleanup and
+shared font-cache rebuild, and macOS startup-volume Spotlight rebuild. Each
+requires `POST /api/cleanup/privileged/plan {actionIds}` followed by an explicit
+`POST /api/cleanup/privileged/run {planId}`. The one-use preview includes the
+exact argv and expires after ten minutes. The runner rechecks root-owned system
+binaries, executes without a shell via `pkexec` (Linux when available) or
+noninteractive `sudo`, stores no password and appends an audit result. Ordinary
+clean plans keep privileged entries skipped. Catalog reporting excludes actions
+on other operating systems. `GET /api/cleanup/disk-access` is a read-only macOS
+probe that reports limited/unknown/accessible evidence and points to Full Disk
+Access settings without claiming to prove an OS grant.
+
 ## Safety
 
 The eight rules in the README are the acceptance criteria for every task.
