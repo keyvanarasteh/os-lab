@@ -162,6 +162,21 @@ every Qleaner detector id to a catalog id, or to a written reason for dropping i
 | HMAC-signed audit history | `db.rs` | CLN-15 |
 | Ignore rules, schedules, headless CLI, disk-access check | `rules`, `schedules` pages, `cli.rs`, `check_system_disk_access` | CLN-17 … CLN-20 |
 
+### Headless commands (CLN-19)
+
+```sh
+./labctl cleanup scan --entry system.user-caches --json
+./labctl cleanup plan --entry system.user-caches --json
+./labctl cleanup clean --plan PLAN_ID --yes --json
+```
+
+Repeat `--entry` to select multiple catalog detectors. `plan` defaults to Trash;
+`--mode delete` must be explicit. The plan id expires after ten minutes, is
+signed in the private state folder, and can be consumed only once. `clean`
+verifies the paths and ignore rules again and writes the signed audit history.
+Exit codes: 0 complete, 1 problem or partial result, 2 usage. No command accepts
+a free-form path or shell command.
+
 ## What the reference code adds
 
 | Capability | Reference | Task |

@@ -2,6 +2,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -83,9 +84,60 @@ class CliTest(unittest.TestCase):
         stream = io.StringIO()
         with mock.patch.object(cli, "probe") as probe, mock.patch("sys.stderr", stream):
             with self.assertRaises(SystemExit) as raised:
-                cli.main(["scan"], stream=io.StringIO())
+                cli.main(["nonesuch"], stream=io.StringIO())
         self.assertEqual(raised.exception.code, 2)
         probe.assert_not_called()
+
+    def test_headless_scan_plan_clean_is_single_use_and_audited(self):
+        with tempfile.TemporaryDirectory() as temp:
+            cache = os.path.join(temp, "Library", "Caches") if sys.platform == "darwin" else os.path.join(temp, ".cache")
+            os.makedirs(cache)
+            with open(os.path.join(cache, "one.bin"), "wb") as handle:
+                handle.write(b"one")
+            env = {"HOME": temp, "USERPROFILE": temp,
+                   "OSLAB_CLEANUP_STATE": os.path.join(temp, "state"),
+                   "XDG_CACHE_HOME": cache}
+            with mock.patch.dict(os.environ, env):
+                stream = io.StringIO()
+                self.assertEqual(cli.main(["scan", "--entry", "system.user-caches", "--json"], stream), 0)
+                self.assertEqual(json.loads(stream.getvalue())["totals"]["sizeBytes"], 3)
+                stream = io.StringIO()
+                self.assertEqual(cli.main(["plan", "--entry", "system.user-caches", "--json"], stream), 0)
+                plan = json.loads(stream.getvalue())
+                self.assertEqual(plan["totals"]["ready"], 1)
+                plan_id = plan["planId"]
+                self.assertEqual(cli.main(["clean", "--plan", plan_id], io.StringIO()), 2)
+                stream = io.StringIO()
+                self.assertEqual(cli.main(["clean", "--plan", plan_id, "--yes", "--json"], stream), 0)
+                self.assertEqual(json.loads(stream.getvalue())["totals"]["bytes"], 3)
+                self.assertEqual(cli.main(["clean", "--plan", plan_id, "--yes"], io.StringIO()), 1)
+                self.assertFalse(os.path.exists(os.path.join(cache, "one.bin")))
+                self.assertEqual(cli.history.read()["total"], 1)
+
+    def test_headless_clean_rejects_a_changed_plan_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            cache = os.path.join(temp, "Library", "Caches") if sys.platform == "darwin" else os.path.join(temp, ".cache")
+            os.makedirs(cache)
+            original = os.path.join(cache, "keep.bin")
+            with open(original, "wb") as handle:
+                handle.write(b"keep")
+            env = {"HOME": temp, "USERPROFILE": temp,
+                   "OSLAB_CLEANUP_STATE": os.path.join(temp, "state"),
+                   "XDG_CACHE_HOME": cache}
+            with mock.patch.dict(os.environ, env):
+                stream = io.StringIO()
+                self.assertEqual(cli.main(["plan", "--entry", "system.user-caches", "--json"], stream), 0)
+                plan_id = json.loads(stream.getvalue())["planId"]
+                stored = os.path.join(env["OSLAB_CLEANUP_STATE"], "cli-plan-" + plan_id + ".json")
+                with open(stored, encoding="utf-8") as handle:
+                    data = json.load(handle)
+                data["payload"]["plan"]["mode"] = "delete"
+                with open(stored, "w", encoding="utf-8") as handle:
+                    json.dump(data, handle)
+                stream = io.StringIO()
+                self.assertEqual(cli.main(["clean", "--plan", plan_id, "--yes", "--json"], stream), 1)
+                self.assertIn("signature", json.loads(stream.getvalue())["error"])
+                self.assertTrue(os.path.exists(original))
 
     def test_no_subcommand_prints_help_and_returns_usage(self):
         stream = io.StringIO()

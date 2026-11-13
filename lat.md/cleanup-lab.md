@@ -26,6 +26,12 @@ fallthrough. Long work becomes a console job with preview, progress and cancel.
 `labctl cleanup status|doctor|history [--json]` runs the same engine through
 `cleanup_lab.cli`: exit `0` when ready, `1` when a required check fails, `2` for a
 usage error, matching [[lat.md/labctl.md]].
+`labctl cleanup scan --entry ID --json` measures catalog targets, `plan --entry ID
+--json` saves a short-lived signed plan, and `clean --plan ID --yes --json`
+consumes it once. These commands return `0` for a complete operation, `1` for a
+problem or partial result, and `2` for usage. Plans live in the private state
+folder and use the audit store's per-install HMAC key; a separate CLI invocation
+rechecks fingerprints and rules before moving anything, then records the run.
 
 ## Catalog
 
