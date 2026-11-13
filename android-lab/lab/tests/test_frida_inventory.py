@@ -242,6 +242,13 @@ def test_host_target_is_one_tcp_device_queried_with_dash_h():
     inv = fi.build_inventory(host="localhost", runner=runner)
     assert [(d["id"], d["transport"]) for d in inv["devices"]] == [("tcp@127.0.0.1:27042", "TCP")]
     assert runner.ps_calls()[0][1:3] == ["-H", "127.0.0.1:27042"]
+    assert runner.calls == runner.ps_calls() and inv["errors"] == []
+
+
+def test_host_target_does_not_depend_on_the_device_listing():
+    runner = FakeRunner(devices=fi.ToolError("frida-ls-devices timed out after 20s"))
+    inv = fi.build_inventory(host="127.0.0.1", runner=runner)
+    assert inv["errors"] == [] and inv["devices"][0]["processCount"] is not None
 
 
 def test_name_filter_matches_name_or_identifier():

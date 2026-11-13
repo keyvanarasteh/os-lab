@@ -373,8 +373,9 @@ def build_inventory(usb=False, device=None, host=None, apps=False, processes=Tru
     except ToolError as exc:
         lister = None
         errors.append({"stage": "backend", "message": str(exc)})
+    # A named TCP target is the whole inventory, so the device listing is skipped.
     try:
-        devices = lister.devices() if lister else []
+        devices = lister.devices() if lister and not host else []
     except ToolError as exc:
         devices = []
         errors.append({"stage": "devices", "message": str(exc)})

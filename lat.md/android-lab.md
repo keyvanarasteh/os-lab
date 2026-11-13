@@ -71,10 +71,13 @@ report generator [[android-lab/lab/scripts/app_reporter.py]], the MobSF client
 
 [[console/frida_inventory.py]] answers "what can Frida attach to right now?" as one JSON document.
 
-It wraps `frida-ls-devices` and `frida-ps`, labels each device with its
-transport (local, USB or TCP) and lists processes for local and USB devices, or
-for one named target. It is read-only: it passes only listing flags and never
-attaches, spawns or starts a frida-server. A TCP target must be a literal
+It covers what `frida-ls-devices` and `frida-ps` report, labels each device
+with its transport (local, USB or TCP) and lists processes for local and USB
+devices, or for one named target. It lists through the `frida` Python module
+when that is importable and falls back to the two command-line tools otherwise,
+because `frida-ls-devices` draws an interactive table that needs a console. It
+is read-only: it only enumerates, passes only listing flags to the tools and
+never attaches, spawns or starts a frida-server. A TCP target must be a literal
 loopback, private or link-local address; hostnames and public addresses are
 refused before any tool runs. A missing tool or a failed listing is recorded in
 the document's `errors` (exit code 1) instead of raising, and a command that
