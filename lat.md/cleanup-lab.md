@@ -10,9 +10,11 @@ The engine is a standard-library Python package; the console and `labctl` are th
 typed layers over it.
 
 The package lives in [[cleanup-lab/engine/cleanup_lab]]. `readiness`, `paths`, the
-catalog loader (CLN-02), the scan job (CLN-03), the safety guard (CLN-12) and the
-plan → clean executor (CLN-13), audit history (CLN-15) and ignore rules (CLN-17) exist now. One module, `safety.py`,
-guards every destructive call, so no other module may delete, move or shred.
+catalog loader (CLN-02), the scan job (CLN-03), the safety guard (CLN-12), the
+plan → clean executor (CLN-13), audit history (CLN-15), ignore rules (CLN-17), the
+volume inventory (CLN-28) and cache relocation (CLN-27) exist now. One module,
+`safety.py`, guards every destructive call, so no other module may delete, move or
+shred.
 
 Target paths are data, never code: every platform path, risk class, owning process
 and privilege flag belongs in `cleanup-lab/catalog/*.json` (CLN-02). Per-OS
@@ -75,6 +77,17 @@ catalog target when the target or any descendant matches, so cleaning a parent
 cannot remove an ignored child. The plan records a digest of the rules and a rule
 change makes confirmation stale; execution checks again before each item.
 
+## Relocation
+
+[[cleanup-lab/engine/cleanup_lab/relocation.py]] moves a cache to another local volume and leaves a symlink behind; only a confirmed plan runs.
+
+Planning is read-only and reports one of seven link states. The executor copies,
+verifies, renames the original aside, creates and verifies the link, then removes
+the aside; a failure leaves the original, the aside, or a verified copy and says
+which. `.oslab-moving` / `.oslab-restoring` mark an interrupted run, and a resume
+finishes or rolls it back. The owning tool must not be running, the destination is
+limited to a reported non-home volume, and there is no elevated fallback.
+
 ## Readiness
 
 `readiness.py` reports what the engine can do on this host without writing anything.
@@ -105,14 +118,19 @@ no free-form path list: an unknown path is `404`, unexpected or duplicate query
 parameters, unknown keys or unknown ids are `400`, and a missing engine is `501`.
 A stale, expired or already-used plan is `409`/`410` with nothing removed. The job
 lives in the console process, and its worker always ends in `done`, `cancelled` or
-`failed` — never `running`. `GET /api/cleanup/history` returns the latest 100
+`failed` — never `running`. `GET /api/cleanup/relocations` lists each catalog
+path's link state per reported volume; `POST /api/cleanup/relocations/plan` takes a
+catalog entry, path index, volume and typed action, and `POST
+/api/cleanup/relocations/run {planId}` runs the confirmed plan. `GET
+/api/cleanup/volumes` lists local mounted volumes and disk pressure. `GET
+/api/cleanup/history` returns the latest 100
 verified runs from the private SQLite store. The store writes each completed
 clean result with path, bytes, mode and outcome, chaining records with
 HMAC-SHA256 and a random per-install key. `labctl cleanup history --verify`
 checks the full chain and exits 1 on tampering. History is durable across console
 restarts. `GET /api/cleanup/rules` lists private ignore rules; `POST` to that route
 adds a typed rule, and `POST /api/cleanup/rules/<id>/update|delete` changes one.
-Later tasks add volumes (CLN-28) and runtimes (CLN-29) here, each typed and validated again by the
+Later tasks add runtimes (CLN-29) here, each typed and validated again by the
 engine.
 
 [[cleanup-lab/engine/cleanup_lab/schedules.py]] keeps scan-only schedules in a
@@ -168,7 +186,8 @@ The engine tests run under `unittest` from the engine folder.
 
 `cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'`
 covers the probe, the catalog, the scan, plan → clean (guard, fingerprints,
-Trash by default, honest failures), the path rules and the CLI exit codes.
+Trash by default, honest failures), relocation (seven states, step failures and
+resume), the path rules and the CLI exit codes.
 Tests live in [[cleanup-lab/engine/tests]]; the console's typed job contract is
 covered by [[android-lab/lab/tests/test_cleanup_console.py]]. [[scripts/run-tests.sh]]
 runs the same suites next to the reference code tests, the Android suite, `bash -n`,

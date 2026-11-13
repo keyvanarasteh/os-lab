@@ -3,8 +3,9 @@
 The console accepts typed, validated calls only: never a command string and never
 a free-form path list from the page (``cleanup-lab/README.md``). Ready:
 readiness (CLN-01), the detector catalog (CLN-02), the scan job (CLN-03) and the
-plan → clean flow (CLN-13) and audit history (CLN-15); the remaining endpoints add
-their own actions here, each validated again by the engine's safety guard.
+plan → clean flow (CLN-13), audit history (CLN-15), rules (CLN-17), schedules
+(CLN-18), the headless CLI (CLN-19), privileged actions (CLN-20), volumes (CLN-28)
+and cache relocation (CLN-27); each request is validated again by the engine.
 
 The engine is imported from ``cleanup-lab/engine`` (``cleanup_lab``), which is a
 plain standard-library package: the console does not install it.
@@ -43,6 +44,8 @@ SCHEDULE_ADD_KEYS = ("cron", "entryIds", "enabled")
 SCHEDULE_TOGGLE_KEYS = ("enabled",)
 PRIVILEGED_PLAN_KEYS = ("actionIds",)
 PRIVILEGED_RUN_KEYS = ("planId",)
+RELOCATION_PLAN_KEYS = ("entryId", "pathIndex", "volumeId", "action")
+RELOCATION_RUN_KEYS = ("planId",)
 #: Engine ``PlanError.code`` → HTTP status on the plan → clean namespace.
 PLAN_STATUS = {
     "plan-invalid": 400,
@@ -52,7 +55,23 @@ PLAN_STATUS = {
     "used": 409,
     "cancelled": 409,
 }
+#: Engine relocation ``RelocationError.code`` → HTTP status.
+RELOCATION_STATUS = {
+    "bad-action": 400,
+    "bad-aside": 400,
+    "bad-staging": 400,
+    "destination-outside": 400,
+    "nested": 400,
+    "no-space": 409,
+    "state": 409,
+    "interrupted": 409,
+    "no-interrupted": 409,
+    "conflict": 409,
+    "missing-store": 409,
+    "unverified-store": 409,
+}
 BODY_KEYS = {"scan": SCAN_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS,
+             "relocation-plan": RELOCATION_PLAN_KEYS, "relocation-run": RELOCATION_RUN_KEYS,
              "rule-add": RULE_ADD_KEYS, "rule-update": RULE_UPDATE_KEYS,
              "rule-delete": (), "schedule-add": SCHEDULE_ADD_KEYS,
              "schedule-toggle": SCHEDULE_TOGGLE_KEYS, "schedule-delete": (),
@@ -128,6 +147,53 @@ def _validate_workers(scan, workers):
     return workers
 
 
+def _relocation_store(volume, entry_id, index):
+    """The store path is derived from the catalog id and path index, never a page path."""
+    safe = entry_id.replace(os.sep, "_").replace("/", "_").replace("\\", "_")
+    return os.path.join(volume, "os-lab-caches", safe, str(index))
+
+
+def _relocation_volume(report, volume_id):
+    for row in report.get("volumes", []):
+        if row.get("mountPoint") == volume_id:
+            return row
+    raise CleanupError(400, "volumeId must name a reported local volume")
+
+
+def _relocation_actions(status, interrupted, store_exists):
+    """The typed actions that make sense in this link state."""
+    if interrupted == "move" or interrupted == "restore":
+        return ["resume"]
+    if status == "local_only":
+        return ["move"]
+    if status == "linked_ok":
+        return ["restore"]
+    if status == "missing_link":
+        return ["restore", "relink"]
+    if status in ("wrong_target", "broken_link") and store_exists:
+        return ["relink"]
+    return []
+
+
+def _relocation_guard(root, entry, path, action):
+    """Ownership, protection and the CLN-12 running-app lock, before a plan exists."""
+    safety = _module(root, "safety")
+    platform = _module(root, "paths").platform_id()
+    if entry.get("needsPrivilege"):
+        raise CleanupError(400, "This cache is marked privileged; relocation has no elevated fallback")
+    if action == "move":
+        verdict = safety.check_target(path, entry, platform=platform)
+        if not verdict.ok:
+            raise CleanupError(400, verdict.reason)
+        return
+    owned = path if os.path.lexists(path) else os.path.dirname(path)
+    if not safety.owned_by_user(owned):
+        raise CleanupError(400, "The cache folder is owned by another user account")
+    busy = safety.running_processes(entry.get("owningProcesses", []), platform=platform)
+    if busy:
+        raise CleanupError(400, "The owning application is running: {0}".format(", ".join(sorted(busy))))
+
+
 class CleanupJob:
     """One running (or finished) cleanup action: a scan, a plan or a clean."""
 
@@ -143,6 +209,13 @@ class CleanupJob:
                 "itemsTotal": 0,
                 "bytesRemoved": 0,
                 "currentPath": "",
+            }
+        elif kind == "relocate":
+            self.progress = {
+                "phase": "queued",
+                "stepsDone": 0,
+                "stepsTotal": 0,
+                "currentStep": "",
             }
         else:
             self.progress = {
@@ -264,6 +337,103 @@ class CleanupJobStore:
         job = CleanupJob("clean", {"planId": plan_id})
         self._register(job)
         return self._spawn(job, self._run_clean, (root, job, record.plan, clean))
+
+    def start_relocation_plan(self, root, request):
+        """Validate a typed move/restore/relink/resume and return a read-only plan.
+
+        The request names a catalog entry, a path index, a reported volume and an
+        action — never a raw path. The engine derives the store path, re-checks
+        the copy policy and the free-space pad, and registers a single-use plan.
+        """
+        relocation = _module(root, "relocation")
+        catalog = _module(root, "catalog")
+        volumes = _module(root, "volumes")
+        paths = _module(root, "paths")
+        platform = paths.platform_id()
+        entry_id = request.get("entryId")
+        if not isinstance(entry_id, str) or not entry_id:
+            raise CleanupError(400, "entryId must be a detector id")
+        index = request.get("pathIndex", 0)
+        if not isinstance(index, int) or isinstance(index, bool) or index < 0:
+            raise CleanupError(400, "pathIndex must be a non-negative whole number")
+        volume_id = request.get("volumeId")
+        if not isinstance(volume_id, str) or not volume_id:
+            raise CleanupError(400, "volumeId must name a reported local volume")
+        action = request.get("action", "move")
+        if action not in relocation.ACTIONS:
+            raise CleanupError(400, "action must be one of {0}".format(", ".join(relocation.ACTIONS)))
+
+        entries = catalog.load(root)
+        entry = next((item for item in entries if item["id"] == entry_id), None)
+        if entry is None:
+            raise CleanupError(400, "Unknown detector id: {0}".format(entry_id))
+        if not entry["paths"].get(platform):
+            raise CleanupError(400, "This entry has no path for this system")
+        resolved = catalog.resolve(entry, platform)
+        if index >= len(resolved):
+            raise CleanupError(400, "pathIndex is out of range for this entry")
+        path = resolved[index]["path"]
+        if path is None:
+            raise CleanupError(400, resolved[index]["reason"] or "This path cannot be resolved")
+
+        try:
+            report = volumes.report()
+        except OSError as exc:
+            raise CleanupError(500, "Volume inventory is unavailable: {0}".format(exc)) from exc
+        volume = _relocation_volume(report, volume_id)
+        if volume.get("home"):
+            raise CleanupError(400, "Choose a volume other than the one that holds the cache")
+        _relocation_guard(root, entry, path, action)
+        store = _relocation_store(volume_id, entry_id, index)
+        home_volume = report.get("homeVolume") or os.path.abspath(os.sep)
+        try:
+            plan = relocation.build_plan(
+                path,
+                store,
+                action,
+                volume_id=volume_id,
+                destination_root=volume_id if action == "move" else home_volume,
+                platform=platform,
+            )
+        except relocation.RelocationError as exc:
+            raise CleanupError(RELOCATION_STATUS.get(exc.code, 400), str(exc)) from exc
+        RELOCATIONS.register(plan)
+        return plan.to_dict()
+
+    def start_relocation_run(self, root, plan_id):
+        """Claim a confirmed relocation plan and run it on a worker thread."""
+        relocation = _module(root, "relocation")
+        try:
+            _module(root, "history").prepare()
+        except Exception as exc:
+            raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+        try:
+            record = RELOCATIONS.claim(plan_id)
+        except PlanStoreError as exc:
+            raise CleanupError(PLAN_STATUS.get(exc.code, 409), str(exc)) from exc
+        job = CleanupJob("relocate", {"planId": plan_id})
+        self._register(job)
+        return self._spawn(job, self._run_relocate, (root, job, record.plan, relocation))
+
+    def _run_relocate(self, root, job, plan, relocation):
+        def update(payload):
+            job.progress = dict(payload)
+
+        try:
+            result = relocation.execute(plan, cancel=job.cancel, progress_callback=update)
+            job.result = result
+            job.progress = result["progress"]
+            job.error = result.get("error")
+            job.state = result["state"] if result["state"] in ("done", "cancelled", "failed") else "done"
+            try:
+                _module(root, "history").append(result)
+            except Exception as exc:
+                job.error = "The relocation finished but the audit log failed: {0}".format(exc)
+        except Exception as exc:  # the job must answer, never hang in "running"
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
 
     def _run_scan(self, root, job, entry_ids, workers):
         def update(payload):
@@ -407,6 +577,77 @@ class PlanStore:
 #: One store per console process; the handler instances are per-request.
 JOBS = CleanupJobStore()
 PLANS = PlanStore()
+RELOCATIONS = PlanStore()
+
+
+def relocation_listing(root):
+    """Every catalog path with its link state against each non-home volume."""
+    volumes = _module(root, "volumes")
+    catalog = _module(root, "catalog")
+    relocation = _module(root, "relocation")
+    paths = _module(root, "paths")
+    platform = paths.platform_id()
+    try:
+        report = volumes.report()
+    except OSError as exc:
+        raise CleanupError(500, "Volume inventory is unavailable: {0}".format(exc)) from exc
+    rows = report.get("volumes", [])
+    targets = [row for row in rows if not row.get("home")]
+    entries = []
+    for entry in catalog.load(root):
+        if not entry["paths"].get(platform):
+            continue
+        relocatable = not entry.get("needsPrivilege") and entry.get("risk") not in (
+            "credentials", "privacy"
+        )
+        reason = ""
+        if entry.get("needsPrivilege"):
+            reason = "This cache needs administrator rights; relocation has no elevated fallback."
+        elif not relocatable:
+            reason = "This entry is a credentials or privacy store; it stays in place."
+        resolved = catalog.resolve(entry, platform)
+        path_rows = []
+        for index, item in enumerate(resolved):
+            path = item["path"]
+            targets_out = []
+            if path:
+                for row in targets:
+                    store = _relocation_store(row["mountPoint"], entry["id"], index)
+                    status = relocation.classify(path, store)
+                    interrupted = relocation.interrupted_kind(path, store)
+                    actions = _relocation_actions(
+                        status.value, interrupted, os.path.lexists(store)
+                    ) if relocatable else []
+                    targets_out.append({
+                        "volumeId": row["mountPoint"],
+                        "storePath": store,
+                        "status": status.value,
+                        "interrupted": interrupted,
+                        "storeExists": os.path.lexists(store),
+                        "actions": actions,
+                    })
+            path_rows.append({
+                "index": index,
+                "template": item["template"],
+                "homePath": path,
+                "reason": item["reason"],
+                "targets": targets_out,
+            })
+        entries.append({
+            "entryId": entry["id"],
+            "entryName": entry["name"],
+            "risk": entry["risk"],
+            "owningProcesses": entry.get("owningProcesses", []),
+            "relocatable": relocatable,
+            "reason": reason,
+            "paths": path_rows,
+        })
+    return {
+        "platform": platform,
+        "homeVolume": report.get("homeVolume"),
+        "volumes": [dict(row, id=row["mountPoint"]) for row in rows],
+        "entries": entries,
+    }
 
 
 def run_due_schedules(root, *, now=None):
@@ -481,6 +722,9 @@ class CleanupAPI:
                 return _module(self.root, "schedules").read()
             except ValueError as exc:
                 raise CleanupError(500, str(exc)) from exc
+        if path == "/api/cleanup/relocations":
+            _query(query)
+            return relocation_listing(self.root)
         if path == "/api/cleanup/history":
             _query(query)
             try:
@@ -506,6 +750,15 @@ class CleanupAPI:
         if path == "/api/cleanup/scan":
             _object_body(body, "scan")
             return JOBS.start_scan(self.root, body)
+        if path == "/api/cleanup/relocations/plan":
+            _object_body(body, "relocation-plan")
+            return JOBS.start_relocation_plan(self.root, body)
+        if path == "/api/cleanup/relocations/run":
+            _object_body(body, "relocation-run")
+            plan_id = body.get("planId")
+            if not isinstance(plan_id, str) or not plan_id:
+                raise CleanupError(400, "planId must be the id of a built relocation plan")
+            return JOBS.start_relocation_run(self.root, plan_id)
         if path == "/api/cleanup/privileged/plan":
             _object_body(body, "privileged-plan")
             try:
