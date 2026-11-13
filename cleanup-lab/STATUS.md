@@ -47,7 +47,7 @@ the finding and the decision are in the session log.
 | CLN-16 | pending | — | — | dashboard page is the whole task | console side only | none |
 | CLN-17 | in progress (this PR) | [#154](https://github.com/keyvanarasteh/os-lab/pull/154) | — | plain settings controls on `/cleanup/` after CLN-16 lands | backend and typed API first | none |
 | CLN-18 | in progress (this PR) | [#155](https://github.com/keyvanarasteh/os-lab/pull/155) | — | plain schedules section on `/cleanup/` after CLN-16 lands | scan-only store, runner and typed API first | none |
-| CLN-19 | pending | — | — | — | — | none |
+| CLN-19 | in progress (this PR) | [#156](https://github.com/keyvanarasteh/os-lab/pull/156) | — | — | headless CLI after engine API | none |
 | CLN-20 | pending | — | — | — | — | none |
 | CLN-21 | pending | — | — | — | — | none |
 | CLN-22 | merged | [#137](https://github.com/keyvanarasteh/os-lab/pull/137) | a3133e76 | — | done ahead of order by Claude Code at the maintainer's request; engine and dashboard untouched | none |
