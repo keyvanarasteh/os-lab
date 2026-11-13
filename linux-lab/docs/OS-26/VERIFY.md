@@ -224,5 +224,6 @@ olarak işaretlenmedi; OS-26'ya özgü testlerin tamamı geçti.
    mevcut uygulama PR'ının güncellendiğini açın.
 6. Video bağlantısını PR'a ekleyip dersin Telegram grubunda paylaşın.
 
-Öğrencinin VM testleri ve lab çıktıları yukarıda kaydedildi. Kanıt videosu ve
-kişisel Git/PR değerlendirmesi henüz eklenmedi.
+Öğrencinin VM testleri ve lab çıktıları yukarıda kaydedildi. Kişisel Git/PR
+değerlendirmesi [REPORT.md](REPORT.md) içindedir; kanıt videosunun bağlantısı
+kayıt tamamlandıktan sonra PR'a eklenecek.

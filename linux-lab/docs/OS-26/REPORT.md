@@ -37,11 +37,19 @@ Uygulama `feat/permission-auditor` dalında hazırlandı. Commit değişiklikler
 kaydeder, push uzak dala aktarır; uygulama PR'ı incelemeye sunar. Aynı dala yeni
 commit gönderilmesi mevcut PR'ı günceller.
 
-## Kişisel değerlendirme ve teslim
+## Kişisel değerlendirme
 
-Bu belge teknik çalışma taslağıdır. Linux lab gözlemleri eklendi; Git/PR
-sürecinde öğrenilenleri anlatan kişisel değerlendirme ve 2–4 dakikalık kanıt
-videosu henüz eklenmedi. Terminal çıktıları kanıt videosunun yerine geçmez.
+Lab denemelerinde dosya izinlerinin ve sahipliğinin nasıl denetlendiğini,
+izinleri düzelttiğimde rapordaki bulguların nasıl değiştiğini gördüm.
+Fork ve ayrı dal kullanmanın, katkımı ana projeden bağımsız hazırlamamı
+sağladığını öğrendim.
+Commitin değişiklikleri kaydettiğini, push işleminin bunları GitHub'a
+aktardığını ve aynı dala eklenen commitlerin mevcut PR'ı güncellediğini öğrendim.
+
+## Teslim durumu
+
+Linux lab doğrulaması ve kişisel değerlendirme eklendi. 2–4 dakikalık kanıt
+videosunun bağlantısı kayıt tamamlandıktan sonra PR'a eklenecek.
 
 Kod, testler ve belge taslağı ChatGPT desteğiyle hazırlanmıştır. Çalıştırma
 komutları, beklenen çıktılar ve doğrulama sonuçları [VERIFY.md](VERIFY.md) içindedir.
