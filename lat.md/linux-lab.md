@@ -36,6 +36,24 @@ expected, network containment is documented in
 [[linux-lab/knowledge/networking.md]] and worked workflows in
 [[linux-lab/knowledge/usecases.md]].
 
+## Permission and ownership audit
+
+[[linux-lab/scripts/permission_audit.py]] audits an owned lab tree's Unix modes
+and UID/GID against configurable limits. It reports world-write, excess bits,
+privileged regular files and ownership drift as text or JSON without applying fixes.
+
+Directory-relative stats and `fwalk` do not follow symlinks. Other filesystems
+and special files are counted as skipped; access errors and the entry budget
+make coverage incomplete. Exit codes are 0 clean, 1 findings, 2 incomplete/usage.
+
+The mode masks default to 0644/0755 and owner to the current UID; group is opt-in.
+Directory sticky/setgid semantics are preserved in suggestions. ACLs and file
+contents are outside scope; the audit is not an atomic filesystem snapshot.
+
+Offline cases in [[android-lab/lab/tests/test_permission_audit.py]] cover rules,
+root changes, links, limits, failure reporting and read-only behavior.
+[[linux-lab/docs/OS-26/VERIFY.md]] supplies the reproducible lab and video steps.
+
 ## Why qemux/qemu
 
 The engine was chosen to match the Windows and macOS labs' compose+web-viewer UX.
