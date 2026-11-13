@@ -37,6 +37,7 @@ SCAN_KEYS = ("entryIds", "workers")
 PLAN_KEYS = ("entryIds", "workers", "mode")
 #: The only key a clean request may carry: which confirmed plan to run.
 CLEAN_KEYS = ("planId",)
+SETTINGS_KEYS = ("shredPolicy",)
 #: Engine ``PlanError.code`` → HTTP status on the plan → clean namespace.
 PLAN_STATUS = {
     "plan-invalid": 400,
@@ -46,7 +47,8 @@ PLAN_STATUS = {
     "used": 409,
     "cancelled": 409,
 }
-BODY_KEYS = {"scan": SCAN_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS}
+BODY_KEYS = {"scan": SCAN_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS,
+             "settings": SETTINGS_KEYS}
 
 
 class CleanupError(ValueError):
@@ -415,6 +417,9 @@ class CleanupAPI:
                 return catalog.report(self.root)
             except catalog.CatalogError as exc:
                 raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+        if path == "/api/cleanup/settings":
+            _query(query)
+            return _module(self.root, "settings").read()
         if path == "/api/cleanup/history":
             _query(query)
             try:
@@ -440,6 +445,12 @@ class CleanupAPI:
         if path == "/api/cleanup/scan":
             _object_body(body, "scan")
             return JOBS.start_scan(self.root, body)
+        if path == "/api/cleanup/settings":
+            _object_body(body, "settings")
+            policy = body.get("shredPolicy")
+            if policy not in _module(self.root, "settings").POLICIES:
+                raise CleanupError(400, "shredPolicy must be off, one-pass or three-pass")
+            return _module(self.root, "settings").update(policy)
         if path == "/api/cleanup/plan":
             _object_body(body, "plan")
             return JOBS.start_plan(self.root, body)

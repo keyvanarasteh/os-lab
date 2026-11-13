@@ -297,7 +297,6 @@ def test_plan_and_clean_requests_are_typed(tmp_path, monkeypatch):
         {"entryIds": "system.user-caches"},
         {"entryIds": ["nope.entry"]},
         {"entryIds": ["system.user-caches", "system.user-caches"]},
-        {"entryIds": ["system.user-caches"], "mode": "shred"},
         {"entryIds": ["system.user-caches"], "workers": 0},
         {"entryIds": ["system.user-caches"], "workers": True},
     ):
@@ -405,3 +404,25 @@ def test_the_browser_route_plans_and_cleans(tmp_path, monkeypatch):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_shred_policy_requires_setting_and_audits_result(tmp_path, monkeypatch):
+    target = catalog_cache_target(tmp_path, monkeypatch)
+    (tmp_path / "private-state").mkdir(mode=0o700)
+    monkeypatch.setenv("OSLAB_CLEANUP_STATE", str(tmp_path / "private-state"))
+    with open(os.path.join(target, "sample"), "wb") as handle:
+        handle.write(b"secret")
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    assert api.get("/api/cleanup/settings", {})["shredPolicy"] == "off"
+    with pytest.raises(cleanup_api.CleanupError) as invalid:
+        api.post("/api/cleanup/settings", {"shredPolicy": "five-pass"})
+    assert invalid.value.status == 400
+    assert api.post("/api/cleanup/settings", {"shredPolicy": "one-pass"})["shredPolicy"] == "one-pass"
+    plan_job = api.post("/api/cleanup/plan", {"entryIds": ["system.user-caches"], "mode": "shred"})
+    wait_for(plan_job, "done")
+    assert plan_job.result["shredPolicy"] == "one-pass"
+    clean_job = api.post("/api/cleanup/clean", {"planId": plan_job.result["planId"]})
+    wait_for(clean_job, "done")
+    assert clean_job.result["results"][0]["status"] == "shredded"
+    assert not os.path.exists(target)
+    assert api.get("/api/cleanup/history", {})["verified"] is True
