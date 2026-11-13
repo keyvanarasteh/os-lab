@@ -150,6 +150,17 @@ gibi sunulmaz. Güncelleyici hatası, değiştirilmemiş upstream üzerinde yap�
 20 ayrı hedefli geliştirme ortamı denemesinde tekrarlanmadı; VM'deki nedeni
 bu sonuçla kesinleştirilemez. Genel paketin tamamı geçti olarak işaretlenmedi.
 
+Öğrencinin aynı Ubuntu VM'sinde güncelleyici testi daha sonra tek başına
+tekrar çalıştırıldı:
+
+```bash
+.venv-test/bin/python -m pytest android-lab/lab/tests/test_app_update.py::test_install_downloads_verifies_and_opens -q
+```
+
+Sonuç: **1 passed in 0.03s**. Önceki güncelleyici hatası bu hedefli denemede
+tekrarlanmadı. Bu sonuç genel paketin tamamının geçtiği anlamına gelmez;
+yukarıdaki tam çalıştırma kaydı korunmuştur.
+
 Logdaki `Security Score: 24/100 (Grade: F)`, kasıtlı zayıflıklar içeren örnek
 APK'nın güvenlik değerlendirmesidir. İlgili analiz/raporlama aşaması geçti.
 
