@@ -17,6 +17,7 @@ import pwd
 import re
 import shlex
 from contextlib import contextmanager
+import signal
 import stat
 import subprocess
 import sys
@@ -36,10 +37,54 @@ BACKUP_UID = 0
 BACKUP_GID = 0
 TRUSTED_PATH = "/usr/sbin:/usr/bin:/sbin:/bin"
 FIXES = ("ssh-permissions", "user-key-permissions", "unattended-timer", "ufw-ssh-rule")
+UFW_ACTIONS = ('allow', 'deny', 'reject', 'limit')
+UFW_LOG_TYPES = ('log', 'log-all')
+UFW_KEYWORDS = ('in', 'out', 'on', 'from', 'to', 'port', 'app', 'proto', 'comment', *UFW_LOG_TYPES)
+# Ctrl-C, terminal hangup and service-manager termination are recorded while
+# repairs run, so a command or file update in progress is not cut in half.
+DEFERRED_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+FINDING_LINE = re.compile(r'^\[(PASS|FAIL|WARN|SKIP)\] ([^:]+): (.*)$')
+SUMMARY_LINE = re.compile(r'^Summary: (\d+) FAIL, (\d+) WARN$')
 
 
 class Refused(RuntimeError):
     """A required safety condition was not established."""
+
+
+class Interrupted(Refused):
+    """A termination signal stopped repairs at a safe checkpoint."""
+
+    def __init__(self, signum: int, message: str | None = None):
+        self.signum = signum
+        super().__init__(message or f'interrupted by {signal.Signals(signum).name}')
+
+
+@contextmanager
+def deferred_signals(state: dict, signums: tuple = DEFERRED_SIGNALS):
+    """Record termination signals instead of dying between related steps."""
+    def record(signum, _frame):
+        state.setdefault('signal', signum)
+    previous = {}
+    try:
+        for signum in signums:
+            previous[signum] = signal.signal(signum, record)
+        yield
+    finally:
+        for signum, handler in previous.items():
+            signal.signal(signum, handler)
+
+
+def checkpoint(state: dict) -> None:
+    if state.get('signal'):
+        raise Interrupted(state['signal'])
+
+
+def notify(message: str) -> None:
+    # After SIGHUP the terminal may be gone; state is already in the manifest.
+    try:
+        print(message, file=sys.stderr)
+    except OSError:
+        pass
 
 
 class System:
@@ -153,6 +198,97 @@ def ufw_rules(text: str) -> list[list[str]]:
     return [shlex.split(line) for line in text.splitlines() if line.startswith('ufw ')]
 
 
+def same_address(value: str, source: str) -> bool:
+    try:
+        return ipaddress.ip_network(value, strict=False) == ipaddress.ip_network(source)
+    except ValueError:
+        return False
+
+
+def ufw_rule_fields(tokens: list[str]) -> dict | None:
+    """Parse one `ufw show added` rule into the fields UFW uses for identity.
+
+    UFW treats rules as the same when direction, interfaces, addresses, ports,
+    apps and protocol match; action, log type and comment do not make a rule
+    distinct. Returns None for syntax this parser does not understand.
+    """
+    if len(tokens) < 3 or tokens[0] != 'ufw':
+        return None
+    rest = tokens[1:]
+    fields = {'route': rest[0] == 'route', 'direction': 'in', 'in_on': '', 'out_on': '',
+              'log': '', 'from': 'any', 'from_port': 'any', 'from_app': '',
+              'to': 'any', 'to_port': 'any', 'to_app': '', 'proto': 'any', 'comment': ''}
+    if fields['route']:
+        rest = rest[1:]
+    if not rest or rest[0] not in UFW_ACTIONS:
+        return None
+    fields['action'], rest = rest[0], rest[1:]
+    if len(rest) >= 2 and rest[-2] == 'comment':
+        fields['comment'], rest = rest[-1], rest[:-2]
+    full, index = False, 0
+    while index < len(rest):
+        word, following = rest[index], rest[index + 1:]
+        if word in ('in', 'out') and following[:1] == ['on'] and len(following) >= 2:
+            fields[f'{word}_on'] = following[1]
+            fields['direction'] = word
+            full, index = True, index + 3
+        elif word in ('in', 'out'):
+            fields['direction'], index = word, index + 1
+        elif word in UFW_LOG_TYPES:
+            fields['log'], index = word, index + 1
+        elif word in ('from', 'to') and following and following[0] not in UFW_KEYWORDS:
+            fields[word] = following[0]
+            full, index = True, index + 2
+            if rest[index:index + 1] in (['port'], ['app']) and len(rest) > index + 1:
+                fields[f'{word}_{rest[index]}'] = rest[index + 1]
+                index += 2
+        elif word == 'proto' and following:
+            fields['proto'], full, index = following[0], True, index + 2
+        elif not full and index == len(rest) - 1 and word not in UFW_KEYWORDS:
+            # Short syntax such as "allow 22/tcp" or "allow OpenSSH": any to any.
+            fields['to_port'], index = word, index + 1
+        else:
+            return None
+    return fields
+
+
+def ufw_same_connection(fields: dict, source: str, port: int) -> bool:
+    """True when UFW would consider the rule identical to the management rule."""
+    return (not fields['route'] and fields['direction'] == 'in'
+            and not fields['in_on'] and not fields['out_on']
+            and same_address(fields['from'], source)
+            and fields['from_port'] == 'any' and not fields['from_app']
+            and fields['to'] == 'any' and fields['to_port'] == str(port)
+            and not fields['to_app'] and fields['proto'] == 'tcp')
+
+
+def ufw_equivalent_allow(rules: list[list[str]], source: str, port: int) -> bool:
+    """Classify existing rules for one inbound TCP management connection.
+
+    Plan and apply both use this function. It returns True when an equivalent
+    allow rule already exists. It refuses an existing deny/reject/limit rule for
+    the same connection, because `ufw allow` would silently replace it, and a
+    rule naming the source that cannot be parsed. Rules differing in direction,
+    interface, source port, app, destination, port or protocol are distinct:
+    UFW appends a new rule and leaves them unchanged.
+    """
+    equivalent = False
+    for tokens in rules:
+        fields = ufw_rule_fields(tokens)
+        if fields is None:
+            if any(same_address(token, source) for token in tokens):
+                raise Refused('an existing UFW rule for the management source cannot be '
+                              'classified; review it manually; no changes')
+            continue
+        if not ufw_same_connection(fields, source, port):
+            continue
+        if fields['action'] != 'allow':
+            raise Refused(f"existing UFW {fields['action']} rule for {source} to port {port}/tcp "
+                          'would be replaced by ufw allow; resolve it manually; no changes')
+        equivalent = True
+    return equivalent
+
+
 def read_file(path: Path) -> tuple[bytes, dict]:
     # Work through one no-follow descriptor, including the snapshot bytes, to
     # avoid following a link substituted between stat/read/backup/chmod.
@@ -205,35 +341,76 @@ def listening_ports(system: System) -> set[int]:
     return ports
 
 
+def parse_findings(stdout: str) -> tuple[list[dict], list[tuple[int, int]]]:
+    findings, summaries = [], []
+    for line in stdout.splitlines():
+        match, summary = FINDING_LINE.match(line), SUMMARY_LINE.match(line)
+        if match:
+            findings.append(dict(zip(("status", "check", "detail"), match.groups())))
+        elif summary:
+            summaries.append((int(summary[1]), int(summary[2])))
+        elif findings and line.strip():
+            findings[-1]["detail"] += "\n" + line
+    return findings, summaries
+
+
+def incomplete_audit(result: subprocess.CompletedProcess, findings: list[dict],
+                     summaries: list[tuple[int, int]]) -> str | None:
+    """Explain why collector output is not a complete audit, or return None."""
+    if result.returncode not in (0, 1):
+        return f'collector exited {result.returncode}; audit not completed'
+    if not findings:
+        return 'audit collector returned no findings; audit incomplete'
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if len(summaries) != 1 or not SUMMARY_LINE.match(lines[-1]):
+        return 'collector output has no single final summary line; audit incomplete'
+    counted = (sum(f['status'] == 'FAIL' for f in findings), sum(f['status'] == 'WARN' for f in findings))
+    if summaries[0] != counted:
+        return (f'summary reports {summaries[0][0]} FAIL/{summaries[0][1]} WARN but findings contain '
+                f'{counted[0]} FAIL/{counted[1]} WARN; audit incomplete')
+    if (result.returncode == 1) != (counted[0] > 0):
+        return f'collector exit {result.returncode} does not match {counted[0]} FAIL findings; audit incomplete'
+    return None
+
+
 def audit(system: System, context: str | None, output_format: str) -> int:
+    """Run the collector; 0/1 only for a complete audit, otherwise 2."""
+    findings: list[dict] = []
+    problem, code = None, 2
     if not system.ubuntu():
-        print('[SKIP] platform: Ubuntu required; no audit or application performed')
-        return 2
-    collector = SCRIPT_DIR / 'hardening.sh'
-    if not collector.is_file() or collector.stat().st_size == 0:
-        raise Refused('audit collector hardening.sh is missing or empty; audit not performed')
-    args = ["bash", str(collector), "audit"]
-    if context:
-        args += ["--context", context]
-    result = system.run(*args)
-    if result.returncode in (0, 1) and not re.search(r'^\[(PASS|FAIL|WARN|SKIP)\] ', result.stdout, re.MULTILINE):
-        raise Refused('audit collector returned no findings; audit incomplete')
-    if output_format == "json":
-        findings = []
-        for line in result.stdout.splitlines():
-            match = re.match(r"^\[(PASS|FAIL|WARN|SKIP)\] ([^:]+): (.*)$", line)
-            if match:
-                findings.append(dict(zip(("status", "check", "detail"), match.groups())))
-            elif findings and not line.startswith("Summary:") and line.strip():
-                findings[-1]["detail"] += "\n" + line
+        if output_format == 'text':
+            print('[SKIP] platform: Ubuntu required; no audit or application performed')
+            return 2
+        findings = [{"status": "SKIP", "check": "platform",
+                     "detail": "Ubuntu required; no audit or application performed"}]
+        problem = 'Ubuntu required; audit not performed'
+    else:
+        collector = SCRIPT_DIR / 'hardening.sh'
+        args = ["bash", str(collector), "audit", *(["--context", context] if context else [])]
+        try:
+            if not collector.is_file() or collector.stat().st_size == 0:
+                raise Refused('audit collector hardening.sh is missing or empty; audit not performed')
+            result = system.run(*args)
+        except (Refused, OSError) as exc:
+            problem = str(exc)
+        else:
+            findings, summaries = parse_findings(result.stdout)
+            problem = incomplete_audit(result, findings, summaries)
+            code = 2 if problem else result.returncode
+            if output_format == 'text':
+                print(result.stdout, end="")
+            if result.stderr:
+                print('[WARN] audit.execution: diagnostic output omitted; inspect validator locally', file=sys.stderr)
+    if output_format == 'json':
         print(json.dumps({"schema_version": 1, "task": "OS-30", "mode": "audit",
                           "recorded_at": datetime.now(timezone.utc).isoformat(),
-                          "exit_code": result.returncode, "findings": findings}, indent=2))
-    else:
-        print(result.stdout, end="")
-    if result.stderr:
-        print('[WARN] audit.execution: diagnostic output omitted; inspect validator locally', file=sys.stderr)
-    return result.returncode
+                          "exit_code": code, "complete": problem is None, "error": problem,
+                          "summary": {status: sum(f['status'] == status for f in findings)
+                                      for status in ('PASS', 'FAIL', 'WARN', 'SKIP')},
+                          "findings": findings}, indent=2))
+    elif problem:
+        print(f'[FAIL] audit: {problem}', file=sys.stderr)
+    return code
 
 
 class RepairPlan:
@@ -252,6 +429,8 @@ class RepairPlan:
         self.timer_state = None
         self.ufw_state: dict[Path, dict] = {}
         self.ufw_before = None
+        self.ufw_existing = False
+        self.skipped: list[str] = []
         if not self.fixes:
             raise Refused("select at least one --fix; no default mutation")
         if any(fix not in FIXES for fix in self.fixes):
@@ -300,7 +479,7 @@ class RepairPlan:
                 address = ipaddress.ip_address(source or '')
             except ValueError as exc:
                 raise Refused("--management-source must be one IP, not a subnet or shell expression") from exc
-            if address.is_unspecified or address.is_multicast:
+            if address.is_unspecified or address.is_multicast or getattr(address, 'scope_id', None):
                 raise Refused("invalid management client address")
             self.source = str(address)
             if port not in self.ports:
@@ -312,10 +491,15 @@ class RepairPlan:
             # existing rules. Do not claim that an earlier deny is overridden.
             rules = ufw_rules(system.require("ufw", "show", "added"))
             self.ufw_before = {"rules": rules, "status": status}
+            # Refuses a same-connection deny/reject/limit rule before any change.
+            self.ufw_existing = ufw_equivalent_allow(rules, self.source, port)
             for path in UFW_FILES:
                 trusted_parent(path)
                 self.ufw_state[path] = fingerprint(path)
-            self.steps.append(f'Add TCP allow rule from {self.source} to actual SSH port {port}; keep UFW activation/defaults and all existing rules unchanged')
+            if self.ufw_existing:
+                self.skipped.append(f'ufw-ssh-rule: equivalent allow rule from {self.source} to port {port}/tcp already exists; left unchanged')
+            else:
+                self.steps.append(f'Add TCP allow rule from {self.source} to actual SSH port {port}; keep UFW activation/defaults and all existing rules unchanged')
 
     def add_mode(self, path: Path, mode: int, root_owned: bool = False) -> None:
         before = fingerprint(path)
@@ -330,6 +514,8 @@ class RepairPlan:
         print('[WARN] apply.scope: no root/password-login disabling, account deletion, package upgrades, UFW enabling or default-policy changes')
         for number, step in enumerate(self.steps, 1):
             print(f'  {number}. {step}')
+        for note in self.skipped:
+            print(f'[SKIP] {note}')
         if not self.steps:
             print('[SKIP] apply: selected repairs already satisfied')
 
@@ -343,6 +529,18 @@ class RepairPlan:
             state = self.system.run("systemctl", "is-enabled", "apt-daily-upgrade.timer").stdout.strip()
             if state != self.timer_state:
                 raise Refused("timer state changed since preview")
+        if self.ufw_before is not None:
+            self.recheck_firewall()
+
+    def recheck_firewall(self) -> list[list[str]]:
+        """Re-read UFW and re-run the plan's classifier on the current rules."""
+        rules = ufw_rules(self.system.require('ufw', 'show', 'added'))
+        if (rules != self.ufw_before['rules']
+                or self.system.require('ufw', 'status', 'verbose') != self.ufw_before['status']):
+            raise Refused('firewall changed since preview; rerun plan')
+        if ufw_equivalent_allow(rules, self.source, self.port) != self.ufw_existing:
+            raise Refused('firewall rule classification changed since preview; rerun plan')
+        return rules
 
     def execute(self, backup_root: Path = Path('/var/backups/os-30')) -> Path | None:
         # Called only after CLI confirmation. No environment-variable root override.
@@ -360,6 +558,16 @@ class RepairPlan:
             return self._execute_locked(backup_root)
 
     def _execute_locked(self, backup_root: Path) -> Path:
+        signals: dict = {}
+        with deferred_signals(signals):
+            backup = self._apply_journaled(backup_root, signals)
+        if signals.get('signal'):
+            notify(f'[WARN] apply: {signal.Signals(signals["signal"]).name} arrived after completion; '
+                   f'the run is applied and recorded; backup: {backup}')
+        return backup
+
+    def _apply_journaled(self, backup_root: Path, signals: dict) -> Path:
+        checkpoint(signals)
         self.unchanged()
         backup = Path(tempfile.mkdtemp(prefix='repair-', dir=backup_root))
         states = {**self.files, **self.ufw_state}
@@ -382,16 +590,20 @@ class RepairPlan:
                     "timer_before": self.timer_state, "timer_after": None,
                     "ufw": None, "steps": self.steps}
         save_manifest(backup, manifest)
-        # Confirm snapshot consistency before making any system mutation.
-        self.unchanged()
-        for number, (path, state) in enumerate(states.items()):
-            if hashlib.sha256((backup / str(number)).read_bytes()).hexdigest() != state['sha256']:
-                raise Refused("backup integrity check failed")
         changed: list[Path] = []
         timer_attempted = False
         ufw_attempted = False
+        ufw = None
         try:
+            # Signals received while snapshotting stop here, before any mutation.
+            checkpoint(signals)
+            # Confirm snapshot consistency before making any system mutation.
+            self.unchanged()
+            for number, (path, state) in enumerate(states.items()):
+                if hashlib.sha256((backup / str(number)).read_bytes()).hexdigest() != state['sha256']:
+                    raise Refused("backup integrity check failed")
             for path, mode in self.desired.items():
+                checkpoint(signals)
                 changed.append(path)
                 set_mode(path, mode, self.files[path])
                 if fingerprint(path) != {**self.files[path], 'mode': mode}:
@@ -399,27 +611,30 @@ class RepairPlan:
             if 'ssh-permissions' in self.fixes:
                 self.system.require('sshd', '-t')
             if self.timer_state == 'disabled':
+                checkpoint(signals)
                 timer_attempted = True
                 self.system.require('systemctl', 'enable', 'apt-daily-upgrade.timer')
                 if self.system.require('systemctl', 'is-enabled', 'apt-daily-upgrade.timer').strip() != 'enabled':
                     raise Refused('timer postcondition failed')
             if 'ufw-ssh-rule' in self.fixes:
-                if (ufw_rules(self.system.require('ufw', 'show', 'added')) != self.ufw_before['rules']
-                        or self.system.require('ufw', 'status', 'verbose') != self.ufw_before['status']):
-                    raise Refused('firewall changed since preview')
-                # UFW may update an existing identical rule's comment. Avoid
-                # touching such a rule: it could not be proven to belong to us.
-                existing = any(self.rule_matches(shlex.join(rule)) for rule in self.ufw_before['rules'])
+                checkpoint(signals)
+                # Same classifier as plan, re-run immediately before the only
+                # UFW mutation. An equivalent allow rule is left untouched: UFW
+                # would otherwise rewrite its comment.
+                self.recheck_firewall()
                 ufw = {"before": self.ufw_before, "source": self.source, "port": self.port,
                        "marker": f'OS-30:{run_id}', "added_rule": None}
-                if not existing:
+                if not self.ufw_existing:
+                    # Journal the rule identity first: after SIGKILL or power
+                    # loss the `applying` manifest still names the exact rule.
+                    manifest['ufw'] = ufw
+                    save_manifest(backup, manifest)
                     ufw_attempted = True
                     self.system.require('ufw', 'allow', 'from', self.source, 'to', 'any',
                                         'port', str(self.port), 'proto', 'tcp', 'comment', ufw['marker'])
                 rules = ufw_rules(self.system.require('ufw', 'show', 'added'))
-                if not existing:
-                    candidates = [rule for rule in rules if rule[-2:] == ['comment', ufw['marker']]
-                                  and self.rule_matches(shlex.join(rule))]
+                if not self.ufw_existing:
+                    candidates = [rule for rule in rules if self.run_rule(rule, ufw['marker'])]
                     if len(candidates) != 1:
                         raise Refused('added SSH allow rule could not be verified')
                     rule = candidates[0]
@@ -436,48 +651,89 @@ class RepairPlan:
                 entry['post'] = fingerprint(Path(entry['path']))
             if self.timer_state is not None:
                 manifest['timer_after'] = self.system.require('systemctl', 'is-enabled', 'apt-daily-upgrade.timer').strip()
+            checkpoint(signals)
             manifest['status'] = 'applied'
             save_manifest(backup, manifest)
             print(f'[PASS] apply: selected repairs verified; run-id: {run_id}; backup: {backup}')
             return backup
         except (Exception, KeyboardInterrupt) as exc:
-            failures = []
-            for path in reversed(changed):
+            signum = exc.signum if isinstance(exc, Interrupted) else signals.get('signal')
+            if signum is None and isinstance(exc, KeyboardInterrupt):
+                signum = signal.SIGINT
+            # A second signal must not abandon the reversal half way.
+            with deferred_signals(signals):
+                reverted, failures = self._revert(changed, timer_attempted, ufw_attempted, ufw)
+                manifest['status'] = 'interrupted' if signum else 'failed'
+                manifest['recovery'] = {"signal": signal.Signals(signum).name if signum else None,
+                                        "error": str(exc) or type(exc).__name__,
+                                        "reverted": reverted, "unreverted": failures}
                 try:
-                    current = fingerprint(path)
-                    if current not in (self.files[path], {**self.files[path], 'mode': self.desired[path]}):
-                        raise Refused('refusing rollback over concurrent file change')
-                    set_mode(path, self.files[path]['mode'], current)
-                except (OSError, Refused):
-                    failures.append(str(path))
-            if timer_attempted:
-                try:
-                    self.system.require('systemctl', 'disable', 'apt-daily-upgrade.timer')
-                    if self.system.run('systemctl', 'is-enabled', 'apt-daily-upgrade.timer').stdout.strip() != 'disabled':
-                        raise Refused('timer rollback postcondition failed')
-                except Refused:
-                    failures.append('timer enablement')
-            # Never reset/delete UFW rules as rollback. On an unverified rule
-            # addition, retain its snapshot and report partial state explicitly.
-            if ufw_attempted:
-                failures.append('UFW rule may have been added; inspect saved rules manually (no automatic delete/reset)')
-            detail = '; '.join(failures) if failures else 'permission/timer changes rolled back'
-            manifest['status'] = 'failed'
-            try:
-                save_manifest(backup, manifest)
-            except OSError:
-                detail += '; failed to persist failure journal'
-            raise Refused(f'application failed; {detail}; backup: {backup}') from exc
+                    save_manifest(backup, manifest)
+                except OSError:
+                    failures.append('failed to persist recovery journal')
+            if failures:
+                detail = 'NOT reverted: ' + '; '.join(failures)
+            else:
+                detail = 'all applied changes rolled back' if reverted else 'no changes were made'
+            if signum:
+                raise Interrupted(signum, f'apply interrupted by {signal.Signals(signum).name}; '
+                                          f'{detail}; backup: {backup}') from exc
+            raise Refused(f'application failed: {exc}; {detail}; backup: {backup}') from exc
 
-    def rule_matches(self, line: str) -> bool:
-        import shlex
+    def _revert(self, changed: list[Path], timer_attempted: bool, ufw_attempted: bool,
+                ufw: dict | None) -> tuple[list[str], list[str]]:
+        """Undo only changes whose current state is proven to be this run's."""
+        reverted, failures = [], []
+        for path in reversed(changed):
+            try:
+                current = fingerprint(path)
+                if current not in (self.files[path], {**self.files[path], 'mode': self.desired[path]}):
+                    raise Refused('refusing rollback over concurrent file change')
+                set_mode(path, self.files[path]['mode'], current)
+                reverted.append(str(path))
+            except (OSError, Refused):
+                failures.append(str(path))
+        if timer_attempted:
+            try:
+                self.system.require('systemctl', 'disable', 'apt-daily-upgrade.timer')
+                if self.system.run('systemctl', 'is-enabled', 'apt-daily-upgrade.timer').stdout.strip() != 'disabled':
+                    raise Refused('timer rollback postcondition failed')
+                reverted.append('apt-daily-upgrade.timer enablement')
+            except Refused:
+                failures.append('timer enablement')
+        if ufw_attempted:
+            problem = self._remove_verified_rule(ufw)
+            if problem:
+                failures.append(problem)
+            else:
+                reverted.append(f"UFW rule {ufw['marker']}")
+        return reverted, failures
+
+    def _remove_verified_rule(self, ufw: dict | None) -> str | None:
+        """Delete this run's rule only after its identity and the full rule list were proven.
+
+        Never reset UFW or delete by number. Returns None on success, else why
+        the rule was left for manual review.
+        """
+        if not ufw or not ufw.get('added_rule') or not ufw.get('after'):
+            return 'UFW rule may have been added; inspect saved rules manually (no automatic delete/reset)'
         try:
-            tokens = shlex.split(line)
-        except ValueError:
-            return False
-        return (tokens[:2] == ['ufw', 'allow'] and
-                all(any(tokens[i:i + 2] == pair for i in range(len(tokens) - 1))
-                    for pair in (['from', self.source], ['to', 'any'], ['port', str(self.port)], ['proto', 'tcp'])))
+            if (ufw_rules(self.system.require('ufw', 'show', 'added')) != ufw['after']['rules']
+                    or self.system.require('ufw', 'status', 'verbose') != ufw['after']['status']):
+                return f"UFW rule {ufw['marker']} left in place: firewall changed after verification"
+            self.system.require('ufw', '--force', 'delete', 'allow', 'from', ufw['source'], 'to', 'any',
+                                'port', str(ufw['port']), 'proto', 'tcp', 'comment', ufw['marker'])
+            if (ufw_rules(self.system.require('ufw', 'show', 'added')) != ufw['before']['rules']
+                    or self.system.require('ufw', 'status', 'verbose') != ufw['before']['status']):
+                return f"UFW rule {ufw['marker']} removal could not be verified; inspect manually"
+        except (Refused, ValueError):
+            return f"UFW rule {ufw['marker']} state could not be verified; inspect manually"
+        return None
+
+    def run_rule(self, rule: list[str], marker: str) -> bool:
+        fields = ufw_rule_fields(rule)
+        return bool(fields and ufw_same_connection(fields, self.source, self.port)
+                    and fields['action'] == 'allow' and not fields['log'] and fields['comment'] == marker)
 
 
 def valid_run_id(value: str) -> bool:
@@ -533,7 +789,9 @@ class RollbackPlan:
                 or m.get('schema_version') != 2 or m.get('task') != 'OS-30'
                 or m.get('run_id') != self.run_id
                 or m.get('status') not in ('applied', 'rollback_partial', 'rolled_back')):
-            raise Refused('unsupported/unfinished manifest; verified schema-2 post-state required')
+            status = m.get('status') if isinstance(m, dict) else None
+            raise Refused(f'unsupported/unfinished manifest (status {status!r}); verified schema-2 '
+                          'post-state required; see manual recovery in linux-lab/knowledge/hardening.md')
         fixes = m.get('fixes')
         if not isinstance(fixes, list) or not fixes or any(f not in FIXES for f in fixes):
             raise Refused('invalid recorded operations')
@@ -834,6 +1092,10 @@ def main(argv: list[str] | None = None, system: System | None = None) -> int:
             raise Refused('confirmation mismatch; no changes')
         plan.execute()
         return 0
+    except Interrupted as exc:
+        # Safe-to-reverse changes were undone and the outcome is in the manifest.
+        notify(f'[WARN] {args.mode}: {exc}')
+        return 128 + exc.signum
     except (Refused, OSError, EOFError, ValueError, TypeError) as exc:
         print(f'[FAIL] {args.mode}: {exc}', file=sys.stderr)
         return 2

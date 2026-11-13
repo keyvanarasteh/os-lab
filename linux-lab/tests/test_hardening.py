@@ -1,12 +1,25 @@
 """OS-30 subprocess tests: security commands are isolated PATH mocks."""
+import contextlib
+import importlib.util
+import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'hardening.sh'
+HC_SPEC = importlib.util.spec_from_file_location('harden_check_collector_tests', SCRIPT.with_name('harden_check.py'))
+hc = importlib.util.module_from_spec(HC_SPEC)
+HC_SPEC.loader.exec_module(hc)
+# One ssh.socket with two listen entries plus an unrelated systemd listener.
+SS_SYSTEMD = ('LISTEN 0 4096 0.0.0.0:22 0.0.0.0:* users:(("systemd",pid=1,fd=50))\n'
+              'LISTEN 0 4096 [::]:2222 [::]:* users:(("systemd",pid=1,fd=51))\n'
+              'LISTEN 0 4096 127.0.0.1:9999 0.0.0.0:* users:(("systemd",pid=1,fd=52))')
+LISTEN_PER_LINE = '0.0.0.0:22 (Stream)\n[::]:2222 (Stream)'
+LISTEN_ONE_LINE = '0.0.0.0:22 (Stream) [::]:2222 (Stream)'
 MOCK = r'''#!/usr/bin/env python3
 import json, os, sys
 from pathlib import Path
@@ -20,15 +33,20 @@ if name == 'grep' and args == ['-q', '^ID=ubuntu$', '/etc/os-release']: sys.exit
 if name == 'grep':
     s = sys.stdin.read()
     sys.exit(0 if s.strip() == 'install ok installed' else 1)
+if name == 'date':
+    if case == 'date_fail': sys.exit(1)  # unguarded failure inside updates_audit
+    print('1700086400'); sys.exit(0)
 if name == 'systemctl':
     if args[0] == 'show':
-        print('[::]:22 (Stream)' if case == 'socket' else '')
+        if case == 'env_socket': print(os.environ['LISTEN_OUTPUT'])
+        else: print('[::]:22 (Stream)' if case == 'socket' else '')
         sys.exit(0)
     if args[0] == 'is-enabled': sys.exit(0 if Path(os.environ['STATE']).exists() else 1)
     if args[0] in ('is-active', 'cat'): sys.exit(0)
     if args == ['enable', 'apt-daily-upgrade.timer']:
         Path(os.environ['STATE']).touch(); sys.exit(0)
     sys.exit(99)
+if name == 'ss' and case == 'env_socket': print(os.environ['SS_OUTPUT']); sys.exit(0)
 if name == 'ss' and case in ('socket', 'unrelated_socket'):
     print('LISTEN 0 128 [::]:22 [::]:* users:(("systemd",pid=1,fd=3))\nLISTEN 0 128 127.0.0.1:9999 0.0.0.0:* users:(("systemd",pid=1,fd=4))'); sys.exit(0)
 if name == 'ss': print('LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=1,fd=3))'); sys.exit(0)
@@ -84,6 +102,30 @@ sys.exit(99)
 '''
 
 
+class CollectorSystem(hc.System):
+    """Runs the real collector through harden_check.audit with this module's PATH mocks."""
+
+    def __init__(self, env):
+        self.env = env
+
+    def ubuntu(self):
+        return True
+
+    def run(self, *args):
+        return subprocess.run(args, env=self.env, text=True, capture_output=True, timeout=30, check=False)
+
+
+class OutputSystem(hc.System):
+    """Feeds fixed ss/systemctl output to harden_check.listening_ports()."""
+
+    def __init__(self, ss, listen):
+        self.ss, self.listen = ss, listen
+
+    def run(self, *args):
+        output = self.ss if args[0] == 'ss' else self.listen
+        return subprocess.CompletedProcess(args, 0, stdout=output + '\n', stderr='')
+
+
 class HardeningTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -93,7 +135,7 @@ class HardeningTests(unittest.TestCase):
         mock.write_text(MOCK)
         mock.chmod(0o755)
         for cmd in ('uname', 'grep', 'systemctl', 'ss', 'sshd', 'getent', 'passwd',
-                    'visudo', 'sudo', 'apt', 'apt-config', 'dpkg-query', 'ufw', 'stat', 'find', 'id',
+                    'visudo', 'sudo', 'apt', 'apt-config', 'dpkg-query', 'ufw', 'stat', 'find', 'id', 'date',
                     'apt-get', 'chmod', 'chown', 'cp', 'usermod', 'userdel', 'reboot'):
             (self.root / cmd).symlink_to(mock)
         self.env = dict(os.environ, PATH=str(self.root) + os.pathsep + os.environ['PATH'],
@@ -257,6 +299,59 @@ class HardeningTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn('Bash audit performs no mutations', result.stdout)
         self.assert_read_only()
+
+    def python_audit(self, output_format, case=''):
+        self.env['CASE'] = case
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+            code = hc.audit(CollectorSystem(dict(self.env)), None, output_format)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_every_ssh_socket_listen_entry_matches_python_plan(self):
+        for listen in (LISTEN_PER_LINE, LISTEN_ONE_LINE):
+            with self.subTest(listen=listen):
+                self.env.update(LISTEN_OUTPUT=listen, SS_OUTPUT=SS_SYSTEMD)
+                result = self.run_script(case='env_socket')
+                match = re.search(r'^\[PASS\] ssh\.socket_listeners: ssh\.socket/systemd endpoint match: (.*)$',
+                                  result.stdout, re.MULTILINE)
+                self.assertIsNotNone(match, result.stdout)
+                endpoints = match.group(1).split()
+                self.assertEqual(endpoints, ['0.0.0.0:22', '[::]:2222'])
+                self.assertNotIn('9999', result.stdout)
+                self.assertNotIn('[WARN] ssh.listeners: no attributable', result.stdout)
+                bash_ports = {int(endpoint.rsplit(':', 1)[1]) for endpoint in endpoints}
+                self.assertEqual(bash_ports, hc.listening_ports(OutputSystem(SS_SYSTEMD, listen)))
+                self.assert_read_only()
+
+    def test_unexpected_failure_inside_a_check_is_incomplete_not_a_result(self):
+        result = self.run_script(case='date_fail')
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn('[FAIL] execution: audit stopped before completion', result.stderr)
+        self.assertIn('[PASS] ssh.permissions', result.stdout)  # partial findings exist
+        self.assertNotIn('Summary:', result.stdout)
+        for output_format in ('text', 'json'):
+            with self.subTest(output_format=output_format):
+                code, out, err = self.python_audit(output_format, 'date_fail')
+                self.assertEqual(code, 2)
+                if output_format == 'json':
+                    report = json.loads(out)
+                    self.assertEqual((report['exit_code'], report['complete']), (2, False))
+                    self.assertIn('collector exited 2', report['error'])
+                else:
+                    self.assertIn('[FAIL] audit: collector exited 2', err)
+
+    def test_text_and_json_reports_agree_on_real_collector_output(self):
+        for case, expected in (('', 0), ('ufw_inactive', 1), ('uid0', 1), ('sshd_denied', 0)):
+            with self.subTest(case=case):
+                text_code, text, _ = self.python_audit('text', case)
+                json_code, raw, _ = self.python_audit('json', case)
+                report = json.loads(raw)
+                summary = re.search(r'^Summary: (\d+) FAIL, (\d+) WARN$', text, re.MULTILINE)
+                self.assertEqual((text_code, json_code, report['exit_code']), (expected,) * 3)
+                self.assertEqual((report['complete'], report['error']), (True, None))
+                self.assertEqual((report['summary']['FAIL'], report['summary']['WARN']),
+                                 tuple(map(int, summary.groups())))
+                self.assertEqual([(f['status'], f['check']) for f in report['findings']],
+                                 re.findall(r'^\[(PASS|FAIL|WARN|SKIP)\] ([^:]+): ', text, re.MULTILINE))
 
     def test_mac_platform_is_rejected(self):
         result = self.run_script(case='mac')

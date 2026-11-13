@@ -5,7 +5,10 @@ import io
 import json
 import os
 import pty
+import re
 import select
+import shlex
+import signal
 import time
 from pathlib import Path
 import subprocess
@@ -65,9 +68,14 @@ class FakeSystem(hc.System):
             else: self.enabled = False
         elif args == ('ufw', 'status', 'verbose'): output = 'Status: inactive'
         elif args == ('ufw', 'show', 'added'):
-            output = ('ufw allow from 192.0.2.10 to any port 22 proto tcp' + (f' comment {self.marker}' if self.marker else '')) if self.rule_added and self.verify_rule else ''
+            # Real UFW quotes comments: comment 'OS-30:<id>'.
+            output = ('ufw allow from 192.0.2.10 to any port 22 proto tcp' + (f" comment '{self.marker}'" if self.marker else '')) if self.rule_added and self.verify_rule else ''
             output += '\n' + '\n'.join(self.extra_rules)
         elif args[:2] == ('ufw', 'allow'):
+            # Like UFW's set_rule(), a rule for the same connection with another
+            # action or log type is replaced in place instead of kept.
+            self.extra_rules = [rule for rule in self.extra_rules if not re.fullmatch(
+                r"ufw (deny|reject|limit)( log| log-all)? from 192\.0\.2\.10 to any port 22 proto tcp( comment .*)?", rule)]
             self.rule_added = True
             self.marker = args[-1] if 'comment' in args else None
         elif args[:3] == ('ufw', '--force', 'delete'):
@@ -75,7 +83,8 @@ class FakeSystem(hc.System):
             else: self.rule_added = False
         elif args[0] == 'bash':
             code = 1 if self.fail_audit else 0
-            output = '[WARN] sample: manual review\n[FAIL] ssh.passwordauthentication: yes\n' if code else '[PASS] sample: good\n'
+            output = ('[WARN] sample: manual review\n[FAIL] ssh.passwordauthentication: yes\n\nSummary: 1 FAIL, 1 WARN\n'
+                      if code else '[PASS] sample: good\n\nSummary: 0 FAIL, 0 WARN\n')
         else: raise AssertionError(f'unexpected command: {args}')
         return subprocess.CompletedProcess(args, code, stdout=output, stderr='')
 
@@ -235,6 +244,204 @@ class RepairTests(unittest.TestCase):
         with self.assertRaisesRegex(hc.Refused, 'listeners changed'): plan.execute(self.backups)
         self.assertFalse(self.backups.exists())
 
+    # --- UFW classification: plan and apply share ufw_equivalent_allow() ---
+
+    def ufw_plan(self, rules=()):
+        self.system = FakeSystem()
+        self.system.extra_rules = list(rules)
+        return self.plan(['ufw-ssh-rule'], source='192.0.2.10', port=22)
+
+    def no_ufw_mutation(self):
+        return not any(c[:2] == ('ufw', 'allow') or c[:3] == ('ufw', '--force', 'delete') for c in self.system.calls)
+
+    def test_same_connection_deny_reject_limit_refused_without_changes(self):
+        for rule in ('ufw deny from 192.0.2.10 to any port 22 proto tcp',
+                     'ufw reject from 192.0.2.10 to any port 22 proto tcp',
+                     'ufw limit from 192.0.2.10 to any port 22 proto tcp',
+                     "ufw deny log from 192.0.2.10 to any port 22 proto tcp comment 'admin block'"):
+            with self.subTest(rule=rule):
+                with self.assertRaisesRegex(hc.Refused, 'would be replaced'):
+                    self.ufw_plan([rule])
+                self.assertTrue(self.no_ufw_mutation())
+                self.assertEqual(self.system.extra_rules, [rule])
+                for mode in ('plan', 'apply'):
+                    with patch('builtins.input', side_effect=AssertionError('must not prompt')), \
+                         contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+                        code = hc.main([mode, '--fix', 'ufw-ssh-rule', '--management-source', '192.0.2.10',
+                                        '--ssh-port', '22'], self.system)
+                    self.assertEqual(code, 2)
+                    self.assertIn('would be replaced', err.getvalue())
+                self.assertTrue(self.no_ufw_mutation())
+        self.assertFalse(self.backups.exists())
+
+    def test_equivalent_allow_rule_is_skip_and_never_touched(self):
+        for rule in ("ufw allow from 192.0.2.10 to any port 22 proto tcp comment 'admin rule'",
+                     'ufw allow log from 192.0.2.10 to any port 22 proto tcp'):
+            with self.subTest(rule=rule):
+                plan = self.ufw_plan([rule])
+                self.assertEqual(plan.steps, [])
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    plan.preview()
+                self.assertIn('[SKIP] ufw-ssh-rule: equivalent allow rule from 192.0.2.10 to port 22/tcp', output.getvalue())
+                self.assertIsNone(plan.execute(self.backups))
+                with patch('builtins.input', side_effect=AssertionError('must not prompt')), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(hc.main(['apply', '--fix', 'ufw-ssh-rule', '--management-source', '192.0.2.10',
+                                              '--ssh-port', '22'], self.system), 0)
+                self.assertTrue(self.no_ufw_mutation())
+                self.assertEqual(self.system.extra_rules, [rule])
+        self.assertFalse(self.backups.exists())
+
+    def test_direction_interface_source_port_and_other_differences_are_distinct(self):
+        for rule in ('ufw allow out from 192.0.2.10 to any port 22 proto tcp',
+                     'ufw deny out from 192.0.2.10 to any port 22 proto tcp',
+                     'ufw allow in on eth1 from 192.0.2.10 to any port 22 proto tcp',
+                     'ufw deny in on eth1 from 192.0.2.10 to any port 22 proto tcp',
+                     'ufw allow from 192.0.2.10 port 5555 to any port 22 proto tcp',
+                     'ufw limit from 192.0.2.10 port 5555 to any port 22 proto tcp',
+                     'ufw deny from 192.0.2.10 to any port 22 proto udp',
+                     'ufw deny from 192.0.2.11 to any port 22 proto tcp',
+                     'ufw route allow from 192.0.2.10 to any port 22 proto tcp',
+                     'ufw deny 22/tcp'):
+            with self.subTest(rule=rule):
+                plan = self.ufw_plan([rule])
+                self.assertEqual(len(plan.steps), 1)
+                # A fresh root per run: an existing root must be root-owned.
+                with contextlib.redirect_stdout(io.StringIO()):
+                    backup = plan.execute(self.root / f'backups-{len(list(self.root.glob("backups-*")))}')
+                ufw = json.loads((backup / 'manifest.json').read_text())['ufw']
+                self.assertEqual(ufw['added_rule'][-2:], ['comment', ufw['marker']])
+                self.assertEqual(self.system.extra_rules, [rule])  # appended, never replaced
+
+    def test_rule_fields_follow_ufw_identity(self):
+        fields = hc.ufw_rule_fields(shlex.split(
+            "ufw deny in on eth0 log from 192.0.2.10 port 5555 to any port 22 proto tcp comment 'a b'"))
+        self.assertEqual((fields['action'], fields['in_on'], fields['log'], fields['from'], fields['from_port'],
+                          fields['to_port'], fields['proto'], fields['comment']),
+                         ('deny', 'eth0', 'log', '192.0.2.10', '5555', '22', 'tcp', 'a b'))
+        self.assertTrue(hc.ufw_same_connection(hc.ufw_rule_fields(shlex.split(
+            'ufw limit from 192.0.2.10/32 to any port 22 proto tcp')), '192.0.2.10', 22))
+        self.assertIsNone(hc.ufw_rule_fields(['ufw', 'allow', 'from', '192.0.2.10', 'unexpected']))
+
+    def test_unclassifiable_rule_naming_the_source_is_refused(self):
+        with self.assertRaisesRegex(hc.Refused, 'cannot be classified'):
+            self.ufw_plan(['ufw allow from 192.0.2.10 unexpected-token'])
+        self.assertTrue(self.no_ufw_mutation())
+
+    def test_apply_rechecks_firewall_immediately_before_rule_addition(self):
+        self.system.extra_rules = []
+        plan = self.plan(['ssh-permissions', 'ufw-ssh-rule'], source='192.0.2.10', port=22)
+        conflict = 'ufw deny from 192.0.2.10 to any port 22 proto tcp'
+        original = self.system.run
+        def run(*args):
+            result = original(*args)
+            if args == ('sshd', '-t') and self.system.syntax_calls == 2:
+                self.system.extra_rules.append(conflict)  # appears after the chmod
+            return result
+        with patch.object(self.system, 'run', side_effect=run), \
+                self.assertRaisesRegex(hc.Refused, 'firewall changed since preview.*all applied changes rolled back'):
+            plan.execute(self.backups)
+        self.assertEqual(hc.fingerprint(self.config)['mode'], 0o644)
+        self.assertTrue(self.no_ufw_mutation())
+        self.assertEqual(self.system.extra_rules, [conflict])
+        manifest = json.loads(next(self.backups.glob('repair-*/manifest.json')).read_text())
+        self.assertEqual(manifest['status'], 'failed')
+
+    # --- Interruption: deferred SIGINT/SIGTERM/SIGHUP during apply ---
+
+    def forked(self, scenario):
+        """Run a real-signal scenario in a child so a missing handler cannot kill the runner."""
+        read_fd, write_fd = os.pipe()
+        pid = os.fork()
+        if pid == 0:
+            os.close(read_fd)
+            try:
+                payload = json.dumps(scenario())
+            except BaseException as exc:
+                payload = json.dumps({'error': repr(exc)})
+            os.write(write_fd, payload.encode())
+            os._exit(0)
+        os.close(write_fd)
+        with os.fdopen(read_fd, 'rb') as stream:
+            data = stream.read()
+        _, status = os.waitpid(pid, 0)
+        self.assertFalse(os.WIFSIGNALED(status), f'child killed by signal {os.WTERMSIG(status) if os.WIFSIGNALED(status) else ""}')
+        return json.loads(data)
+
+    def interrupted_apply(self, fixes, trigger, signum, backups, **kwargs):
+        plan = self.plan(fixes, **kwargs)
+        original = self.system.run
+        def run(*args):
+            result = original(*args)
+            if args[:2] == trigger:
+                os.kill(os.getpid(), signum)  # arrives while the command is "running"
+            return result
+        self.system.run = run
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                plan.execute(backups)
+        except hc.Interrupted as exc:
+            manifest = json.loads(next(backups.glob('repair-*/manifest.json')).read_text())
+            return {'signum': int(exc.signum), 'message': str(exc), 'mode': self.config.stat().st_mode & 0o777,
+                    'enabled': self.system.enabled, 'rule_added': self.system.rule_added,
+                    'extra_rules': self.system.extra_rules, 'manifest': manifest,
+                    'deletes': [list(c) for c in self.system.calls if c[:3] == ('ufw', '--force', 'delete')]}
+        return {'error': 'apply was not interrupted'}
+
+    def test_sigterm_and_sighup_during_apply_revert_and_record_state(self):
+        for signum in (signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(signal=signum.name):
+                self.system = FakeSystem()
+                backups = self.root / f'backups-{signum.name}'
+                result = self.forked(lambda: self.interrupted_apply(
+                    ['ssh-permissions', 'unattended-timer'], ('systemctl', 'enable'), signum, backups))
+                self.assertNotIn('error', result, result)
+                self.assertEqual(result['signum'], signum)
+                self.assertEqual(result['mode'], 0o644)
+                self.assertFalse(result['enabled'])
+                self.assertIn('all applied changes rolled back', result['message'])
+                manifest = result['manifest']
+                self.assertEqual(manifest['status'], 'interrupted')
+                self.assertEqual(manifest['recovery']['signal'], signum.name)
+                self.assertEqual(manifest['recovery']['unreverted'], [])
+                self.assertEqual(set(manifest['recovery']['reverted']),
+                                 {str(self.config), 'apt-daily-upgrade.timer enablement'})
+        self.assertEqual(self.config.stat().st_mode & 0o777, 0o644)
+
+    def test_signal_after_verified_ufw_addition_removes_only_that_rule(self):
+        self.system.extra_rules = ['ufw allow 443/tcp']
+        result = self.forked(lambda: self.interrupted_apply(
+            ['ufw-ssh-rule'], ('ufw', 'allow'), signal.SIGTERM, self.root / 'backups-ufw',
+            source='192.0.2.10', port=22))
+        self.assertNotIn('error', result, result)
+        marker = result['manifest']['ufw']['marker']
+        self.assertFalse(result['rule_added'])
+        self.assertEqual(result['extra_rules'], ['ufw allow 443/tcp'])
+        self.assertEqual(len(result['deletes']), 1)
+        self.assertEqual(result['deletes'][0][-2:], ['comment', marker])
+        self.assertEqual(result['manifest']['status'], 'interrupted')
+        self.assertEqual(result['manifest']['recovery']['reverted'], [f'UFW rule {marker}'])
+
+    def test_unverified_ufw_addition_on_signal_is_left_and_recorded(self):
+        self.system.verify_rule = False
+        result = self.forked(lambda: self.interrupted_apply(
+            ['ufw-ssh-rule'], ('ufw', 'allow'), signal.SIGHUP, self.root / 'backups-unverified',
+            source='192.0.2.10', port=22))
+        self.assertNotIn('error', result, result)
+        self.assertTrue(result['rule_added'])
+        self.assertEqual(result['deletes'], [])
+        self.assertIn('may have been added', result['manifest']['recovery']['unreverted'][0])
+        self.assertIn('NOT reverted', result['message'])
+
+    def test_cli_interruption_exit_codes(self):
+        for signum, expected in ((signal.SIGINT, 130), (signal.SIGHUP, 129), (signal.SIGTERM, 143)):
+            with self.subTest(signal=signum.name):
+                with patch('builtins.input', return_value='APPLY OS-30'), \
+                     patch.object(hc.RepairPlan, 'execute', side_effect=hc.Interrupted(signum)), \
+                     contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+                    self.assertEqual(hc.main(['apply', '--fix', 'unattended-timer'], self.system), expected)
+                self.assertIn(signum.name, err.getvalue())
+
     def cli(self, args, answer='APPLY OS-30'):
         with patch('builtins.input', return_value=answer) as prompt, \
              patch.object(hc.RepairPlan, 'execute') as execute, \
@@ -285,6 +492,8 @@ class RepairTests(unittest.TestCase):
         report = json.loads(output.getvalue())
         self.assertEqual(report['findings'][1]['status'], 'FAIL')
         self.assertEqual(report['exit_code'], 1)
+        self.assertEqual((report['complete'], report['error']), (True, None))
+        self.assertEqual(report['summary'], {'PASS': 0, 'FAIL': 1, 'WARN': 1, 'SKIP': 0})
         self.assertTrue(any(call[0] == 'bash' and call[2] == 'audit' for call in self.system.calls))
 
     def test_audit_refuses_repair_options(self):
@@ -311,6 +520,58 @@ class RepairTests(unittest.TestCase):
         with patch.object(self.system, 'run', return_value=result), contextlib.redirect_stderr(io.StringIO()) as output:
             self.assertEqual(hc.main(['audit'], self.system), 2)
         self.assertIn('audit incomplete', output.getvalue())
+
+    def audit_output(self, stdout, code, output_format):
+        result = subprocess.CompletedProcess(['bash'], code, stdout=stdout, stderr='')
+        with patch.object(self.system, 'run', return_value=result), \
+             contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+            status = hc.main(['audit', '--format', output_format], self.system)
+        return status, out.getvalue(), err.getvalue()
+
+    def test_incomplete_or_inconsistent_collector_output_exits_2(self):
+        cases = {
+            'truncated before summary': ('[WARN] a: b\n[FAIL] c: d\n', 1),
+            'summary count mismatch': ('[FAIL] c: d\n\nSummary: 2 FAIL, 0 WARN\n', 1),
+            'warning count mismatch': ('[WARN] a: b\n\nSummary: 0 FAIL, 0 WARN\n', 0),
+            'summary not last': ('[PASS] a: b\n\nSummary: 0 FAIL, 0 WARN\n[PASS] e: f\n', 0),
+            'duplicate summary': ('[PASS] a: b\nSummary: 0 FAIL, 0 WARN\nSummary: 0 FAIL, 0 WARN\n', 0),
+            'exit code mismatch': ('[PASS] a: b\n\nSummary: 0 FAIL, 0 WARN\n', 1),
+            'unexpected exit': ('[PASS] a: b\n\nSummary: 0 FAIL, 0 WARN\n', 127),
+            'killed collector': ('[PASS] a: b\n', -15),
+        }
+        for name, (stdout, code) in cases.items():
+            with self.subTest(case=name):
+                status, _, err = self.audit_output(stdout, code, 'text')
+                self.assertEqual(status, 2)
+                self.assertIn('[FAIL] audit:', err)
+                status, out, _ = self.audit_output(stdout, code, 'json')
+                report = json.loads(out)
+                self.assertEqual((status, report['exit_code'], report['complete']), (2, 2, False))
+                self.assertTrue(report['error'])
+
+    def test_json_platform_and_collector_errors_are_valid_json(self):
+        self.system.is_ubuntu = False
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(hc.main(['audit', '--format', 'json'], self.system), 2)
+        report = json.loads(out.getvalue())
+        self.assertEqual((report['exit_code'], report['complete'], report['findings'][0]['check']), (2, False, 'platform'))
+        self.system.is_ubuntu = True
+        with patch.object(hc, 'SCRIPT_DIR', self.root), contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(hc.main(['audit', '--format', 'json'], self.system), 2)
+        self.assertIn('missing or empty', json.loads(out.getvalue())['error'])
+        self.assertEqual(self.system.calls, [])
+        failure = hc.Refused('cannot complete bash; no result inferred')
+        with patch.object(self.system, 'run', side_effect=failure), contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(hc.main(['audit', '--format', 'json'], self.system), 2)
+        report = json.loads(out.getvalue())
+        self.assertEqual((report['exit_code'], report['complete'], report['findings']), (2, False, []))
+        self.assertIn('cannot complete bash', report['error'])
+
+    def test_non_ubuntu_text_audit_keeps_plain_skip(self):
+        self.system.is_ubuntu = False
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(hc.main(['audit'], self.system), 2)
+        self.assertEqual(out.getvalue(), '[SKIP] platform: Ubuntu required; no audit or application performed\n')
 
 
 class TerminalTests(unittest.TestCase):

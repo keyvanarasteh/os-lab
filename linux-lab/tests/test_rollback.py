@@ -243,11 +243,21 @@ class RollbackTests(unittest.TestCase):
     def test_preexisting_equivalent_rule_is_not_retagged_or_removed(self):
         self.system.rule_added = True
         self.system.marker = 'ADMIN-EXISTING'
-        _, run_id = self.ufw_applied()
+        # The UFW part is a SKIP; the permission repair still creates a run.
+        _, run_id = self.ufw_applied(with_modes=True)
         self.assertTrue(self.rollback(run_id))
+        self.assertEqual(self.config.stat().st_mode & 0o777, 0o644)
         self.assertTrue(self.system.rule_added)
         self.assertEqual(self.system.marker, 'ADMIN-EXISTING')
         self.assertFalse(any(c[:2] == ('ufw', 'allow') or c[:3] == ('ufw', '--force', 'delete') for c in self.system.calls))
+
+    def test_interrupted_failed_or_unfinished_apply_is_not_rollback_evidence(self):
+        backup, run_id = self.applied()
+        for status in ('interrupted', 'failed', 'applying'):
+            self.edit(backup, lambda m: m.update(status=status))
+            with self.subTest(status=status), self.assertRaisesRegex(hc.Refused, 'manual recovery'):
+                hc.RollbackPlan(self.system, run_id)
+        self.assertEqual(self.config.stat().st_mode & 0o777, 0o600)
 
     def test_duplicate_run_marker_never_deleted(self):
         _, run_id = self.ufw_applied()

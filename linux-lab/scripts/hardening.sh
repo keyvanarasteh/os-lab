@@ -7,11 +7,21 @@ MODE=audit
 CONTEXT=""
 FAILS=0
 WARNS=0
+COMPLETE=0
 report() {
   printf '[%s] %s: %s\n' "$1" "$2" "$3"
   case "$1" in FAIL) FAILS=$((FAILS + 1));; WARN) WARNS=$((WARNS + 1));; esac
 }
-trap 'printf "[FAIL] execution: unexpected error at line %s; stopped\n" "$LINENO" >&2' ERR
+# An ERR trap is not inherited by the check functions, so guard completion on
+# EXIT instead: any stop before the summary is an incomplete audit (exit 2),
+# never a baseline result (0/1) built from partial findings.
+incomplete_guard() {
+  local status=$?
+  if ((COMPLETE == 0)); then
+    printf '[FAIL] execution: audit stopped before completion (status %s); results are incomplete\n' "$status" >&2
+    exit 2
+  fi
+}
 usage() {
   printf '%s\n' 'Usage: hardening.sh [audit|apply] [--context user=...,host=...,addr=...,laddr=...,lport=...]' \
     'audit is read-only. For plan/apply use: python3 scripts/harden_check.py --help'
@@ -64,18 +74,23 @@ ssh_permissions() {
   report WARN ssh.includes 'permission scan covers standard config paths only; custom Include files and parent directories require manual permission review'
 }
 ssh_listeners() {
-  local sockets direct socket_list endpoint matched=""
+  local sockets direct socket_list socket_endpoints endpoint listen matched=""
   if ! sockets=$(ss -H -ltnp 2>/dev/null); then
     report WARN ssh.listeners 'ss unavailable or failed'; return
   fi
   direct=$(printf '%s\n' "$sockets" | awk '/"sshd"/ {print $4}')
   if [[ -n $direct ]]; then report PASS ssh.listeners "sshd-owned TCP endpoints: $direct"; fi
   # Attribute systemd sockets only when the endpoint is explicitly listed by
-  # ssh.socket; do not treat every systemd listener as SSH.
+  # ssh.socket; do not treat every systemd listener as SSH. systemctl prints
+  # one "ADDRESS (Stream)" entry per line: read every entry, with the same
+  # rule as listening_ports() in harden_check.py.
   if socket_list=$(systemctl show --property=Listen --value ssh.socket 2>/dev/null); then
+    socket_endpoints=$(printf '%s\n' "$socket_list" | awk '{for (i = 1; i < NF; i++) if ($(i + 1) == "(Stream)") print $i}')
     while IFS= read -r endpoint; do
       [[ -n $endpoint ]] || continue
-      case " $socket_list " in *" $endpoint (Stream)"*) matched="${matched}${endpoint} ";; esac
+      while IFS= read -r listen; do
+        if [[ $listen == "$endpoint" ]]; then matched="${matched}${endpoint} "; break; fi
+      done <<< "$socket_endpoints"
     done < <(printf '%s\n' "$sockets" | awk '/"systemd"/ {print $4}')
   fi
   if [[ -n $matched ]]; then report PASS ssh.socket_listeners "ssh.socket/systemd endpoint match: $matched"; fi
@@ -216,9 +231,11 @@ if [[ $MODE == apply ]]; then
   exit 2
 fi
 
+trap incomplete_guard EXIT
 ssh_audit
 users_audit
 updates_audit
 ufw_audit
 printf '\nSummary: %s FAIL, %s WARN\n' "$FAILS" "$WARNS"
+COMPLETE=1
 ((FAILS == 0)) || exit 1
