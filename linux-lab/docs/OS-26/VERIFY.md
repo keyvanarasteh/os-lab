@@ -116,6 +116,11 @@ beklenen UID ile 5 sahiplik bulgusu/çıkış `1`, elle düzeltmeden sonra 0 bul
 `0` alındı. Denetleyicinin izinleri, UID/GID'yi, mtime/ctime'ı değiştirmediği
 kontrol edildi. Bunlar geliştirme ortamının sonuçlarıdır.
 
+Sembolik bağlantı testindeki kök dizinin izni açıkça `0755` olarak ayarlandı;
+böylece test, kullanıcının varsayılan `umask` ayarından bağımsızdır. Düzeltme
+sonrasında geliştirme ortamında hem `umask 0022` hem `umask 0002` ile aynı test
+paketi ayrı ayrı **41 passed** verdi. Denetleyicinin izin kuralları değişmedi.
+
 Genel kontroller, aynı ortamda değişiklik içermeyen upstream
 `5924675c2edce5f88dbf68b46f3504d8dba2a051` ile karşılaştırıldı:
 
@@ -163,4 +168,4 @@ olarak işaretlenmedi; OS-26'ya özgü testlerin tamamı geçti.
    mevcut uygulama PR'ının güncellendiğini açın.
 6. Video bağlantısını PR'a ekleyip dersin Telegram grubunda paylaşın.
 
-Öğrencinin kendi VM çıktısı ve kanıt videosu henüz bu aşamada alınmadı.
+Öğrencinin kendi VM'sinde düzeltme sonrası test doğrulaması ve kanıt videosu bekleniyor.

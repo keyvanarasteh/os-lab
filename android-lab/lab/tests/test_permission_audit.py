@@ -122,6 +122,8 @@ def test_group_only_drift_preserves_owner(tmp_path):
 def test_symlinks_and_broken_links_are_not_followed(tmp_path):
     root, outside = tmp_path / "root", tmp_path / "outside"
     root.mkdir()
+    # This fixture tests links; its root must be clean regardless of the umask.
+    root.chmod(0o755)
     outside.mkdir()
     bad = make_file(outside, mode=0o666)
     (root / "file-link").symlink_to(bad)
