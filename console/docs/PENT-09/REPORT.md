@@ -5,10 +5,10 @@
 | Student | Ada Mert Kızılırmak (2520191019) · [@RedRiveRR](https://github.com/RedRiveRR) |
 | Course | MYO062 — midterm |
 | Task | PENT-09, reserved in [#124](https://github.com/keyvanarasteh/os-lab/pull/124) |
-| Code | [`console/frida_inventory.py`](../../frida_inventory.py) |
-| Tests | [`android-lab/lab/tests/test_frida_inventory.py`](../../../android-lab/lab/tests/test_frida_inventory.py) (53 tests) |
+| Code | [`console/frida_inventory.py`](../../frida_inventory.py) · endpoint in [`android-lab/lab/web_ui.py`](../../../android-lab/lab/web_ui.py) · card in [`dashboard/src/views/frida-targets-card.tsx`](../../../dashboard/src/views/frida-targets-card.tsx) |
+| Tests | [`test_frida_inventory.py`](../../../android-lab/lab/tests/test_frida_inventory.py) (53 tests) · [`test_web_ui.py`](../../../android-lab/lab/tests/test_web_ui.py) (2 tests) · [`health-and-content.spec.ts`](../../../dashboard/e2e/health-and-content.spec.ts) (1 browser test) |
 | Verification | [`VERIFY.md`](VERIFY.md) |
-| Proof video | linked in the pull request description |
+| Proof video | [PENT-09-kanit-videosu.mp4](https://drive.google.com/file/d/1R3edzKdm2v5GT7L6bzol07a1j9GUrjXf/view?usp=sharing) (2:31) |
 
 ## What it does
 
@@ -73,6 +73,24 @@ target from [`VERIFY.md`](VERIFY.md) (`tools` block shortened):
 With `--apps`, only running applications are listed and each entry also
 carries the application `identifier` (for example `com.testlab.bank`).
 
+## Dashboard card
+
+The jobs view (`/jobs/`) has a **Frida targets** card that shows the same
+inventory in the console:
+
+![Frida targets card on the jobs view](jobs-card.png)
+
+- The web console serves the document at `GET /api/frida/inventory`. It calls
+  `build_inventory()` directly, so the card and the command line cannot disagree.
+- Each device is a row with its name, id, transport and process count; the
+  process list opens on demand.
+- An optional address field names one lab frida-server (`?host=`). It goes
+  through the same scope guard: an address outside the lab is answered with
+  400 and the reason is shown next to the field, before any Frida call.
+- The card only lists. It has loading, empty and error states, its text is
+  translated in all seven locale catalogs, and it is left out of the public
+  Pages build, which has no local engine to ask.
+
 ## Design
 
 **Two backends, one document.** The tool lists through the `frida` Python
@@ -110,14 +128,18 @@ replaced by fakes, so they need no device and no network. They cover output
 parsing (JSON and table), the scope guard, the read-only argument allowlist,
 target selection, filtering, error recording, both backends, timeouts and exit codes.
 
+Two tests in `test_web_ui.py` cover the endpoint (the listing, a named target,
+and the refusal of out-of-scope addresses with no Frida call). One Playwright
+test drives the card in a browser against a mocked endpoint: first load, a
+named target, the process list and a refused address.
+
 Results of the real runs, including the full `./scripts/run-tests.sh` output on
 Linux, are in [`VERIFY.md`](VERIFY.md).
 
-## Limitations and follow-up
+## Limitations
 
-- The PENT-09 card also lists a dashboard "jobs-view card listing attachable
-  lab targets". This PR delivers the inventory tool and its JSON contract; the
-  dashboard card that renders it is **not** included and is left as a follow-up.
+- The dashboard card lists processes only; application listing (`--apps`) and
+  the name filter are available on the command line.
 - Live verification used a Linux lab container over TCP and the local device.
   The USB path (`-U`) is covered by tests with fakes only; no physical or
   emulated Android device was attached during verification.

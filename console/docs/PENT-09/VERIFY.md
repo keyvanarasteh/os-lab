@@ -12,6 +12,10 @@ Environment: Windows 11, Python 3.13, `frida` / `frida-tools` 17.24.3, Docker De
 $ cd android-lab/lab && python -m pytest tests/test_frida_inventory.py -q
 .....................................................                    [100%]
 53 passed in 2.61s
+
+$ python -m pytest tests/test_web_ui.py -q -k frida
+..                                                                       [100%]
+2 passed, 16 deselected in 1.28s
 ```
 
 ## 2. Lab target
@@ -117,23 +121,75 @@ $ python console/frida_inventory.py -U -t 5
 exit code 1
 ```
 
-## 7. Full test runner
+## 7. Dashboard card
 
-`./scripts/run-tests.sh` on Linux (`python:3.13` container, fresh clone of this
-branch rebased on `master` at `90f571f6`, `lat` installed):
+The web console serves the inventory at `GET /api/frida/inventory`. Against the
+lab target from section 2, with the console running on the same machine:
+
+```
+GET /api/frida/inventory?host=127.0.0.1      -> 200
+  "backend": "api",
+  "devices": [{"id": "tcp@127.0.0.1:27042", "type": "remote", "transport": "TCP", "name": "127.0.0.1:27042",
+               "processes": [{"pid": 1, "name": "frida-server"}, {"pid": 10, "name": "sleep"}], "processCount": 2, "error": null}],
+  "summary": {"devices": 1, "usb": 0, "tcp": 1, "processes": 2}, "errors": []
+
+GET /api/frida/inventory?host=8.8.8.8        -> 400
+  {"error": "8.8.8.8 is not a loopback or private lab address; refusing"}
+
+GET /api/frida/inventory?host=example.com    -> 400
+  {"error": "'example.com' is not an IP address; use the lab device's loopback or private IP"}
+```
+
+The card on `/jobs/`, served by the web console from the committed
+`dashboard/dist`. Here the console ran in a second container, so the lab
+target is reached on its private Docker bridge address instead of loopback:
+
+![Frida targets card listing the lab target](jobs-card.png)
+
+An address outside the lab is refused and the reason is shown in the card:
+
+![Frida targets card refusing a public address](jobs-card-refused.png)
+
+Dashboard checks, run in `dashboard/` on Linux with Node 22
+(`mcr.microsoft.com/playwright:v1.65.0-noble` container):
+
+```
+$ npm run check
+> tsc --noEmit
+(no errors)
+
+$ npm run test:i18n
+2330 keys match across 7 locales; no new untranslated TSX strings.
+
+$ npm run build
+(ok; the committed dashboard/dist is this build, byte for byte)
+
+$ npm run test:e2e
+  1 skipped
+  54 passed (30.9s)
+```
+
+The skipped browser test is an existing one; the new test is
+`jobs view lists the Frida targets and shows a refused address`.
+
+## 8. Full test runner
+
+`./scripts/run-tests.sh` on Linux (`python:3.13` container, normal user, fresh
+clone of this branch on top of `master` at `90f571f6`, `lat` installed):
 
 ```
 == Stage 1: android unit tests (pytest) ==
 FAILED tests/test_web_ui.py::test_lab_start_requires_a_previewed_plan - assert 400 == 409
-1 failed, 221 passed, 2 skipped in 18.89s
+1 failed, 223 passed, 2 skipped in 41.73s
 [fail] android-lab/lab test suite
 == Source Lab engine tests (pytest) ==
-176 passed in 4.91s
+176 passed in 11.00s
 [ok]   source-lab/engine test suite
 == Cleanup Lab reference tests (unittest) ==
 [ok]   cleanup-lab/reference/python
 == Cleanup Lab engine tests (unittest) ==
-FAILED (failures=2, skipped=1)
+FAIL: test_refusal_codes_are_stable (test_safety.TargetTest.test_refusal_codes_are_stable) (path='/tmp/tmpvp9t91hr/caches/app', code='app-running')
+FAILED (failures=1)
 [fail] cleanup-lab/engine
 == Cleanup Lab qrust-scan crate (cargo test) ==
 [skip] cargo not installed; qrust-scan tests not run
@@ -149,9 +205,8 @@ FAILED (failures=2, skipped=1)
 5 passed, 2 failed, 2 skipped
 ```
 
-The runner is **not** fully green, and the two failing stages are not caused by
-this change. The same three tests fail on unmodified `master` (`90f571f6`) in
-the same container:
+The runner is **not** fully green. The two failing tests are not caused by this
+change; both also fail on unmodified `master` (`90f571f6`) in the same image:
 
 ```
 $ git checkout 90f571f6
@@ -159,12 +214,20 @@ $ (cd android-lab/lab && python -m pytest tests/test_web_ui.py -q)
 FAILED tests/test_web_ui.py::test_lab_start_requires_a_previewed_plan - assert 400 == 409
 1 failed, 15 passed
 $ (cd cleanup-lab/engine && python -m unittest discover -s tests -p 'test_*.py' -q)
-FAIL: test_unusable_trash_needs_setup (tests.test_readiness.ProbeTest.test_unusable_trash_needs_setup)
 FAIL: test_refusal_codes_are_stable (tests.test_safety.TargetTest.test_refusal_codes_are_stable)
-Ran 154 tests in 1.924s
-FAILED (failures=2, skipped=1)
 ```
 
-This PR touches none of those files. The container runs as root, which may be
-why the two Cleanup Lab tests fail there; that was not investigated further.
-All 53 tests added by this PR pass, and `lat check` passes.
+Both depend on the host. The first asks for the Android Lab `status` action,
+which this container does not offer (`Unsupported action for Android Lab:
+status`), so the request is rejected with 400 before the token check. The
+second expects a running-application check to refuse a path. This PR changes
+neither test nor the code they exercise.
+
+Stage 5 is skipped because the runner only runs it when `dashboard/node_modules`
+exists; the dashboard checks are in section 7. When it does run, its
+"dist matches the sources" comparison also fails on unmodified `master` in this
+environment: a rebuild differs from the committed build in 505 HTML pages and
+in no script or style file. In the page inspected (`404.html`) the only
+difference is the generated `astro-island uid` attribute.
+
+All tests added by this PR pass (53 + 2 Python, 1 browser), and `lat check` passes.
