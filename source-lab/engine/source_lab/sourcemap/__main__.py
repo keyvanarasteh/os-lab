@@ -65,7 +65,7 @@ def _add_generate_flags(parser: argparse.ArgumentParser) -> None:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(prog="sourcemap",
+    parser = argparse.ArgumentParser(prog="sourcemap", allow_abbrev=False,
                                      description="Map symbols, imports and roles in a source tree.")
     sub = parser.add_subparsers(dest="command")
     generate = sub.add_parser("generate", help="generate a repo map")

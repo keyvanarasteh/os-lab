@@ -404,6 +404,10 @@ Large files, minified bundles and budget stops are recorded in coverage, and a b
 
 Generate writes the requested artifact, and query applies a filter without rewriting the map.
 
+[[source-lab/engine/source_lab/sourcemap/__main__.py#main]] disables top-level
+option abbreviation so `query --map` reaches the query parser on Python 3.12
+instead of colliding with the generation parser's `--map-*` flags.
+
 ### Markup adapters
 
 Astro frontmatter, Svelte scripts, HTML ids and assets, and CSS selectors and custom properties are extracted.

@@ -124,7 +124,10 @@ def test_health_capabilities_are_served_by_console(web_server):
     assert any(item.get("lab") == "ios" for group in data["groups"] for item in group["items"])
 
 
-def test_lab_start_requires_a_previewed_plan(web_server):
+def test_lab_start_requires_a_previewed_plan(web_server, monkeypatch):
+    # Test the preview-token guard independently of installed VM providers.
+    # A host without KVM/runtime support cannot build a real Android plan.
+    monkeypatch.setattr("web_ui.oslab.plan", lambda *args, **kwargs: {})
     status, data = _post(f"{web_server}/api/labs/start",
                          {"request": {"lab": "android", "action": "status"}, "token": "forged"},
                          {"X-OSLab": "1"})

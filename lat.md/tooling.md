@@ -29,6 +29,19 @@ VM labs are kept `bash -n` clean and use `set -euo pipefail`.
 The [[source-lab]] engine tests run in their own process from
 [[source-lab/engine]] so their imports cannot collide with Android tests.
 
+## Native messaging audit
+
+[[scripts/analysis/ext_native_host.py]] audits owned unpacked extensions and
+explicitly supplied native host manifests offline (PENT-18).
+
+A declared lab root bounds all reads; the tool never executes a host or accesses
+a browser, registry or network. It reports lexical API clues, browser-specific caller
+allowlists and local binary metadata/mode risks. Computed calls, effective
+privileges, signatures and Windows ACLs remain unverified. See
+[[scripts/analysis/README.md]] for limits, exit codes and the inert fixture builder
+[[scripts/analysis/make_native_host_lab.py]]. Its regression tests live in
+[[android-lab/lab/tests/test_ext_native_host.py]] and run with the normal suite.
+
 ## Firewall rule renderer
 
 [[firewall-lab/vm/scripts/render-rules.py]] turns a company's abstract rules into UFW
