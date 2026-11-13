@@ -2320,5 +2320,14 @@
   "measured · Move to Trash": "gemessen · In den Papierkorb",
   "moved to Trash, not yet freed.": "In den Papierkorb verschoben; Speicherplatz noch nicht freigegeben.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "Sekunden. Die Bereinigung verschiebt Elemente in den Papierkorb; Speicherplatz wird erst nach dessen Leerung frei.",
-  "skipped": "übersprungen"
+  "skipped": "übersprungen",
+  "Frida targets": "Frida-Ziele",
+  "Devices and processes Frida can attach to right now. This card only lists them; nothing is attached or started.": "Geräte und Prozesse, an die sich Frida gerade anhängen kann. Diese Karte listet sie nur auf; nichts wird angehängt oder gestartet.",
+  "Lab target address": "Adresse des Laborziels",
+  "Optional. The loopback or private IP of a lab frida-server; any other address is refused.": "Optional. Die Loopback- oder private IP eines frida-server im Labor; jede andere Adresse wird abgelehnt.",
+  "Check": "Prüfen",
+  "processes": "Prozesse",
+  "Show processes": "Prozesse anzeigen",
+  "Could not list Frida targets:": "Frida-Ziele konnten nicht aufgelistet werden:",
+  "No Frida device found.": "Kein Frida-Gerät gefunden."
 }

@@ -2320,5 +2320,14 @@
   "measured · Move to Trash": "اندازه‌گیری‌شده · انتقال به سطل زباله",
   "moved to Trash, not yet freed.": "به سطل زباله منتقل شد؛ فضا هنوز آزاد نشده است.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "ثانیه. پاک‌سازی موارد را به سطل زباله می‌برد؛ فضا پس از خالی‌کردن آن آزاد می‌شود.",
-  "skipped": "ردشده"
+  "skipped": "ردشده",
+  "Frida targets": "هدف‌های Frida",
+  "Devices and processes Frida can attach to right now. This card only lists them; nothing is attached or started.": "دستگاه‌ها و پردازه‌هایی که Frida هم‌اکنون می‌تواند به آن‌ها متصل شود. این کارت فقط آن‌ها را فهرست می‌کند؛ به چیزی متصل نمی‌شود و چیزی اجرا نمی‌شود.",
+  "Lab target address": "نشانی هدف آزمایشگاه",
+  "Optional. The loopback or private IP of a lab frida-server; any other address is refused.": "اختیاری. نشانی IP حلقهٔ بازگشتی یا خصوصیِ یک frida-server آزمایشگاه؛ هر نشانی دیگری رد می‌شود.",
+  "Check": "بررسی",
+  "processes": "پردازه",
+  "Show processes": "نمایش پردازه‌ها",
+  "Could not list Frida targets:": "فهرست هدف‌های Frida دریافت نشد:",
+  "No Frida device found.": "هیچ دستگاه Frida پیدا نشد."
 }

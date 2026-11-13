@@ -369,3 +369,35 @@ test("shared CopyButton reports clipboard failure without a success icon", async
   await expect(page.getByRole("status").filter({ hasText: "Clipboard unavailable" })).toBeVisible();
   await expect(page.getByText("Copied", { exact: true })).toHaveCount(0);
 });
+
+test("jobs view lists the Frida targets and shows a refused address", async ({ page }) => {
+  await mockApi(page);
+  const asked: string[] = [];
+  await page.route("**/api/frida/inventory*", async (route) => {
+    const host = new URL(route.request().url()).searchParams.get("host") ?? "";
+    asked.push(host);
+    if (host === "8.8.8.8") {
+      await route.fulfill({ status: 400, json: { error: "8.8.8.8 is not a loopback or private lab address; refusing" } });
+      return;
+    }
+    const device = host
+      ? { id: `tcp@${host}`, type: "remote", transport: "TCP", name: host, os: null, processes: [{ pid: 1, name: "frida-server" }, { pid: 10, name: "sleep" }], processCount: 2, error: null }
+      : { id: "local", type: "local", transport: "local", name: "Local System", os: null, processes: [{ pid: 4, name: "init" }], processCount: 1, error: null };
+    await route.fulfill({ json: {
+      schema: "oslab.frida-inventory/1", generatedAt: "2026-11-13T00:00:00Z", backend: "api", devices: [device],
+      summary: { devices: 1, usb: 0, tcp: host ? 1 : 0, processes: device.processCount }, errors: []
+    } });
+  });
+  await page.goto("/jobs/");
+  const card = page.locator("#frida-targets");
+  await expect(card.getByText("Local System")).toBeVisible();
+  await card.getByLabel("Lab target address").fill("127.0.0.1:27042");
+  await card.getByRole("button", { name: "Check" }).click();
+  await expect(card.getByText("tcp@127.0.0.1:27042")).toBeVisible();
+  await card.getByText("Show processes").click();
+  await expect(card.getByText("frida-server", { exact: true })).toBeVisible();
+  await card.getByLabel("Lab target address").fill("8.8.8.8");
+  await card.getByRole("button", { name: "Check" }).click();
+  await expect(card.getByRole("alert")).toContainText("refusing");
+  expect(asked).toEqual(["", "127.0.0.1:27042", "8.8.8.8"]);
+});

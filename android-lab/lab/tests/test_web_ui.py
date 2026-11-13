@@ -176,3 +176,45 @@ def test_app_update_status_is_reported_without_network(web_server):
     assert "supported" in data and "updateAvailable" in data
     assert data["install"] is None
 
+
+class _FakeFrida:
+    name = "api"
+
+    def __init__(self):
+        self.calls = []
+
+    def devices(self):
+        self.calls.append("devices")
+        return [{"id": "local", "type": "local", "transport": "local", "name": "Local System", "os": None},
+                {"id": "socket", "type": "remote", "transport": "TCP", "name": "Local Socket", "os": None}]
+
+    def processes(self, device_id, host, apps):
+        self.calls.append(("processes", device_id, host))
+        return [{"pid": 10, "name": "sleep"}]
+
+
+def test_frida_inventory_lists_attachable_targets(web_server, monkeypatch):
+    import web_ui
+    fake = _FakeFrida()
+    monkeypatch.setattr(web_ui.frida_inventory, "pick_backend", lambda *args, **kwargs: fake)
+    data = json.load(urllib.request.urlopen(f"{web_server}/api/frida/inventory"))
+    assert data["schema"] == "oslab.frida-inventory/1" and data["readOnly"] is True
+    assert [d["id"] for d in data["devices"]] == ["local", "socket"]
+    assert data["devices"][0]["processes"] == [{"pid": 10, "name": "sleep"}]
+    assert data["devices"][1]["processes"] is None  # an unnamed remote entry is never probed
+
+    data = json.load(urllib.request.urlopen(f"{web_server}/api/frida/inventory?host=127.0.0.1:27042"))
+    assert [d["id"] for d in data["devices"]] == ["tcp@127.0.0.1:27042"]
+    assert fake.calls[-1] == ("processes", "tcp@127.0.0.1:27042", "127.0.0.1:27042")
+
+
+def test_frida_inventory_refuses_targets_outside_the_lab(web_server, monkeypatch):
+    import web_ui
+    fake = _FakeFrida()
+    monkeypatch.setattr(web_ui.frida_inventory, "pick_backend", lambda *args, **kwargs: fake)
+    for host in ("8.8.8.8", "example.com"):
+        with pytest.raises(urllib.error.HTTPError) as refused:
+            urllib.request.urlopen(f"{web_server}/api/frida/inventory?host={host}")
+        assert refused.value.code == 400
+        assert "error" in json.load(refused.value)
+    assert fake.calls == []

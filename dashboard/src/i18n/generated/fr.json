@@ -2320,5 +2320,14 @@
   "measured · Move to Trash": "mesurés · Déplacer vers la corbeille",
   "moved to Trash, not yet freed.": "déplacés vers la corbeille, espace pas encore libéré.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "secondes. Le nettoyage déplace les éléments vers la corbeille ; l’espace n’est libéré qu’après sa vidange.",
-  "skipped": "ignorés"
+  "skipped": "ignorés",
+  "Frida targets": "Cibles Frida",
+  "Devices and processes Frida can attach to right now. This card only lists them; nothing is attached or started.": "Appareils et processus auxquels Frida peut s'attacher en ce moment. Cette carte se contente de les lister ; rien n'est attaché ni démarré.",
+  "Lab target address": "Adresse de la cible du labo",
+  "Optional. The loopback or private IP of a lab frida-server; any other address is refused.": "Facultatif. L'adresse IP de bouclage ou privée d'un frida-server du labo ; toute autre adresse est refusée.",
+  "Check": "Vérifier",
+  "processes": "processus",
+  "Show processes": "Afficher les processus",
+  "Could not list Frida targets:": "Impossible de lister les cibles Frida :",
+  "No Frida device found.": "Aucun appareil Frida trouvé."
 }
