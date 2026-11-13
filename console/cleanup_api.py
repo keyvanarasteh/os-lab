@@ -459,6 +459,12 @@ class CleanupAPI:
         if path == "/api/cleanup/disk-access":
             _query(query)
             return _module(self.root, "readiness").disk_access()
+        if path == "/api/cleanup/volumes":
+            _query(query)
+            try:
+                return _module(self.root, "volumes").report()
+            except OSError as exc:
+                raise CleanupError(500, "Volume inventory is unavailable: {0}".format(exc)) from exc
         if path == "/api/cleanup/catalog":
             _query(query)
             catalog = _module(self.root, "catalog")

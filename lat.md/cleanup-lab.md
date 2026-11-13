@@ -137,6 +137,14 @@ on other operating systems. `GET /api/cleanup/disk-access` is a read-only macOS
 probe that reports limited/unknown/accessible evidence and points to Full Disk
 Access settings without claiming to prove an OS grant.
 
+[[cleanup-lab/engine/cleanup_lab/volumes.py]] reads local mounts and disk space
+without writing anything. `GET /api/cleanup/volumes` returns name, mount point,
+filesystem, total/free bytes, used percentage, disk-pressure warning (85% by
+default), root/removable/internal flags and the volume holding the home folder.
+Linux uses mountinfo, macOS uses the local `mount` list and read-only `diskutil`
+metadata, and Windows uses logical drive types. Network, pseudo and macOS
+system-support mounts are omitted; unknown hardware flags remain null.
+
 ## Safety
 
 The eight rules in the README are the acceptance criteria for every task.

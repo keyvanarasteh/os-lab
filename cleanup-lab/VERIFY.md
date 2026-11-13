@@ -596,3 +596,22 @@ argv, the one-use token, platform refusal, trusted-binary checks and no shell.
 The full repository gate was not rerun because its unchanged Rust stage filled
 the remaining volume space on CLN-19; the focused engine and console suites cover
 this change. Dashboard checks await the plain CLN-16 integration.
+
+## CLN-28 — local volumes and disk pressure
+
+Branch `codex/cln-28-volumes`, stacked on CLN-20. Read-only mounted-volume
+report lists local disks and total/free bytes, marks root and home volume,
+and warns at 85% usage. Network, pseudo and macOS system-support mounts are
+omitted. Linux, macOS and Windows parsers use fake mount and disk data in tests;
+the macOS host probe returned the Data mount as the home volume.
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 133 tests — OK
+$ uv run --with pytest python -m pytest android-lab/lab/tests/test_cleanup_console.py -q
+14 passed
+$ lat check
+All checks passed
+```
+
+The plain `/cleanup/` volumes card depends on CLN-16's page branch.
