@@ -83,6 +83,13 @@ refused before any tool runs. A missing tool or a failed listing is recorded in
 the document's `errors` (exit code 1) instead of raising, and a command that
 times out is stopped together with its child processes.
 
+The web console serves the same document at `GET /api/frida/inventory`, with an
+optional `host` query that goes through the same scope guard (an out-of-scope
+address answers 400). The jobs view renders it in
+[[dashboard/src/views/frida-targets-card.tsx]]: each device with its transport
+and process count, and its process list on demand. The card only lists, and it
+is left out of the public Pages build, which has no local engine.
+
 ## Tests
 
 The lab ships a pytest suite in [[android-lab/lab/tests]].

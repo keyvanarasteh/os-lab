@@ -100,6 +100,26 @@ export interface LabPlan {
   display: string;
 }
 export type JobState = "running" | "succeeded" | "failed" | "cancelled" | "timed-out" | "interrupted";
+/** One device row of `console/frida_inventory.py` (schema oslab.frida-inventory/1). */
+export interface FridaDevice {
+  id: string;
+  type: string;
+  transport: "local" | "USB" | "TCP";
+  name: string;
+  os: string | null;
+  processes: { pid: number | null; name: string; identifier?: string }[] | null;
+  processCount: number | null;
+  error: string | null;
+}
+export interface FridaInventory {
+  schema: string;
+  generatedAt: string;
+  backend: string | null;
+  devices: FridaDevice[];
+  summary: { devices: number; usb: number; tcp: number; processes: number };
+  errors: { stage: string; device?: string; message: string }[];
+}
+
 export interface LabJob {
   id: string;
   label: string;
@@ -290,6 +310,7 @@ export const api = {
   jobs: () => call<{ jobs: LabJob[] }>("/api/jobs"),
   job: (id: string) => call<LabJob>(`/api/jobs/${encodeURIComponent(id)}`),
   cancel: (id: string) => post<LabJob>(`/api/jobs/${encodeURIComponent(id)}/cancel`),
+  fridaInventory: (host = "") => call<FridaInventory>(`/api/frida/inventory${host ? `?host=${encodeURIComponent(host)}` : ""}`),
   // Android Lab workbench
   logs: () => call<AndroidLogs>("/api/logs"),
   clearLogs: () => post("/api/logs/clear"),

@@ -2320,5 +2320,14 @@
   "measured · Move to Trash": "ölçüldü · Çöp'e taşı",
   "moved to Trash, not yet freed.": "Çöp'e taşındı, alan henüz boşalmadı.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "saniye. Temizlik öğeleri Çöp'e taşır; Çöp boşaltılana kadar disk alanı açılmaz.",
-  "skipped": "atlandı"
+  "skipped": "atlandı",
+  "Frida targets": "Frida hedefleri",
+  "Devices and processes Frida can attach to right now. This card only lists them; nothing is attached or started.": "Frida'nın şu anda bağlanabileceği cihazlar ve süreçler. Bu kart yalnızca listeler; hiçbir şeye bağlanılmaz ve hiçbir şey başlatılmaz.",
+  "Lab target address": "Laboratuvar hedef adresi",
+  "Optional. The loopback or private IP of a lab frida-server; any other address is refused.": "İsteğe bağlı. Laboratuvardaki bir frida-server'ın loopback veya özel IP adresi; başka her adres reddedilir.",
+  "Check": "Denetle",
+  "processes": "süreç",
+  "Show processes": "Süreçleri göster",
+  "Could not list Frida targets:": "Frida hedefleri listelenemedi:",
+  "No Frida device found.": "Frida cihazı bulunamadı."
 }
