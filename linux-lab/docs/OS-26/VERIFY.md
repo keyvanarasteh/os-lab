@@ -108,7 +108,52 @@ sonuç **41 passed**. Testler geçici dosyalar kullanır; ağ, `sudo` veya gerç
 sahiplik değişikliği gerektirmez. `lat`, proje belgelerinin grafik kontrolüdür;
 denetleyicinin bağımlılığı değildir. Genel runner diğer labları da test eder.
 
-## Kaydedilen geliştirme doğrulaması
+## Öğrencinin Ubuntu lab doğrulaması
+
+Mert'in `mert@ubuntu` oturumunda, `~/os-lab-mertksll` dizininden paylaştığı
+terminal çıktıları aşağıdaki sonuçları doğruladı. Kullanıcının UID/GID'si
+`1001:1001`; bu oturumun Python ve Ubuntu sürümü ayrıca kaydedilmedi.
+
+| Kontrol | Gözlenen sonuç |
+|---|---|
+| OS-26 testleri | **41 passed in 0.57s** |
+| İlk izin taraması | Tam tarama; 5 girdi, 3 bulgulu girdi; çıkış `1` |
+| Elle `chmod` sonrası tarama | Tam tarama; 5 girdi, 0 bulgu; çıkış `0` |
+| Beklenen sahip `1002` ile kontrol | 5 girdide `owner-drift`; çıkış `1` |
+| JSON, varsayılan sahip `1001` | `complete: true`, `audited: 5`, `findings: []`, `errors: []`; çıkış `0` |
+
+Sahiplik kontrolü için yalnızca beklenen UID değiştirildi; önerilen `chown`
+komutları çalıştırılmadı. Sonraki JSON raporu girdilerin mevcut kullanıcı
+politikasına uygun olduğunu gösterdi.
+
+Öğrencinin `.venv-test` ortamında çalıştırdığı `./scripts/run-tests.sh` sonucu:
+
+| Genel kontrol | Gözlenen sonuç |
+|---|---|
+| Android test paketi (OS-26 dahil) | 214 geçti, 2 başarısız, 2 atlandı |
+| Source Lab / Cleanup referans | 176 / 35 geçti |
+| Cleanup engine | 228 test; 4 başarısız, 5 hata |
+| Örnek APK analizi ve raporlama | Geçti |
+| Kabuk sözdizimi | 71 script geçti |
+| Cargo / lat / dashboard | İlgili araç veya bağımlılıklar kurulu olmadığı için atlandı |
+| Runner özeti | `4 passed, 2 failed, 3 skipped`; çıkış `1` |
+
+Android paketindeki iki başarısız test:
+
+- `test_app_update.py::test_install_downloads_verifies_and_opens`
+- `test_web_ui.py::test_lab_start_requires_a_previewed_plan`
+
+Bu testler, uygulama güncelleyicisi ve Cleanup Lab dosyaları bu PR'da
+değiştirilmedi. Web ve Cleanup sorunları aşağıdaki geliştirme ortamı upstream
+karşılaştırmasında da görüldü; bu karşılaştırma öğrencinin VM'sinde yapılmış
+gibi sunulmaz. Güncelleyici hatası, değiştirilmemiş upstream üzerinde yapılan
+20 ayrı hedefli geliştirme ortamı denemesinde tekrarlanmadı; VM'deki nedeni
+bu sonuçla kesinleştirilemez. Genel paketin tamamı geçti olarak işaretlenmedi.
+
+Logdaki `Security Score: 24/100 (Grade: F)`, kasıtlı zayıflıklar içeren örnek
+APK'nın güvenlik değerlendirmesidir. İlgili analiz/raporlama aşaması geçti.
+
+## Önceki geliştirme ortamı ve upstream karşılaştırması
 
 Linux x86_64, Python 3.12.14 üzerinde OS-26 testleri **41 passed** verdi.
 Yukarıdaki lab senaryosunda 5 girdi denetlendi: önce 3 bulgu/çıkış `1`, farklı
@@ -168,4 +213,5 @@ olarak işaretlenmedi; OS-26'ya özgü testlerin tamamı geçti.
    mevcut uygulama PR'ının güncellendiğini açın.
 6. Video bağlantısını PR'a ekleyip dersin Telegram grubunda paylaşın.
 
-Öğrencinin kendi VM'sinde düzeltme sonrası test doğrulaması ve kanıt videosu bekleniyor.
+Öğrencinin VM testleri ve lab çıktıları yukarıda kaydedildi. Kanıt videosu ve
+kişisel Git/PR değerlendirmesi henüz eklenmedi.

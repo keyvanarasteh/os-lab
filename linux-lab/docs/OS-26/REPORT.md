@@ -6,6 +6,8 @@
 
 **Rezervasyon:** [#112](https://github.com/keyvanarasteh/os-lab/pull/112)
 
+**Uygulama PR'ı:** [#191](https://github.com/keyvanarasteh/os-lab/pull/191)
+
 ## Yapılan çalışma
 
 `permission_audit.py`, seçilen Linux lab dizinindeki dosya ve dizinlerin Unix
@@ -18,6 +20,16 @@ hedeflerini takip etmez. Erişim hataları ve tarama sınırı raporu eksik olar
 işaretler. Testler gerçek geçici dosyalarda izinleri, JSON çıktısını, çıkış
 kodlarını, bağlantıları ve dosyaların değişmeden kaldığını kontrol eder.
 
+## Ubuntu lab gözlemleri
+
+Mert hesabında OS-26'nın 41 testi geçti. Beş girdili örnek labda üç izin
+bulgusu raporlandı; izinler elle düzeltildikten sonra bulgu sayısı sıfıra indi.
+Beklenen UID farklı seçilince beş sahiplik bulgusu görüldü; normal politika ile
+JSON raporu tam tarama ve boş bulgu/hata listeleri verdi.
+
+Genel test paketi de çalıştırıldı. Diğer bileşenlerde kalan hatalar ve atlanan
+kontroller, OS-26 sonuçlarıyla birlikte [VERIFY.md](VERIFY.md) içinde kaydedildi.
+
 ## Git ve PR akışı
 
 Fork: `mertksll/os-lab`. Görev rezervasyonu ayrı PR olarak kabul edildi.
@@ -27,10 +39,9 @@ commit gönderilmesi mevcut PR'ı günceller.
 
 ## Kişisel değerlendirme ve teslim
 
-Bu belge teknik çalışma taslağıdır. Mert'in kendi Linux labında çalıştırma
-gözlemleri, Git/PR sürecinde öğrendiklerini anlatan kişisel değerlendirmesi ve
-2–4 dakikalık kanıt videosu henüz eklenmedi. Geliştirme ortamındaki test sonucu,
-öğrencinin lab videosu yerine sunulmaz.
+Bu belge teknik çalışma taslağıdır. Linux lab gözlemleri eklendi; Git/PR
+sürecinde öğrenilenleri anlatan kişisel değerlendirme ve 2–4 dakikalık kanıt
+videosu henüz eklenmedi. Terminal çıktıları kanıt videosunun yerine geçmez.
 
 Kod, testler ve belge taslağı ChatGPT desteğiyle hazırlanmıştır. Çalıştırma
 komutları, beklenen çıktılar ve doğrulama sonuçları [VERIFY.md](VERIFY.md) içindedir.
