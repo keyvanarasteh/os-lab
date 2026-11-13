@@ -39,6 +39,8 @@ PLAN_KEYS = ("entryIds", "workers", "mode")
 CLEAN_KEYS = ("planId",)
 RULE_ADD_KEYS = ("kind", "value", "enabled")
 RULE_UPDATE_KEYS = RULE_ADD_KEYS
+SCHEDULE_ADD_KEYS = ("cron", "entryIds", "enabled")
+SCHEDULE_TOGGLE_KEYS = ("enabled",)
 #: Engine ``PlanError.code`` → HTTP status on the plan → clean namespace.
 PLAN_STATUS = {
     "plan-invalid": 400,
@@ -50,7 +52,8 @@ PLAN_STATUS = {
 }
 BODY_KEYS = {"scan": SCAN_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS,
              "rule-add": RULE_ADD_KEYS, "rule-update": RULE_UPDATE_KEYS,
-             "rule-delete": ()}
+             "rule-delete": (), "schedule-add": SCHEDULE_ADD_KEYS,
+             "schedule-toggle": SCHEDULE_TOGGLE_KEYS, "schedule-delete": ()}
 
 
 class CleanupError(ValueError):
@@ -403,6 +406,44 @@ JOBS = CleanupJobStore()
 PLANS = PlanStore()
 
 
+def run_due_schedules(root, *, now=None):
+    """Launch only scans for this minute; completion writes a compact report."""
+    schedules = _module(root, "schedules")
+    launched = []
+    for row in schedules.claim_due(now):
+        try:
+            job = JOBS.start_scan(root, {"entryIds": row["entryIds"]})
+            job.request["scheduleId"] = row["id"]
+        except Exception as exc:
+            schedules.record(row["id"], {"state": "failed", "error": str(exc), "finishedAt": time.time()})
+            continue
+
+        def finish(schedule_id, active):
+            while active.state == "running":
+                time.sleep(0.05)
+            result = active.result or {}
+            schedules.record(schedule_id, {"state": active.state, "jobId": active.id,
+                                          "totals": result.get("totals"), "error": active.error,
+                                          "finishedAt": active.finishedAt})
+
+        threading.Thread(target=finish, args=(row["id"], job), daemon=True).start()
+        launched.append(job)
+    return launched
+
+
+def start_schedule_runner(root):
+    """Console-lifetime hook. Missed minutes are not replayed after shutdown."""
+    def loop():
+        while True:
+            try:
+                run_due_schedules(root)
+            except Exception as exc:
+                print("Cleanup schedule runner: {0}: {1}".format(type(exc).__name__, exc),
+                      file=sys.stderr)
+            time.sleep(15)
+    threading.Thread(target=loop, daemon=True, name="cleanup-schedules").start()
+
+
 class CleanupAPI:
     # @lat: [[cleanup-lab#Console API]]
     def __init__(self, root):
@@ -422,6 +463,12 @@ class CleanupAPI:
         if path == "/api/cleanup/rules":
             _query(query)
             return _module(self.root, "rules").read()
+        if path == "/api/cleanup/schedules":
+            _query(query)
+            try:
+                return _module(self.root, "schedules").read()
+            except ValueError as exc:
+                raise CleanupError(500, str(exc)) from exc
         if path == "/api/cleanup/history":
             _query(query)
             try:
@@ -454,6 +501,31 @@ class CleanupAPI:
                                                           enabled=body.get("enabled", True))
             except ValueError as exc:
                 raise CleanupError(400, str(exc)) from exc
+        if path == "/api/cleanup/schedules":
+            _object_body(body, "schedule-add")
+            cron = body.get("cron")
+            entry_ids = _validate_entry_ids(self.root, _module(self.root, "catalog"),
+                                            body.get("entryIds"), required=True)
+            try:
+                return _module(self.root, "schedules").add(cron, entry_ids,
+                    enabled=body.get("enabled", True))
+            except ValueError as exc:
+                raise CleanupError(400, str(exc)) from exc
+        schedule_parts = path.strip("/").split("/")
+        if len(schedule_parts) == 5 and schedule_parts[:3] == ["api", "cleanup", "schedules"]:
+            schedule_id, action = schedule_parts[3], schedule_parts[4]
+            schedules = _module(self.root, "schedules")
+            try:
+                if action == "toggle":
+                    _object_body(body, "schedule-toggle")
+                    if "enabled" not in body:
+                        raise CleanupError(400, "enabled is required")
+                    return schedules.toggle(schedule_id, body["enabled"])
+                if action == "delete":
+                    _object_body(body, "schedule-delete")
+                    return schedules.delete(schedule_id)
+            except schedules.ScheduleError as exc:
+                raise CleanupError(404 if str(exc) == "Schedule not found" else 400, str(exc)) from exc
         rule_parts = path.strip("/").split("/")
         if len(rule_parts) == 5 and rule_parts[:3] == ["api", "cleanup", "rules"]:
             rule_id, action = rule_parts[3], rule_parts[4]
