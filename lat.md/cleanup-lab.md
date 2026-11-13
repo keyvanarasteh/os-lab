@@ -191,6 +191,13 @@ high/privacy/credentials risk. The extended preset adds other low/medium risk
 entries. Both use the same expiring Trash plan. Detailed catalog selection and
 delete mode remain at `/cleanup/scan/`.
 
+The dashboard counts categories with detected locations from scan path evidence, not from the
+number of catalog rows or preset items. An existing empty location is shown as
+such; missing paths are explained in the full report. Findings can be ordered by
+measured size or by priority (recommended safe items, other safe items, separate
+review, then locations with no measurable space). The plan uses only measured,
+cleanable items and keeps its own safety checks.
+
 The page renders
 category results at `/cleanup/results/`, skipped/failed and unreadable items at
 `/cleanup/leftovers/`, and verified audit records at `/cleanup/history/`.

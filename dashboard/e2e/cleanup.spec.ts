@@ -33,7 +33,11 @@ test("scan, confirm, clean, leftovers and history use typed cleanup jobs", async
   await page.goto("/cleanup/");
   await expect(page.getByRole("heading", { name: "Quick cleanup" })).toBeVisible();
   await page.getByRole("button", { name: "Scan now" }).click();
-  await expect(page.getByText("142 B measured across 2 categories", { exact: false })).toBeVisible();
+  await expect(page.getByText("142 B")).toBeVisible();
+  await expect(page.getByTestId("cleanup-finding").first()).toContainText("Private data");
+  await page.getByRole("button", { name: "Priority" }).click();
+  await expect(page.getByTestId("cleanup-finding").first()).toContainText("Caches");
+  await page.getByRole("button", { name: "Size" }).click();
   await page.getByRole("button", { name: "Review plan" }).click();
   expect(calls.find((call) => call.path === "/api/cleanup/scan")?.body).toEqual({ entryIds: ["system.caches", "browser.private"] });
   expect(calls.find((call) => call.path === "/api/cleanup/plan")?.body).toEqual({ entryIds: ["system.caches"], mode: "trash" });
@@ -44,12 +48,35 @@ test("scan, confirm, clean, leftovers and history use typed cleanup jobs", async
   await expect(page.getByText("moved to Trash, not yet freed.", { exact: false })).toBeVisible();
   expect(calls.filter((call) => call.path === "/api/cleanup/clean")[0].body).toEqual({ planId: "plan-1" });
   await page.goto("/cleanup/results/");
+  await expect(page.getByTestId("cleanup-result").first()).toContainText("Private data");
+  await page.getByRole("button", { name: "Priority" }).click();
+  await expect(page.getByTestId("cleanup-result").first()).toContainText("Caches");
   await expect(page.getByText("system · Caches")).toBeVisible();
   await expect(page.getByText("env:XDG_CACHE_HOME").first()).toBeVisible();
   await page.goto("/cleanup/leftovers/");
   await expect(page.getByText("No leftovers were reported.")).toBeVisible();
   await page.goto("/cleanup/history/");
   await expect(page.getByText("Run #1 · trash")).toBeVisible();
+});
+
+test("missing paths do not become findings or a zero-count preset", async ({ page }) => {
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown = {};
+    if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "linux", entries: [{ id: "system.missing", name: "Missing cache", category: "system", risk: "low", hint: "Cache", impact: "", defaultSelected: true, cleanable: true, needsPrivilege: false, paths: [{ template: "~/missing", path: "/tmp/missing", reason: "" }] }] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [{ id: "scan-1", kind: "scan", state: "done", request: { entryIds: ["system.missing"] }, progress: {}, error: null, result: { cancelled: false, entries: [{ id: "system.missing", name: "Missing cache", category: "system", risk: "low", sizeBytes: 0, files: 0, folders: 0, unreadable: [], paths: [{ path: "/tmp/missing", missing: true, measured: false, reason: "The path does not exist.", sizeBytes: 0, error: null }] }], totals: { sizeBytes: 0, files: 0, folders: 0, unreadable: 0 } } }] };
+    else if (path === "/api/host") data = { host: { os: "linux", osPretty: "Linux", arch: "amd64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/");
+  await expect(page.getByText("No existing catalog locations were detected.", { exact: false })).toBeVisible();
+  await expect(page.getByTestId("cleanup-finding")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Review plan" })).toHaveCount(0);
+  await expect(page.getByText(/0 findings|0 categories/i)).toHaveCount(0);
 });
 
 test("container pruning needs a preview and VM inventory stays report only", async ({ page }) => {

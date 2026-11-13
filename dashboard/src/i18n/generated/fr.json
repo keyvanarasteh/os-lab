@@ -2321,4 +2321,20 @@
   "moved to Trash, not yet freed.": "déplacés vers la corbeille, espace pas encore libéré.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "secondes. Le nettoyage déplace les éléments vers la corbeille ; l’espace n’est libéré qu’après sa vidange.",
   "skipped": "ignorés"
+,
+  "Choose More safe options to review additional measured items.": "Choisissez Autres options sûres pour examiner d’autres éléments mesurés.",
+  "Detected locations": "Emplacements détectés",
+  "Detected locations need separate review; no safe preset items were selected.": "Les emplacements détectés nécessitent un examen séparé ; aucun élément sûr n’a été présélectionné.",
+  "More findings": "Autres résultats",
+  "No existing catalog locations were detected. Check the full report for missing or unreadable paths.": "Aucun emplacement du catalogue n’a été détecté. Consultez le rapport complet pour les chemins manquants ou illisibles.",
+  "Priority": "Priorité",
+  "Scan findings": "Résultats de l’analyse",
+  "Size": "Taille",
+  "Sort findings": "Trier les résultats",
+  "detected categories": "catégories détectées",
+  "measured": "mesurés"
+,
+  "Optional": "Facultatif",
+  "Review separately": "Examiner séparément",
+  "No measurable space": "Aucun espace mesurable"
 }

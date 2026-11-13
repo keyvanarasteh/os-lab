@@ -154,12 +154,12 @@ export interface CleanupStatus {
 }
 export interface CleanupEntry {
   id: string; name: string; category: string; risk: string; hint: string; impact: string;
-  defaultSelected: boolean; needsPrivilege: boolean;
+  defaultSelected: boolean; needsPrivilege: boolean; cleanable?: boolean;
   paths: { template: string; path: string | null; reason: string; source?: string }[];
 }
 export interface CleanupScan {
   cancelled: boolean;
-  entries: { id: string; name: string; category: string; risk: string; sizeBytes: number; files: number; folders: number; unreadable: string[]; paths: { path: string | null; reason: string; source?: string; sizeBytes: number; error: string | null }[] }[];
+  entries: { id: string; name: string; category: string; risk: string; sizeBytes: number; files: number; folders: number; unreadable: string[]; paths: { path: string | null; reason: string; source?: string; sizeBytes: number; missing?: boolean; measured?: boolean; symlink?: boolean; unreadable?: string[]; error: string | null }[] }[];
   totals: { sizeBytes: number; files: number; folders: number; unreadable: number };
 }
 export interface CleanupPlan {

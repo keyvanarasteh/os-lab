@@ -2321,4 +2321,20 @@
   "moved to Trash, not yet freed.": "به سطل زباله منتقل شد؛ فضا هنوز آزاد نشده است.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "ثانیه. پاک‌سازی موارد را به سطل زباله می‌برد؛ فضا پس از خالی‌کردن آن آزاد می‌شود.",
   "skipped": "ردشده"
+,
+  "Choose More safe options to review additional measured items.": "برای بررسی موارد اندازه‌گیری‌شده بیشتر، گزینه‌های امن بیشتر را انتخاب کنید.",
+  "Detected locations": "مکان‌های شناسایی‌شده",
+  "Detected locations need separate review; no safe preset items were selected.": "مکان‌های شناسایی‌شده نیاز به بررسی جداگانه دارند؛ هیچ مورد امنی از پیش انتخاب نشد.",
+  "More findings": "یافته‌های بیشتر",
+  "No existing catalog locations were detected. Check the full report for missing or unreadable paths.": "هیچ مکان موجودی از فهرست شناسایی نشد. برای مسیرهای گمشده یا خوانده‌نشدنی گزارش کامل را ببینید.",
+  "Priority": "اولویت",
+  "Scan findings": "یافته‌های اسکن",
+  "Size": "اندازه",
+  "Sort findings": "مرتب‌سازی یافته‌ها",
+  "detected categories": "دسته شناسایی‌شده",
+  "measured": "اندازه‌گیری شد"
+,
+  "Optional": "اختیاری",
+  "Review separately": "جداگانه بررسی کنید",
+  "No measurable space": "فضای قابل اندازه‌گیری ندارد"
 }

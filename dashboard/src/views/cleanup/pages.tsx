@@ -17,6 +17,32 @@ const isScan = (job: CleanupJob): job is CleanupJob & { result: CleanupScan } =>
 const isPlan = (job: CleanupJob): job is CleanupJob & { result: CleanupPlan } => job.kind === "plan" && !!job.result;
 const isClean = (job: CleanupJob): job is CleanupJob & { result: CleanupResult } => job.kind === "clean" && !!job.result;
 const PathSource = ({ source }: { source?: string }) => <span className="text-(--iux-muted-foreground)">Source: <code translate="no">{source || "catalog"}</code></span>;
+type ScanEntry = CleanupScan["entries"][number];
+type SortMode = "size" | "priority";
+const safe = (entry: CleanupEntry) => entry.cleanable !== false && !entry.needsPrivilege && (entry.risk === "low" || entry.risk === "medium");
+const priority = (entry?: CleanupEntry) => !entry || !safe(entry) ? 2 : entry.defaultSelected ? 0 : 1;
+const detected = (entry: ScanEntry) => entry.paths.some((path) => path.measured === true || path.sizeBytes > 0 || path.symlink === true || !!path.unreadable?.length);
+const findingPriority = (entry: ScanEntry, catalog: Map<string, CleanupEntry>) => entry.sizeBytes > 0 ? priority(catalog.get(entry.id)) : 3;
+function sortEntries(rows: ScanEntry[], catalog: Map<string, CleanupEntry>, mode: SortMode) {
+  return [...rows].sort((a, b) => {
+    const presence = Number(detected(b)) - Number(detected(a));
+    const size = b.sizeBytes - a.sizeBytes;
+    const rank = findingPriority(a, catalog) - findingPriority(b, catalog);
+    return presence || (mode === "size" ? size || rank : rank || size) || a.name.localeCompare(b.name);
+  });
+}
+function SortControls({ mode, onChange }: { mode: SortMode; onChange: (value: SortMode) => void }) {
+  return <div role="group" aria-label="Sort findings" className="flex flex-wrap gap-2">
+    <button type="button" className="iux-btn" data-variant={mode === "size" ? "primary" : "outline"} aria-pressed={mode === "size"} onClick={() => onChange("size")}>Size</button>
+    <button type="button" className="iux-btn" data-variant={mode === "priority" ? "primary" : "outline"} aria-pressed={mode === "priority"} onClick={() => onChange("priority")}>Priority</button>
+  </div>;
+}
+function FindingRow({ item, rank }: { item: ScanEntry; rank: number }) {
+  return <div data-testid="cleanup-finding" className="flex flex-wrap justify-between gap-x-3 border-b border-(--iux-border) py-1">
+    <span>{item.name} · {rank === 0 ? "Recommended" : rank === 1 ? "Optional" : rank === 2 ? "Review separately" : "No measurable space"}</span>
+    <strong>{bytes(item.sizeBytes)}</strong>
+  </div>;
+}
 
 export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
   const [status, setStatus] = useState<CleanupStatus | null>(null);
@@ -31,6 +57,7 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"trash" | "delete">("trash");
   const [preset, setPreset] = useState<"recommended" | "extended">("recommended");
+  const [sortMode, setSortMode] = useState<SortMode>("size");
   const [confirm, setConfirm] = useState(false);
   const [now, setNow] = useState(Date.now() / 1000);
   const locale = typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname);
@@ -82,13 +109,18 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
   const busy = submitting || active?.state === "running";
   const canWork = status?.state === "ready" && !busy;
   const measured = new Map(latestScan?.entries.map((item) => [item.id, item]) ?? []);
-  const safeEntries = entries.filter((item) => measured.get(item.id)?.sizeBytes && !["high", "privacy", "credentials"].includes(item.risk) && !item.needsPrivilege);
-  const suggested = safeEntries.filter((item) => preset === "extended" || item.defaultSelected);
+  const catalog = new Map(entries.map((item) => [item.id, item]));
+  const findings = latestScan?.entries.filter(detected) ?? [];
+  const sortedFindings = sortEntries(findings, catalog, sortMode);
+  const sortedResults = sortEntries(latestScan?.entries ?? [], catalog, sortMode);
+  const safeEntries = entries.filter((item) => (measured.get(item.id)?.sizeBytes ?? 0) > 0 && safe(item));
+  const suggested = safeEntries.filter((item) => preset === "extended" || item.defaultSelected)
+    .sort((a, b) => (measured.get(b.id)?.sizeBytes ?? 0) - (measured.get(a.id)?.sizeBytes ?? 0) || priority(a) - priority(b) || a.name.localeCompare(b.name));
   const suggestedIds = suggested.map((item) => item.id);
   const suggestedBytes = suggested.reduce((sum, item) => sum + (measured.get(item.id)?.sizeBytes ?? 0), 0);
   const planFollowsScan = !!planJob && jobs.findIndex((job) => job.id === planJob.id) <= jobs.findIndex(isScan);
   const planMatches = !!latestPlan && planFollowsScan && latestPlan.mode === "trash" && JSON.stringify([...(planJob?.request.entryIds ?? [])].sort()) === JSON.stringify([...suggestedIds].sort());
-  const canConfirmSuggested = canWork && !!latestPlan && planMatches && !planUsed && latestPlan.expiresAt > now && latestPlan.totals.ready > 0;
+  const canConfirmSuggested = canWork && !latestScan?.cancelled && !!latestPlan && planMatches && !planUsed && latestPlan.expiresAt > now && latestPlan.totals.ready > 0;
 
   async function start(action: () => Promise<CleanupJob>) {
     setActionError(""); setSubmitting(true); setConfirm(false);
@@ -125,11 +157,19 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
               {active?.state === "running" && <div className="mt-4" role="status"><p>{active.kind} in progress · {String(active.progress?.pathsDone ?? active.progress?.itemsDone ?? 0)} / {String(active.progress?.pathsTotal ?? active.progress?.itemsTotal ?? "…")}</p><progress className="mt-2 w-full" max={Number(active.progress?.pathsTotal ?? active.progress?.itemsTotal ?? 1)} value={Number(active.progress?.pathsDone ?? active.progress?.itemsDone ?? 0)} /><p className="break-all text-xs text-(--iux-muted-foreground)" translate="no">{active.progress?.currentPath}</p><button type="button" className="iux-btn mt-2" onClick={() => void cancel()}>Cancel</button></div>}
               {active?.state === "failed" && <Status value={{ ok: false, text: active.error || "The cleanup job failed." }} />}{actionError && <Status value={{ ok: false, text: actionError }} />}
             </Section>
-            {latestScan && <Section title="Suggested cleanup" description={latestScan.cancelled ? "Scan cancelled. Results are partial; scan again for suggestions." : `${bytes(latestScan.totals.sizeBytes)} measured across ${latestScan.entries.length} categories. Review the plan before cleaning.`}>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Cleanup preset"><button type="button" className="iux-btn" data-variant={preset === "recommended" ? "primary" : "outline"} aria-pressed={preset === "recommended"} disabled={busy} onClick={() => { setPreset("recommended"); setConfirm(false); }}>Recommended</button><button type="button" className="iux-btn" data-variant={preset === "extended" ? "primary" : "outline"} aria-pressed={preset === "extended"} disabled={busy} onClick={() => { setPreset("extended"); setConfirm(false); }}>More safe options</button></div>
-              <p className="mt-3 text-sm">{suggested.length} categories · {bytes(suggestedBytes)} measured · Move to Trash</p><p className="text-sm text-(--iux-muted-foreground)">High risk, privacy, credentials and privileged items require separate review.</p>
-              {suggested.length ? <details className="mt-3 text-sm"><summary className="cursor-pointer">Included categories</summary><ul className="mt-2 space-y-1">{suggested.map((item) => <li key={item.id}>{item.name} · {bytes(measured.get(item.id)?.sizeBytes ?? 0)}</li>)}</ul></details> : <Empty>No safe cleanup suggestions in this scan.</Empty>}
-              <div className="mt-4 flex flex-wrap gap-2"><button type="button" className="iux-btn" disabled={!canWork || latestScan.cancelled || !suggested.length} onClick={() => void start(() => api.cleanupPlan(suggestedIds, "trash"))}>Review plan</button><a className="iux-btn" href={link("results/")}>Full scan report</a><a className="iux-btn" href={link("scan/")}>Choose individual items</a></div>
+            {latestScan && <Section title="Scan findings" description={latestScan.cancelled ? "Scan cancelled. Results are partial; scan again for suggestions." : "Review detected locations and a plan before cleaning."}>
+              {findings.length > 0 ? <>
+                <p className="text-sm">{bytes(latestScan.totals.sizeBytes)} <span>measured</span> · {findings.length} <span>detected categories</span></p>
+                <div className="my-3 flex flex-wrap items-center justify-between gap-2"><strong className="text-sm">Detected locations</strong>{findings.length > 1 && <SortControls mode={sortMode} onChange={setSortMode} />}</div>
+                <div className="space-y-1 text-sm">{sortedFindings.slice(0, 5).map((item) => <FindingRow key={item.id} item={item} rank={findingPriority(item, catalog)} />)}
+                  {sortedFindings.length > 5 && <details className="pt-2"><summary className="cursor-pointer">More findings</summary>{sortedFindings.slice(5).map((item) => <FindingRow key={item.id} item={item} rank={findingPriority(item, catalog)} />)}</details>}
+                </div>
+              </> : <Empty>No existing catalog locations were detected. Check the full report for missing or unreadable paths.</Empty>}
+              {safeEntries.length > 0 && !latestScan.cancelled ? <div className="mt-4">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Cleanup preset"><button type="button" className="iux-btn" data-variant={preset === "recommended" ? "primary" : "outline"} aria-pressed={preset === "recommended"} disabled={busy} onClick={() => { setPreset("recommended"); setConfirm(false); }}>Recommended</button><button type="button" className="iux-btn" data-variant={preset === "extended" ? "primary" : "outline"} aria-pressed={preset === "extended"} disabled={busy} onClick={() => { setPreset("extended"); setConfirm(false); }}>More safe options</button></div>
+                {suggested.length ? <><p className="mt-3 text-sm">{suggested.length} categories · {bytes(suggestedBytes)} measured · Move to Trash</p><p className="text-sm text-(--iux-muted-foreground)">High risk, privacy, credentials and privileged items require separate review.</p><details className="mt-3 text-sm"><summary className="cursor-pointer">Included categories</summary><ul className="mt-2 space-y-1">{suggested.map((item) => <li key={item.id}>{item.name} · {bytes(measured.get(item.id)?.sizeBytes ?? 0)}</li>)}</ul></details></> : <Empty>Choose More safe options to review additional measured items.</Empty>}
+              </div> : findings.length > 0 && !latestScan.cancelled ? <Empty>Detected locations need separate review; no safe preset items were selected.</Empty> : null}
+              <div className="mt-4 flex flex-wrap gap-2">{suggested.length > 0 && !latestScan.cancelled && <button type="button" className="iux-btn" disabled={!canWork} onClick={() => void start(() => api.cleanupPlan(suggestedIds, "trash"))}>Review plan</button>}<a className="iux-btn" href={link("results/")}>Full scan report</a><a className="iux-btn" href={link("scan/")}>Choose individual items</a></div>
               {latestPlan && planMatches && <div className="mt-4 rounded-md border border-(--iux-border) p-3 text-sm"><p>{latestPlan.totals.ready} items ready · {bytes(latestPlan.totals.bytes)} · {latestPlan.totals.skipped} skipped</p><p>Plan expires in {Math.max(0, Math.ceil(latestPlan.expiresAt - now))} seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.</p><details className="mt-2"><summary className="cursor-pointer">Plan details</summary>{latestPlan.items.map((item, index) => <p key={`${item.entryId}-${index}`} className="mt-2 break-all">{item.entryName} · {item.status} · {bytes(item.sizeBytes)} · <span translate="no">{item.path}</span>{item.reason && ` · ${item.reason}`}</p>)}</details>{planUsed && <p>This plan was already run. Review a new plan.</p>}<button type="button" className="iux-btn mt-3" data-variant="primary" disabled={!canConfirmSuggested} onClick={() => setConfirm(true)}>Confirm clean</button></div>}
               {confirm && latestPlan && planMatches && <div role="dialog" aria-modal="true" aria-label="Confirm cleanup" className="mt-3 rounded-md border border-(--iux-border) p-4"><p>Move {latestPlan.totals.ready} items ({bytes(latestPlan.totals.bytes)}) to Trash?</p><div className="mt-3 flex gap-2"><button type="button" className="iux-btn" data-variant="primary" disabled={!canConfirmSuggested} onClick={() => void start(() => api.cleanupClean(latestPlan.planId))}>Run clean</button><button type="button" className="iux-btn" onClick={() => setConfirm(false)}>Back</button></div></div>}
             </Section>}
@@ -150,7 +190,8 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
             </Section>
             {latestScan && <Section title="Scan results" description={`${bytes(latestScan.totals.sizeBytes)} measured across ${latestScan.entries.length} entries`}>
               {latestScan.cancelled && <p>Scan cancelled. Results are partial.</p>}
-              {latestScan.entries.length ? latestScan.entries.map((item) => <div key={item.id} className="border-b border-(--iux-border) py-2 text-sm"><strong>{item.name}</strong> · {bytes(item.sizeBytes)} · {item.files} files</div>) : <Empty>No measured results yet.</Empty>}
+              <SortControls mode={sortMode} onChange={setSortMode} />
+              {latestScan.entries.length ? sortedResults.map((item) => <div key={item.id} className="border-b border-(--iux-border) py-2 text-sm"><strong>{item.name}</strong> · {bytes(item.sizeBytes)} · {item.files} files</div>) : <Empty>No measured results yet.</Empty>}
               <a className="iux-btn mt-3" href={link("results/")}>View results</a>
             </Section>}
             <Section title="Plan & confirm" description="A plan checks every path again. Trash is the default; permanent deletion requires an explicit choice.">
@@ -170,7 +211,8 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
           </>}
           {page === "results" && <>
             <Section title="Results by category" description="Measurements from the latest scan in this console session.">
-              {!latestScan ? <Empty>No scan results yet. Run a scan first.</Empty> : latestScan.entries.map((item) => <div key={item.id} className="border-b border-(--iux-border) py-3"><strong>{item.category} · {item.name}</strong><p>{bytes(item.sizeBytes)} · {item.files} files · {item.folders} folders</p>{item.paths.map((path, index) => <p key={index} className="break-all text-sm"><span translate="no">{path.path || path.reason}</span> · {bytes(path.sizeBytes)} · <PathSource source={path.source} /></p>)}</div>)}
+              {latestScan && <SortControls mode={sortMode} onChange={setSortMode} />}
+              {!latestScan ? <Empty>No scan results yet. Run a scan first.</Empty> : sortedResults.map((item) => <div key={item.id} data-testid="cleanup-result" className="border-b border-(--iux-border) py-3"><strong>{item.category} · {item.name}</strong><p>{bytes(item.sizeBytes)} · {item.files} files · {item.folders} folders</p>{item.paths.map((path, index) => <p key={index} className="break-all text-sm"><span translate="no">{path.path || path.reason}</span> · {bytes(path.sizeBytes)} · <PathSource source={path.source} /></p>)}</div>)}
             </Section>
             <Section title="Clean result" description={latestClean ? `${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not freed" : "deleted permanently"}` : undefined}>
               {!latestClean ? <Empty>No clean results yet.</Empty> : latestClean.results.map((item, index) => <div key={index} className="border-b border-(--iux-border) py-3"><strong>{item.entryName} · {item.status}</strong><p translate="no" className="break-all">{item.path}</p><PathSource source={item.source} /><p>{item.reason || item.error}</p>{item.trashPath && <p translate="no" className="break-all">{item.trashPath}</p>}</div>)}
