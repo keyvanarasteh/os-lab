@@ -2321,4 +2321,20 @@
   "moved to Trash, not yet freed.": "نُقلت إلى سلة المهملات، ولم تتحرر المساحة بعد.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "ثانية. ينقل التنظيف العناصر إلى سلة المهملات؛ لا تتحرر المساحة حتى إفراغها.",
   "skipped": "تم تخطيها"
+,
+  "Choose More safe options to review additional measured items.": "اختر خيارات آمنة إضافية لمراجعة عناصر أخرى تم قياسها.",
+  "Detected locations": "المواقع المكتشفة",
+  "Detected locations need separate review; no safe preset items were selected.": "تحتاج المواقع المكتشفة إلى مراجعة منفصلة؛ لم تُحدّد عناصر آمنة مسبقًا.",
+  "More findings": "نتائج إضافية",
+  "No existing catalog locations were detected. Check the full report for missing or unreadable paths.": "لم تُكتشف مواقع موجودة من الفهرس. راجع التقرير الكامل للمسارات المفقودة أو غير المقروءة.",
+  "Priority": "الأولوية",
+  "Scan findings": "نتائج الفحص",
+  "Size": "الحجم",
+  "Sort findings": "ترتيب النتائج",
+  "detected categories": "فئات مكتشفة",
+  "measured": "تم قياسها"
+,
+  "Optional": "اختياري",
+  "Review separately": "راجع بشكل منفصل",
+  "No measurable space": "لا توجد مساحة قابلة للقياس"
 }

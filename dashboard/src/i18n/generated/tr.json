@@ -2321,4 +2321,20 @@
   "moved to Trash, not yet freed.": "Çöp'e taşındı, alan henüz boşalmadı.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "saniye. Temizlik öğeleri Çöp'e taşır; Çöp boşaltılana kadar disk alanı açılmaz.",
   "skipped": "atlandı"
+,
+  "Choose More safe options to review additional measured items.": "Ek ölçülen öğeleri incelemek için Diğer güvenli seçenekler’i seçin.",
+  "Detected locations": "Tespit edilen konumlar",
+  "Detected locations need separate review; no safe preset items were selected.": "Tespit edilen konumlar ayrı incelenmeli; güvenli ön ayara öğe seçilmedi.",
+  "More findings": "Diğer bulgular",
+  "No existing catalog locations were detected. Check the full report for missing or unreadable paths.": "Mevcut bir katalog konumu tespit edilmedi. Eksik veya okunamayan yollar için tam rapora bakın.",
+  "Priority": "Öncelik",
+  "Scan findings": "Tarama bulguları",
+  "Size": "Boyut",
+  "Sort findings": "Bulguları sırala",
+  "detected categories": "tespit edilen kategori",
+  "measured": "ölçüldü"
+,
+  "Optional": "İsteğe bağlı",
+  "Review separately": "Ayrı inceleyin",
+  "No measurable space": "Ölçülebilir alan yok"
 }
