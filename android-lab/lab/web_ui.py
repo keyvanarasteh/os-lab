@@ -248,7 +248,12 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             payload = job.to_dict() if hasattr(job, "to_dict") else job
             # 202: the job keeps running after the answer (the jobs endpoints poll it).
             self._json(
-                202 if path in ("/api/cleanup/scan", "/api/cleanup/plan", "/api/cleanup/clean") else 200,
+                202 if path in (
+                    "/api/cleanup/scan",
+                    "/api/cleanup/plan",
+                    "/api/cleanup/clean",
+                    "/api/cleanup/relocations/run",
+                ) else 200,
                 payload,
             )
         except cleanup_api.CleanupError as exc:

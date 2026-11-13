@@ -52,6 +52,18 @@ follows a symlink out of its top-level path.
 | (none) | per-item result | `trashed` / `deleted` / `skipped` (stable code + reason) / `failed` (error); bytes counted only after the original is gone. |
 | streaming progress | progress callback | `itemsDone`, `itemsTotal`, `bytesRemoved`, `currentPath`; the job is polled through `GET /api/cleanup/jobs/<id>`. |
 
+## Relocation translations
+
+| Reference | Cleanup Lab | Notes |
+|---|---|---|
+| `cleanup_ref.relocation.classify` | `relocation.classify` | The seven link states; only `lstat` / `readlink`, never follows a link. |
+| `plan_move` / `plan_restore` / `plan_relink` | `plan_move` / `plan_restore` / `plan_relink` | Ordered, typed steps. Relink refuses a real folder (`conflict`) instead of `rm -rf`-ing it. |
+| (none) | `plan_resume` | Detects `.oslab-moving` / `.oslab-restoring`, verifies the surviving copy, then finishes or rolls back. |
+| (none) | `relocation.execute` | Copy → verify → rename aside → symlink → verify link → remove aside; per-step results and the surviving-data field. |
+| Copy, then immediate `rm -rf` of the original with no verification | **Not ported** | Verify the copy before the original is moved aside, and report every failed step. |
+| Retry the whole operation as an elevated shell string | **Not ported** | A permission failure is a failure with a reason; no shell, no elevation. |
+| "Prepare" / "link" removes whatever is at the home path | **Not ported** | A real folder is `conflict`; only a link is replaced. |
+
 ## System
 
 | Qleaner id | Catalog id | Task | Notes |

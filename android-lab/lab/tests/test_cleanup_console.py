@@ -7,6 +7,7 @@ item changes, and a job that always answers.
 """
 import json
 import os
+import shutil
 import sys
 import threading
 import time
@@ -52,10 +53,12 @@ def clean_jobs(tmp_path, monkeypatch):
     drain()
     cleanup_api.JOBS.jobs.clear()
     cleanup_api.PLANS.plans.clear()
+    cleanup_api.RELOCATIONS.plans.clear()
     yield
     drain()
     cleanup_api.JOBS.jobs.clear()
     cleanup_api.PLANS.plans.clear()
+    cleanup_api.RELOCATIONS.plans.clear()
 
 
 def catalog_cache_target(tmp_path, monkeypatch):
@@ -507,6 +510,222 @@ def test_the_browser_route_plans_and_cleans(tmp_path, monkeypatch):
         assert clean["state"] == "done"
         assert clean["result"]["results"][0]["status"] == "trashed"
         assert clean["result"]["totals"]["bytes"] == 64
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def relocation_setup(tmp_path, monkeypatch):
+    """A fake two-volume host: the generated home volume and a store volume."""
+    platform = paths_module.platform_id()
+    if platform not in ("macos", "linux"):
+        pytest.skip("no catalog path for this test platform")
+    home = tmp_path / "home"
+    store_volume = tmp_path / "store-volume"
+    os.makedirs(home)
+    os.makedirs(store_volume)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    if platform == "linux":
+        monkeypatch.setenv("XDG_CACHE_HOME", str(home / ".cache"))
+    entry = next(
+        item for item in catalog_module.load(REPO_ROOT) if item["id"] == "system.user-caches"
+    )
+    target = catalog_module.resolve(entry, platform)[0]["path"]
+    os.makedirs(target, exist_ok=True)
+    with open(os.path.join(target, "one.bin"), "wb") as handle:
+        handle.write(b"x" * 64)
+
+    def row(mount, name, is_home):
+        return {
+            "id": str(mount), "name": name, "mountPoint": str(mount),
+            "filesystem": "apfs", "source": "", "totalBytes": 10**12,
+            "freeBytes": 10**12, "usedPercent": 0.0, "pressure": False,
+            "root": False, "removable": False, "internal": True, "home": is_home,
+        }
+
+    report = {
+        "platform": platform,
+        "homeVolume": str(home),
+        "thresholdPercent": 85,
+        "volumes": [row(home, "home", True), row(store_volume, "store", False)],
+    }
+    real = cleanup_api._module
+
+    class FakeVolumes:
+        @staticmethod
+        def report():
+            return report
+
+    def fake_module(root, name):
+        if name == "volumes":
+            return FakeVolumes
+        return real(root, name)
+
+    monkeypatch.setattr(cleanup_api, "_module", fake_module)
+    return target, str(store_volume)
+
+
+def test_relocation_listing_reports_states_and_typed_actions(tmp_path, monkeypatch):
+    target, store_volume = relocation_setup(tmp_path, monkeypatch)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    listing = api.get("/api/cleanup/relocations", {})
+    assert listing["homeVolume"] == str(tmp_path / "home")
+    assert {row["id"] for row in listing["volumes"]} == {str(tmp_path / "home"), store_volume}
+    entry = next(row for row in listing["entries"] if row["entryId"] == "system.user-caches")
+    assert entry["relocatable"] is True
+    item = entry["paths"][0]
+    assert item["homePath"] == target
+    target_row = item["targets"][0]
+    assert target_row["volumeId"] == store_volume
+    assert target_row["status"] == "local_only"
+    assert target_row["actions"] == ["move"]
+
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.get("/api/cleanup/relocations", {"x": ["1"]})
+    assert caught.value.status == 400
+
+
+def test_a_relocation_is_planned_then_run_with_an_audit_record(tmp_path, monkeypatch):
+    target, store_volume = relocation_setup(tmp_path, monkeypatch)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    plan = api.post(
+        "/api/cleanup/relocations/plan",
+        {"entryId": "system.user-caches", "volumeId": store_volume, "action": "move"},
+    )
+    assert plan["action"] == "move"
+    assert plan["status"] == "local_only"
+    assert [step["op"] for step in plan["steps"]] == [
+        "copy", "verify_copy", "rename", "symlink", "verify_link", "remove_tree",
+    ]
+    job = wait_for(api.post("/api/cleanup/relocations/run", {"planId": plan["planId"]}), "done")
+    assert job.kind == "relocate"
+    assert job.result["state"] == "done"
+    assert job.result["action"] == "move"
+    assert job.result["preserved"] == "store"
+    assert os.path.islink(target)
+    with open(os.path.join(job.result["storePath"], "one.bin"), "rb") as handle:
+        assert handle.read() == b"x" * 64
+    history = api.get("/api/cleanup/history", {})
+    assert history["total"] == 1
+    assert history["entries"][0]["result"]["action"] == "move"
+
+
+def test_relocation_requests_are_typed(tmp_path, monkeypatch):
+    target, store_volume = relocation_setup(tmp_path, monkeypatch)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    refused = [
+        {"path": target},
+        {"entryId": "system.user-caches", "volumeId": store_volume, "root": target},
+        {},
+        {"entryId": "nope.entry", "volumeId": store_volume},
+        {"entryId": "system.user-caches", "volumeId": "/no/such/volume"},
+        {"entryId": "system.user-caches", "volumeId": str(tmp_path / "home")},
+        {"entryId": "system.user-caches", "volumeId": store_volume, "pathIndex": -1},
+        {"entryId": "system.user-caches", "volumeId": store_volume, "pathIndex": True},
+        {"entryId": "system.user-caches", "volumeId": store_volume, "action": "shred"},
+        {"entryId": "system.user-caches", "volumeId": store_volume, "action": "move", "extra": 1},
+    ]
+    for body in refused:
+        with pytest.raises(cleanup_api.CleanupError) as caught:
+            api.post("/api/cleanup/relocations/plan", body)
+        assert caught.value.status == 400, body
+
+    for body in ({}, {"planId": ""}, {"planId": 3}, {"planId": "x", "force": True}):
+        with pytest.raises(cleanup_api.CleanupError) as caught:
+            api.post("/api/cleanup/relocations/run", body)
+        assert caught.value.status == 400, body
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/relocations/run", {"planId": "not-a-plan"})
+    assert caught.value.status == 404
+
+
+def test_a_relocation_plan_is_single_use_and_expires(tmp_path, monkeypatch):
+    target, store_volume = relocation_setup(tmp_path, monkeypatch)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    plan = api.post(
+        "/api/cleanup/relocations/plan",
+        {"entryId": "system.user-caches", "volumeId": store_volume},
+    )
+    wait_for(api.post("/api/cleanup/relocations/run", {"planId": plan["planId"]}), "done")
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/relocations/run", {"planId": plan["planId"]})
+    assert caught.value.status == 409
+    assert "already run" in str(caught.value)
+
+    second = api.post(
+        "/api/cleanup/relocations/plan",
+        {"entryId": "system.user-caches", "volumeId": store_volume, "action": "restore"},
+    )
+    record = cleanup_api.RELOCATIONS.get(second["planId"])
+    assert record is not None
+    record.plan.expires_at = time.time() - 1
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/relocations/run", {"planId": second["planId"]})
+    assert caught.value.status == 410
+
+
+def test_an_interrupted_move_is_listed_and_resumed(tmp_path, monkeypatch):
+    target, store_volume = relocation_setup(tmp_path, monkeypatch)
+    aside = target + ".oslab-moving"
+    store = os.path.join(store_volume, "os-lab-caches", "system.user-caches", "0")
+    os.rename(target, aside)
+    shutil.copytree(aside, store, symlinks=True)
+
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    listing = api.get("/api/cleanup/relocations", {})
+    entry = next(row for row in listing["entries"] if row["entryId"] == "system.user-caches")
+    target_row = entry["paths"][0]["targets"][0]
+    assert target_row["interrupted"] == "move"
+    assert target_row["actions"] == ["resume"]
+
+    plan = api.post(
+        "/api/cleanup/relocations/plan",
+        {"entryId": "system.user-caches", "volumeId": store_volume, "action": "resume"},
+    )
+    job = wait_for(api.post("/api/cleanup/relocations/run", {"planId": plan["planId"]}), "done")
+    assert job.result["state"] == "done"
+    assert os.path.islink(target)
+    assert not os.path.lexists(aside)
+
+
+def test_the_browser_route_plans_and_runs_a_relocation(tmp_path, monkeypatch):
+    target, store_volume = relocation_setup(tmp_path, monkeypatch)
+    from web_ui import LabHttpHandler
+
+    server = HTTPServer(("127.0.0.1", 0), LabHttpHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = "http://127.0.0.1:{0}".format(server.server_address[1])
+
+    def call(path, body=None):
+        data = None if body is None else json.dumps(body).encode("utf-8")
+        headers = (
+            {"Content-Type": "application/json", "X-OSLab": "1"} if body is not None else {}
+        )
+        request = urllib.request.Request(base + path, data=data, headers=headers)
+        with urllib.request.urlopen(request, timeout=10) as answer:
+            return answer.status, json.loads(answer.read().decode("utf-8"))
+
+    try:
+        status, plan = call(
+            "/api/cleanup/relocations/plan",
+            {"entryId": "system.user-caches", "volumeId": store_volume},
+        )
+        assert status == 200
+        status, started = call(
+            "/api/cleanup/relocations/run", {"planId": plan["planId"]}
+        )
+        assert status == 202
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            _, job = call("/api/cleanup/jobs/" + started["id"])
+            if job["state"] != "running":
+                break
+            time.sleep(0.01)
+        assert job["state"] == "done"
+        assert job["result"]["state"] == "done"
+        assert os.path.islink(target)
     finally:
         server.shutdown()
         server.server_close()

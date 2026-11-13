@@ -55,13 +55,116 @@ the finding and the decision are in the session log.
 | CLN-24 | pending | — | — | — | — | none |
 | CLN-25 | pending | — | — | — | — | none |
 | CLN-26 | pending | — | — | — | — | none |
-| CLN-27 | pending | — | — | — | — | none |
+| CLN-27 | in progress (this PR) | [#159](https://github.com/keyvanarasteh/os-lab/pull/159) | — | plain relocation controls on `/cleanup/` after CLN-16 lands | engine, typed API and tests first; draft until controls land | none |
 | CLN-28 | in progress (this PR) | [#158](https://github.com/keyvanarasteh/os-lab/pull/158) | — | plain `/cleanup/` volumes card after CLN-16 lands | read-only engine and API first | none |
 | CLN-29 | pending | — | — | — | — | none |
 
 No CLN task has a student reservation or open student PR: `grep -rl CLN-
 reservations/` matches only `README.md` and `_schema.json`, and no open PR title or
 branch names a CLN id.
+
+## Dashboard handoff — CLN-27
+
+**Status: draft.** Engine, typed console API and tests are done; the plain
+functional controls below are the open page gate. Read `docs/UX_READINESS.md` and
+the behavior-first gates from `docs/UX_GUIDELINE_PATCH_PLAN.md`: ship working
+controls with visible errors first, then the visual pass. Do not add a raw path
+field, an elevated/run-as-admin action, or a destructive default.
+
+### Console endpoints (live on this branch)
+
+`GET /api/cleanup/volumes` — CLN-28, read-only; use its `volumes` rows as the only
+destination choices and its `homeVolume` to reject the home volume.
+
+`GET /api/cleanup/relocations` — read-only listing, no query parameters:
+
+```json
+{
+  "platform": "macos",
+  "homeVolume": "/",
+  "volumes": [{ "id": "/Volumes/Store", "mountPoint": "/Volumes/Store", "home": false, "freeBytes": 0 }],
+  "entries": [{
+    "entryId": "system.user-caches", "entryName": "User caches", "risk": "low",
+    "owningProcesses": ["Finder"], "relocatable": true, "reason": "",
+    "paths": [{
+      "index": 0, "template": "~/Library/Caches", "homePath": "/Users/me/Library/Caches",
+      "reason": "",
+      "targets": [{
+        "volumeId": "/Volumes/Store", "storePath": "/Volumes/Store/os-lab-caches/system.user-caches/0",
+        "status": "local_only", "interrupted": "", "storeExists": false,
+        "actions": ["move"]
+      }]
+    }]
+  }]
+}
+```
+
+`POST /api/cleanup/relocations/plan` — header `X-OSLab: 1`, JSON body exactly
+`{ "entryId": string, "volumeId": "/Volumes/Store", "pathIndex": 0, "action": "move" }`;
+only `entryId` and `volumeId` are required (`pathIndex` defaults 0, `action` defaults
+`move`). Actions: `move`, `restore`, `relink`, `resume` — offer only the strings in
+the target's `actions`. The response is a ready plan, `200`:
+
+```json
+{ "planId": "...", "action": "move", "status": "local_only", "interrupted": "",
+  "homePath": "...", "storePath": "...", "volumeId": "...", "platform": "macos",
+  "sizeBytes": 123, "freeBytes": 456, "padBytes": 268435456, "expiresAt": 0,
+  "ttlSeconds": 600, "steps": [{ "op": "copy", "src": "...", "dst": "..." }] }
+```
+
+`POST /api/cleanup/relocations/run` — JSON `{ "planId": "..." }`; returns the shared
+job with `202`, `kind: "relocate"`, progress `{ "stepsDone", "stepsTotal" }`. Poll
+`GET /api/cleanup/jobs/<id>`, cancel with `POST /api/cleanup/jobs/<id>/cancel`.
+A stale, expired or already-run plan is `409`/`410`; a missing plan is `404`.
+
+### Result the page must render
+
+The job result carries `state` (`done`/`failed`/`cancelled`), `preserved`
+(`home`/`store`/`aside`), `linkStatus`, `interrupted`, per-step `steps` with
+`state` and `error`, `progress`, `error`, and the paths. Show the failed step and
+its `error` next to the action; never report success while `state` is `failed`.
+`preserved` says where the only copy is — say it plainly (`Original` / `Copy on the
+volume` / `Set-aside original`). An interrupted run (`interrupted` =
+`move`/`restore`) shows `Resume` from the target's actions.
+
+### Link states and what to offer
+
+| State | Meaning | Actions |
+|---|---|---|
+| `local_only` | real folder at home, no store | Move |
+| `linked_ok` | link resolves to the store | Restore |
+| `missing_link` | link exists, target missing | Relink (an interrupted run offers Resume) |
+| `broken_link` | link target is gone | Relink |
+| `wrong_target` | link points elsewhere | Relink |
+| `conflict` | real folder at home and a store copy | Relink refuses; explain, no force |
+| `missing` | nothing at home or store | none / Restore if a store exists |
+
+Move is destructive only of the original after the copy verifies; label it
+`Move cache`. Restore keeps the store unless the user explicitly removes it (offer
+that as a checkbox in the behavior-first pass only if the engine field is exposed —
+today's plan does not remove the store; do not invent one).
+
+### Refusals and states
+
+`relocatable: false` (credentials/privacy or `needsPrivilege`) — show `reason`, no
+action, no elevation offer. No non-home volume — disable with “Connect or mount
+another volume.” Home volume — never selectable. Owning process running, stale
+state, out of space, destination outside the reported volumes, nested paths — show
+the engine `error`; do not retry as admin. Request failure — the existing offline
+sentence; no polling. Public Pages — “The Cleanup Lab runs in the local app.”
+
+### Visible strings (English; i18n keys)
+
+`Relocate caches` · `Move cache` · `Restore` · `Relink` · `Resume` · `Plan move` ·
+`Confirm move` · `Moving…` · `Restore cache` · `Restoring…` · `Resumed` ·
+`Linked` · `Not linked` · `Missing link` · `Broken link` · `Wrong target` ·
+`Conflict` · `Nothing found` · `Destination volume` · `Free space` ·
+`Space needed` · `Keep the copy on the volume` · `Original` · `Copy on the volume` ·
+`Set-aside original` · `The owning application is running:` ·
+`This cache needs administrator rights; relocation has no elevated fallback.` ·
+`Connect or mount another volume.` ·
+`Relocation copies first and verifies before the original is set aside.` ·
+`The Cleanup Lab runs in the local app.`
 
 ## Dashboard handoff — CLN-13
 
@@ -581,3 +684,23 @@ was 7 passed / 1 failed / 1 skipped: the android stage shows the same six
 pre-existing ids as `master` (158 passed), and the dashboard stage skipped because
 this worktree has no `node_modules`. Dashboard typecheck/build/e2e were not run —
 no dashboard file changed.
+
+**2026-11-13 — CLN-27.** Cache relocation behind a symlink. Added
+`cleanup_lab/relocation.py`: the seven link states; read-only `plan_move`,
+`plan_restore`, `plan_relink` and `plan_resume`; a copy → verify → rename aside →
+symlink → verify link → remove aside executor with per-step results, transient
+retries and no elevated fallback. A failure leaves the original, the set-aside
+original or a verified copy and reports which; `.oslab-moving` / `.oslab-restoring`
+are detected and resumed or rolled back. The destination must be a CLN-28 reported
+non-home volume, the owning tool must not be running and the free-space check keeps
+a 256 MB pad. Console adds `GET /api/cleanup/relocations`, `POST
+/api/cleanup/relocations/plan|run` and clears relocation plans in tests; the browser
+route returns `202` for a run. Added 24 engine tests (157 total, OK) and six console
+tests (20 total, passed). `README.md`, `PARITY.md`, `VERIFY.md`, `lat.md/cleanup-lab.md`
+and the CLN-27 handoff above were updated. No CLN-27 reservation or student PR
+existed. A full `./scripts/run-tests.sh --no-venv` run was 7 passed / 1 failed / 1
+skipped: the android stage has the five pre-existing ids (`test_app_update` ×3,
+`test_jadx_decompiler_on_real_dex`, `test_web_ui` plan preview) and 169 passed;
+the dashboard stage skipped for missing `node_modules`. Dashboard checks were not
+run — no dashboard file changed. Draft PR targets `codex/cln-28-volumes` until the
+lower stack merges and the plain controls land.
