@@ -55,7 +55,7 @@ the finding and the decision are in the session log.
 | CLN-24 | pending | — | — | — | — | none |
 | CLN-25 | pending | — | — | — | — | none |
 | CLN-26 | pending | — | — | — | — | none |
-| CLN-27 | in progress (this PR) | — | — | plain relocation controls on `/cleanup/` after CLN-16 lands | engine, typed API and tests first; draft until controls land | none |
+| CLN-27 | in progress (this PR) | [#159](https://github.com/keyvanarasteh/os-lab/pull/159) | — | plain relocation controls on `/cleanup/` after CLN-16 lands | engine, typed API and tests first; draft until controls land | none |
 | CLN-28 | in progress (this PR) | [#158](https://github.com/keyvanarasteh/os-lab/pull/158) | — | plain `/cleanup/` volumes card after CLN-16 lands | read-only engine and API first | none |
 | CLN-29 | pending | — | — | — | — | none |
 
