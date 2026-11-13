@@ -8,7 +8,7 @@
 | Code | [`console/frida_inventory.py`](../../frida_inventory.py) · endpoint in [`android-lab/lab/web_ui.py`](../../../android-lab/lab/web_ui.py) · card in [`dashboard/src/views/frida-targets-card.tsx`](../../../dashboard/src/views/frida-targets-card.tsx) |
 | Tests | [`test_frida_inventory.py`](../../../android-lab/lab/tests/test_frida_inventory.py) (53 tests) · [`test_web_ui.py`](../../../android-lab/lab/tests/test_web_ui.py) (2 tests) · [`health-and-content.spec.ts`](../../../dashboard/e2e/health-and-content.spec.ts) (1 browser test) |
 | Verification | [`VERIFY.md`](VERIFY.md) |
-| Proof video | [PENT-09-kanit-videosu.mp4](https://drive.google.com/file/d/1R3edzKdm2v5GT7L6bzol07a1j9GUrjXf/view?usp=sharing) (2:31) |
+| Proof video | [PENT-09-kanit-videosu-v2.mp4](https://drive.google.com/file/d/1s9lyTXlMTMKjIaj3FSG_uZ0PMz5xnqpr/view?usp=sharing) (3:43) |
 
 ## What it does
 
