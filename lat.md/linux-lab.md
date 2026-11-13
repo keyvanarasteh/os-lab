@@ -36,6 +36,26 @@ expected, network containment is documented in
 [[linux-lab/knowledge/networking.md]] and worked workflows in
 [[linux-lab/knowledge/usecases.md]].
 
+## Server first-look diagnostics (OS-16)
+
+[[linux-lab/scripts/server_firstlook.py]] reports Linux guest facts without
+changing the system or requiring sudo.
+
+It runs fixed argument lists for uname, lsb_release, inxi (CPU only),
+free, local df and systemctl service listing, with locale-independent parsing and
+per-command timeouts. It needs only Python's standard library and no sudo.
+
+Readable text and JSON expose kernel/architecture, distro, CPU, memory bytes,
+local mount usage and loaded service states. An architecture note distinguishes
+kernel names from distribution package names. Missing tools, failed commands,
+unrecognized output and timeouts stay explicit; unavailable service data is null,
+not an empty healthy list. Exit 0 means report generation, not a health verdict.
+Nothing is installed, changed, automatically saved or sent over the network.
+
+[[android-lab/lab/tests/test_server_firstlook.py]] covers normal output, missing
+tools, timeouts, malformed tables, failed/non-systemd services, JSON and CLI errors.
+[[linux-lab/docs/OS-16/VERIFY.md]] describes lab reproduction and evidence capture.
+
 ## Why qemux/qemu
 
 The engine was chosen to match the Windows and macOS labs' compose+web-viewer UX.
