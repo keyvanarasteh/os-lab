@@ -41,6 +41,8 @@ RULE_ADD_KEYS = ("kind", "value", "enabled")
 RULE_UPDATE_KEYS = RULE_ADD_KEYS
 SCHEDULE_ADD_KEYS = ("cron", "entryIds", "enabled")
 SCHEDULE_TOGGLE_KEYS = ("enabled",)
+PRIVILEGED_PLAN_KEYS = ("actionIds",)
+PRIVILEGED_RUN_KEYS = ("planId",)
 #: Engine ``PlanError.code`` → HTTP status on the plan → clean namespace.
 PLAN_STATUS = {
     "plan-invalid": 400,
@@ -53,7 +55,8 @@ PLAN_STATUS = {
 BODY_KEYS = {"scan": SCAN_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS,
              "rule-add": RULE_ADD_KEYS, "rule-update": RULE_UPDATE_KEYS,
              "rule-delete": (), "schedule-add": SCHEDULE_ADD_KEYS,
-             "schedule-toggle": SCHEDULE_TOGGLE_KEYS, "schedule-delete": ()}
+             "schedule-toggle": SCHEDULE_TOGGLE_KEYS, "schedule-delete": (),
+             "privileged-plan": PRIVILEGED_PLAN_KEYS, "privileged-run": PRIVILEGED_RUN_KEYS}
 
 
 class CleanupError(ValueError):
@@ -453,6 +456,9 @@ class CleanupAPI:
         if path == "/api/cleanup/status":
             _query(query)
             return _module(self.root, "readiness").probe(self.root)
+        if path == "/api/cleanup/disk-access":
+            _query(query)
+            return _module(self.root, "readiness").disk_access()
         if path == "/api/cleanup/catalog":
             _query(query)
             catalog = _module(self.root, "catalog")
@@ -494,6 +500,25 @@ class CleanupAPI:
         if path == "/api/cleanup/scan":
             _object_body(body, "scan")
             return JOBS.start_scan(self.root, body)
+        if path == "/api/cleanup/privileged/plan":
+            _object_body(body, "privileged-plan")
+            try:
+                return _module(self.root, "privileged").preview(body.get("actionIds"))
+            except ValueError as exc:
+                raise CleanupError(400, str(exc)) from exc
+        if path == "/api/cleanup/privileged/run":
+            _object_body(body, "privileged-run")
+            module = _module(self.root, "privileged")
+            try:
+                _module(self.root, "history").prepare()
+                result = module.run(body.get("planId"))
+                _module(self.root, "history").append(result)
+                return result
+            except module.PrivilegedError as exc:
+                status = {"unknown-plan": 404, "expired": 410, "stale": 409}.get(exc.code, 400)
+                raise CleanupError(status, str(exc)) from exc
+            except Exception as exc:
+                raise CleanupError(500, "Privileged run or audit failed: {0}".format(exc)) from exc
         if path == "/api/cleanup/rules":
             _object_body(body, "rule-add")
             try:
