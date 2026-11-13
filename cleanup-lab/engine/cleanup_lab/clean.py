@@ -44,17 +44,18 @@ import time
 import urllib.parse
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import safety
 from . import scan
+from . import settings, shred
 from .catalog import load, resolve as catalog_resolve
 from .paths import platform_id, trash_dir
 
 #: The modes a plan may name. ``trash`` is the default and the only automatic
 #: choice; ``delete`` must be requested explicitly and is executed exactly as
 #: planned (Qleaner's bug was the *fallback*, not the mode).
-MODES = ("trash", "delete")
+MODES = ("trash", "delete", "shred")
 DEFAULT_MODE = "trash"
 #: A plan expires after this many seconds even when nothing changed.
 PLAN_TTL = 600.0
@@ -100,6 +101,7 @@ class Plan:
     payload: dict | None
     fingerprints: dict
     progress: dict
+    entries: dict = field(default_factory=dict)
 
     def to_dict(self):
         return self.payload
@@ -389,6 +391,9 @@ def build_plan(
     target = platform or platform_id()
     if mode not in MODES:
         raise PlanError("mode must be one of {0}".format(", ".join(MODES)))
+    shred_policy = settings.read(env=env, platform=target)["shredPolicy"] if mode == "shred" else None
+    if mode == "shred" and shred_policy == "off":
+        raise PlanError("Shredding is disabled in Cleanup Lab settings.")
     if (
         not isinstance(entry_ids, (list, tuple))
         or not entry_ids
@@ -498,6 +503,7 @@ def build_plan(
             payload=None,
             fingerprints={},
             progress=progress.final_cancelled(),
+            entries=by_id,
         )
 
     fingerprints = {}
@@ -513,6 +519,10 @@ def build_plan(
         if measure["kind"] == "other":
             item["status"], item["code"] = "skipped", "not-cleanable"
             item["reason"] = "Not a regular file or folder; there is nothing to clean here."
+            continue
+        if mode == "shred" and (measure["symlinks"] or measure["special"] or measure["unreadable"]):
+            item["status"], item["code"] = "skipped", "shred-unsupported"
+            item["reason"] = "Shredding requires only readable regular files and directories, with no symlinks."
             continue
         item["sizeBytes"] = measure["bytes"]
         item["sizeOnDiskBytes"] = measure["onDiskBytes"]
@@ -551,6 +561,9 @@ def build_plan(
             "folders": sum(item["folders"] for item in ready),
         },
     }
+    if mode == "shred":
+        payload["shredPolicy"] = shred_policy
+        payload["shredLimitation"] = shred.LIMITATION
     return Plan(
         id=payload["planId"],
         mode=mode,
@@ -559,6 +572,7 @@ def build_plan(
         payload=payload,
         fingerprints=fingerprints,
         progress=progress.final(),
+        entries=by_id,
     )
 
 
@@ -871,6 +885,7 @@ def execute_plan(
     plan,
     measures,
     *,
+    root=None,
     env=None,
     platform=None,
     cancel=None,
@@ -895,6 +910,8 @@ def execute_plan(
     clock = time.time if clock is None else clock
     target = platform or platform_id()
     env = os.environ if env is None else env
+    if plan.mode == "shred" and settings.read(env=env, platform=target)["shredPolicy"] != plan.payload.get("shredPolicy"):
+        raise PlanError("The shred policy changed; build a new plan.", "stale")
     items = plan.payload["items"]
     trash_target = trash_dir(env, target)
     started = clock()
@@ -912,7 +929,7 @@ def execute_plan(
 
     emit()
     results = []
-    counts = {"trashed": 0, "deleted": 0, "skipped": 0, "failed": 0}
+    counts = {"trashed": 0, "deleted": 0, "shredded": 0, "skipped": 0, "failed": 0}
     totals = {"bytes": 0, "files": 0, "folders": 0}
     cancelled = False
     now = clock()
@@ -947,15 +964,49 @@ def execute_plan(
                     )
                     results.append(_result_item(item, "trashed", measure=measure, trash_path=destination))
                     counts["trashed"] += 1
+                elif plan.mode == "shred":
+                    entry = plan.entries.get(item["entryId"])
+                    if entry is None:
+                        raise CleanError("The catalog entry for this shred plan is missing.")
+                    if root is not None:
+                        try:
+                            current_entry = next((row for row in load(root, env) if row["id"] == item["entryId"]), None)
+                        except Exception as exc:
+                            raise CleanError("The current detector catalog could not be checked: {0}".format(exc)) from exc
+                        if current_entry != entry:
+                            raise CleanError("The detector catalog changed; build a new shred plan.")
+                    verdict = safety.check_target(path, entry, env=env, platform=target)
+                    if not verdict.ok:
+                        raise CleanError("Shred guard refused the item: {0}".format(verdict.reason))
+                    if os.path.realpath(path) != os.path.normpath(path):
+                        raise CleanError("Path became a symlink before shredding.")
+                    try:
+                        safety.validate_managed_path(path, home=env.get("HOME"))
+                    except safety.PathPolicyError as exc:
+                        raise CleanError(str(exc)) from exc
+                    outcome = shred.shred_tree(path, plan.payload["shredPolicy"], cancel=cancel)
+                    removed = {"bytes": outcome.bytes_removed, "files": outcome.files_removed,
+                               "folders": outcome.folders_removed}
+                    totals["bytes"] += removed["bytes"]
+                    totals["files"] += removed["files"]
+                    totals["folders"] += removed["folders"]
+                    if outcome.errors:
+                        results.append(_result_item(item, "failed", measure=removed,
+                                                    error="; ".join(outcome.errors)))
+                        counts["failed"] += 1
+                    else:
+                        results.append(_result_item(item, "shredded", measure=removed))
+                        counts["shredded"] += 1
                 else:
                     _run_delete(
                         path, unlink=unlink, rmdir=rmdir, lexists=lexists, lstat=lstat, sleep=sleep
                     )
                     results.append(_result_item(item, "deleted", measure=measure))
                     counts["deleted"] += 1
-                totals["bytes"] += measure["bytes"]
-                totals["files"] += measure["files"]
-                totals["folders"] += measure["folders"]
+                if plan.mode != "shred":
+                    totals["bytes"] += measure["bytes"]
+                    totals["files"] += measure["files"]
+                    totals["folders"] += measure["folders"]
             except (OSError, CleanError) as exc:
                 results.append(
                     _result_item(item, "failed", error="{0}: {1}".format(type(exc).__name__, exc))
@@ -965,11 +1016,13 @@ def execute_plan(
         progress["bytesRemoved"] = totals["bytes"]
         emit()
 
+    cancelled = cancelled or _cancelled(cancel)
     finished = clock()
     progress["phase"] = "cancelled" if cancelled else "done"
     return {
         "planId": plan.id,
         "mode": plan.mode,
+        **({"shredPolicy": plan.payload["shredPolicy"], "shredLimitation": plan.payload["shredLimitation"]} if plan.mode == "shred" else {}),
         "platform": target,
         "startedAt": started,
         "finishedAt": finished,
@@ -981,6 +1034,7 @@ def execute_plan(
             "items": len(items),
             "trashed": counts["trashed"],
             "deleted": counts["deleted"],
+            **({"shredded": counts["shredded"]} if plan.mode == "shred" else {}),
             "skipped": counts["skipped"],
             "failed": counts["failed"],
             "bytes": totals["bytes"],

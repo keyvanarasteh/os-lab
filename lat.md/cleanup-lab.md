@@ -151,6 +151,19 @@ callback is throttled, and a cancel returns the partial counters with
 
 ## Plan → clean
 
+CLN-14 adds a guarded shred mode with an explicit policy setting.
+
+[[cleanup-lab/engine/cleanup_lab/settings.py]] stores `off`, `one-pass` or
+`three-pass` in private state and exposes the limitation text through
+`GET/POST /api/cleanup/settings`. The default is `off`. A shred plan captures
+the selected policy and refuses symlink, special or unreadable content. At
+execution, the safety guard rechecks the target; [[cleanup-lab/engine/cleanup_lab/shred.py]]
+overwrites regular single-link files with random data (one pass) or zero, one
+and random data (three passes), then randomly renames and unlinks them. It
+recurses through directories, records each failure and credits only bytes
+actually removed. SSD, APFS, copy-on-write, snapshots and backups can retain
+data despite overwriting; the API reports that limit for the eventual UI.
+
 [[cleanup-lab/engine/cleanup_lab/clean.py]] previews and runs destructive work; only a confirmed, unexpired plan can move a file.
 
 Building is read-only: the guard checks each catalog path, one `lstat` walk records
@@ -203,6 +216,11 @@ the default.
 The local app polls only while a job runs. Public Pages renders the routes without
 engine calls or destructive controls. All eight route sets are built, including
 the seven translated locales.
+
+The advanced scan page also exposes the private shred policy, initially off.
+Shred plans require an enabled one-pass or three-pass policy and show the
+storage limitation in the plan and confirmation. The result reports shredded
+items separately from ordinary Trash and delete outcomes.
 
 ## Console API
 

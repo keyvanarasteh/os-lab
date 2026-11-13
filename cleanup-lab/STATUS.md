@@ -42,7 +42,7 @@ the finding and the decision are in the session log.
 | CLN-11 | merged | [#152](https://github.com/keyvanarasteh/os-lab/pull/152) | ef1d2f1a | frontend client/state still due | report-and-suggest only | none |
 | CLN-12 | merged | [#136](https://github.com/keyvanarasteh/os-lab/pull/136) | 3d5ab866 | — | — | none |
 | CLN-13 | merged | [#139](https://github.com/keyvanarasteh/os-lab/pull/139) | 6656ed55 | — | dashboard layer landed in CLN-16 | none |
-| CLN-14 | pending | — | — | — | — | none |
+| CLN-14 | in review | [#153](https://github.com/keyvanarasteh/os-lab/pull/153) | — | plain shred settings, plan confirmation and limitation text added | logic, API and dashboard controls | none |
 | CLN-15 | merged | [#140](https://github.com/keyvanarasteh/os-lab/pull/140) | 310f7d19 | — | history view landed in CLN-16 | none |
 | CLN-16 | merged | [#141](https://github.com/keyvanarasteh/os-lab/pull/141) | b06db079 | — | — | none |
 | CLN-17 | pending | — | — | — | — | none |

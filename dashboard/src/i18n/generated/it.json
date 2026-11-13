@@ -2291,8 +2291,7 @@
   "Report only. No files are deleted here.": "Solo report. Qui non viene eliminato alcun file.",
   "Scanning app leftovers…": "Scansione dei residui delle app…",
   "unreadable paths:": "percorsi illeggibili:",
-  "· Confidence:": "· Attendibilità:"
-,
+  "· Confidence:": "· Attendibilità:",
   ") to Trash?": ") nel Cestino?",
   "Advanced scan": "Scansione avanzata",
   "Choose individual items": "Scegli singoli elementi",
@@ -2320,5 +2319,16 @@
   "measured · Move to Trash": "misurati · Sposta nel Cestino",
   "moved to Trash, not yet freed.": "spostati nel Cestino; spazio non ancora liberato.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "secondi. La pulizia sposta gli elementi nel Cestino; lo spazio si libera solo dopo averlo svuotato.",
-  "skipped": "saltati"
+  "skipped": "saltati",
+  "Shred selected items": "Distruggi gli elementi selezionati",
+  "Shred policy": "Criterio di distruzione",
+  "Off (default)": "Disattivato (predefinito)",
+  "One pass": "Un passaggio",
+  "Three passes": "Tre passaggi",
+  "Loading shred settings…": "Caricamento delle impostazioni di distruzione…",
+  "Shredding permanently removes selected files. Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshots or backups.": "La distruzione rimuove definitivamente i file selezionati. La sovrascrittura non garantisce la cancellazione su SSD, APFS, copy-on-write, snapshot o backup.",
+  "Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshotted or backed-up storage.": "La sovrascrittura non garantisce la cancellazione su SSD, APFS, copy-on-write, snapshot o archivi con backup.",
+  "shredded (best effort)": "distrutto (al meglio)",
+  "shredded (best effort).": "distrutto (al meglio).",
+  "shredded": "distrutto"
 }

@@ -1,5 +1,42 @@
 import { expect, test } from "@playwright/test";
 
+test("shred stays off until enabled and requires a reviewed plan with its storage limit", async ({ page }) => {
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  let policy = "off";
+  const limitation = "Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshotted or backed-up storage.";
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().postDataJSON?.() ?? {};
+    if (route.request().method() === "POST") posts.push({ path, body });
+    let data: unknown = {};
+    if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "macos", entries: [{ id: "system.caches", name: "Caches", category: "system", risk: "low", hint: "Safe cache", impact: "", defaultSelected: true, needsPrivilege: false, paths: [{ template: "~/Caches", path: "/tmp/caches", reason: "" }] }] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+    else if (path === "/api/cleanup/settings") {
+      if (route.request().method() === "POST") policy = String(body.shredPolicy);
+      data = { shredPolicy: policy, shredLimitation: limitation };
+    } else if (path === "/api/cleanup/plan") data = { id: "job-plan", kind: "plan", state: "done", request: body, progress: null, result: { planId: "shred-plan", mode: "shred", shredPolicy: policy, shredLimitation: limitation, expiresAt: Date.now() / 1000 + 600, totals: { ready: 1, skipped: 0, bytes: 42 }, items: [{ entryId: "system.caches", entryName: "Caches", path: "/tmp/caches", status: "ready", code: "", reason: "", sizeBytes: 42, files: 1, folders: 0 }] }, error: null };
+    else if (path === "/api/cleanup/clean") data = { id: "job-clean", kind: "clean", state: "done", request: body, progress: null, result: { planId: "shred-plan", mode: "shred", cancelled: false, results: [{ entryId: "system.caches", entryName: "Caches", path: "/tmp/caches", status: "shredded", code: "", reason: "", error: null, bytes: 42, trashPath: null }], totals: { items: 1, trashed: 0, deleted: 0, shredded: 1, skipped: 0, failed: 0, bytes: 42 } }, error: null };
+    else if (path === "/api/host") data = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/scan/");
+  await expect(page.getByRole("option", { name: "Shred selected items" })).toBeDisabled();
+  await page.getByRole("combobox", { name: "Shred policy" }).selectOption("one-pass");
+  await page.getByRole("combobox", { name: "Mode" }).selectOption("shred");
+  await expect(page.getByText(limitation)).toBeVisible();
+  await page.getByRole("button", { name: "Build plan" }).click();
+  expect(posts.find((call) => call.path === "/api/cleanup/plan")?.body).toEqual({ entryIds: ["system.caches"], mode: "shred" });
+  expect(posts.find((call) => call.path === "/api/cleanup/clean")).toBeUndefined();
+  await page.getByRole("button", { name: "Confirm clean" }).click();
+  await expect(page.getByRole("dialog")).toContainText(limitation);
+  await page.getByRole("button", { name: "Run clean" }).click();
+  expect(posts.find((call) => call.path === "/api/cleanup/clean")?.body).toEqual({ planId: "shred-plan" });
+});
+
 test("scan, confirm, clean, leftovers and history use typed cleanup jobs", async ({ page }) => {
   const calls: { path: string; body: Record<string, unknown> }[] = [];
   const scan = { cancelled: false, entries: [{ id: "system.caches", name: "Caches", category: "system", risk: "low", sizeBytes: 42, files: 1, folders: 1, unreadable: [], paths: [{ path: "/tmp/caches", reason: "", source: "env:XDG_CACHE_HOME", sizeBytes: 42, error: null }] }, { id: "browser.private", name: "Private data", category: "browser", risk: "privacy", sizeBytes: 100, files: 1, folders: 0, unreadable: [], paths: [{ path: "/tmp/private", reason: "", sizeBytes: 100, error: null }] }], totals: { sizeBytes: 142, files: 2, folders: 1, unreadable: 0 } };

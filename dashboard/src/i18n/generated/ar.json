@@ -2291,8 +2291,7 @@
   "Report only. No files are deleted here.": "للعرض فقط. لا تُحذف أي ملفات هنا.",
   "Scanning app leftovers…": "جارٍ فحص بقايا التطبيقات…",
   "unreadable paths:": "مسارات غير قابلة للقراءة:",
-  "· Confidence:": "· مستوى الثقة:"
-,
+  "· Confidence:": "· مستوى الثقة:",
   ") to Trash?": ") إلى سلة المهملات؟",
   "Advanced scan": "فحص متقدم",
   "Choose individual items": "اختيار عناصر منفردة",
@@ -2320,5 +2319,16 @@
   "measured · Move to Trash": "تم قياسها · النقل إلى سلة المهملات",
   "moved to Trash, not yet freed.": "نُقلت إلى سلة المهملات، ولم تتحرر المساحة بعد.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "ثانية. ينقل التنظيف العناصر إلى سلة المهملات؛ لا تتحرر المساحة حتى إفراغها.",
-  "skipped": "تم تخطيها"
+  "skipped": "تم تخطيها",
+  "Shred selected items": "إتلاف العناصر المحددة",
+  "Shred policy": "سياسة الإتلاف",
+  "Off (default)": "متوقف (افتراضي)",
+  "One pass": "مرور واحد",
+  "Three passes": "ثلاثة مرورّات",
+  "Loading shred settings…": "جارٍ تحميل إعدادات الإتلاف…",
+  "Shredding permanently removes selected files. Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshots or backups.": "الإتلاف يزيل الملفات المحددة نهائيًا. الكتابة فوق البيانات لا تضمن محوها على SSD أو APFS أو أنظمة النسخ عند الكتابة أو اللقطات أو النسخ الاحتياطية.",
+  "Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshotted or backed-up storage.": "الكتابة فوق البيانات لا تضمن محوها على SSD أو APFS أو أنظمة النسخ عند الكتابة أو التخزين ذي اللقطات أو النسخ الاحتياطية.",
+  "shredded (best effort)": "أُتلف (بأفضل جهد)",
+  "shredded (best effort).": "أُتلف (بأفضل جهد).",
+  "shredded": "أُتلف"
 }

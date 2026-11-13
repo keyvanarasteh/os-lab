@@ -38,6 +38,7 @@ DEEP_KEYS = ("rootIds", "minIdleDays")
 PLAN_KEYS = ("entryIds", "workers", "mode")
 #: The only key a clean request may carry: which confirmed plan to run.
 CLEAN_KEYS = ("planId",)
+SETTINGS_KEYS = ("shredPolicy",)
 CONTAINER_PREVIEW_KEYS = ("actionId",)
 CONTAINER_PRUNE_KEYS = ("previewId",)
 #: Engine ``PlanError.code`` → HTTP status on the plan → clean namespace.
@@ -52,7 +53,7 @@ PLAN_STATUS = {
 BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS,
              "macos-leftovers": (), "packages": (), "vm-scan": (),
               "container-preview": CONTAINER_PREVIEW_KEYS, "container-prune": CONTAINER_PRUNE_KEYS,
-              "leftovers": ()}
+              "leftovers": (), "settings": SETTINGS_KEYS}
 
 
 class CleanupError(ValueError):
@@ -431,7 +432,7 @@ class CleanupJobStore:
         try:
             measures = clean.verify_plan(plan, cancel=job.cancel)
             result = clean.execute_plan(
-                plan, measures, cancel=job.cancel, progress_callback=update
+                plan, measures, root=root, cancel=job.cancel, progress_callback=update
             )
             job.result = result
             job.progress = result["progress"]
@@ -570,6 +571,13 @@ class CleanupAPI:
                 return catalog.report(self.root)
             except catalog.CatalogError as exc:
                 raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+        if path == "/api/cleanup/settings":
+            _query(query)
+            policy = _module(self.root, "settings")
+            try:
+                return policy.read()
+            except policy.SettingsError as exc:
+                raise CleanupError(500, str(exc)) from exc
         if path == "/api/cleanup/containers":
             _query(query)
             return _module(self.root, "containers").capabilities(self.root)
@@ -604,6 +612,16 @@ class CleanupAPI:
         if path == "/api/cleanup/scan":
             _object_body(body, "scan")
             return JOBS.start_scan(self.root, body)
+        if path == "/api/cleanup/settings":
+            _object_body(body, "settings")
+            settings = _module(self.root, "settings")
+            policy = body.get("shredPolicy")
+            if policy not in settings.POLICIES:
+                raise CleanupError(400, "shredPolicy must be off, one-pass or three-pass")
+            try:
+                return settings.update(policy)
+            except settings.SettingsError as exc:
+                raise CleanupError(500, str(exc)) from exc
         if path == "/api/cleanup/vms/scan":
             _object_body(body, "vm-scan")
             return JOBS.start_vm_scan(self.root)

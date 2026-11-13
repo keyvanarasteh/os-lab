@@ -3,7 +3,7 @@ import { BroomIcon } from "@phosphor-icons/react";
 import { AppShell } from "../../shell/app-shell";
 import { TopBar } from "../../shell/top-bar";
 import { Empty, PageHead, Section, Status } from "../../components/ui";
-import { api, type CleanupEntry, type CleanupHistory, type CleanupJob, type CleanupPlan, type CleanupResult, type CleanupScan, type CleanupStatus } from "../../lib/api";
+import { api, type CleanupEntry, type CleanupHistory, type CleanupJob, type CleanupMode, type CleanupPlan, type CleanupResult, type CleanupScan, type CleanupSettings, type CleanupStatus } from "../../lib/api";
 import { localeFromPath, localePath } from "../../i18n/paths";
 import { CleanupExtraTools } from "./extra-tools";
 import { CrossPlatformLeftovers } from "./cross-leftovers";
@@ -29,7 +29,10 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [mode, setMode] = useState<"trash" | "delete">("trash");
+  const [mode, setMode] = useState<CleanupMode>("trash");
+  const [settings, setSettings] = useState<CleanupSettings | null>(null);
+  const [settingsError, setSettingsError] = useState("");
+  const [savingSettings, setSavingSettings] = useState(false);
   const [preset, setPreset] = useState<"recommended" | "extended">("recommended");
   const [confirm, setConfirm] = useState(false);
   const [now, setNow] = useState(Date.now() / 1000);
@@ -57,6 +60,14 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
     let alive = true;
     void api.cleanupHistory().then((value) => { if (alive) setHistory(value); })
       .catch((error) => { if (alive) setLoadError(errorText(error)); });
+    return () => { alive = false; };
+  }, [page]);
+
+  useEffect(() => {
+    if (PUBLIC || page !== "scan") return;
+    let alive = true;
+    void api.cleanupSettings().then((value) => { if (alive) setSettings(value); })
+      .catch((error) => { if (alive) setSettingsError(errorText(error)); });
     return () => { alive = false; };
   }, [page]);
 
@@ -89,6 +100,7 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
   const planFollowsScan = !!planJob && jobs.findIndex((job) => job.id === planJob.id) <= jobs.findIndex(isScan);
   const planMatches = !!latestPlan && planFollowsScan && latestPlan.mode === "trash" && JSON.stringify([...(planJob?.request.entryIds ?? [])].sort()) === JSON.stringify([...suggestedIds].sort());
   const canConfirmSuggested = canWork && !!latestPlan && planMatches && !planUsed && latestPlan.expiresAt > now && latestPlan.totals.ready > 0;
+  const canConfirmAdvanced = canWork && !savingSettings && !!latestPlan && latestPlan.totals.ready > 0 && latestPlan.expiresAt > now && !planUsed && latestPlan.mode === mode && (mode !== "shred" || latestPlan.shredPolicy === settings?.shredPolicy) && JSON.stringify([...(planJob?.request.entryIds ?? [])].sort()) === JSON.stringify([...selected].sort());
 
   async function start(action: () => Promise<CleanupJob>) {
     setActionError(""); setSubmitting(true); setConfirm(false);
@@ -101,6 +113,12 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
     setActionError("");
     try { await api.cleanupCancel(active.id); }
     catch (error) { setActionError(errorText(error)); }
+  }
+  async function saveShredPolicy(policy: CleanupSettings["shredPolicy"]) {
+    setSettingsError(""); setSavingSettings(true); setConfirm(false);
+    try { setSettings(await api.cleanupUpdateSettings(policy)); }
+    catch (error) { setSettingsError(errorText(error)); }
+    finally { setSavingSettings(false); }
   }
   const tabs: { id: CleanupPageId; label: string; path: string }[] = [
     { id: "", label: "Dashboard", path: "" }, { id: "scan", label: "Advanced scan", path: "scan/" }, { id: "results", label: "Results", path: "results/" },
@@ -133,7 +151,7 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
               {latestPlan && planMatches && <div className="mt-4 rounded-md border border-(--iux-border) p-3 text-sm"><p>{latestPlan.totals.ready} items ready · {bytes(latestPlan.totals.bytes)} · {latestPlan.totals.skipped} skipped</p><p>Plan expires in {Math.max(0, Math.ceil(latestPlan.expiresAt - now))} seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.</p><details className="mt-2"><summary className="cursor-pointer">Plan details</summary>{latestPlan.items.map((item, index) => <p key={`${item.entryId}-${index}`} className="mt-2 break-all">{item.entryName} · {item.status} · {bytes(item.sizeBytes)} · <span translate="no">{item.path}</span>{item.reason && ` · ${item.reason}`}</p>)}</details>{planUsed && <p>This plan was already run. Review a new plan.</p>}<button type="button" className="iux-btn mt-3" data-variant="primary" disabled={!canConfirmSuggested} onClick={() => setConfirm(true)}>Confirm clean</button></div>}
               {confirm && latestPlan && planMatches && <div role="dialog" aria-modal="true" aria-label="Confirm cleanup" className="mt-3 rounded-md border border-(--iux-border) p-4"><p>Move {latestPlan.totals.ready} items ({bytes(latestPlan.totals.bytes)}) to Trash?</p><div className="mt-3 flex gap-2"><button type="button" className="iux-btn" data-variant="primary" disabled={!canConfirmSuggested} onClick={() => void start(() => api.cleanupClean(latestPlan.planId))}>Run clean</button><button type="button" className="iux-btn" onClick={() => setConfirm(false)}>Back</button></div></div>}
             </Section>}
-            {latestClean && <Section title="Latest clean report" description={`${latestClean.totals.trashed} moved to Trash · ${latestClean.totals.skipped} skipped · ${latestClean.totals.failed} failed`}><p className="text-sm">{bytes(latestClean.totals.bytes)} moved to Trash, not yet freed.</p><div className="mt-3 flex gap-2"><a className="iux-btn" href={link("results/")}>View report</a><a className="iux-btn" href={link("leftovers/")}>View leftovers</a><a className="iux-btn" href={link("history/")}>History</a></div></Section>}
+            {latestClean && <Section title="Latest clean report" description={`${latestClean.totals.trashed} moved to Trash · ${latestClean.totals.deleted} deleted · ${latestClean.totals.shredded ?? 0} shredded · ${latestClean.totals.skipped} skipped · ${latestClean.totals.failed} failed`}><p className="text-sm">{bytes(latestClean.totals.bytes)} {latestClean.mode === "trash" ? "moved to Trash, not yet freed." : latestClean.mode === "shred" ? "shredded (best effort)." : "deleted permanently."}</p><div className="mt-3 flex gap-2"><a className="iux-btn" href={link("results/")}>View report</a><a className="iux-btn" href={link("leftovers/")}>View leftovers</a><a className="iux-btn" href={link("history/")}>History</a></div></Section>}
           </>}
           {page === "scan" && <>
             <Section title="Scan" description="Choose catalog entries. Scanning only measures files; it does not remove them.">
@@ -154,25 +172,28 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
               <a className="iux-btn mt-3" href={link("results/")}>View results</a>
             </Section>}
             <Section title="Plan & confirm" description="A plan checks every path again. Trash is the default; permanent deletion requires an explicit choice.">
-              <label className="text-sm">Mode <select value={mode} disabled={busy} onChange={(event) => { setMode(event.target.value as "trash" | "delete"); setConfirm(false); }} className="ml-2 rounded-md border border-(--iux-border) bg-(--iux-background) p-2"><option value="trash">Trash (default)</option><option value="delete">Delete permanently</option></select></label>
+              <label className="text-sm">Mode <select value={mode} disabled={busy} onChange={(event) => { setMode(event.target.value as CleanupMode); setConfirm(false); }} className="ml-2 rounded-md border border-(--iux-border) bg-(--iux-background) p-2"><option value="trash">Trash (default)</option><option value="delete">Delete permanently</option><option value="shred" disabled={settings?.shredPolicy === "off" || !settings}>Shred selected items</option></select></label>
               {mode === "delete" && <p className="mt-2 text-sm">Deleting permanently cannot be undone.</p>}
-              <div className="mt-3"><button type="button" className="iux-btn" disabled={!canWork || !selected.length} onClick={() => void start(() => api.cleanupPlan(selected, mode))}>Build plan</button></div>
+              <div className="mt-3 rounded-md border border-(--iux-border) p-3 text-sm"><label>Shred policy <select aria-label="Shred policy" value={settings?.shredPolicy ?? "off"} disabled={!settings || !canWork || savingSettings} onChange={(event) => void saveShredPolicy(event.target.value as CleanupSettings["shredPolicy"])} className="ml-2 rounded-md border border-(--iux-border) bg-(--iux-background) p-2"><option value="off">Off (default)</option><option value="one-pass">One pass</option><option value="three-pass">Three passes</option></select></label>{!settings && !settingsError && <p>Loading shred settings…</p>}{settingsError && <Status value={{ ok: false, text: settingsError }} />}{settings && <p className="mt-2">{settings.shredLimitation}</p>}</div>
+              {mode === "shred" && <p className="mt-2 text-sm">Shredding permanently removes selected files. Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshots or backups.</p>}
+              <div className="mt-3"><button type="button" className="iux-btn" disabled={!canWork || !selected.length || savingSettings || (mode === "shred" && (!settings || settings.shredPolicy === "off"))} onClick={() => void start(() => api.cleanupPlan(selected, mode))}>Build plan</button></div>
               {latestPlan && <div className="mt-4"><p>{latestPlan.totals.ready} items ready · {bytes(latestPlan.totals.bytes)} · expires in {Math.max(0, Math.ceil(latestPlan.expiresAt - now))} seconds</p>
                 {latestPlan.items.map((item, index) => <div key={`${item.entryId}-${index}`} className="border-b border-(--iux-border) py-2 text-sm"><strong>{item.entryName}</strong> · {item.status} · {bytes(item.sizeBytes)}<p translate="no" className="break-all">{item.path}</p><PathSource source={item.source} />{item.reason && <p>{item.reason}</p>}</div>)}
                 {latestPlan.expiresAt <= now && <p>This plan expired. Build a new plan.</p>}
                 {planUsed && <p>This plan was already run. Build a new plan.</p>}
-                <button type="button" className="iux-btn mt-3" data-variant="primary" disabled={!canWork || !latestPlan.totals.ready || latestPlan.expiresAt <= now || planUsed || latestPlan.mode !== mode || JSON.stringify([...(planJob?.request.entryIds ?? [])].sort()) !== JSON.stringify([...selected].sort())} onClick={() => setConfirm(true)}>Confirm clean</button>
+                {latestPlan.mode === "shred" && <p className="mt-2 text-sm">{latestPlan.shredPolicy} · {latestPlan.shredLimitation}</p>}
+                <button type="button" className="iux-btn mt-3" data-variant="primary" disabled={!canConfirmAdvanced} onClick={() => setConfirm(true)}>Confirm clean</button>
               </div>}
-              {confirm && latestPlan && <div role="dialog" aria-modal="true" aria-label="Confirm cleanup" className="mt-4 rounded-md border border-(--iux-border) p-4"><p>Clean {latestPlan.totals.ready} items · {bytes(latestPlan.totals.bytes)} · {latestPlan.mode === "trash" ? "Move to Trash" : "Delete permanently"}?</p><div className="mt-3 flex gap-2"><button type="button" className="iux-btn" data-variant="primary" onClick={() => void start(() => api.cleanupClean(latestPlan.planId))}>Run clean</button><button type="button" className="iux-btn" onClick={() => setConfirm(false)}>Back</button></div></div>}
+              {confirm && latestPlan && <div role="dialog" aria-modal="true" aria-label="Confirm cleanup" className="mt-4 rounded-md border border-(--iux-border) p-4"><p>Clean {latestPlan.totals.ready} items · {bytes(latestPlan.totals.bytes)} · {latestPlan.mode === "trash" ? "Move to Trash" : latestPlan.mode === "shred" ? `Shred with ${latestPlan.shredPolicy}` : "Delete permanently"}?</p>{latestPlan.mode === "shred" && <p>{latestPlan.shredLimitation}</p>}<div className="mt-3 flex gap-2"><button type="button" className="iux-btn" data-variant="primary" disabled={!canConfirmAdvanced} onClick={() => void start(() => api.cleanupClean(latestPlan.planId))}>Run clean</button><button type="button" className="iux-btn" onClick={() => setConfirm(false)}>Back</button></div></div>}
             </Section>
-            {latestClean && <Section title="Clean result" description={`${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not freed" : "deleted permanently"}`}><a className="iux-btn" href={link("leftovers/")}>View leftovers</a></Section>}
+            {latestClean && <Section title="Clean result" description={`${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not freed" : latestClean.mode === "shred" ? "shredded (best effort)" : "deleted permanently"}`}><a className="iux-btn" href={link("leftovers/")}>View leftovers</a></Section>}
             <CleanupExtraTools now={now} />
           </>}
           {page === "results" && <>
             <Section title="Results by category" description="Measurements from the latest scan in this console session.">
               {!latestScan ? <Empty>No scan results yet. Run a scan first.</Empty> : latestScan.entries.map((item) => <div key={item.id} className="border-b border-(--iux-border) py-3"><strong>{item.category} · {item.name}</strong><p>{bytes(item.sizeBytes)} · {item.files} files · {item.folders} folders</p>{item.paths.map((path, index) => <p key={index} className="break-all text-sm"><span translate="no">{path.path || path.reason}</span> · {bytes(path.sizeBytes)} · <PathSource source={path.source} /></p>)}</div>)}
             </Section>
-            <Section title="Clean result" description={latestClean ? `${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not freed" : "deleted permanently"}` : undefined}>
+            <Section title="Clean result" description={latestClean ? `${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not freed" : latestClean.mode === "shred" ? "shredded (best effort)" : "deleted permanently"}` : undefined}>
               {!latestClean ? <Empty>No clean results yet.</Empty> : latestClean.results.map((item, index) => <div key={index} className="border-b border-(--iux-border) py-3"><strong>{item.entryName} · {item.status}</strong><p translate="no" className="break-all">{item.path}</p><PathSource source={item.source} /><p>{item.reason || item.error}</p>{item.trashPath && <p translate="no" className="break-all">{item.trashPath}</p>}</div>)}
             </Section>
           </>}
@@ -186,7 +207,7 @@ export default function CleanupPage({ page = "" }: { page?: CleanupPageId }) {
           {(status?.platform?.id === "linux" || status?.platform?.id === "windows") && <CrossPlatformLeftovers />}
           </>}
           {page === "history" && <Section title="Audit history" description="Verified cleanup runs stored on this computer.">
-            {!history?.entries.length ? <Empty>No cleanup runs recorded yet.</Empty> : history.entries.map((entry) => <div key={entry.id} className="border-b border-(--iux-border) py-3"><strong>Run #{entry.id} · {entry.result.mode}</strong><p>{bytes(entry.result.totals.bytes)} · {entry.result.totals.items} items · {entry.result.cancelled ? "cancelled" : "finished"}</p>{entry.result.results.map((item, index) => <p key={index} className="break-all text-sm"><span translate="no">{item.path}</span> · {item.status} · {bytes(item.bytes)}</p>)}</div>)}
+            {!history?.entries.length ? <Empty>No cleanup runs recorded yet.</Empty> : history.entries.map((entry) => <div key={entry.id} className="border-b border-(--iux-border) py-3"><strong>Run #{entry.id} · {entry.result.mode}{entry.result.shredPolicy ? ` · ${entry.result.shredPolicy}` : ""}</strong><p>{bytes(entry.result.totals.bytes)} · {entry.result.totals.items} items · {entry.result.cancelled ? "cancelled" : "finished"}</p>{entry.result.results.map((item, index) => <p key={index} className="break-all text-sm"><span translate="no">{item.path}</span> · {item.status} · {bytes(item.bytes)}</p>)}</div>)}
           </Section>}
         </>}
     </main>

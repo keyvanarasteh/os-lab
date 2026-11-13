@@ -614,6 +614,21 @@ CLN-13 (three AppImage architecture expectations, invalid `JAVA_HOME` for JADX,
 source console mutation guard, and web UI preview status): 6 failed, 158 passed,
 1 skipped. No dashboard files changed; CLN-16 owns the history view.
 
+## CLN-14 — best-effort shred policy
+
+`GET/POST /api/cleanup/settings` exposes `off`, `one-pass` and `three-pass`;
+the default off policy refuses shred plans. One pass writes random bytes;
+three passes write zero, one and random bytes. The plan records the policy and
+storage limitation. Execution rechecks the catalog guard, refuses hardlinks
+and symlinks, overwrites nested regular files, randomly renames and unlinks,
+and reports each failure. Partial removal credits only removed bytes. Tests
+use generated temp files and a fake private state folder; the console test
+checks a confirmed shred job and signed audit history.
+
+Overwriting is best effort: SSD wear levelling, APFS/copy-on-write, snapshots
+and backups may preserve data. The advanced scan page shows the private policy,
+requires enabling it before a shred plan, and repeats this limit in the plan
+and confirmation. The clean report identifies shredded items separately.
 ## CLN-08 — container actions and report-only VMs
 
 The container catalog defines four Docker prune scopes and three Podman fallback

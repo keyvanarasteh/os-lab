@@ -2291,8 +2291,7 @@
   "Report only. No files are deleted here.": "Yalnızca rapor. Burada hiçbir dosya silinmez.",
   "Scanning app leftovers…": "Uygulama kalıntıları taranıyor…",
   "unreadable paths:": "okunamayan yollar:",
-  "· Confidence:": "· Güven düzeyi:"
-,
+  "· Confidence:": "· Güven düzeyi:",
   ") to Trash?": ") Çöp'e taşınsın mı?",
   "Advanced scan": "Gelişmiş tarama",
   "Choose individual items": "Öğeleri tek tek seç",
@@ -2320,5 +2319,16 @@
   "measured · Move to Trash": "ölçüldü · Çöp'e taşı",
   "moved to Trash, not yet freed.": "Çöp'e taşındı, alan henüz boşalmadı.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "saniye. Temizlik öğeleri Çöp'e taşır; Çöp boşaltılana kadar disk alanı açılmaz.",
-  "skipped": "atlandı"
+  "skipped": "atlandı",
+  "Shred selected items": "Seçili öğeleri parçalayarak sil",
+  "Shred policy": "Parçalayarak silme ilkesi",
+  "Off (default)": "Kapalı (varsayılan)",
+  "One pass": "Tek geçiş",
+  "Three passes": "Üç geçiş",
+  "Loading shred settings…": "Parçalayarak silme ayarları yükleniyor…",
+  "Shredding permanently removes selected files. Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshots or backups.": "Parçalayarak silme, seçili dosyaları kalıcı olarak kaldırır. Üzerine yazma SSD, APFS, yazarken kopyalama, anlık görüntü veya yedeklerde silinmeyi garanti etmez.",
+  "Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshotted or backed-up storage.": "Üzerine yazma, SSD, APFS, yazarken kopyalama, anlık görüntü veya yedekli depolamada silinmeyi garanti etmez.",
+  "shredded (best effort)": "parçalayarak silindi (en iyi çaba)",
+  "shredded (best effort).": "parçalayarak silindi (en iyi çaba).",
+  "shredded": "parçalayarak silindi"
 }

@@ -2291,8 +2291,7 @@
   "Report only. No files are deleted here.": "Solo informe. Aquí no se elimina ningún archivo.",
   "Scanning app leftovers…": "Analizando restos de aplicaciones…",
   "unreadable paths:": "rutas ilegibles:",
-  "· Confidence:": "· Confianza:"
-,
+  "· Confidence:": "· Confianza:",
   ") to Trash?": ") a la Papelera?",
   "Advanced scan": "Análisis avanzado",
   "Choose individual items": "Elegir elementos",
@@ -2320,5 +2319,16 @@
   "measured · Move to Trash": "medidos · Mover a la Papelera",
   "moved to Trash, not yet freed.": "movidos a la Papelera, espacio aún no liberado.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "segundos. La limpieza mueve elementos a la Papelera; el espacio se libera al vaciarla.",
-  "skipped": "omitidos"
+  "skipped": "omitidos",
+  "Shred selected items": "Destruir los elementos seleccionados",
+  "Shred policy": "Política de destrucción",
+  "Off (default)": "Desactivado (predeterminado)",
+  "One pass": "Una pasada",
+  "Three passes": "Tres pasadas",
+  "Loading shred settings…": "Cargando ajustes de destrucción…",
+  "Shredding permanently removes selected files. Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshots or backups.": "La destrucción elimina permanentemente los archivos seleccionados. Sobrescribir no garantiza el borrado en SSD, APFS, copia en escritura, instantáneas o copias de seguridad.",
+  "Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshotted or backed-up storage.": "Sobrescribir no garantiza el borrado en SSD, APFS, copia en escritura, instantáneas ni almacenamiento respaldado.",
+  "shredded (best effort)": "destruido (mejor esfuerzo)",
+  "shredded (best effort).": "destruido (mejor esfuerzo).",
+  "shredded": "destruido"
 }

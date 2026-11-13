@@ -2291,8 +2291,7 @@
   "Report only. No files are deleted here.": "Rapport uniquement. Aucun fichier n’est supprimé ici.",
   "Scanning app leftovers…": "Analyse des résidus d’applications…",
   "unreadable paths:": "chemins illisibles :",
-  "· Confidence:": "· Confiance :"
-,
+  "· Confidence:": "· Confiance :",
   ") to Trash?": ") vers la corbeille ?",
   "Advanced scan": "Analyse avancée",
   "Choose individual items": "Choisir les éléments",
@@ -2320,5 +2319,16 @@
   "measured · Move to Trash": "mesurés · Déplacer vers la corbeille",
   "moved to Trash, not yet freed.": "déplacés vers la corbeille, espace pas encore libéré.",
   "seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.": "secondes. Le nettoyage déplace les éléments vers la corbeille ; l’espace n’est libéré qu’après sa vidange.",
-  "skipped": "ignorés"
+  "skipped": "ignorés",
+  "Shred selected items": "Broyer les éléments sélectionnés",
+  "Shred policy": "Politique de broyage",
+  "Off (default)": "Désactivé (par défaut)",
+  "One pass": "Un passage",
+  "Three passes": "Trois passages",
+  "Loading shred settings…": "Chargement des paramètres de broyage…",
+  "Shredding permanently removes selected files. Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshots or backups.": "Le broyage supprime définitivement les fichiers sélectionnés. La réécriture ne garantit pas l’effacement sur SSD, APFS, copie sur écriture, instantanés ou sauvegardes.",
+  "Overwriting cannot guarantee erasure on SSD, APFS, copy-on-write, snapshotted or backed-up storage.": "La réécriture ne garantit pas l’effacement sur SSD, APFS, copie sur écriture, instantanés ou stockage sauvegardé.",
+  "shredded (best effort)": "broyé (au mieux)",
+  "shredded (best effort).": "broyé (au mieux).",
+  "shredded": "broyé"
 }

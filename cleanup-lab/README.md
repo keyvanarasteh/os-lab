@@ -100,6 +100,11 @@ are credited only after the item is really gone from its original path, using th
 run's measurement — never the plan estimate. Privileged items and items whose app
 is running stay skipped.
 
+Shredding is off by default and requires an explicit one-pass or three-pass
+policy in the private settings file. A confirmed shred plan rechecks the target
+and reports partial failures and bytes actually removed. Overwriting cannot
+guarantee erasure on SSD, APFS, copy-on-write filesystems, snapshots or backups.
+
 ## Safety guard
 
 `cleanup_lab/safety.py` guards every filesystem deletion and move. It

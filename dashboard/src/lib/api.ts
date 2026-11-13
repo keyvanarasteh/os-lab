@@ -163,18 +163,20 @@ export interface CleanupScan {
   totals: { sizeBytes: number; files: number; folders: number; unreadable: number };
 }
 export interface CleanupPlan {
-  planId: string; mode: "trash" | "delete"; expiresAt: number;
+  planId: string; mode: CleanupMode; expiresAt: number; shredPolicy?: "one-pass" | "three-pass"; shredLimitation?: string;
   items: { entryId: string; entryName: string; path: string | null; status: string; code: string; reason: string; source?: string; sizeBytes: number; files: number; folders: number }[];
   totals: { ready: number; skipped: number; bytes: number };
 }
 export interface CleanupResult {
-  planId: string; mode: "trash" | "delete"; cancelled: boolean;
+  planId: string; mode: CleanupMode; cancelled: boolean; shredPolicy?: "one-pass" | "three-pass"; shredLimitation?: string;
   results: { entryId: string; entryName: string; path: string | null; status: string; code: string; reason: string; source?: string; error: string | null; bytes: number; trashPath: string | null }[];
-  totals: { items: number; trashed: number; deleted: number; skipped: number; failed: number; bytes: number };
+  totals: { items: number; trashed: number; deleted: number; shredded?: number; skipped: number; failed: number; bytes: number };
 }
+export type CleanupMode = "trash" | "delete" | "shred";
+export interface CleanupSettings { shredPolicy: "off" | "one-pass" | "three-pass"; shredLimitation: string }
 export interface CleanupJob {
   id: string; kind: "scan" | "plan" | "clean"; state: "running" | "done" | "cancelled" | "failed";
-  request: { entryIds?: string[]; mode?: "trash" | "delete"; planId?: string };
+  request: { entryIds?: string[]; mode?: CleanupMode; planId?: string };
   progress: Record<string, string | number> | null;
   result: CleanupScan | CleanupPlan | CleanupResult | null;
   error: string | null;
@@ -268,9 +270,11 @@ export const api = {
   cleanupStatus: () => call<CleanupStatus>("/api/cleanup/status"),
   cleanupCatalog: () => call<{ platform: string; entries: CleanupEntry[] }>("/api/cleanup/catalog"),
   cleanupHistory: () => call<CleanupHistory>("/api/cleanup/history"),
+  cleanupSettings: () => call<CleanupSettings>("/api/cleanup/settings"),
+  cleanupUpdateSettings: (shredPolicy: CleanupSettings["shredPolicy"]) => post<CleanupSettings>("/api/cleanup/settings", { shredPolicy }),
   cleanupJobs: () => call<{ jobs: CleanupJob[] }>("/api/cleanup/jobs"),
   cleanupScan: (entryIds: string[]) => post<CleanupJob>("/api/cleanup/scan", { entryIds }),
-  cleanupPlan: (entryIds: string[], mode: "trash" | "delete") => post<CleanupJob>("/api/cleanup/plan", { entryIds, mode }),
+  cleanupPlan: (entryIds: string[], mode: CleanupMode) => post<CleanupJob>("/api/cleanup/plan", { entryIds, mode }),
   cleanupClean: (planId: string) => post<CleanupJob>("/api/cleanup/clean", { planId }),
   cleanupJob: (id: string) => call<CleanupJob>(`/api/cleanup/jobs/${encodeURIComponent(id)}`),
   cleanupCancel: (id: string) => post<CleanupJob>(`/api/cleanup/jobs/${encodeURIComponent(id)}/cancel`),
