@@ -30,7 +30,7 @@ Command, run from `android-lab/lab`:
 python -m pytest tests/test_pinning_detector.py -v
 ```
 
-Result: **32 passed, 0 failed** (about 0.6 s).
+Result: **43 passed, 0 failed** (about 1 s). 11 tests were added for the review follow-ups below.
 
 All fixtures are synthetic and built in memory (including a small Android binary-XML encoder used
 only by the tests), so no third-party app or live target is involved.
@@ -158,9 +158,17 @@ Trust-all / allow-all validation found: TLS may be interceptable without any byp
 - Native `.so` analysis is string-based; no disassembly.
 - Not tested against real third-party APKs, only synthetic fixtures. Real-APK validation in the Android
   lab would need an APK you are authorised to analyse.
-- No proof video was recorded.
+- Proof video: link to be added to the PR description (video is recorded separately from the code).
 
 ## 7. Conclusion
 
-All 32 PENT-11 tests pass and the CLI works end to end on a synthetic APK. The limitations above are
+All 43 PENT-11 tests pass and the CLI works end to end on a synthetic APK. The limitations above are
 the remaining gaps before calling this fully verified against real apps.
+
+## 7. Review follow-ups (PR #173 automated review)
+
+- NSC pin-sets only count as strong evidence when the manifest references that file (`@xml/<name>`); unreferenced or mismatched configs are weak and warned about. Identical NSC copies are deduplicated.
+- `sha1/` pins are matched with their own payload length; AXML string-pool counts are validated against chunk bounds (no unbounded loop on malformed manifests).
+- Generic TLS signals (custom TrustManager without a key comparison, verify callbacks, bundled certificates, library presence) stay `low`; weak signals alone never reach `likely_pinned`, and framework markers no longer upgrade weak-only signals.
+- Unreadable, changed or oversized inputs are listed in `skipped`; `scan_complete` / `scan_truncated` are exposed and an empty result on a partial scan is `incomplete_scan`. Aggregate limits: 50,000 files and 1 GiB decompressed.
+- The output directory is excluded from directory scans, and the JSON + Markdown pair is written to a private temp dir and then published together.
