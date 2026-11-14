@@ -13,9 +13,10 @@ import { CleanupExtraTools } from "./extra-tools";
 import { CrossPlatformLeftovers } from "./cross-leftovers";
 import { MonitorBanner, MonitorCard } from "./monitor-card";
 import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
+import { IgnoreSection } from "./ignore-card";
 import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
-import type { BookmarksPayload, CleanupVolume } from "../../lib/api";
+import type { BookmarksPayload, CleanupVolume, IgnoreRulesPayload } from "../../lib/api";
 
 export type CleanupPageId = "" | "scan" | "results" | "leftovers" | "history" | "space";
 export const CLEANUP_PAGES: CleanupPageId[] = ["", "scan", "results", "leftovers", "history", "space"];
@@ -214,6 +215,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const [history, setHistory] = useState<CleanupHistory | null>(null);
   const [permissions, setPermissions] = useState<CleanupPermissions | null>(null);
   const [bookmarks, setBookmarks] = useState<BookmarksPayload | null>(null);
+  const [ignoreRules, setIgnoreRules] = useState<IgnoreRulesPayload | null>(null);
   const [loading, setLoading] = useState(!PUBLIC);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -282,10 +284,14 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     void api.cleanupBookmarks()
       .then((payload) => { if (alive) setBookmarks(payload); })
       .catch(() => { if (alive) setBookmarks(null); });
+    void api.cleanupIgnoreRules()
+      .then((payload) => { if (alive) setIgnoreRules(payload); })
+      .catch(() => { if (alive) setIgnoreRules(null); });
     return () => { alive = false; };
   }, []);
 
   const reloadBookmarks = () => { void api.cleanupBookmarks().then(setBookmarks).catch(() => {}); };
+  const reloadIgnoreRules = () => { void api.cleanupIgnoreRules().then(setIgnoreRules).catch(() => {}); };
   const bookmarkedIds = new Set((bookmarks?.bookmarks ?? []).map((item) => item.entryId));
 
   /** CLNP-21: a capability card either navigates a tab or scrolls to its section. */
@@ -452,6 +458,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           {page === "" && !PUBLIC && <BookmarksSection bookmarks={bookmarks} reload={reloadBookmarks}
             onQuickClean={(job) => { setActive(job); setJobs((old) => [job, ...old.filter((row) => row.id !== job.id)]); setBookmarkConfirm(true); }}
             onCatalogChanged={() => { void api.cleanupCatalog().then((catalog) => setEntries(catalog.entries)).catch(() => {}); }} />}
+          {page === "" && !PUBLIC && <IgnoreSection rules={ignoreRules} reload={reloadIgnoreRules} />}
           {page === "" && !PUBLIC && bookmarkConfirm && active && isPlan(active) &&
             <ConfirmDialog plan={active.result} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
               onRun={() => void start(() => api.cleanupClean(active.result.planId))}
