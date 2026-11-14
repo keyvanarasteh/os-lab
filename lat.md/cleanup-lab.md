@@ -330,6 +330,21 @@ no request steers the walker. Console: `GET /api/cleanup/explorer/roots`
 and typed `explorer`/`explorer-subtree` jobs. The Space Explorer tab never
 deletes; it links cleaning back to the plan flow.
 
+## Port sprint
+
+The `feat/cleanup-port` workstream ports the remaining roadmap tasks and
+approved additions as original os-lab code; the plan lives in
+[[cleanup-lab/PLAN-port-sprint.md]], the checklist in
+[[cleanup-lab/TODO-port-sprint.md]].
+
+Series: pending `CLN-14`, `CLN-17`, `CLN-18`, `CLN-19`, `CLN-21`, `CLN-29`,
+the not-done deltas of the merged CLNP-21…23 Space Explorer and CLNP-14…19
+quick clean, and provisional `CLN-30…36`. Behaviours were specified from a
+read-only study of mature open-source cleaners; the implementation names no
+external project. Every task obeys the architecture contract, the safety
+rules and the do-not-port tables, lands as its own commit series, and updates
+this node, `cleanup-lab/README.md`, `VERIFY.md` and `PARITY.md` together.
+
 ## Dashboard pages
 
 [[dashboard/src/views/cleanup/pages.tsx]] renders the dashboard at `/cleanup/`:
