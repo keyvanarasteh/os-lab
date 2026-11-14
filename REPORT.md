@@ -37,13 +37,21 @@ metadata. The student must review the changes and understand the implementation 
   records, and documented pending rubric/video evidence.
 - Updated reservation course/status and knowledge-graph runner coverage.
 
-The final focused OS-30 suite passes **115 tests**. Bash syntax, ShellCheck and
-Python AST checks pass.
+Latest recorded OS-30 result: **116/116, exit code 0** in 53.395s, from
+`python3 -m unittest discover -s linux-lab/tests -v`, on `d5ba261d` plus the
+then-uncommitted OS-30 fixes (including the UFW failure/interruption policy).
+This identifies the tested tree at execution time, not the current branch tip.
+The **115-test** result is the previous run after the quoted-Ubuntu-ID fix,
+not the latest result. `git diff --check` passed (exit 0). Bash syntax,
+ShellCheck and Python AST checks passed in their recorded runs.
 
 The complete repository check is not green on this macOS ARM64 / Python 3.14
 host: Android/console and Cleanup Lab tests fail outside the OS-30 files.
 `lat check` also reports an existing paragraph-length error in
-`lat.md/cleanup-lab.md:237`. Those paths have no diff against the fetched PR
+`lat.md/cleanup-lab.md:237` (339 characters; maximum 250), so `lat check`
+failed with exit code 1. The last recorded full repository runner result remains
+**5 stages passed, 2 failed, 3 skipped; exit code 1**; it was not rerun for this
+documentation update. Those paths have no diff against the fetched PR
 target. See `VERIFY.md` for counts and commands; no general CI pass is claimed.
 
 ## Scope
@@ -138,10 +146,21 @@ The companion Bash collector is part of the deliverable and remains audit-only.
 The repository runner preserves its existing stages with an added OS-30 unittest
 stage; no unrelated runner implementation was replaced.
 
-Operator-reported UTM text-audit and read-only-plan checks exist for an earlier
-revision. They were not repeated during integration. Raw server findings and
-identifying details are excluded from shared documentation. Live JSON audit,
-apply and rollback are not verified; fake-command tests do not establish live
+### Historical UTM verification — 2026-11-13, `bdcc521`
+
+Operator-reported Ubuntu 24.04 ARM64 UTM results for `bdcc521`:
+
+- Text audit: **3 FAIL, 18 WARN, exit code 1**.
+- JSON audit: valid JSON, schema version `1`, `exit_code: 1`, with
+  **15 PASS, 18 WARN, 3 FAIL**.
+- Read-only permission plan: `/etc/ssh/sshd_config` **0644 → 0600**;
+  no change was applied. Mode 0644 can already pass the audit; the plan is an
+  optional stricter mode, not proof of an existing permission FAIL.
+
+These are historical operator-reported checks, supplied for the record and not
+re-executed during this preparation. Raw identifying server output is excluded.
+The current version has no new live text/JSON audit or plan verification; live
+apply and rollback remain unverified. Mock/PTY tests do not establish live
 system behavior. Video evidence has not been supplied.
 
 Current focused test commands/results are recorded in `VERIFY.md`. Historical
@@ -172,5 +191,5 @@ validation could not run. No global installation or `lat init` was performed.
 After the checks passed, the reviewed OS-30 files and README image
 were staged; no commit or push was made. Subsequent documentation corrections
 require their own staging review. No live audit was run during integration;
-the earlier UTM audit and read-only plan were operator-reported on a previous
-revision. `VERIFY.md` distinguishes those checks from local mock evidence.
+the UTM text/JSON audits and read-only plan were operator-reported on
+`bdcc521` on 2026-11-13. `VERIFY.md` distinguishes those checks from local mock evidence.

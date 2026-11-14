@@ -2,13 +2,18 @@
 
 ## UFW failure/interruption policy verification (2026-11-14)
 
-Current working-tree change: failed/interrupted apply never automatically deletes
+Tested tree at execution time: `d5ba261d27a8e50f862a22a3b8602c3fbef18354`
+plus the then-uncommitted OS-30 fixes, including the UFW failure/interruption
+policy. This is the recorded test provenance, not a claim about today's HEAD.
+No tests or live checks were rerun for this documentation-only update.
+
+Tested behavior: failed/interrupted apply never automatically deletes
 UFW rules, even after verified insertion. Attempted additions retain snapshots
 and manifest, report manual rule-state inspection and print the backup path.
 Successful applied runs retain the separately confirmed rollback path.
 
-- `python3 -m unittest discover -s linux-lab/tests -v`: **116 tests passed in
-  53.395s**, exit 0, macOS arm64 / Python 3.14.3.
+- `python3 -m unittest discover -s linux-lab/tests -v`: **116/116, exit code 0** in
+  53.395s, macOS arm64 / Python 3.14.3.
 - Failure regression covers an add command failing after mutation, failed rule
   verification and journal failure after verified insertion; no UFW delete call,
   retained snapshots/manifest, failed status and manual-review/path messages.
@@ -17,15 +22,17 @@ Successful applied runs retain the separately confirmed rollback path.
   Unverified interrupted insertion is also retained without deletion.
 - Existing equivalent-rule SKIP, conflict refusal, quoted Ubuntu ID, exact-rule
   rollback and explicit rollback consent regressions all pass.
-- Python syntax and `git diff --check`: passed.
-- `lat check`: the existing `lat.md/cleanup-lab.md:237` paragraph-length error
-  remains (339 characters; maximum 250). No OS-30 graph error was reported.
+- Python syntax: passed. `git diff --check`: passed, exit code 0; also rerun
+  successfully after this documentation update.
+- `lat check`: failed, exit code 1, due to the existing
+  `lat.md/cleanup-lab.md:237` paragraph-length error (339 characters; maximum
+  250). No OS-30 graph error was reported.
 
 All system commands are fakes and snapshots are temporary fixtures; no live UFW
 or host security changes were made. Earlier runs below retain their original
 behavior and results; their automatic-delete observations are historical.
 
-## Current local submission checks (2026-11-14)
+## Previous local submission checks (2026-11-14)
 
 Starting HEAD: `d5ba261d27a8e50f862a22a3b8602c3fbef18354` on
 `feat/os-30-delivery`. Working tree was clean before preparation. The removed
@@ -45,7 +52,7 @@ failed as expected (exit 1): `ID="ubuntu"` was incorrectly rejected with exit 2.
 The collector now accepts that form consistently with Python. The test uses
 synthetic release data and checks that the audit performs no mutations.
 
-Final focused suite: `python3 -m unittest discover -s linux-lab/tests -v`:
+Previous focused suite: `python3 -m unittest discover -s linux-lab/tests -v`:
 **115 tests passed in 54.810s**, exit 0, after the quoted-ID change.
 
 Post-change Python AST parsing passed for the entry point and three test files;
@@ -207,16 +214,26 @@ ShellCheck was installed only in `.venv-test`; lat used a temporary npm cache.
 No system or VM package installation was performed. The runner generates ignored
 sample APK/report artifacts; those are not OS-30 live-audit evidence.
 
-## Operator-reported UTM checks
+## Historical operator-reported UTM checks — 2026-11-13, `bdcc521`
 
-Text audit and read-only permission planning were reported as completed on an
-Ubuntu 24.04 ARM64 lab without applying changes. These checks belong to an earlier
-revision and were not re-executed during integration. Raw audit findings, measured
-server configuration, real account names, addresses/hostnames and local paths are
-not retained in the shared verification record.
+Environment: Ubuntu 24.04 ARM64 on UTM. The operator supplied the following
+results for `bdcc521` (`feat/os-30-hardening-checker`):
 
-Live JSON audit, apply and rollback are unverified. Local fake-command and PTY
-tests must not be presented as live Ubuntu verification.
+- Text audit: **3 FAIL, 18 WARN, exit code 1**.
+- JSON audit: valid JSON, schema version `1`, `exit_code: 1`, with
+  **15 PASS, 18 WARN, 3 FAIL**.
+- Read-only permission plan: `/etc/ssh/sshd_config` **0644 → 0600**.
+  No changes were applied. Existing 0644 mode can already pass the audit;
+  0600 is an optional stricter permission profile.
+
+These results are historical operator-reported evidence, not new executions
+by this agent. Raw audit findings, real account names, addresses/hostnames and
+identifying local paths are not retained in the shared record.
+
+The current version has not been live-verified for text audit, JSON audit or
+read-only planning during this preparation. Live apply and rollback remain
+unverified. The historical JSON success does not verify today's code, and local
+fake-command/PTY tests must not be presented as live Ubuntu verification.
 
 ## Rollback usage and evidence boundary
 
@@ -273,8 +290,8 @@ Latest pre-delivery checks (after the test-runner cd guard was restored):
   install dependencies. Historical results above are not new integration results.
 
 No live audit was run during this integration or the local pre-delivery checks.
-An operator reported UTM text audit and read-only plan execution on an earlier
-revision, as described above; those are separate from local mock tests.
-Live JSON audit, apply and rollback remain unverified. No package installation,
+An operator reported UTM text/JSON audits and read-only plan execution on
+`bdcc521` on 2026-11-13, as described above; those are separate from local mock tests.
+Current-version live JSON audit, apply and rollback remain unverified. No package installation,
 commit or push was performed. The npx package-access attempt above failed before
 the graph checker could run; it is not a passing graph validation.
