@@ -122,6 +122,7 @@ def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
         "name": os.path.basename(root_path) or root_path,
         "path": root_path,
         "sizeBytes": 0,
+        "sizeOnDiskBytes": 0,
         "files": 0,
         "folders": 0,
         "children": [],
@@ -188,6 +189,11 @@ def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
             if key not in seen_inodes:
                 seen_inodes.add(key)
                 node["sizeBytes"] += entry_stat.st_size
+                blocks = getattr(entry_stat, "st_blocks", None)
+                if blocks is None:
+                    node["onDiskUnknown"] = True  # this OS exposes no block count
+                else:
+                    node["sizeOnDiskBytes"] += blocks * 512
                 node["files"] += 1
         if progress_callback is not None and counters["nodes"] % 500 == 0:
             progress_callback({"currentPath": entry.path, "nodes": counters["nodes"]})
@@ -195,6 +201,9 @@ def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
     node["children"] = sorted(child_nodes, key=lambda item: (item["sizeBytes"], item["name"]), reverse=True)
     for child in child_nodes:
         node["sizeBytes"] += child["sizeBytes"]
+        node["sizeOnDiskBytes"] += child["sizeOnDiskBytes"] or 0
+        if child.get("onDiskUnknown"):
+            node["onDiskUnknown"] = True
         node["files"] += child["files"]
         node["folders"] += child["folders"]
         node["unreadable"] += child["unreadable"]
