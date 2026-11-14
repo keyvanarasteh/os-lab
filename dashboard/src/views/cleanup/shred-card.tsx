@@ -22,7 +22,7 @@ export function ShredSection({ settings, reload }: {
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const policy = settings?.settings.shredPolicy ?? "off";
+  const policy = settings?.settings?.shredPolicy ?? "off";
 
   async function choose(next: ShredPolicy) {
     setBusy(true); setError("");
