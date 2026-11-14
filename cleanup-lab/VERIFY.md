@@ -1105,3 +1105,39 @@ the tests now pin `OSLAB_CLEANUP_STATE` through `mock.patch.dict` for every
 CLI call. No user data was touched (the store contained nothing else), and
 the engine's own fail-closed behaviour was unaffected — but it is recorded
 here as the exact class of mistake rule 8 exists to prevent.
+
+## CLN-19 — headless CLI parity
+
+Branch `feat/cln-19` (stacked on `feat/cleanup-port`; the first per-task PR of
+the port sprint). Scope: `cleanup_lab/plan_store.py`, the three `labctl`
+subcommands, the graduated `scan` in `test_cli.py`, and `tests/test_cln19.py`.
+
+### CLN-19 tests
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_cln19 tests.test_cli -v
+Ran 21 tests …
+OK
+```
+
+Covers: the scan is read-only and agrees with its JSON totals; unknown
+`--entry` ids are usage errors; `plan` stores a `0600` plan file and prints a
+claimable id; `clean` refuses without `--plan` and `--yes` (usage exit); the
+happy path claims the plan, moves the file to the Trash, audits the run, and
+is single-use (the second `clean` refuses and the store holds nothing
+claimable); an unknown plan id is a problem exit; an expired stored plan
+refuses; the shred policy gates a headless shred; a corrupt ignore store
+refuses the headless plan; control characters in names are escaped in text
+output (exercised through the scan's unreadable listing).
+
+```console
+$ python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 373 tests … (failure set identical to clean master in this sandbox; zero new)
+```
+
+Integration notes: the JSON round-trip of plan fingerprints (tuple → list)
+surfaced as an always-stale plan; the CLI rebuilds tuples on claim. The
+pre-existing `test_cli` case that used `scan` as its unknown-command example
+was updated (`scan` is now real; the case uses a genuinely unknown name).
+Console pytest suite and Playwright e2e remain CI-gated (offline sandbox) —
+they run on the PR.

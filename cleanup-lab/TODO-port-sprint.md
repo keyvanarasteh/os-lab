@@ -58,10 +58,15 @@ series; `VERIFY.md` gets an entry with real command output per task.
 
 ## Task 3 — CLN-19 headless CLI
 
-- [ ] `labctl cleanup scan|plan|clean --plan <id> --yes --json`.
-- [ ] JSON never prompts; `clean` requires `--yes` + unexpired plan id.
-- [ ] Sanitize file names in text output (ANSI/bidi/control stripped).
-- [ ] Exit codes 0/1/2 in every path; CLI tests; README usage.
+- [x] `labctl cleanup scan|plan|clean --entry … --mode … --plan <id> --yes --json`
+      over the file-backed plan store (`cleanup_lab/plan_store.py`: single-use
+      claim by atomic rename, TTL re-checked at claim, crash-safe).
+- [x] JSON never prompts; `clean` requires `--plan` + `--yes`; the audit trail
+      is written headless too (a failed append is reported, exit 1).
+- [x] Sanitize file names in text output; the scan lists its first unreadable
+      paths (escaped).
+- [x] Exit codes 0/1/2 in every path; 11 tests in `tests/test_cln19.py`; the
+      graduated `scan` subcommand updated in `test_cli.py`; README usage.
 
 ## Task 4 — CLN-18 scheduled dry-run scans
 

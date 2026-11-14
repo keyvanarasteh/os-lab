@@ -83,7 +83,9 @@ class CliTest(unittest.TestCase):
         stream = io.StringIO()
         with mock.patch.object(cli, "probe") as probe, mock.patch("sys.stderr", stream):
             with self.assertRaises(SystemExit) as raised:
-                cli.main(["scan"], stream=io.StringIO())
+                # "scan" graduated to a real command in CLN-19; use a name that
+                # is genuinely unknown.
+                cli.main(["frobnicate"], stream=io.StringIO())
         self.assertEqual(raised.exception.code, 2)
         probe.assert_not_called()
 
