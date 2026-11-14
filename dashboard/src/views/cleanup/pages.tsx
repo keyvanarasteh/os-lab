@@ -16,10 +16,11 @@ import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
 import { IgnoreSection } from "./ignore-card";
 import { ShredSection } from "./shred-card";
 import { SchedulesSection } from "./schedules-card";
+import { LedgerSection } from "./ledger-card";
 import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
 import { WidgetsCard } from "./widgets-card";
-import type { BookmarksPayload, CleanupVolume, CleanupSettingsPayload, CleanupWidgetSnapshot, IgnoreRulesPayload, SchedulesPayload } from "../../lib/api";
+import type { BookmarksPayload, CleanupVolume, CleanupSettingsPayload, CleanupWidgetSnapshot, IgnoreRulesPayload, LedgerPayload, SchedulesPayload } from "../../lib/api";
 
 /** CLW-03: overview sections the desktop app's deep links may target. */
 const WIDGET_SECTIONS = new Set(["cleanup-widgets", "cleanup-monitor", "cleanup-permissions", "cleanup-bookmarks", "overview-review", "overview-storage"]);
@@ -225,6 +226,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const [ignoreRules, setIgnoreRules] = useState<IgnoreRulesPayload | null>(null);
   const [shredSettings, setShredSettings] = useState<CleanupSettingsPayload | null>(null);
   const [schedules, setSchedules] = useState<SchedulesPayload | null>(null);
+  const [ledger, setLedger] = useState<LedgerPayload | null>(null);
   const [loading, setLoading] = useState(!PUBLIC);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -307,6 +309,18 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     void api.cleanupSchedules()
       .then((payload) => { if (alive) setSchedules(payload); })
       .catch(() => { if (alive) setSchedules(null); });
+    void api.cleanupLedger()
+      .then((payload) => {
+        if (!alive) return;
+        setLedger(payload);
+        // CLN-26: soft pre-selection — learned rows get ticked, never forced:
+        // the user unticks them like any other row, and the reason rides the
+        // row's learned badge.
+        if (payload.error || !payload.suggestions.length) return;
+        setSelected((old) => [...old, ...payload.suggestions
+          .map((s) => s.entryId).filter((id) => !old.includes(id))]);
+      })
+      .catch(() => { if (alive) setLedger(null); });
     return () => { alive = false; };
   }, []);
 
@@ -315,6 +329,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const reloadIgnoreRules = () => { void api.cleanupIgnoreRules().then(setIgnoreRules).catch(() => {}); };
   const reloadShredSettings = () => { void api.cleanupSettings().then(setShredSettings).catch(() => {}); };
   const reloadSchedules = () => { void api.cleanupSchedules().then(setSchedules).catch(() => {}); };
+  const reloadLedger = () => { void api.cleanupLedger().then(setLedger).catch(() => {}); };
+  const learnedReasons = new Map((ledger?.suggestions ?? []).map((item) => [item.entryId, item.reason]));
   const bookmarkedIds = new Set((bookmarks?.bookmarks ?? []).map((item) => item.entryId));
 
   /** CLNP-21: a capability card either navigates a tab or scrolls to its section. */
@@ -517,6 +533,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           {page === "" && !PUBLIC && <IgnoreSection rules={ignoreRules} reload={reloadIgnoreRules} />}
           {page === "" && !PUBLIC && <ShredSection settings={shredSettings} reload={reloadShredSettings} />}
           {page === "" && !PUBLIC && <SchedulesSection schedules={schedules} reload={reloadSchedules} />}
+          {page === "" && !PUBLIC && <LedgerSection ledger={ledger} reload={reloadLedger} />}
           {page === "" && !PUBLIC && bookmarkConfirm && active && isPlan(active) &&
             <ConfirmDialog plan={active.result} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
               onRun={() => void start(() => api.cleanupClean(active.result.planId))}
@@ -585,6 +602,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                     </span>
                     <span className="flex items-center gap-2">
                       <Badge tone={riskTone(item.risk)}>{riskLabel(item.risk)}</Badge>
+                      {learnedReasons.has(item.id) && <span className="text-xs text-[#f36c21]" title={learnedReasons.get(item.id)}>learned</span>}
                       <span dir="ltr" className="ms-auto tabular-nums">
                         {size != null ? bytes(size) : item.paths.some((path) => path.path) ? "Not measured" : "Unavailable"}
                       </span>

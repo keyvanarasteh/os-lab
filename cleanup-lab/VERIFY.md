@@ -1211,3 +1211,36 @@ a command). Dashboard: the Simulator runtimes card on the extra-tools page
 confirm then audited run), 9 new strings x 7 locales; `npm run check` clean,
 `test:i18n` 2550 keys x 7, build OK. Playwright e2e and screenshots remain
 CI-gated.
+
+## CLN-26 — learning ledger
+
+Branch `feat/cln-26` (stacked on `feat/cln-29`). Scope: `cleanup_lab/ledger.py`
+(engine module by a parallel subagent, 31 tests), the console record hook +
+`GET /api/cleanup/ledger` + `/clear`, the Learning card, learned badges and
+soft pre-selection on the scan page, docs.
+
+### Ledger tests
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_ledger -v
+Ran 31 tests in 0.058s
+OK
+```
+
+Covers: record filters (only trashed/deleted/shredded with real bytes),
+aggregation and the min_runs threshold, bytes-desc ordering, risk filtering
+(never high/credentials/privacy), corrupt and wrong-shape stores moved aside
+with the problem reported, the 1000-run eviction cap, clear, privacy (0700
+folder, 0600 file, no .tmp), symlinked store refused. Full engine suite: the
+known pre-existing `test_relocation` set only; zero new failures.
+
+### Surfaces
+
+Console: the clean job records rows into the ledger after the audit append (a
+ledger failure never fails a finished clean); `GET /api/cleanup/ledger` returns
+stats + suggestions for the current catalog; `POST /api/cleanup/ledger/clear`
+resets it. Dashboard: the Learning card (stats, Clear ledger) and the scan
+rows' learned badges carrying the "Why is this selected?" reason; soft
+pre-selection ticks learned entries at load. 9 new strings x 7 locales;
+`npm run check` clean, `test:i18n` 2559 keys x 7, build OK. Console pytest and
+Playwright e2e remain CI-gated. Remaining slice: `labctl cleanup ledger`.

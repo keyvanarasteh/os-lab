@@ -188,6 +188,25 @@ the console's own plans stay in its process. Text output sanitizes every path
 and name (control characters escaped), and the scan lists its first unreadable
 paths so the machine-readable detail in `--json` has a visible counterpart.
 
+## Learning ledger (CLN-26)
+
+`cleanup_lab/ledger.py` records what was really cleaned — only rows whose
+status is `trashed`/`deleted`/`shredded` with bytes actually freed — into the
+private state (`ledger.json`, the usual discipline; 1000-run cap, oldest
+evicted). A corrupt file is moved aside (`ledger.corrupt-<epoch>.json`) and the
+store starts empty with the problem reported — lifetime totals are never
+silently overwritten. Aggregated by entry id, the learned patterns drive soft
+pre-selection: at the next scan the matching rows arrive **ticked** with a
+"Why is this selected?" hint, never forced and never for `high`, `credentials`
+or `privacy` rows (rule 5).
+
+Console: the clean job feeds every result to the ledger (a ledger failure
+never fails a clean that already happened); `GET /api/cleanup/ledger` returns
+stats plus the suggestions for the current catalog, `POST
+/api/cleanup/ledger/clear` resets it. CLI: `labctl cleanup ledger [--clear]`.
+Dashboard: the Learning card (stats, clear) and the learned badges on the scan
+rows.
+
 ## Simulator runtimes (CLN-29)
 
 `cleanup_lab/runtimes.py` inventories Xcode simulator runtimes (fixed

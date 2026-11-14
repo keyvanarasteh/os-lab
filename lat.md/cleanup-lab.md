@@ -452,6 +452,13 @@ CLN-08 pattern — fixed argv per kind, id shape validation, a fresh-inventory
 candidate check at preview, a single-use preview id and an audited run —
 surfaced in the dashboard's Simulator runtimes card.
 
+CLN-26 adds the learning ledger ([[cleanup-lab/engine/cleanup_lab/ledger.py]]):
+the clean job records every really-cleaned row, learned entry ids arrive ticked
+(never default-selected, never high/credentials/privacy) with a
+"Why is this selected?" hint, a corrupt ledger is moved aside and reported, and
+`GET /api/cleanup/ledger` plus `POST /api/cleanup/ledger/clear` and the
+dashboard's Learning card keep it inspectable and clearable.
+
 ## Dashboard pages
 
 [[dashboard/src/views/cleanup/pages.tsx]] renders the dashboard at `/cleanup/`:

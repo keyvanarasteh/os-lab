@@ -103,10 +103,14 @@ series; `VERIFY.md` gets an entry with real command output per task.
 
 ## Task 7 — CLN-26 learning ledger
 
-- [ ] Cleaned-items ledger in private state (bytes actually freed, per run).
-- [ ] Learned rows ticked (never default-selected) + "Why is this selected?"
-      hint; never high-risk/credentials/privacy.
-- [ ] Corrupt ledger moved aside and reported; clearable from the page; tests.
+- [x] Cleaned-items ledger in private state (bytes actually freed, 1000-run
+      cap, engine module by a parallel subagent, 31 tests).
+- [x] Learned rows ticked (never default-selected) + the reason hint on the
+      scan row's learned badge; never high-risk/credentials/privacy.
+- [x] Corrupt ledger moved aside and reported; Learning card on `/cleanup/`
+      with stats + Clear; console record hook + `GET /api/cleanup/ledger` and
+      `/clear`; seven locales. (`labctl cleanup ledger` is the remaining
+      slice.)
 
 ## Task 8 — CLN-31 scan snapshots
 

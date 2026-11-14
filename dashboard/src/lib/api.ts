@@ -441,6 +441,12 @@ export interface RuntimeItem {
 export interface RuntimeProbe { available: boolean; reason?: string; items: RuntimeItem[] }
 export interface RuntimesPayload { xcode: RuntimeProbe; android: RuntimeProbe }
 export interface RuntimeDeletePreview { previewId: string; kind: string; id: string; argv: string[]; expiresAt: number }
+/** CLN-26: the learning ledger — stats plus soft pre-selection suggestions. */
+export interface LedgerSuggestion { entryId: string; reason: string }
+export interface LedgerPayload {
+  stats: { runs: number; entries: number; bytes: number }; suggestions: LedgerSuggestion[];
+  error: string | null;
+}
 export interface RuntimeDeleteResult {
   status: "completed" | "failed"; argv: string[]; kind?: string; id?: string;
   returncode?: number; stdout?: string; stderr?: string; error?: string;
@@ -596,6 +602,9 @@ export const api = {
     post<RuntimeDeletePreview>("/api/cleanup/runtimes/delete/preview", { kind, id }),
   cleanupRuntimeDeleteRun: (previewId: string) =>
     post<CleanupAuxJob<RuntimeDeleteResult>>("/api/cleanup/runtimes/delete/run", { previewId }),
+  /** CLN-26: the learning ledger; "error" carries a store problem's message. */
+  cleanupLedger: () => call<LedgerPayload>("/api/cleanup/ledger"),
+  cleanupLedgerClear: () => post<{ cleared: boolean; stats: LedgerPayload["stats"]; error: string | null }>("/api/cleanup/ledger/clear", {}),
   /** CLNP-23: the Space Explorer (read-only size trees over registered roots). */
   cleanupExplorerRoots: () => call<{ roots: CleanupExplorerRoot[] }>("/api/cleanup/explorer/roots"),
   cleanupExplorerScan: (rootId: string) => post<CleanupExplorerJob>("/api/cleanup/explorer/scan", { rootId }),
