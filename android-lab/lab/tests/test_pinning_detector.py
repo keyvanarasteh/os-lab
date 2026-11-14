@@ -326,8 +326,8 @@ def test_embedded_certificate_in_assets(tmp_path):
     })
     report = pd.analyze(apk)
     m = methods_of(report)["embedded_certificate"]
-    assert m["confidence"] == "medium"
-    assert report["pinning_status"] == "likely_pinned"
+    assert m["confidence"] == "low"  # bundled cert alone is not pinning evidence
+    assert report["pinning_status"] == "possible"
     assert all("META-INF" not in e["file"] for s in m["signals"] for e in s["evidence"])
 
 
@@ -411,3 +411,92 @@ def test_oversized_entries_are_skipped(tmp_path, monkeypatch):
     monkeypatch.setattr(pd, "MAX_FILE_BYTES", 10)
     apk = make_apk(tmp_path, {"classes.dex": dex("Lokhttp3/CertificatePinner;", PIN)})
     assert pd.analyze(apk)["files_scanned"] == 0
+
+
+# --------------------------------------------------------------------------
+# Review follow-ups (PR #173 Sourcery findings)
+# --------------------------------------------------------------------------
+
+SHA1_PIN = "sha1/" + "AbCdEfGhIjKlMnOpQrStUvWxYz0=" 
+
+
+def test_okhttp_sha1_pin_literal_detected(tmp_path):
+    apk = make_apk(tmp_path, {"classes.dex": dex(SHA1_PIN)})
+    assert "okhttp" in methods_of(pd.analyze(apk))
+
+
+def test_unreferenced_nsc_does_not_report_pinned(tmp_path):
+    apk = make_apk(tmp_path, {
+        "AndroidManifest.xml": build_axml(manifest_tree(nsc_ref=False)),
+        "res/xml/network_security_config.xml": build_axml(nsc_tree()),
+    })
+    report = pd.analyze(apk)
+    assert report["pinning_status"] != "pinned"
+    assert methods_of(report)["network_security_config"]["confidence"] == "low"
+
+
+def test_bundled_rn_and_cordova_modules_stay_low(tmp_path):
+    apk = make_apk(tmp_path, {"assets/index.android.bundle": b"require('react-native-ssl-pinning')",
+                              "assets/www/cordova.js": b"sslCertificateChecker"})
+    report = pd.analyze(apk)
+    assert report["pinning_status"] == "possible"
+    assert methods_of(report)["third_party_library"]["confidence"] == "low"
+
+
+def test_flutter_marker_does_not_upgrade_weak_signal(tmp_path):
+    apk = make_apk(tmp_path, {"lib/arm64-v8a/libflutter.so": b"x", "assets/app.dart": b"badCertificateCallback"})
+    assert methods_of(pd.analyze(apk))["flutter"]["confidence"] == "low"
+
+
+def test_ordinary_custom_trustmanager_without_pin_is_not_likely_pinned(tmp_path):
+    src = b"class T implements X509TrustManager { void checkServerTrusted() {} } SSLContext c;"
+    apk = make_apk(tmp_path, {"smali/app/T.smali": src})
+    assert pd.analyze(apk)["pinning_status"] == "possible"
+
+
+def test_duplicate_expired_nsc_copies_are_deduplicated(tmp_path):
+    files = {"AndroidManifest.xml": build_axml(manifest_tree(nsc_ref=True))}
+    for i in range(6):
+        files[f"res/xml/copy{i}.xml"] = build_axml(nsc_tree(expiration="2001-01-01"))
+    report = pd.analyze(make_apk(tmp_path, files))
+    assert len(report["network_security_config"]) == 1
+    assert report["pinning_status"] != "pinned"
+
+
+def test_malformed_string_pool_count_is_rejected_without_blowup():
+    good = build_axml(nsc_tree())
+    # chunk header at 8: type(2) hsize(2) size(4) count(4) -> claim a huge string count
+    bad = good[:16] + struct.pack("<I", 0x7FFFFFFF) + good[20:]
+    assert pd.decode_axml(bad) is None
+
+
+def test_unreadable_entries_mark_scan_incomplete(tmp_path, monkeypatch):
+    apk = make_apk(tmp_path, {"a.txt": b"hello"})
+    monkeypatch.setattr(zipfile.ZipFile, "open", lambda *a, **k: (_ for _ in ()).throw(OSError("boom")))
+    report = pd.analyze(apk)
+    assert report["scan_complete"] is False
+    assert report["pinning_status"] == "incomplete_scan"
+    assert report["skipped"]
+
+
+def test_aggregate_file_limit_truncates_scan(tmp_path, monkeypatch):
+    monkeypatch.setattr(pd, "MAX_TOTAL_FILES", 2)
+    apk = make_apk(tmp_path, {f"f{i}.txt": b"x" for i in range(5)})
+    report = pd.analyze(apk)
+    assert report["scan_truncated"] is True and report["scan_complete"] is False
+
+
+def test_output_dir_inside_target_is_not_rescanned(tmp_path):
+    out = tmp_path / "reports"
+    out.mkdir()
+    (out / "pinning-report.md").write_text(PIN, encoding="utf-8")
+    (tmp_path / "Clean.java").write_text("class Clean {}", encoding="utf-8")
+    report = pd.analyze(str(tmp_path), exclude=(str(out),))
+    assert report["pinning_status"] == "none_detected"
+
+
+def test_cli_publishes_report_pair_atomically(tmp_path):
+    apk = make_apk(tmp_path, {"classes.dex": dex(PIN)})
+    out = tmp_path / "out"
+    assert pd.main([apk, "-o", str(out)]) == 0
+    assert sorted(os.listdir(out)) == ["pinning-report.json", "pinning-report.md"]
