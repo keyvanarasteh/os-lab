@@ -102,6 +102,38 @@ are credited only after the item is really gone from its original path, using th
 run's measurement — never the plan estimate. Privileged items and items whose app
 is running stay skipped.
 
+## Ignore rules (CLN-17)
+
+`cleanup_lab/ignore.py` keeps the user's never-touch rules as typed data in the
+private state store (`ignore-rules.json`, same discipline as the settings store:
+`0700` folder, `0600` file, no symlink, atomic replace) and the engine enforces
+them everywhere. Three rule types: `path` (an absolute folder or file; the rule
+covers the path and everything under it), `glob` (matched against the full path
+and any path suffix, so a bare name matches at any depth; `*` and `?` never
+cross a separator unless the pattern carries one; a folder matched by the
+pattern covers its subtree; there is no negation — a rule can only protect) and
+`extension` (a bare, case-insensitive suffix). A `path` rule may not be the
+filesystem root or the home folder: ignoring either would ignore everything,
+and the store refuses instead of honouring it.
+
+Enforcement: the catalog scan skips ignored paths unmeasured and counts them
+(`totals.ignoredPaths`); the project sweep never reports and never descends
+into an ignored directory; the Space Explorer prunes ignored entries from the
+tree (counted per node in `ignored`); and the plan refuses an ignored item
+(`ignored`) and any folder holding an ignored path (`contains-ignored`, enforced
+for glob and extension rules during the fingerprint walk). The store fails
+closed: a file that cannot be read or trusted refuses the scan, the sweep, the
+explorer walk and every plan (`ignore-store-corrupt`) — rules that cannot be
+seen are never silently dropped.
+
+`GET /api/cleanup/ignore` lists the rules (a corrupt store is reported in
+`error`); `POST /api/cleanup/ignore` adds one (`type`, `value`, optional
+`note`; duplicates and invalid values are `400`); `POST
+/api/cleanup/ignore/remove` removes one by id (unknown id is `404`). The page
+sends type and value, never a pre-built rule. `labctl cleanup ignore list|add|
+remove [--json]` runs the same store with exit codes `0` ok / `1` problem /
+`2` usage.
+
 ## Volumes (CLN-28)
 
 `cleanup_lab/volumes.py` inventories the local mounted volumes read-only:

@@ -973,3 +973,35 @@ Not run in this environment: the suite imports `pytest`, which is not
 installed offline here. The change adds optional keyword parameters and
 payload fields only — no signature the console uses was removed or renamed.
 To be run in the normal environment before merge.
+
+### Slice 2 — enforcement surfaces (sweep, explorer, console, CLI)
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_ignore -v
+Ran 34 tests in 0.045s
+OK
+```
+
+New in this slice: the project sweep refuses an ignored candidate and prunes
+the subtree of an ignored folder (`glob` and `path` rules); the sweep and the
+Space Explorer refuse a corrupt store (`ignore-store-corrupt`); the explorer
+prunes ignored entries from the tree (absent from children and sizes, counted
+per node in `ignored`); `labctl cleanup ignore list|add|remove` exit codes
+(0 ok, 1 corrupt store or unknown id, 2 usage), JSON output, a real-store
+add→remove roundtrip through `OSLAB_CLEANUP_STATE`, and argparse usage errors.
+
+```console
+$ python3 -m unittest discover -s tests -p 'test_*.py'   # full engine suite
+Ran 336 tests in 1.859s
+FAILED (failures=3, errors=5)
+```
+
+The 8 failing ids are identical to the clean-`master` set in this sandbox
+(verified side by side; zero new failures on this branch).
+
+Console endpoint tests were added to
+`android-lab/lab/tests/test_cleanup_console.py` (roundtrip through
+`GET/POST /api/cleanup/ignore` and `/remove`, typed 400s, duplicate refusal,
+unknown-id 404, corrupt store reported in `error` and blocking writes) — this
+environment has no `pytest`, so they run in the normal environment before
+merge. The dashboard settings section is the remaining slice of CLN-17.

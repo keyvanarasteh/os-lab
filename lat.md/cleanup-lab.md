@@ -399,13 +399,17 @@ external project. Every task obeys the architecture contract, the safety
 rules and the do-not-port tables, lands as its own commit series, and updates
 this node, `cleanup-lab/README.md`, `VERIFY.md` and `PARITY.md` together.
 
-CLN-17's engine slice has landed: `cleanup_lab/ignore.py` keeps typed rules
-(`path` / `glob` / `extension`) in the private state store with the settings
-store's discipline, the scan skips ignored paths unmeasured and counts them,
-and the plan refuses an ignored path (`ignored`), a folder holding an ignored
-path (`contains-ignored`, enforced during the fingerprint walk for glob and
-extension rules) and an unreadable rules store (`ignore-store-corrupt`). The
-console CRUD, `labctl cleanup ignore` and the settings section follow.
+CLN-17's engine and CLI slices have landed: `cleanup_lab/ignore.py` keeps
+typed rules (`path` / `glob` / `extension`) in the private state store with
+the settings store's discipline, the scan skips ignored paths unmeasured and
+counts them, the project sweep and the Space Explorer prune ignored
+directories from their walks, and the plan refuses an ignored path
+(`ignored`), a folder holding an ignored path (`contains-ignored`, enforced
+during the fingerprint walk for glob and extension rules) and an unreadable
+rules store (`ignore-store-corrupt`). The console answers
+`GET/POST /api/cleanup/ignore` and `/api/cleanup/ignore/remove` (ids only,
+typed 400s), and `labctl cleanup ignore list|add|remove [--json]` runs the
+same store. The settings section on `/cleanup/` follows.
 
 ## Dashboard pages
 

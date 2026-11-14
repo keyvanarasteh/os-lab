@@ -6,21 +6,32 @@ store), the three matching semantics (``path`` covers the subtree, ``glob``
 matches at any depth, ``extension`` case-insensitively), the scan prune, and
 the plan refusals — ``ignored`` for a direct match, ``contains-ignored`` for a
 folder holding an ignored path (by rule and by walk), and
-``ignore-store-corrupt`` failing the plan closed. Every test runs on a
-generated temp tree — never a real user folder (rule 8).
+``ignore-store-corrupt`` failing the plan closed — plus the project sweep and
+the Space Explorer pruning against the same rules and the `labctl cleanup
+ignore` command surface. Every test runs on a generated temp tree — never a
+real user folder (rule 8).
 """
+import io
 import json
 import os
+import pathlib
+import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
 
 from cleanup_lab import clean  # noqa: E402
+from cleanup_lab import cli  # noqa: E402
+from cleanup_lab import deep  # noqa: E402
+from cleanup_lab import explorer  # noqa: E402
 from cleanup_lab import ignore as ignore_module  # noqa: E402
 from cleanup_lab import paths as paths_module  # noqa: E402
 from cleanup_lab import scan as scan_module  # noqa: E402
+
+ROOT = str(pathlib.Path(__file__).resolve().parents[3])
 
 
 def make_entry(entry_id, paths, **overrides):
@@ -314,3 +325,187 @@ class PlanScanTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeepSweepTests(unittest.TestCase):
+    """The project sweep prunes against the same rules — and fails closed."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="cln-ignore-deep-")
+        self.home = self.tmp.name
+        self.env = {"HOME": self.home, "USERPROFILE": self.home}
+        self.projects = os.path.join(self.home, "Projects")
+        os.makedirs(self.projects)
+        web = os.path.join(self.projects, "web")
+        os.makedirs(web)
+        with open(os.path.join(web, "package.json"), "w") as handle:
+            handle.write("{}")
+        cache = os.path.join(web, "node_modules")
+        os.makedirs(cache)
+        with open(os.path.join(cache, "file"), "wb") as handle:
+            handle.write(b"12345")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _sweep(self):
+        return deep.sweep(ROOT, ["home-projects"], env=self.env, platform="linux")
+
+    def test_the_sweep_reports_a_candidate_without_rules(self):
+        result = self._sweep()
+        self.assertEqual({item["id"] for item in result["items"]}, {"projects.node-modules"})
+
+    def test_the_sweep_refuses_an_ignored_candidate(self):
+        ignore_module.add_rule("glob", "node_modules", env=self.env, platform="linux")
+        self.assertEqual(self._sweep()["items"], [])
+
+    def test_the_sweep_prunes_the_subtree_of_an_ignored_folder(self):
+        ignore_module.add_rule("path", os.path.join(self.projects, "web"), env=self.env, platform="linux")
+        self.assertEqual(self._sweep()["items"], [])
+
+    def test_the_sweep_refuses_a_corrupt_store(self):
+        state = paths_module.state_dir(self.env, "linux")
+        os.makedirs(state, mode=0o700, exist_ok=True)
+        with open(os.path.join(state, "ignore-rules.json"), "w", encoding="utf-8") as handle:
+            handle.write("{not json")
+        with self.assertRaises(deep.DeepError) as caught:
+            self._sweep()
+        self.assertIn("ignore-store-corrupt", str(caught.exception))
+
+
+class ExplorerTests(unittest.TestCase):
+    """The Space Explorer prunes ignored entries from the tree — and fails closed."""
+
+    platform = "macos"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="cln-ignore-explore-")
+        self.base = self.tmp.name
+        # The rules store must live outside the scanned tree: the registered
+        # root is the temp home itself, and a store created inside it would
+        # show up as an ordinary folder.
+        self.state = os.path.join(self.tmp.name + "-state")
+        os.makedirs(self.state, mode=0o700)
+        self.env = {"HOME": self.base, "USERPROFILE": self.base, "PATH": "",
+                    "OSLAB_CLEANUP_STATE": self.state}
+        self.root = tempfile.mkdtemp(prefix="cln-ignore-explore-root-")
+        os.makedirs(os.path.join(self.root, "cleanup-lab", "catalog"))
+        with open(os.path.join(self.root, "cleanup-lab", "deep-roots.json"), "w") as handle:
+            json.dump({"home-projects": self.base}, handle)
+        demo = os.path.join(self.base, "projects", "demo")
+        os.makedirs(demo)
+        with open(os.path.join(demo, "f.bin"), "wb") as handle:
+            handle.write(b"x" * 100)
+        keep = os.path.join(self.base, "projects", "keep")
+        os.makedirs(keep)
+        with open(os.path.join(keep, "k.txt"), "wb") as handle:
+            handle.write(b"y" * 10)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        shutil.rmtree(self.root, ignore_errors=True)
+        shutil.rmtree(self.state, ignore_errors=True)
+
+    def _explore(self):
+        return explorer.explore(self.root, "home-projects", env=self.env, platform=self.platform)
+
+    def _projects_node(self, payload):
+        return next(child for child in payload["tree"]["children"] if child["name"] == "projects")
+
+    def test_the_explorer_prunes_ignored_entries_from_the_tree(self):
+        ignore_module.add_rule(
+            "path", os.path.join(self.base, "projects", "demo"),
+            env=self.env, platform=self.platform,
+        )
+        payload = self._explore()
+        projects = self._projects_node(payload)
+        self.assertEqual({child["name"] for child in projects["children"]}, {"keep"})
+        self.assertEqual(projects["ignored"], 1)  # demo was pruned, counted here
+        self.assertEqual(payload["tree"]["sizeBytes"], 10)
+        self.assertTrue(os.path.exists(os.path.join(self.base, "projects", "demo", "f.bin")))
+
+    def test_an_extension_rule_prunes_its_files_from_the_tree(self):
+        ignore_module.add_rule("extension", "bin", env=self.env, platform=self.platform)
+        payload = self._explore()
+        projects = self._projects_node(payload)
+        demo = next(child for child in projects["children"] if child["name"] == "demo")
+        self.assertEqual(demo["sizeBytes"], 0)
+        self.assertEqual(demo["ignored"], 1)
+        self.assertEqual(payload["tree"]["sizeBytes"], 10)
+
+    def test_the_explorer_refuses_a_corrupt_store(self):
+        state = paths_module.state_dir(self.env, self.platform)
+        os.makedirs(state, mode=0o700, exist_ok=True)
+        with open(os.path.join(state, "ignore-rules.json"), "w", encoding="utf-8") as handle:
+            handle.write("{not json")
+        with self.assertRaises(explorer.ExplorerError) as caught:
+            self._explore()
+        self.assertIn("ignore-store-corrupt", str(caught.exception))
+
+
+class CliIgnoreTests(unittest.TestCase):
+    """`labctl cleanup ignore list|add|remove` — exit codes 0/1/2."""
+
+    def run_cli(self, argv):
+        stream = io.StringIO()
+        code = cli.main(argv, stream=stream)
+        return code, stream.getvalue()
+
+    def test_ignore_list_prints_the_rules_as_json_and_text(self):
+        rule = {"id": "abc123", "type": "glob", "value": "*.tmp"}
+        with mock.patch.object(cli.ignore, "load_rules", return_value=([rule], None)):
+            code, text = self.run_cli(["ignore", "list", "--json"])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(text)["rules"][0]["id"], "abc123")
+            code, text = self.run_cli(["ignore", "list"])
+            self.assertEqual(code, 0)
+            self.assertIn("Cleanup Lab ignore rules", text)
+            self.assertIn("*.tmp", text)
+            self.assertIn("abc123", text)
+
+    def test_ignore_list_fails_closed_on_a_corrupt_store(self):
+        problem = {"code": "ignore-store-corrupt", "message": "boom"}
+        with mock.patch.object(cli.ignore, "load_rules", return_value=([], problem)):
+            code, _ = self.run_cli(["ignore", "list", "--json"])
+            self.assertEqual(code, 1)
+
+    def test_ignore_add_validates_and_reports(self):
+        self.assertEqual(self.run_cli(["ignore", "add"])[0], 2)
+        self.assertEqual(self.run_cli(["ignore", "add", "wat", "x"])[0], 2)
+        self.assertEqual(self.run_cli(["ignore", "add", "glob"])[0], 2)
+        rule = {"id": "abc123", "type": "glob", "value": "*.tmp"}
+        with mock.patch.object(cli.ignore, "add_rule", return_value=rule) as added:
+            code, text = self.run_cli(["ignore", "add", "glob", "*.tmp", "--note", "drafts"])
+            self.assertEqual(code, 0)
+            self.assertIn("Added glob rule", text)
+            self.assertEqual(added.call_args[0], ("glob", "*.tmp"))
+            self.assertEqual(added.call_args[1]["note"], "drafts")
+        with mock.patch.object(cli.ignore, "add_rule", side_effect=ValueError("bad value")):
+            self.assertEqual(self.run_cli(["ignore", "add", "glob", "*.tmp"])[0], 2)
+        with mock.patch.object(cli.ignore, "add_rule",
+                               side_effect=cli.ignore.RulesError("unreadable store")):
+            self.assertEqual(self.run_cli(["ignore", "add", "glob", "*.tmp"])[0], 1)
+
+    def test_ignore_remove_reports_unknown_ids(self):
+        self.assertEqual(self.run_cli(["ignore", "remove"])[0], 2)
+        self.assertEqual(self.run_cli(["ignore", "remove", "abc", "extra"])[0], 2)
+        with mock.patch.object(cli.ignore, "remove_rule", return_value=True):
+            code, text = self.run_cli(["ignore", "remove", "abc123", "--json"])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(text)["removed"], "abc123")
+        with mock.patch.object(cli.ignore, "remove_rule", return_value=False):
+            self.assertEqual(self.run_cli(["ignore", "remove", "abc123"])[0], 1)
+
+    def test_ignore_add_and_remove_roundtrip_through_a_real_store(self):
+        with tempfile.TemporaryDirectory(prefix="cln-ignore-cli-") as state:
+            with mock.patch.dict(os.environ, {"OSLAB_CLEANUP_STATE": state}):
+                code, _ = self.run_cli(["ignore", "add", "extension", "log"])
+                self.assertEqual(code, 0)
+                with open(os.path.join(state, "ignore-rules.json"), encoding="utf-8") as handle:
+                    stored = json.load(handle)
+                self.assertEqual(stored["rules"][0]["value"], "log")
+                rule_id = stored["rules"][0]["id"]
+                code, _ = self.run_cli(["ignore", "remove", rule_id])
+                self.assertEqual(code, 0)
+                with open(os.path.join(state, "ignore-rules.json"), encoding="utf-8") as handle:
+                    self.assertEqual(json.load(handle)["rules"], [])

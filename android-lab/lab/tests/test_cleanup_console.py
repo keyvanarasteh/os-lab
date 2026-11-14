@@ -1012,3 +1012,45 @@ def test_the_widget_reflects_a_finished_scan_and_publishes_on_completion(tmp_pat
     assert payload["status"] in ("ready-to-clean", "up-to-date")
     fetched = api.get("/api/cleanup/widget", {})
     assert fetched["lastScan"]["foundBytes"] == 64
+def test_ignore_rules_roundtrip_through_the_console(tmp_path):
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    assert api.get("/api/cleanup/ignore", {}) == {"rules": [], "error": None}
+    added = api.post("/api/cleanup/ignore", {"type": "path", "value": str(tmp_path / "keep"), "note": "mine"})
+    assert added["error"] is None
+    assert len(added["rules"]) == 1
+    rule = added["rules"][0]
+    assert rule["type"] == "path" and rule["note"] == "mine"
+    # a duplicate type+value is refused; so is anything untyped or unkeyed
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/ignore", {"type": "path", "value": str(tmp_path / "keep")})
+    assert caught.value.status == 400
+    for body in (
+        {"type": "wat", "value": "x"},
+        {"value": "x"},
+        {"type": "glob"},
+        {"type": "glob", "value": ""},
+        {"type": "glob", "value": "*", "extra": 1},
+        {"type": "glob", "value": 3},
+        {"type": "glob", "value": "*.tmp", "note": 7},
+    ):
+        with pytest.raises(cleanup_api.CleanupError) as caught:
+            api.post("/api/cleanup/ignore", body)
+        assert caught.value.status == 400, body
+    removed = api.post("/api/cleanup/ignore/remove", {"ruleId": rule["id"]})
+    assert removed["rules"] == []
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/ignore/remove", {"ruleId": rule["id"]})
+    assert caught.value.status == 404
+
+
+def test_a_corrupt_ignore_store_is_reported_and_blocks_writes(tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "ignore-rules.json").write_text("{not json")
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    listing = api.get("/api/cleanup/ignore", {})
+    assert listing["rules"] == []
+    assert "cannot be read" in listing["error"]
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/ignore", {"type": "glob", "value": "*.tmp"})
+    assert caught.value.status == 500
