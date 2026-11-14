@@ -1,1026 +1,1488 @@
 {
-"schemaVersion": 1,
-"name": "Kurumsal Ağ Topolojisi ve Güvenlik Mimarisi",
-"sector": "Cybersecurity services",
-"author": {
-"name": "U*** B***",
-"course": "BGT207",
-"github": "ufuk888"
-},
-"summary": "A cybersecurity company with an Istanbul HQ, a Sivas SOC and R&D base, an Ankara training academy and a Dubai trade office. Critical sites run Active-Passive FortiGate HA clusters with Dual-ISP SD-WAN failover, IPsec/SD-WAN tunnels terminate at the Sivas hub, remote access is enforced via role-based ZTNA/VPN with MFA, and monitoring runs in three layers with tiered log retention, automated config backups, monthly patching, active CVE watch, and KVKK/GDPR compliance.",
-"branches": [
-{
-"id": "istanbul-hq",
-"name": "Istanbul HQ",
-"role": "headquarters",
-"location": "Istanbul, Turkey",
-"population": {
-"staff": 55,
-"rnd": 5
-},
-"network": {
-"cidr": "10.10.0.0/16",
-"dmz": false,
-"vlans": [
-{
-"id": 10,
-"name": "management-accounting",
-"cidr": "10.10.10.0/27",
-"note": "22 management and accounting staff; isolated ERP/finance segment."
-},
-{
-"id": 20,
-"name": "marketing",
-"cidr": "10.10.20.0/28",
-"note": "8 marketing staff."
-},
-{
-"id": 30,
-"name": "it-systems",
-"cidr": "10.10.30.0/28",
-"note": "5 central IT and systems engineers."
-},
-{
-"id": 40,
-"name": "redteam-tr-eu",
-"cidr": "10.10.40.0/27",
-"note": "20 Red Team (TR/EU) offensive operators."
-},
-{
-"id": 50,
-"name": "rnd-software",
-"cidr": "10.10.50.0/28",
-"note": "5 R&D software engineers developing offensive/defensive tooling."
-},
-{
-"id": 60,
-"name": "iot-camera",
-"cidr": "10.10.60.0/27",
-"note": "Isolated IoT, IP security cameras and network printers (local NVR/print server only)."
-},
-{
-"id": 70,
-"name": "guest-wifi",
-"cidr": "10.10.70.0/26",
-"note": "Isolated guest Wi-Fi with captive portal and Law 5651 logging; no RFC1918 access."
-},
-{
-"id": 99,
-"name": "management",
-"cidr": "10.10.99.0/28",
-"note": "Out-of-Band (OOB) network and firewall management VLAN accessible only via MFA Jump Host."
-}
-]
-},
-"bandwidth": {
-"downMbps": 250,
-"upMbps": 250,
-"drivers": [
-"cloud ERP/finance",
-"Red Team data transfers",
-"Dual-ISP SD-WAN failover"
-]
-},
-"firewalls": [
-{
-"segment": "perimeter",
-"ha": {
-"mode": "active-passive",
-"protocol": "FGCP",
-"units": 2,
-"failoverTimeSec": 1
-},
-"chosen": {
-"product": "FortiGate 80F (Active-Passive HA Cluster)",
-"vendor": "Fortinet",
-"throughputGbps": 0.715,
-"priceUsd": 1650,
-"bundle3YrUsd": 3600,
-"price": "$1,650 (unit) / $3,600 (3-yr UTP)",
-"reason": "Deployed as a 2-unit FGCP Active-Passive HA cluster (<1s failover) with Dual-ISP SD-WAN. 1.5 million concurrent sessions absorb Red Team scans (Nmap/Masscan/Burp); 715 Mbps threat protection covers the 250 Mbps line."
-},
-"alternatives": [
-{
-"product": "FortiGate 60F",
-"vendor": "Fortinet",
-"priceUsd": 850,
-"price": "$850 (unit) / $1,850 (3-yr UTP)",
-"reason": "Lower RAM; 60 users plus 20 Red Team scanners would cause session drops."
-},
-{
-"product": "PA-440",
-"vendor": "Palo Alto Networks",
-"priceUsd": 2100,
-"price": "$2,100 (unit) / $4,600 (3-yr Threat Prevention)",
-"reason": "Comparable enterprise NGFW; higher multi-year licensing cost compared to FortiGate 80F."
-},
-{
-"product": "Secure Firewall 1210",
-"vendor": "Cisco",
-"priceUsd": 2450,
-"price": "$2,450 (unit) / $5,100 (3-yr Security)",
-"reason": "Strong throughput, but lacks native single-pane Fortinet SD-WAN/SIEM integration."
-},
-{
-"product": "Quantum Spark 1600",
-"vendor": "Check Point",
-"priceUsd": 1900,
-"price": "$1,900 (unit) / $4,100 (3-yr NGTX)",
-"reason": "Compact gateway; lower session concurrency headroom for aggressive Red Team scans."
-}
-],
-"rules": [
-{
-"action": "allow",
-"direction": "in",
-"proto": "udp",
-"port": "67,68",
-"from": "istanbul-all-vlans",
-"to": "local-dhcp-service",
-"note": "Base service (DHCP): allows clients on local VLANs to obtain dynamic IP leases."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp,tcp",
-"port": "53",
-"from": "istanbul-corp-vlans",
-"to": "sivas-core-dns",
-"note": "Base service (DNS): enforces internal DNS resolution and prevents DNS leaks."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp",
-"port": "123",
-"from": "istanbul-all-vlans",
-"to": "sivas-ntp-server",
-"note": "Base service (NTP): Stratum-2 clock synchronization across all devices for SIEM log correlation."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "22,443",
-"from": "vlan30-it-systems",
-"to": "vlan99-management",
-"note": "OOB Management: restricts SSH/HTTPS management access to authorized IT admins via MFA Jump Host."
-},
-{
-"action": "deny",
-"direction": "forward",
-"proto": "any",
-"from": "any-except-it",
-"to": "vlan99-management",
-"note": "Management isolation: blocks all non-IT VLANs from reaching network device management interfaces."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp",
-"port": "500,4500",
-"from": "branch-lan",
-"to": "sivas-hub",
-"note": "IPsec VPN / SD-WAN to the Sivas SOC hub; all inter-branch traffic is encrypted."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "any",
-"from": "vlan40-redteam",
-"to": "red-team-targets",
-"note": "Red Team VLAN may run offensive scans against authorized targets; SPAN mirror ports feed Wireshark/Zeek."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "22,443",
-"from": "vlan50-rnd-software",
-"to": "sivas-gitlab-registry",
-"note": "R&D VLAN access to central GitLab and container registries in Sivas."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "80,443",
-"from": "corporate-vlans",
-"to": "internet",
-"note": "Outbound corporate web access inspected by IPS, AV, and Web Filtering; 'Log Allowed Traffic' enabled."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "554,9100",
-"from": "vlan60-iot-camera",
-"to": "local-nvr-print-server",
-"note": "IoT/Camera isolation: restricts IP cameras and printers strictly to local NVR/print servers with zero internet access."
-},
-{
-"action": "deny",
-"direction": "forward",
-"proto": "any",
-"from": "vlan70-guest-wifi",
-"to": "rfc1918-internal",
-"note": "Guest isolation: blocks guest Wi-Fi from accessing any internal 10.0.0.0/8 subnet."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "80,443",
-"from": "vlan70-guest-wifi",
-"to": "internet",
-"note": "Guest internet-only egress after captive portal authentication."
-},
-{
-"action": "deny",
-"direction": "any",
-"proto": "any",
-"from": "any",
-"to": "any",
-"note": "Explicit Default-Deny (catch-all): every packet not explicitly allowed across inbound, forward, or outbound is dropped and logged."
-}
-]
-}
-]
-},
-{
-"id": "sivas-soc",
-"name": "Sivas SOC and R&D Hub",
-"role": "datacenter",
-"location": "Sivas, Turkey",
-"population": {
-"staff": 70,
-"software": 35
-},
-"network": {
-"cidr": "10.20.0.0/16",
-"dmz": false,
-"vlans": [
-{
-"id": 10,
-"name": "rnd-software",
-"cidr": "10.20.10.0/26",
-"note": "35 software developers; CI/CD pipelines, GitLab and Docker images."
-},
-{
-"id": 20,
-"name": "soc",
-"cidr": "10.20.20.0/25",
-"note": "65 SOC analysts; Wazuh SIEM, FortiAnalyzer and company-wide telemetry."
-},
-{
-"id": 30,
-"name": "local-support",
-"cidr": "10.20.30.0/28",
-"note": "5 infrastructure and local support engineers."
-},
-{
-"id": 60,
-"name": "iot-camera",
-"cidr": "10.20.60.0/27",
-"note": "Datacenter CCTV cameras, biometric access control and printers isolated to local NVR."
-},
-{
-"id": 70,
-"name": "guest-wifi",
-"cidr": "10.20.70.0/27",
-"note": "Isolated visitor Wi-Fi segment with internet-only access."
-},
-{
-"id": 99,
-"name": "management",
-"cidr": "10.20.99.0/28",
-"note": "Out-of-Band (OOB) management VLAN for HA firewalls, core switches, hypervisors and iLO/IPMI."
-}
-]
-},
-"bandwidth": {
-"downMbps": 500,
-"upMbps": 500,
-"drivers": [
-"SOC log/telemetry",
-"Docker images",
-"VPN hub",
-"Dual-ISP SD-WAN failover"
-]
-},
-"firewalls": [
-{
-"segment": "perimeter",
-"ha": {
-"mode": "active-passive",
-"protocol": "FGCP",
-"units": 2,
-"failoverTimeSec": 1
-},
-"chosen": {
-"product": "FortiGate 200F (Active-Passive HA Cluster)",
-"vendor": "Fortinet",
-"throughputGbps": 3,
-"priceUsd": 5800,
-"bundle3YrUsd": 12500,
-"price": "$5,800 (unit) / $12,500 (3-yr UTP)",
-"reason": "Deployed as a 2-unit FGCP Active-Passive HA cluster (<1s failover) with Dual-ISP SD-WAN. 3 Gbps threat protection and 13 Gbps IPsec inspect 500 Mbps with SSL decryption for the SOC without a bottleneck."
-},
-"alternatives": [
-{
-"product": "FortiGate 100F",
-"vendor": "Fortinet",
-"priceUsd": 3200,
-"price": "$3,200 (unit) / $6,900 (3-yr UTP)",
-"reason": "About 1 Gbps threat protection; would hit 80% CPU with 105 users plus every branch's VPN logs and SSL DPI."
-},
-{
-"product": "FortiGate 400F",
-"vendor": "Fortinet",
-"priceUsd": 11500,
-"price": "$11,500 (unit) / $24,500 (3-yr UTP)",
-"reason": "Budget waste for 105 users; meant for 500+ user data centers."
-},
-{
-"product": "PA-1410",
-"vendor": "Palo Alto Networks",
-"priceUsd": 8900,
-"price": "$8,900 (unit) / $18,400 (3-yr Threat Prevention)",
-"reason": "Comparable SOC-grade NGFW; significantly higher hardware and subscription cost."
-},
-{
-"product": "Quantum Force 9100",
-"vendor": "Check Point",
-"priceUsd": 9500,
-"price": "$9,500 (unit) / $19,800 (3-yr NGTX)",
-"reason": "Strong SSL inspection; higher TCO than FortiGate 200F HA pair."
-}
-],
-"rules": [
-{
-"action": "allow",
-"direction": "in",
-"proto": "udp",
-"port": "67,68",
-"from": "sivas-all-vlans",
-"to": "local-dhcp-service",
-"note": "Base service (DHCP): dynamic IP assignment for Sivas VLANs."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp,tcp",
-"port": "53",
-"from": "all-branch-vlans",
-"to": "sivas-core-dns",
-"note": "Base service (DNS): centralized recursive/internal DNS resolution for all four sites."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp",
-"port": "123",
-"from": "all-branch-vlans",
-"to": "sivas-ntp-server",
-"note": "Base service (NTP): forensic-grade time sync across all branches and SIEM collectors."
-},
-{
-"action": "allow",
-"direction": "in",
-"proto": "udp",
-"port": "500,4500",
-"from": "branch-vpns",
-"to": "sivas-hub",
-"note": "All branch IPsec/SD-WAN tunnels terminate on the Sivas HA cluster."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "514,1514,1515",
-"from": "all-branch-firewalls-agents",
-"to": "vlan20-soc",
-"note": "Encrypted syslog and Wazuh agent telemetry ingestion into Sivas SIEM/FortiAnalyzer."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "22,443",
-"from": "vlan20-soc,vlan30-support",
-"to": "vlan99-management",
-"note": "OOB Management: MFA-authenticated SOC/IT engineers managing infrastructure."
-},
-{
-"action": "deny",
-"direction": "forward",
-"proto": "any",
-"from": "any-except-soc-it",
-"to": "vlan99-management",
-"note": "Management isolation: blocks R&D and other segments from accessing management VLAN 99."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "80,443",
-"from": "vlan20-soc",
-"to": "any",
-"note": "SOC performs SSL decryption / deep packet inspection (excluding KVKK privacy-bypass categories)."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "22,443,5000",
-"from": "vlan10-rnd-software",
-"to": "rnd-build-registries",
-"note": "R&D software build, Git, and Docker registry traffic with 'Log Allowed Traffic' enabled."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "554,9100",
-"from": "vlan60-iot-camera",
-"to": "sivas-physical-sec-nvr",
-"note": "Physical security IoT/CCTV restricted to local NVR; no internet egress."
-},
-{
-"action": "deny",
-"direction": "forward",
-"proto": "any",
-"from": "vlan70-guest-wifi",
-"to": "rfc1918-internal",
-"note": "Guest Wi-Fi blocked from reaching any internal corporate subnet."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "80,443",
-"from": "vlan70-guest-wifi",
-"to": "internet",
-"note": "Guest internet-only access."
-},
-{
-"action": "deny",
-"direction": "any",
-"proto": "any",
-"from": "any",
-"to": "any",
-"note": "Explicit Default-Deny (catch-all): everything not explicitly allowed across all directions is dropped and logged."
-}
-]
-}
-]
-},
-{
-"id": "ankara-academy",
-"name": "Ankara Academy",
-"role": "campus",
-"location": "Ankara, Turkey",
-"population": {
-"staff": 10,
-"students": 100
-},
-"network": {
-"cidr": "10.30.0.0/16",
-"dmz": false,
-"vlans": [
-{
-"id": 10,
-"name": "academics",
-"cidr": "10.30.10.0/28",
-"note": "10 instructors and academic staff."
-},
-{
-"id": 20,
-"name": "interns-students",
-"cidr": "10.30.20.0/24",
-"note": "100 interns/students; strict Zero Trust internet-only isolation."
-},
-{
-"id": 60,
-"name": "iot-camera",
-"cidr": "10.30.60.0/27",
-"note": "Classroom smart boards, IP cameras and printers isolated from student/staff VLANs."
-},
-{
-"id": 70,
-"name": "guest-wifi",
-"cidr": "10.30.70.0/25",
-"note": "Seminar and guest Wi-Fi with captive portal and Law 5651 logging."
-},
-{
-"id": 99,
-"name": "management",
-"cidr": "10.30.99.0/28",
-"note": "Out-of-Band (OOB) management VLAN for campus HA firewalls, switches and AP controllers."
-}
-]
-},
-"bandwidth": {
-"downMbps": 300,
-"upMbps": 300,
-"drivers": [
-"VM downloads",
-"training videos",
-"lab access",
-"Dual-ISP SD-WAN failover"
-]
-},
-"firewalls": [
-{
-"segment": "perimeter",
-"ha": {
-"mode": "active-passive",
-"protocol": "FGCP",
-"units": 2,
-"failoverTimeSec": 1
-},
-"chosen": {
-"product": "FortiGate 100F (Active-Passive HA Cluster)",
-"vendor": "Fortinet",
-"throughputGbps": 1,
-"priceUsd": 3200,
-"bundle3YrUsd": 6900,
-"price": "$3,200 (unit) / $6,900 (3-yr UTP)",
-"reason": "Deployed as a 2-unit FGCP Active-Passive HA cluster (<1s failover) with Dual-ISP SD-WAN. High port density separates instructor and intern networks on physical interfaces, with CPU headroom for strict Application Control and Traffic Shaping."
-},
-"alternatives": [
-{
-"product": "FortiGate 80F",
-"vendor": "Fortinet",
-"priceUsd": 1650,
-"price": "$1,650 (unit) / $3,600 (3-yr UTP)",
-"reason": "Fewer physical interfaces for hardware-level lab/classroom segmentation."
-},
-{
-"product": "FortiGate 60F",
-"vendor": "Fortinet",
-"priceUsd": 850,
-"price": "$850 (unit) / $1,850 (3-yr UTP)",
-"reason": "110 concurrent users exceeds recommended 50-60 user sizing under heavy QoS/App Control."
-},
-{
-"product": "PA-440",
-"vendor": "Palo Alto Networks",
-"priceUsd": 2100,
-"price": "$2,100 (unit) / $4,600 (3-yr Threat Prevention)",
-"reason": "Fewer onboard switched/SFP ports than FortiGate 100F."
-},
-{
-"product": "Quantum Spark 1600",
-"vendor": "Check Point",
-"priceUsd": 1900,
-"price": "$1,900 (unit) / $4,100 (3-yr NGTX)",
-"reason": "Compact gateway; less suited for multi-segment campus port isolation."
-}
-],
-"rules": [
-{
-"action": "allow",
-"direction": "in",
-"proto": "udp",
-"port": "67,68",
-"from": "ankara-all-vlans",
-"to": "local-dhcp-service",
-"note": "Base service (DHCP): assigns IP leases to instructors, interns, IoT and guests."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp,tcp",
-"port": "53",
-"from": "ankara-all-vlans",
-"to": "filtered-dns-proxy",
-"note": "Base service (DNS): enforces DNS filtering against malicious domains."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp",
-"port": "123",
-"from": "ankara-all-vlans",
-"to": "sivas-ntp-server",
-"note": "Base service (NTP): synchronizes campus clocks with Sivas central NTP."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "22,443",
-"from": "sivas-it-jump-host",
-"to": "vlan99-management",
-"note": "OOB Management: central IT manages Ankara network devices over encrypted Sivas tunnel."
-},
-{
-"action": "deny",
-"direction": "forward",
-"proto": "any",
-"from": "vlan20-interns",
-"to": "internal-vlans",
-"note": "Zero Trust: intern VLAN 20 cannot reach any internal 10.0.0.0/8 VLAN."
-},
-{
-"action": "deny",
-"direction": "out",
-"proto": "any",
-"from": "vlan20-interns",
-"to": "p2p",
-"note": "Application Control blocks P2P/Torrent traffic for interns."
-},
-{
-"action": "limit",
-"direction": "out",
-"proto": "tcp",
-"port": "80,443",
-"from": "vlan20-interns",
-"to": "internet",
-"note": "Traffic shaping/rate limiting so VM downloads and video do not saturate the 300 Mbps backbone."
-},
-{
-"action": "allow",
-"direction": "out",
-"proto": "tcp",
-"port": "80,443",
-"from": "vlan20-interns",
-"to": "internet",
-"note": "Zero Trust: intern VLAN 20 gets controlled internet-only egress."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp",
-"port": "500,4500",
-"from": "vlan10-academics",
-"to": "sivas-hub",
-"note": "Encrypted IPsec VPN / SD-WAN tunnel for instructors to access Sivas lab resources."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "554,9100",
-"from": "vlan60-iot-camera",
-"to": "ankara-local-nvr-print",
-"note": "IoT/Camera isolation: restricts smart boards, cameras and printers to local NVR/print server."
-},
-{
-"action": "deny",
-"direction": "forward",
-"proto": "any",
-"from": "vlan70-guest-wifi",
-"to": "rfc1918-internal",
-"note": "Guest isolation: blocks seminar/visitor Wi-Fi from internal VLANs."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "80,443",
-"from": "vlan70-guest-wifi",
-"to": "internet",
-"note": "Guest internet-only egress."
-},
-{
-"action": "deny",
-"direction": "any",
-"proto": "any",
-"from": "any",
-"to": "any",
-"note": "Explicit Default-Deny (catch-all): all unpermitted inbound, forward and outbound traffic is dropped and logged."
-}
-]
-}
-]
-},
-{
-"id": "dubai-field",
-"name": "Dubai Trade Office",
-"role": "branch",
-"location": "Dubai, UAE",
-"population": {
-"staff": 30,
-"rnd": 5
-},
-"network": {
-"cidr": "10.40.0.0/16",
-"dmz": false,
-"vlans": [
-{
-"id": 10,
-"name": "intl-sales",
-"cidr": "10.40.10.0/28",
-"note": "8 international sales and account staff."
-},
-{
-"id": 20,
-"name": "redteam-mea",
-"cidr": "10.40.20.0/27",
-"note": "17 Red Team (MEA) field consultants."
-},
-{
-"id": 30,
-"name": "local-support",
-"cidr": "10.40.30.0/28",
-"note": "5 local technical support staff."
-},
-{
-"id": 40,
-"name": "rnd-software",
-"cidr": "10.40.40.0/28",
-"note": "5 R&D integration engineers building MEA customer PoC connectors."
-},
-{
-"id": 60,
-"name": "iot-camera",
-"cidr": "10.40.60.0/28",
-"note": "Office IP cameras and printers isolated to local NVR/print server."
-},
-{
-"id": 70,
-"name": "guest-wifi",
-"cidr": "10.40.70.0/27",
-"note": "Client and visitor Wi-Fi isolated from all corporate VLANs."
-},
-{
-"id": 99,
-"name": "management",
-"cidr": "10.40.99.0/28",
-"note": "Out-of-Band (OOB) network management VLAN accessible only via Sivas IT Jump Host."
-}
-]
-},
-"bandwidth": {
-"downMbps": 200,
-"upMbps": 200,
-"drivers": [
-"video conferencing",
-"Red Team operational data",
-"Dual-ISP SD-WAN failover"
-]
-},
-"firewalls": [
-{
-"segment": "perimeter",
-"ha": {
-"mode": "dual-isp-sdwan-rma",
-"protocol": "Dual-ISP SD-WAN + 4-Hour RMA",
-"units": 1,
-"failoverTimeSec": 3
-},
-"chosen": {
-"product": "FortiGate 60F",
-"vendor": "Fortinet",
-"throughputGbps": 0.7,
-"priceUsd": 850,
-"bundle3YrUsd": 1850,
-"price": "$850 (unit) / $1,850 (3-yr UTP)",
-"reason": "6.5 Gbps IPsec hardware acceleration (SOC4) lets Red Team (MEA) send operational data to Sivas with zero added latency, backed by Dual-ISP SD-WAN failover and 4-hour FortiCare RMA."
-},
-"alternatives": [
-{
-"product": "FortiGate 40F",
-"vendor": "Fortinet",
-"priceUsd": 550,
-"price": "$550 (unit) / $1,150 (3-yr UTP)",
-"reason": "SOHO class for 10-15 users; VPN throughput would be borderline for 35 people."
-},
-{
-"product": "PA-410",
-"vendor": "Palo Alto Networks",
-"priceUsd": 1350,
-"price": "$1,350 (unit) / $2,950 (3-yr Threat Prevention)",
-"reason": "Small branch NGFW; higher subscription cost and lower IPsec throughput than 60F."
-},
-{
-"product": "Quantum Spark 1550",
-"vendor": "Check Point",
-"priceUsd": 1200,
-"price": "$1,200 (unit) / $2,600 (3-yr NGTX)",
-"reason": "Branch gateway; lacks native Fortinet SD-WAN orchestration with Sivas 200F hub."
-},
-{
-"product": "XGS 116",
-"vendor": "Sophos",
-"priceUsd": 1100,
-"price": "$1,100 (unit) / $2,400 (3-yr Xstream)",
-"reason": "Desktop unit; multi-vendor overhead for a 35-person branch."
-}
-],
-"rules": [
-{
-"action": "allow",
-"direction": "in",
-"proto": "udp",
-"port": "67,68",
-"from": "dubai-all-vlans",
-"to": "local-dhcp-service",
-"note": "Base service (DHCP): local VLAN IP address assignment."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp,tcp",
-"port": "53",
-"from": "dubai-corp-vlans",
-"to": "sivas-core-dns",
-"note": "Base service (DNS): encrypted DNS resolution via Sivas core DNS."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp",
-"port": "123",
-"from": "dubai-all-vlans",
-"to": "sivas-ntp-server",
-"note": "Base service (NTP): centralized clock synchronization with Sivas hub."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "22,443",
-"from": "sivas-it-jump-host",
-"to": "vlan99-management",
-"note": "OOB Management: restricts firewall/switch administration to MFA-verified central IT."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "udp",
-"port": "500,4500",
-"from": "branch-lan",
-"to": "sivas-hub",
-"note": "IPsec VPN / SD-WAN to the Sivas SOC hub; all inter-branch traffic is encrypted."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "any",
-"from": "vlan20-redteam-mea",
-"to": "authorized-mea-targets",
-"note": "Red Team (MEA) authorized assessment traffic monitored via SPAN mirror ports."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "22,443",
-"from": "vlan40-rnd-software",
-"to": "sivas-gitlab-registry",
-"note": "R&D PoC engineers access Sivas code repositories with 'Log Allowed Traffic' enabled."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp,udp",
-"port": "80,443,3478",
-"from": "dubai-corp-vlans",
-"to": "internet",
-"note": "Corporate internet and QoS-prioritized video conferencing."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "554,9100",
-"from": "vlan60-iot-camera",
-"to": "dubai-local-nvr-print",
-"note": "IoT/Camera isolation: restricts office cameras and printers to local NVR/print server."
-},
-{
-"action": "deny",
-"direction": "forward",
-"proto": "any",
-"from": "vlan70-guest-wifi",
-"to": "rfc1918-internal",
-"note": "Guest isolation: blocks visitor Wi-Fi from internal corporate networks."
-},
-{
-"action": "allow",
-"direction": "forward",
-"proto": "tcp",
-"port": "80,443",
-"from": "vlan70-guest-wifi",
-"to": "internet",
-"note": "Guest internet-only egress."
-},
-{
-"action": "deny",
-"direction": "any",
-"proto": "any",
-"from": "any",
-"to": "any",
-"note": "Explicit Default-Deny (catch-all): everything not explicitly allowed across all directions is dropped and logged."
-}
-]
-}
-]
-}
-],
-"remoteAccess": {
-"type": "role-based-ztna-and-site-vpn",
-"auth": "SAML 2.0 SSO + FIDO2/FortiToken MFA + FortiClient EMS Device Posture Check",
-"roles": [
-{
-"role": "SOC-Analyst",
-"allowedDestinations": ["10.20.20.0/25 (Sivas Wazuh SIEM / FortiAnalyzer TCP/443)"],
-"deniedDestinations": ["ERP/Finance", "R&D source repos", "VLAN 99 Management"],
-"controls": "Hardware MFA + Managed EDR required"
-},
-{
-"role": "NetSec-Admin",
-"allowedDestinations": ["VLAN 99 Management via PAM Jump Host (TCP/22,443)"],
-"deniedDestinations": ["Direct unbrokered production DBs"],
-"controls": "FIDO2 MFA + full PAM session recording"
-},
-{
-"role": "RnD-Dev",
-"allowedDestinations": ["Sivas GitLab & Docker Registry (TCP/22,443)"],
-"deniedDestinations": ["SOC consoles", "Accounting/ERP", "VLAN 99 Management"],
-"controls": "Short-lived SSH certificates + MFA + DLP"
-},
-{
-"role": "RedTeam-Ops",
-"allowedDestinations": ["Red Team VLANs (10.10.40.0/27, 10.40.20.0/27) & approved C2"],
-"deniedDestinations": ["Corporate internal servers", "Accounting", "Academy VLANs"],
-"controls": "Isolated Red Team ZTNA profile + full PCAP/Zeek logging"
-},
-{
-"role": "Corp-User",
-"allowedDestinations": ["Per-App ZTNA proxy for Cloud ERP/CRM only"],
-"deniedDestinations": ["All internal L3 corporate subnets"],
-"controls": "Application-level micro-tunnel + MFA"
-},
-{
-"role": "Intern-Student",
-"allowedDestinations": ["None (Remote corporate VPN/ZTNA explicitly denied)"],
-"deniedDestinations": ["All corporate networks and VPN gateways"],
-"controls": "On-campus Ankara VLAN 20 internet-only access"
-}
-],
-"note": "Inter-branch links run over encrypted Site-to-Site IPsec VPN / SD-WAN terminating at the Sivas hub, while remote user access is scoped strictly by role (RBAC) via FortiClient ZTNA, SAML SSO, MFA, and endpoint posture verification."
-},
-"monitoring": {
-"siem": "Wazuh SIEM and FortiAnalyzer HA cluster in Sivas collects all four branches' firewall logs over encrypted IPsec tunnels; sFlow/NetFlow plus SPAN with Wireshark/Zeek; Sysmon and Wazuh agents on accounting, R&D, SOC, and management endpoints.",
-"owner": "The 24/7 SOC team in Sivas (65 analysts).",
-"alertSink": "SOC consoles in Sivas (Wazuh SIEM / FortiAnalyzer / SOAR).",
-"appVsSecurity": "Layered: network telemetry (Layer 2) for traffic spikes and DDoS, EDR/XDR (Layer 3) for host events, firewall logs (Layer 1) for policy hits.",
-"retention": "Tiered lifecycle: 90 days Hot NVMe indexing in Sivas (Wazuh/FortiAnalyzer) for real-time correlation, 365 days Warm compressed storage, and 2 to 5 years immutable WORM Cold archive signed with RFC 3161 timestamps per Turkish Law No. 5651 and KVKK."
-},
-"operations": {
-"configBackup": "Automated daily (02:00 UTC+3) and event-driven (on every policy commit) encrypted (AES-256-GCM) firewall configuration and Policy-as-Code YAML backups via FortiManager and Ansible across a 3-2-1 architecture: (1) Sivas Git/Vault server, (2) Istanbul HQ secondary DR vault, and (3) immutable off-site cloud storage. Hardware failover RTO < 1s; full site rebuild RTO < 30 min, RPO = 0.",
-"patchRoutine": "Fortinet Mature (M) firmware releases and server security patches are validated in the Sivas staging lab and applied monthly on the first Sunday (02:00-05:00 UTC+3) using zero-downtime FGCP HA In-Service Upgrades. Critical zero-day vulnerabilities (CVSS >= 9.0 or CISA KEV) carry a < 24-hour emergency patch / IPS virtual-patch SLA."
-},
-"cveWatch": [
-{
-"cve": "CVE-2024-21762",
-"cvss": 9.8,
-"component": "FortiOS SSL-VPN Out-of-Bound Write RCE",
-"status": "Patched & Mitigated",
-"mitigation": "Upgraded all FortiGates to FortiOS 7.4.4+ / 7.2.8+ Mature builds, replaced legacy SSL-VPN with ZTNA and IPsec IKEv2, and enabled IPS virtual patching."
-},
-{
-"cve": "CVE-2024-55591",
-"cvss": 9.8,
-"component": "FortiOS / FortiProxy WebSocket Authentication Bypass",
-"status": "Patched & Isolated",
-"mitigation": "Upgraded to patched Mature firmware and restricted all administrative interfaces (HTTPS/SSH) exclusively to OOB Management VLAN 99 via MFA Jump Host."
-},
-{
-"cve": "CVE-2024-47575",
-"cvss": 9.8,
-"component": "FortiManager Missing Authentication (FortiJump)",
-"status": "Patched & Hardened",
-"mitigation": "Updated FortiManager to patched release, enforced serial-number certificate whitelisting, and isolated management traffic to VLAN 99."
-},
-{
-"cve": "CVE-2023-27997",
-"cvss": 9.8,
-"component": "FortiOS Heap-Based Buffer Overflow (XORtigate)",
-"status": "Patched",
-"mitigation": "Mature firmware baseline enforced across all 7 FortiGate units with external SSL-VPN listeners disabled."
-},
-{
-"cve": "CVE-2024-4577",
-"cvss": 9.8,
-"component": "PHP-CGI Argument Injection RCE (Web & Academy Portals)",
-"status": "Patched & WAF Protected",
-"mitigation": "Upgraded web servers to PHP 8.3+ and deployed WAF OWASP CRS rules plus FortiGate IPS signatures in front of Ankara Academy and corporate web portals."
-}
-],
-"compliance": {
-"frameworks": ["KVKK (Turkish Law No. 6698)", "GDPR", "Turkish Law No. 5651", "ISO/IEC 27001"],
-"controls": [
-"KVKK Art. 12 & GDPR Art. 32: Strict VLAN isolation for accounting/HR and SOC segments with AES-256 IPsec / TLS 1.3 encryption in transit.",
-"Privacy-by-Design SSL Inspection: Banking, healthcare, HR, and personal webmail categories are bypassed from Sivas SOC SSL decryption.",
-"SIEM PII Pseudonymization: Automatic masking of Turkish ID numbers (TCKN), IBANs, and personal identifiers in Wazuh/FortiAnalyzer logs with role-restricted audit trails.",
-"KVKK Art. 9 Cross-Border Governance: Dubai branch operational telemetry transfers over encrypted tunnels to Sivas under Standard Contractual Clauses (SCC).",
-"Law No. 5651 Compliance: Guest Wi-Fi (VLAN 70) captive portal authentication and RFC 3161 timestamped access logs archived for 2+ years."
-]
-},
-"slug": "siber-guvenlik-sirketi"
+  "schemaVersion": 1,
+  "slug": "siber-guvenlik-sirketi",
+  "name": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
+  "sector": "Cybersecurity services",
+  "author": {
+    "name": "U*** B***",
+    "course": "BGT207",
+    "github": "ufuk888"
+  },
+  "summary": "A cybersecurity company with an Istanbul HQ, a Sivas SOC and R&D base, an Ankara training academy, and a Dubai trade office. Each site deploys a 2-node Active-Passive FortiGate HA cluster (FGCP) with Dual-ISP SD-WAN failover, IPsec hub tunnels terminating in Sivas, role-based ZTNA enforced with SAML 2.0 SSO and FIDO2 hardware MFA, three-layer monitoring (Wazuh/FortiAnalyzer with 90d/1y/5y WORM retention, NetFlow/SPAN, and Sysmon/Wazuh EDR), automated 3-2-1 encrypted backups, monthly Mature firmware patching, and KVKK/GDPR/Law 5651 privacy controls.",
+  "branches": [
+    {
+      "id": "istanbul-hq",
+      "name": "Istanbul HQ",
+      "role": "headquarters",
+      "location": "Istanbul, Turkey",
+      "population": {
+        "staff": 40,
+        "rnd": 20
+      },
+      "network": {
+        "cidr": "10.10.0.0/16",
+        "dmz": false,
+        "vlans": [
+          {
+            "id": 10,
+            "name": "management-accounting",
+            "cidr": "10.10.10.0/27",
+            "note": "Gateway 10.10.10.1 (usable 10.10.10.2-10.10.10.30); 25 executive, HR, and accounting staff using cloud ERP/finance with Sysmon and Wazuh EDR."
+          },
+          {
+            "id": 20,
+            "name": "marketing",
+            "cidr": "10.10.20.0/28",
+            "note": "Gateway 10.10.20.1 (usable 10.10.20.2-10.10.20.14); 10 marketing staff."
+          },
+          {
+            "id": 30,
+            "name": "it-systems",
+            "cidr": "10.10.30.0/28",
+            "note": "Gateway 10.10.30.1 (usable 10.10.30.2-10.10.30.14); 5 internal IT/systems administrators and local print/NVR server (10.10.30.10)."
+          },
+          {
+            "id": 40,
+            "name": "redteam-tr-eu",
+            "cidr": "10.10.40.0/27",
+            "note": "Gateway 10.10.40.1 (usable 10.10.40.2-10.10.40.30); 12 TR/EU Red Team operators in isolated offensive testing subnet with SPAN mirror ports."
+          },
+          {
+            "id": 50,
+            "name": "rnd-software",
+            "cidr": "10.10.50.0/28",
+            "note": "Gateway 10.10.50.1 (usable 10.10.50.2-10.10.50.14); 8 R&D security developers in dedicated VLAN isolated from Red Team."
+          },
+          {
+            "id": 60,
+            "name": "iot-cameras-printers",
+            "cidr": "10.10.60.0/28",
+            "note": "Gateway 10.10.60.1 (usable 10.10.60.2-10.10.60.14); ~10 IP cameras, access readers, and network printers scoped strictly to local NVR/print server 10.10.30.10."
+          },
+          {
+            "id": 70,
+            "name": "guest-wifi",
+            "cidr": "10.10.70.0/27",
+            "note": "Gateway 10.10.70.1 (usable 10.10.70.2-10.10.70.30); visitor guest Wi-Fi with client isolation and HTTP/HTTPS internet-only egress."
+          },
+          {
+            "id": 99,
+            "name": "oob-management",
+            "cidr": "10.10.99.0/28",
+            "note": "Gateway 10.10.99.1 (usable 10.10.99.2-10.10.99.14); Out-of-Band (OOB) management VLAN for FortiGate 80F HA pair, switches, and APs."
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 250,
+        "upMbps": 250,
+        "drivers": [
+          "cloud ERP/finance",
+          "Red Team data transfers",
+          "R&D Git/Docker sync",
+          "Dual-ISP Active-Active SD-WAN (250 Mbps primary + 100 Mbps backup)"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 80F",
+            "vendor": "Fortinet",
+            "throughputGbps": 0.715,
+            "priceUsd": 2950,
+            "reason": "Active-Passive FGCP HA Primary ($1,250 hardware + $1,700 3-yr UTP = $2,950/unit; $5,900 HA pair); 1.5M concurrent sessions absorb Red Team scans and 715 Mbps threat protection covers the 250 Mbps line."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 60F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.7,
+              "priceUsd": 1650,
+              "reason": "$700 hardware + $950 3-yr UTP = $1,650; 2 GB RAM risks session drops under Red Team scans."
+            },
+            {
+              "product": "PA-440",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 1.3,
+              "priceUsd": 6400,
+              "reason": "$2,200 hardware + $4,200 3-yr subscription = $6,400; over 2x TCO of FortiGate 80F."
+            },
+            {
+              "product": "Secure Firewall 1210",
+              "vendor": "Cisco",
+              "throughputGbps": 1.2,
+              "priceUsd": 5800,
+              "reason": "$2,400 hardware + $3,400 3-yr license = $5,800; higher licensing cost."
+            },
+            {
+              "product": "Quantum Spark 1600",
+              "vendor": "Check Point",
+              "throughputGbps": 0.85,
+              "priceUsd": 4500,
+              "reason": "$1,950 hardware + $2,550 3-yr bundle = $4,500; lacks native Fortinet Security Fabric integration."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "67:68",
+              "from": "10.10.0.0/16",
+              "to": "10.10.0.0/16",
+              "note": "Base Service (DHCP): explicit UDP 67-68 IP lease assignment across Istanbul VLANs."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 53,
+              "from": "10.10.0.0/16",
+              "to": "10.10.30.0/28",
+              "note": "Base Service (DNS UDP): explicit UDP 53 name resolution to internal IT/DNS servers."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 53,
+              "from": "10.10.0.0/16",
+              "to": "10.10.30.0/28",
+              "note": "Base Service (DNS TCP): explicit TCP 53 DNS zone/large query resolution to internal DNS servers."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 123,
+              "from": "10.10.0.0/16",
+              "to": "10.10.30.0/28",
+              "note": "Base Service (NTP): explicit UDP 123 clock synchronization for SIEM log correlation."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "it-systems",
+              "to": "oob-management",
+              "note": "OOB Management Access: authorized IT admins (it-systems) reach OOB management VLAN 99 over SSH/HTTPS."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "10.10.0.0/16",
+              "to": "oob-management",
+              "note": "OOB Isolation: block all other Istanbul VLANs from reaching OOB management VLAN 99."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "554,9100",
+              "from": "iot-cameras-printers",
+              "to": "10.10.30.10",
+              "note": "IoT Scoped Access: allow cameras and printers in VLAN 60 to reach local NVR/print server 10.10.30.10 only."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "iot-cameras-printers",
+              "to": "10.0.0.0/8",
+              "note": "IoT Internal Isolation: block VLAN 60 cameras/IoT from all other corporate internal subnets."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "guest-wifi",
+              "to": "10.0.0.0/8",
+              "note": "Guest Wi-Fi Isolation: block VLAN 70 guests from all internal 10.x subnets."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "guest-wifi",
+              "to": "any",
+              "note": "Guest Wi-Fi Internet: allow client-isolated HTTP/HTTPS internet egress for visitors."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "1514:1515",
+              "from": "10.10.0.0/16",
+              "to": "10.20.20.0/25",
+              "note": "Central Telemetry: forward Wazuh EDR/Sysmon agent telemetry over IPsec to Sivas SOC."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 514,
+              "from": "10.10.0.0/16",
+              "to": "10.20.20.0/25",
+              "note": "Central Syslog: forward FortiGate HA firewall logs over IPsec to Sivas FortiAnalyzer."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "10.10.0.0/16",
+              "to": "10.20.0.0/16",
+              "note": "IPsec VPN / SD-WAN: encrypted site-to-site tunnel establishment to Sivas hub."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "rnd-software",
+              "to": "10.20.10.0/26",
+              "note": "R&D Repository Sync: allow Istanbul R&D (VLAN 50) encrypted Git/Docker access to Sivas R&D."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "any",
+              "from": "redteam-tr-eu",
+              "to": "any",
+              "note": "Red Team Operations: allow authorized TR/EU Red Team scans (monitored via SPAN mirror ports)."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "management-accounting",
+              "to": "any",
+              "note": "Corporate Web/ERP Egress: allow management & accounting cloud ERP/finance HTTPS access."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "marketing",
+              "to": "any",
+              "note": "Corporate Web/CRM Egress: allow marketing SaaS/CRM HTTPS access."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "it-systems",
+              "to": "any",
+              "note": "IT Admin Web Egress: allow IT systems vendor patch/cloud console HTTPS access."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": "53,123,500,4500",
+              "from": "any",
+              "to": "any",
+              "note": "Firewall Self-Egress: allow FortiGate DNS, NTP, and IPsec tunnel initiation."
+            },
+            {
+              "action": "deny",
+              "direction": "in",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Inbound): drop and log all unmatched inbound traffic to firewall."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Forward): drop and log all unmatched inter-VLAN and transit traffic."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Outbound): drop and log all unmatched firewall-originated outbound traffic."
+            }
+          ]
+        },
+        {
+          "segment": "ha-standby",
+          "chosen": {
+            "product": "FortiGate 80F",
+            "vendor": "Fortinet",
+            "throughputGbps": 0.715,
+            "priceUsd": 2950,
+            "reason": "Active-Passive FGCP HA Standby failover node ($1,250 hardware + $1,700 3-yr UTP = $2,950/unit; $5,900 HA pair)."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 60F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.7,
+              "priceUsd": 1650,
+              "reason": "Insufficient RAM for Red Team session tables."
+            },
+            {
+              "product": "PA-440",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 1.3,
+              "priceUsd": 6400,
+              "reason": "Higher 3-year TCO."
+            },
+            {
+              "product": "Secure Firewall 1210",
+              "vendor": "Cisco",
+              "throughputGbps": 1.2,
+              "priceUsd": 5800,
+              "reason": "Higher licensing cost."
+            },
+            {
+              "product": "Quantum Spark 1600",
+              "vendor": "Check Point",
+              "throughputGbps": 0.85,
+              "priceUsd": 4500,
+              "reason": "No native FGCP/Security Fabric sync."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 703,
+              "from": "10.10.99.0/28",
+              "to": "10.10.99.0/28",
+              "note": "FGCP HA Session Sync: TCP 703 stateful session synchronization between Active and Standby FortiGate units."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 703,
+              "from": "10.10.99.0/28",
+              "to": "10.10.99.0/28",
+              "note": "FGCP HA Heartbeat: UDP 703 sub-second (<1s) cluster health heartbeat between Active and Standby FortiGate units."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sivas-soc",
+      "name": "Sivas SOC and R&D Hub",
+      "role": "datacenter",
+      "location": "Sivas, Turkey",
+      "population": {
+        "staff": 70,
+        "software": 35
+      },
+      "network": {
+        "cidr": "10.20.0.0/16",
+        "dmz": false,
+        "vlans": [
+          {
+            "id": 10,
+            "name": "rnd-software",
+            "cidr": "10.20.10.0/26",
+            "note": "Gateway 10.20.10.1 (usable 10.20.10.2-10.20.10.62); 35 R&D developers, GitLab, and Harbor container registry."
+          },
+          {
+            "id": 20,
+            "name": "soc",
+            "cidr": "10.20.20.0/25",
+            "note": "Gateway 10.20.20.1 (usable 10.20.20.2-10.20.20.126); 65 SOC analysts, Wazuh SIEM, FortiAnalyzer, and SOAR consoles."
+          },
+          {
+            "id": 30,
+            "name": "local-support",
+            "cidr": "10.20.30.0/28",
+            "note": "Gateway 10.20.30.1 (usable 10.20.30.2-10.20.30.14); 5 datacenter support engineers and local NVR/print server (10.20.30.10)."
+          },
+          {
+            "id": 60,
+            "name": "iot-cameras-printers",
+            "cidr": "10.20.60.0/27",
+            "note": "Gateway 10.20.60.1 (usable 10.20.60.2-10.20.60.30); ~14 datacenter CCTV cameras, UPS/environmental sensors, and printers scoped to NVR/print server 10.20.30.10."
+          },
+          {
+            "id": 70,
+            "name": "guest-wifi",
+            "cidr": "10.20.70.0/28",
+            "note": "Gateway 10.20.70.1 (usable 10.20.70.2-10.20.70.14); auditor/visitor guest Wi-Fi with client isolation and HTTP/HTTPS internet-only egress."
+          },
+          {
+            "id": 99,
+            "name": "oob-management",
+            "cidr": "10.20.99.0/28",
+            "note": "Gateway 10.20.99.1 (usable 10.20.99.2-10.20.99.14); Out-of-Band (OOB) management VLAN for FortiGate 200F HA pair, core switches, and IPMI/iDRAC."
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 500,
+        "upMbps": 500,
+        "drivers": [
+          "SOC log/telemetry",
+          "Docker images",
+          "IPsec VPN hub",
+          "Dual-ISP BGP/SD-WAN (500 Mbps primary + 250 Mbps backup)"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 200F",
+            "vendor": "Fortinet",
+            "throughputGbps": 3.0,
+            "priceUsd": 11400,
+            "reason": "Active-Passive FGCP HA Primary ($4,800 hardware + $6,600 3-yr UTP = $11,400/unit; $22,800 HA pair); 3 Gbps threat protection and 13 Gbps IPsec inspect 500 Mbps with SSL decryption for the SOC without a bottleneck."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 100F",
+              "vendor": "Fortinet",
+              "throughputGbps": 1.0,
+              "priceUsd": 6200,
+              "reason": "$2,600 hardware + $3,600 3-yr UTP = $6,200; ~1 Gbps threat protection hits 80% CPU under SSL decryption + hub VPN logs."
+            },
+            {
+              "product": "FortiGate 400F",
+              "vendor": "Fortinet",
+              "throughputGbps": 6.0,
+              "priceUsd": 26800,
+              "reason": "$11,500 hardware + $15,300 3-yr UTP = $26,800; sized for 500+ user datacenters, excessive for 105 staff."
+            },
+            {
+              "product": "PA-1410",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 3.4,
+              "priceUsd": 19500,
+              "reason": "$7,900 hardware + $11,600 3-yr subscription = $19,500; significantly higher TCO."
+            },
+            {
+              "product": "Quantum Force 9100",
+              "vendor": "Check Point",
+              "throughputGbps": 4.0,
+              "priceUsd": 21000,
+              "reason": "$9,200 hardware + $11,800 3-yr bundle = $21,000; higher 3-year cost than FortiGate 200F."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "67:68",
+              "from": "10.20.0.0/16",
+              "to": "10.20.0.0/16",
+              "note": "Base Service (DHCP): explicit UDP 67-68 IP lease assignment across Sivas VLANs."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 53,
+              "from": "10.20.0.0/16",
+              "to": "10.20.30.0/28",
+              "note": "Base Service (DNS UDP): explicit UDP 53 name resolution to internal DNS servers."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 53,
+              "from": "10.20.0.0/16",
+              "to": "10.20.30.0/28",
+              "note": "Base Service (DNS TCP): explicit TCP 53 name resolution to internal DNS servers."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 123,
+              "from": "10.20.0.0/16",
+              "to": "10.20.30.0/28",
+              "note": "Base Service (NTP): explicit UDP 123 stratum-1/2 clock synchronization across all sites."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "local-support",
+              "to": "oob-management",
+              "note": "OOB Management Access: authorized datacenter support admins reach OOB management VLAN 99."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "soc",
+              "to": "oob-management",
+              "note": "OOB Security Access: authorized SOC engineers reach firewall/SIEM management interfaces in VLAN 99."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "10.20.0.0/16",
+              "to": "oob-management",
+              "note": "OOB Isolation: block all other Sivas VLANs from reaching OOB management VLAN 99."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "554,9100",
+              "from": "iot-cameras-printers",
+              "to": "10.20.30.10",
+              "note": "IoT Scoped Access: allow datacenter CCTV/sensors and printers in VLAN 60 to reach NVR/print server 10.20.30.10."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "iot-cameras-printers",
+              "to": "10.0.0.0/8",
+              "note": "IoT Internal Isolation: block VLAN 60 IoT/CCTV from SOC, R&D, and internal corporate subnets."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "guest-wifi",
+              "to": "10.0.0.0/8",
+              "note": "Guest Wi-Fi Isolation: block VLAN 70 visitors/auditors from all internal 10.x subnets."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "guest-wifi",
+              "to": "any",
+              "note": "Guest Wi-Fi Internet: allow client-isolated HTTP/HTTPS internet egress."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "10.0.0.0/8",
+              "to": "10.20.0.0/16",
+              "note": "IPsec Hub Termination: terminate site-to-site IPsec VPN / SD-WAN tunnels from all branches."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "1514:1515",
+              "from": "10.0.0.0/8",
+              "to": "soc",
+              "note": "Central Wazuh Ingestion: accept encrypted Wazuh EDR/Sysmon telemetry from all branches into Sivas SOC."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 514,
+              "from": "10.0.0.0/8",
+              "to": "soc",
+              "note": "Central Syslog Ingestion: accept firewall and network syslog streams from all branches into FortiAnalyzer."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "10.10.50.0/28",
+              "to": "rnd-software",
+              "note": "R&D Hub Access (Istanbul): allow Istanbul R&D encrypted access to Sivas GitLab and Harbor registry."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "10.40.40.0/28",
+              "to": "rnd-software",
+              "note": "R&D Hub Access (Dubai): allow Dubai R&D encrypted access to Sivas GitLab and Harbor registry."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "rnd-software",
+              "to": "any",
+              "note": "R&D Package Egress: allow Sivas R&D developers HTTPS access to approved package/container registries."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "local-support",
+              "to": "any",
+              "note": "Support Web Egress: allow local datacenter support HTTPS vendor documentation/patch access."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "soc",
+              "to": "10.0.0.0/8",
+              "note": "SOC Scoped Monitoring: restrict SOC active querying to internal 10.0.0.0/8 infrastructure (prevents external HTTPS exfiltration)."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": "53,123,500,4500",
+              "from": "any",
+              "to": "any",
+              "note": "Firewall Self-Egress: allow FortiGate 200F DNS, NTP, and IPsec hub control traffic."
+            },
+            {
+              "action": "deny",
+              "direction": "in",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Inbound): drop and log all unmatched inbound traffic to firewall."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Forward): drop and log all unmatched inter-VLAN and transit traffic."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Outbound): drop and log all unmatched firewall-originated outbound traffic."
+            }
+          ]
+        },
+        {
+          "segment": "ha-standby",
+          "chosen": {
+            "product": "FortiGate 200F",
+            "vendor": "Fortinet",
+            "throughputGbps": 3.0,
+            "priceUsd": 11400,
+            "reason": "Active-Passive FGCP HA Standby failover node ($4,800 hardware + $6,600 3-yr UTP = $11,400/unit; $22,800 HA pair)."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 100F",
+              "vendor": "Fortinet",
+              "throughputGbps": 1.0,
+              "priceUsd": 6200,
+              "reason": "Insufficient SSL inspection headroom."
+            },
+            {
+              "product": "FortiGate 400F",
+              "vendor": "Fortinet",
+              "throughputGbps": 6.0,
+              "priceUsd": 26800,
+              "reason": "Oversized TCO."
+            },
+            {
+              "product": "PA-1410",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 3.4,
+              "priceUsd": 19500,
+              "reason": "Higher 3-year TCO."
+            },
+            {
+              "product": "Quantum Force 9100",
+              "vendor": "Check Point",
+              "throughputGbps": 4.0,
+              "priceUsd": 21000,
+              "reason": "Higher 3-year TCO."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 703,
+              "from": "10.20.99.0/28",
+              "to": "10.20.99.0/28",
+              "note": "FGCP HA Session Sync: TCP 703 stateful session synchronization between Active and Standby FortiGate units."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 703,
+              "from": "10.20.99.0/28",
+              "to": "10.20.99.0/28",
+              "note": "FGCP HA Heartbeat: UDP 703 sub-second (<1s) cluster health heartbeat between Active and Standby FortiGate units."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ankara-academy",
+      "name": "Ankara Academy",
+      "role": "campus",
+      "location": "Ankara, Turkey",
+      "population": {
+        "staff": 10,
+        "students": 100
+      },
+      "network": {
+        "cidr": "10.30.0.0/16",
+        "dmz": false,
+        "vlans": [
+          {
+            "id": 10,
+            "name": "academics",
+            "cidr": "10.30.10.0/28",
+            "note": "Gateway 10.30.10.1 (usable 10.30.10.2-10.30.10.14); 10 instructors/academy admins and local NVR/print server (10.30.10.10)."
+          },
+          {
+            "id": 20,
+            "name": "interns-students",
+            "cidr": "10.30.20.0/24",
+            "note": "Gateway 10.30.20.1 (usable 10.30.20.2-10.30.20.254); 100 interns/students with rate-limited internet-only access (Zero Trust, zero 10.x access)."
+          },
+          {
+            "id": 60,
+            "name": "iot-cameras-printers",
+            "cidr": "10.30.60.0/28",
+            "note": "Gateway 10.30.60.1 (usable 10.30.60.2-10.30.60.14); ~10 campus IP cameras, smart classroom displays, and printers scoped to 10.30.10.10."
+          },
+          {
+            "id": 70,
+            "name": "guest-wifi",
+            "cidr": "10.30.70.0/27",
+            "note": "Gateway 10.30.70.1 (usable 10.30.70.2-10.30.70.30); seminar/visitor guest Wi-Fi with client isolation."
+          },
+          {
+            "id": 99,
+            "name": "oob-management",
+            "cidr": "10.30.99.0/28",
+            "note": "Gateway 10.30.99.1 (usable 10.30.99.2-10.30.99.14); Out-of-Band (OOB) management VLAN for FortiGate 100F HA pair and campus switches."
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 300,
+        "upMbps": 300,
+        "drivers": [
+          "VM downloads",
+          "training videos",
+          "lab access",
+          "Dual-ISP SD-WAN (300 Mbps primary + 100 Mbps backup)"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 100F",
+            "vendor": "Fortinet",
+            "throughputGbps": 1.0,
+            "priceUsd": 6200,
+            "reason": "Active-Passive FGCP HA Primary ($2,600 hardware + $3,600 3-yr UTP = $6,200/unit; $12,400 HA pair); high port density separates instructor, intern, IoT, and OOB networks with CPU headroom for strict App Control and QoS."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 80F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.715,
+              "priceUsd": 2950,
+              "reason": "$1,250 hardware + $1,700 3-yr UTP = $2,950; fewer physical interfaces and tighter margin under 100 concurrent intern downloads."
+            },
+            {
+              "product": "FortiGate 60F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.7,
+              "priceUsd": 1650,
+              "reason": "$700 hardware + $950 3-yr UTP = $1,650; 110 users exceeds its 50-60 user sizing guideline."
+            },
+            {
+              "product": "PA-440",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 1.3,
+              "priceUsd": 6400,
+              "reason": "$2,200 hardware + $4,200 3-yr subscription = $6,400; fewer physical ports than FortiGate 100F."
+            },
+            {
+              "product": "Quantum Spark 1600",
+              "vendor": "Check Point",
+              "throughputGbps": 0.85,
+              "priceUsd": 4500,
+              "reason": "$1,950 hardware + $2,550 3-yr bundle = $4,500; lower port count for physical classroom isolation."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "67:68",
+              "from": "10.30.0.0/16",
+              "to": "10.30.0.0/16",
+              "note": "Base Service (DHCP): explicit UDP 67-68 IP lease assignment across Ankara VLANs."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 53,
+              "from": "10.30.0.0/16",
+              "to": "10.30.10.0/28",
+              "note": "Base Service (DNS UDP): explicit UDP 53 name resolution to internal DNS resolvers."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 53,
+              "from": "10.30.0.0/16",
+              "to": "10.30.10.0/28",
+              "note": "Base Service (DNS TCP): explicit TCP 53 name resolution to internal DNS resolvers."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 123,
+              "from": "10.30.0.0/16",
+              "to": "10.30.10.0/28",
+              "note": "Base Service (NTP): explicit UDP 123 clock synchronization for SIEM log correlation."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "academics",
+              "to": "oob-management",
+              "note": "OOB Management Access: authorized academy admins (academics) reach OOB management VLAN 99."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "10.30.0.0/16",
+              "to": "oob-management",
+              "note": "OOB Isolation: block interns, guests, and IoT VLANs from reaching OOB management VLAN 99."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "554,9100",
+              "from": "iot-cameras-printers",
+              "to": "10.30.10.10",
+              "note": "IoT Scoped Access: allow campus cameras and printers in VLAN 60 to reach local NVR/print server 10.30.10.10."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "iot-cameras-printers",
+              "to": "10.0.0.0/8",
+              "note": "IoT Internal Isolation: block VLAN 60 cameras/smart displays from all other internal subnets."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "interns-students",
+              "to": "10.0.0.0/8",
+              "note": "Zero Trust Intern Isolation: block intern VLAN 20 from reaching any internal 10.x corporate VLAN."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "6881:6889,6969",
+              "from": "interns-students",
+              "to": "any",
+              "note": "P2P/Torrent Block: block BitTorrent/P2P ports on forwarded intern traffic."
+            },
+            {
+              "action": "limit",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "interns-students",
+              "to": "any",
+              "note": "Rate-Limited Intern Internet (Zero Trust): allow forwarded HTTP/HTTPS internet access within QoS rate limit; excess drops."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "guest-wifi",
+              "to": "10.0.0.0/8",
+              "note": "Guest Wi-Fi Isolation: block VLAN 70 event guests from all internal 10.x subnets."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "guest-wifi",
+              "to": "any",
+              "note": "Guest Wi-Fi Internet: allow client-isolated HTTP/HTTPS internet egress."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "1514:1515",
+              "from": "10.30.0.0/16",
+              "to": "10.20.20.0/25",
+              "note": "Central Telemetry: forward Wazuh/Sysmon logs over IPsec to Sivas SOC."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 514,
+              "from": "10.30.0.0/16",
+              "to": "10.20.20.0/25",
+              "note": "Central Syslog: forward FortiGate 100F HA logs over IPsec to Sivas FortiAnalyzer."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "10.30.0.0/16",
+              "to": "10.20.0.0/16",
+              "note": "IPsec VPN / SD-WAN: encrypted site-to-site tunnel establishment to Sivas hub."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "academics",
+              "to": "any",
+              "note": "Academics Web Egress: allow instructors/staff HTTP/HTTPS access to cloud labs and training portals."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": "53,123,500,4500",
+              "from": "any",
+              "to": "any",
+              "note": "Firewall Self-Egress: allow FortiGate 100F DNS, NTP, and IPsec tunnel initiation."
+            },
+            {
+              "action": "deny",
+              "direction": "in",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Inbound): drop and log all unmatched inbound traffic to firewall."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Forward): drop and log all unmatched inter-VLAN, over-limit, and transit traffic."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Outbound): drop and log all unmatched firewall-originated outbound traffic."
+            }
+          ]
+        },
+        {
+          "segment": "ha-standby",
+          "chosen": {
+            "product": "FortiGate 100F",
+            "vendor": "Fortinet",
+            "throughputGbps": 1.0,
+            "priceUsd": 6200,
+            "reason": "Active-Passive FGCP HA Standby failover node ($2,600 hardware + $3,600 3-yr UTP = $6,200/unit; $12,400 HA pair)."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 80F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.715,
+              "priceUsd": 2950,
+              "reason": "Lower port density."
+            },
+            {
+              "product": "FortiGate 60F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.7,
+              "priceUsd": 1650,
+              "reason": "Undersized for 110 users."
+            },
+            {
+              "product": "PA-440",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 1.3,
+              "priceUsd": 6400,
+              "reason": "Fewer physical interfaces."
+            },
+            {
+              "product": "Quantum Spark 1600",
+              "vendor": "Check Point",
+              "throughputGbps": 0.85,
+              "priceUsd": 4500,
+              "reason": "Lower port density."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 703,
+              "from": "10.30.99.0/28",
+              "to": "10.30.99.0/28",
+              "note": "FGCP HA Session Sync: TCP 703 stateful session synchronization between Active and Standby FortiGate units."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 703,
+              "from": "10.30.99.0/28",
+              "to": "10.30.99.0/28",
+              "note": "FGCP HA Heartbeat: UDP 703 sub-second (<1s) cluster health heartbeat between Active and Standby FortiGate units."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dubai-field",
+      "name": "Dubai Trade Office",
+      "role": "branch",
+      "location": "Dubai, UAE",
+      "population": {
+        "staff": 15,
+        "rnd": 20
+      },
+      "network": {
+        "cidr": "10.40.0.0/16",
+        "dmz": false,
+        "vlans": [
+          {
+            "id": 10,
+            "name": "intl-sales",
+            "cidr": "10.40.10.0/28",
+            "note": "Gateway 10.40.10.1 (usable 10.40.10.2-10.40.10.14); 10 international sales and account staff."
+          },
+          {
+            "id": 20,
+            "name": "redteam-mea",
+            "cidr": "10.40.20.0/27",
+            "note": "Gateway 10.40.20.1 (usable 10.40.20.2-10.40.20.30); 12 MEA Red Team field operators."
+          },
+          {
+            "id": 30,
+            "name": "local-support",
+            "cidr": "10.40.30.0/28",
+            "note": "Gateway 10.40.30.1 (usable 10.40.30.2-10.40.30.14); 5 local technical support staff and local NVR/print server (10.40.30.10)."
+          },
+          {
+            "id": 40,
+            "name": "rnd-software",
+            "cidr": "10.40.40.0/28",
+            "note": "Gateway 10.40.40.1 (usable 10.40.40.2-10.40.40.14); 8 regional R&D software developers isolated from Red Team and Sales."
+          },
+          {
+            "id": 60,
+            "name": "iot-cameras-printers",
+            "cidr": "10.40.60.0/28",
+            "note": "Gateway 10.40.60.1 (usable 10.40.60.2-10.40.60.14); ~8 office IP cameras, smart locks, and printers scoped to 10.40.30.10."
+          },
+          {
+            "id": 70,
+            "name": "guest-wifi",
+            "cidr": "10.40.70.0/28",
+            "note": "Gateway 10.40.70.1 (usable 10.40.70.2-10.40.70.14); client/visitor guest Wi-Fi with client isolation."
+          },
+          {
+            "id": 99,
+            "name": "oob-management",
+            "cidr": "10.40.99.0/28",
+            "note": "Gateway 10.40.99.1 (usable 10.40.99.2-10.40.99.14); Out-of-Band (OOB) management VLAN for FortiGate 60F HA pair and local switches."
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 200,
+        "upMbps": 200,
+        "drivers": [
+          "video conferencing",
+          "Red Team operational data",
+          "R&D sync",
+          "Dual-ISP SD-WAN (200 Mbps Fiber primary + 5G/LTE enterprise failover)"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 60F",
+            "vendor": "Fortinet",
+            "throughputGbps": 0.7,
+            "priceUsd": 1650,
+            "reason": "Active-Passive FGCP HA Primary ($700 hardware + $950 3-yr UTP = $1,650/unit; $3,300 HA pair); 6.5 Gbps IPsec via SOC4 ASIC lets MEA Red Team and R&D send operational data to Sivas with zero added latency."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 40F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.6,
+              "priceUsd": 1150,
+              "reason": "$500 hardware + $650 3-yr UTP = $1,150; SOHO class for 10-15 users, borderline for 35 staff + Red Team transfers."
+            },
+            {
+              "product": "PA-410",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 0.65,
+              "priceUsd": 3100,
+              "reason": "$1,100 hardware + $2,000 3-yr subscription = $3,100; nearly 2x cost of FortiGate 60F."
+            },
+            {
+              "product": "Quantum Spark 1550",
+              "vendor": "Check Point",
+              "throughputGbps": 0.65,
+              "priceUsd": 2750,
+              "reason": "$1,150 hardware + $1,600 3-yr bundle = $2,750; lower IPsec ASIC throughput than FortiGate 60F."
+            },
+            {
+              "product": "XGS 116",
+              "vendor": "Sophos",
+              "throughputGbps": 0.68,
+              "priceUsd": 2600,
+              "reason": "$1,050 hardware + $1,550 3-yr bundle = $2,600; lacks native Fortinet SD-WAN/Security Fabric integration."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "67:68",
+              "from": "10.40.0.0/16",
+              "to": "10.40.0.0/16",
+              "note": "Base Service (DHCP): explicit UDP 67-68 IP lease assignment across Dubai VLANs."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 53,
+              "from": "10.40.0.0/16",
+              "to": "10.40.30.0/28",
+              "note": "Base Service (DNS UDP): explicit UDP 53 name resolution to internal DNS resolvers."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 53,
+              "from": "10.40.0.0/16",
+              "to": "10.40.30.0/28",
+              "note": "Base Service (DNS TCP): explicit TCP 53 name resolution to internal DNS resolvers."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 123,
+              "from": "10.40.0.0/16",
+              "to": "10.40.30.0/28",
+              "note": "Base Service (NTP): explicit UDP 123 clock synchronization for SIEM log correlation."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "local-support",
+              "to": "oob-management",
+              "note": "OOB Management Access: authorized local support admins reach OOB management VLAN 99."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "10.40.0.0/16",
+              "to": "oob-management",
+              "note": "OOB Isolation: block all other Dubai VLANs from reaching OOB management VLAN 99."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "554,9100",
+              "from": "iot-cameras-printers",
+              "to": "10.40.30.10",
+              "note": "IoT Scoped Access: allow office cameras and printers in VLAN 60 to reach local NVR/print server 10.40.30.10."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "iot-cameras-printers",
+              "to": "10.0.0.0/8",
+              "note": "IoT Internal Isolation: block VLAN 60 cameras/IoT from all other internal corporate subnets."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "guest-wifi",
+              "to": "10.0.0.0/8",
+              "note": "Guest Wi-Fi Isolation: block VLAN 70 client/guest Wi-Fi from all internal 10.x subnets."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "guest-wifi",
+              "to": "any",
+              "note": "Guest Wi-Fi Internet: allow client-isolated HTTP/HTTPS internet egress."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "1514:1515",
+              "from": "10.40.0.0/16",
+              "to": "10.20.20.0/25",
+              "note": "Central Telemetry: forward Wazuh/Sysmon logs over IPsec to Sivas SOC."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 514,
+              "from": "10.40.0.0/16",
+              "to": "10.20.20.0/25",
+              "note": "Central Syslog: forward FortiGate 60F HA logs over IPsec to Sivas FortiAnalyzer."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "10.40.0.0/16",
+              "to": "10.20.0.0/16",
+              "note": "IPsec VPN / SD-WAN: 6.5 Gbps ASIC-accelerated encrypted tunnel to Sivas hub."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "rnd-software",
+              "to": "10.20.10.0/26",
+              "note": "R&D Repository Sync: allow Dubai R&D (VLAN 40) encrypted Git/Docker access to Sivas R&D."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "any",
+              "from": "redteam-mea",
+              "to": "any",
+              "note": "Red Team MEA Operations: allow authorized MEA field testing traffic (monitored via SPAN)."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "intl-sales",
+              "to": "any",
+              "note": "International Sales Web/CRM Egress: allow global CRM and video conferencing HTTPS access."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "local-support",
+              "to": "any",
+              "note": "Local Support Web Egress: allow local support HTTPS vendor access."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": "53,123,500,4500",
+              "from": "any",
+              "to": "any",
+              "note": "Firewall Self-Egress: allow FortiGate 60F DNS, NTP, and IPsec tunnel initiation."
+            },
+            {
+              "action": "deny",
+              "direction": "in",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Inbound): drop and log all unmatched inbound traffic to firewall."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Forward): drop and log all unmatched inter-VLAN and transit traffic."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default Deny (Outbound): drop and log all unmatched firewall-originated outbound traffic."
+            }
+          ]
+        },
+        {
+          "segment": "ha-standby",
+          "chosen": {
+            "product": "FortiGate 60F",
+            "vendor": "Fortinet",
+            "throughputGbps": 0.7,
+            "priceUsd": 1650,
+            "reason": "Active-Passive FGCP HA Standby failover node ($700 hardware + $950 3-yr UTP = $1,650/unit; $3,300 HA pair)."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 40F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.6,
+              "priceUsd": 1150,
+              "reason": "SOHO class; lower session capacity."
+            },
+            {
+              "product": "PA-410",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 0.65,
+              "priceUsd": 3100,
+              "reason": "Nearly 2x TCO."
+            },
+            {
+              "product": "Quantum Spark 1550",
+              "vendor": "Check Point",
+              "throughputGbps": 0.65,
+              "priceUsd": 2750,
+              "reason": "Lower IPsec throughput."
+            },
+            {
+              "product": "XGS 116",
+              "vendor": "Sophos",
+              "throughputGbps": 0.68,
+              "priceUsd": 2600,
+              "reason": "Lacks native Fortinet SD-WAN integration."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 703,
+              "from": "10.40.99.0/28",
+              "to": "10.40.99.0/28",
+              "note": "FGCP HA Session Sync: TCP 703 stateful session synchronization between Active and Standby FortiGate units."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 703,
+              "from": "10.40.99.0/28",
+              "to": "10.40.99.0/28",
+              "note": "FGCP HA Heartbeat: UDP 703 sub-second (<1s) cluster health heartbeat between Active and Standby FortiGate units."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "remoteAccess": {
+    "type": "ztna",
+    "note": "Inter-branch traffic runs over encrypted AES-256-GCM IPsec VPN / SD-WAN tunnels terminating at Sivas hub (10.20.0.0/16), while remote personnel authenticate via role-based FortiClient ZTNA enforced with SAML 2.0 SSO, phishing-resistant FIDO2 hardware MFA (no TOTP), and device posture checks: SOC analysts -> 10.20.20.0/25; Red Team -> 10.10.40.0/27 & 10.40.20.0/27; R&D -> 10.20.10.0/26, 10.10.50.0/28 & 10.40.40.0/28; IT/Network Admins -> 10.x.99.0/28 OOB VLANs via JIT PAM bastion; Management/Accounting/Sales -> cloud ERP/CRM ZTNA proxy; Interns -> public cloud lab portal only (zero 10.x access)."
+  },
+  "monitoring": {
+    "siem": "Wazuh SIEM and FortiAnalyzer in Sivas (10.20.20.0/25) ingest logs from all 4 branches over IPsec (TCP 1514/1515, UDP 514); sFlow/NetFlow on switches/firewalls plus SPAN mirror ports with Wireshark/Zeek on Red Team VLANs; Sysmon and Wazuh EDR agents on endpoints. Retention: 90d hot NVMe, 1y warm compressed, 5y immutable SHA-256 WORM cold archive per Law No. 5651 & KVKK/GDPR.",
+    "owner": "24/7 SOC team in Sivas (65 analysts) with automated SOAR playbooks, daily 03:00 TRT AES-256 encrypted 3-2-1 config backups (RTO < 15m, RPO < 24h), and monthly 3rd-Sunday 02:00-05:00 TRT hitless FGCP rolling FortiOS Mature firmware patching (CVSS >= 9.0 patched within 24h).",
+    "alertSink": "Wazuh SIEM & FortiAnalyzer SOC consoles in Sivas (10.20.20.0/25) with SOAR incident response.",
+    "appVsSecurity": "Three-layer separation: Layer 1 firewall policy/session logs, Layer 2 network telemetry (NetFlow/sFlow & SPAN), Layer 3 host EDR/XDR (Sysmon/Wazuh) with KVKK/GDPR PII masking and SSL DPI privacy exemptions for banking, healthcare, and HR portals."
+  },
+  "cveWatch": [
+    {
+      "id": "CVE-2024-4577",
+      "product": "PHP-CGI (Academy & Public Web Portals)",
+      "status": "patched",
+      "note": "CVSS 9.8 argument injection RCE; patched PHP runtime across web/academy portals, enforced WAF virtual patching, and verified zero exploitation indicators in Wazuh SIEM."
+    },
+    {
+      "id": "CVE-2024-21762",
+      "product": "Fortinet FortiOS SSL-VPN",
+      "status": "patched",
+      "note": "CVSS 9.8 out-of-bounds write; upgraded all 8 FortiGate units to FortiOS 7.4.x Mature and disabled legacy SSL-VPN on WAN interfaces in favor of ZTNA + FIDO2 MFA."
+    },
+    {
+      "id": "CVE-2024-55591",
+      "product": "Fortinet FortiOS / FortiProxy Auth Bypass",
+      "status": "patched",
+      "note": "CVSS 9.8 authentication bypass; disabled WAN HTTP/HTTPS admin interfaces, isolated management to OOB VLAN 99, and applied Mature firmware patch."
+    },
+    {
+      "id": "CVE-2024-47575",
+      "product": "Fortinet FortiManager (FortiJump)",
+      "status": "mitigated",
+      "note": "CVSS 9.8 missing authentication; restricted TCP/541 to IPsec hub tunnels and OOB VLAN 99 only, upgraded build, and enabled fgfm anomaly detection in Wazuh."
+    },
+    {
+      "id": "CVE-2025-24472",
+      "product": "Fortinet FortiOS CSF Auth Bypass",
+      "status": "patched",
+      "note": "CVSS 8.1 Security Fabric auth bypass; applied FortiOS Mature security patch, restricted admin trusted-hosts, and enabled SIEM alerting."
+    }
+  ]
 }

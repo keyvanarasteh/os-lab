@@ -78,7 +78,7 @@
     },
     {
       "slug": "siber-guvenlik-sirketi",
-      "company": "Kurumsal Ağ Topolojisi ve Güvenlik Mimarisi",
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
       "github": "ufuk888"
     },
     {
@@ -90,15 +90,15 @@
   "summary": {
     "companies": 19,
     "branches": 79,
-    "firewalls": 96,
-    "rules": 1835,
+    "firewalls": 100,
+    "rules": 1912,
     "priceUsd": {
       "min": 0,
       "max": 205357,
-      "total": 2003993.69
+      "total": 2048393.69
     },
     "chosenByVendor": {
-      "Fortinet": 75,
+      "Fortinet": 79,
       "Palo Alto Networks": 8,
       "Cloudflare": 6,
       "Açık kaynak": 2,
@@ -108,10 +108,10 @@
       "Deciso (açık kaynak)": 1
     },
     "chosenByProduct": {
-      "Fortinet FortiGate 60F": 8,
-      "Fortinet FortiGate 200F": 7,
+      "Fortinet FortiGate 60F": 9,
+      "Fortinet FortiGate 200F": 8,
       "Fortinet FortiGate 200F (HA)": 6,
-      "Fortinet FortiGate 100F": 4,
+      "Fortinet FortiGate 100F": 5,
       "Fortinet Fortinet FortiGate 200F": 4,
       "Fortinet FortiGate 600F": 3,
       "Fortinet FortiGate 3500F (HA)": 3,
@@ -124,6 +124,7 @@
       "Fortinet FortiGate 400F (HA)": 2,
       "Fortinet FortiGate 200G (HA pair)": 2,
       "Cloudflare Cloudflare WAF (Business)": 2,
+      "Fortinet FortiGate 80F": 2,
       "Palo Alto Networks Palo Alto PA-5420": 2,
       "Fortinet FortiGate 600F (HA)": 1,
       "Palo Alto Networks PA-3400 series (HA)": 1,
@@ -161,17 +162,16 @@
       "Fortinet FortiGate 1000F": 1,
       "Palo Alto Networks Palo Alto PA-460 (HA)": 1,
       "Check Point Check Point Quantum 6600 (HA)": 1,
-      "Fortinet FortiGate 80F": 1,
       "Fortinet FortiGate-VM08 (AWS)": 1,
       "Fortinet FortiGate 200F (ISFW)": 1,
       "Deciso (açık kaynak) OPNsense (Deciso DEC3800)": 1
     },
     "vendorsConsidered": {
-      "Fortinet": 115,
-      "Palo Alto Networks": 80,
-      "Check Point": 76,
-      "Sophos": 57,
-      "Cisco": 57,
+      "Fortinet": 125,
+      "Palo Alto Networks": 84,
+      "Check Point": 80,
+      "Sophos": 58,
+      "Cisco": 58,
       "Netgate": 16,
       "Deciso": 14,
       "Cloudflare": 10,
@@ -4270,7 +4270,7 @@
       ]
     },
     {
-      "company": "Kurumsal Ağ Topolojisi ve Güvenlik Mimarisi",
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
       "companySlug": "siber-guvenlik-sirketi",
       "sector": "Cybersecurity services",
       "author": "U*** B***",
@@ -4282,11 +4282,11 @@
       "product": "FortiGate 80F",
       "vendor": "Fortinet",
       "throughputGbps": 0.715,
-      "priceUsd": null,
-      "ruleCount": 4,
+      "priceUsd": 2950,
+      "ruleCount": 22,
       "actions": {
-        "allow": 3,
-        "deny": 1,
+        "allow": 16,
+        "deny": 6,
         "reject": 0,
         "limit": 0
       },
@@ -4295,31 +4295,80 @@
         {
           "product": "FortiGate 60F",
           "vendor": "Fortinet",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.7,
+          "priceUsd": 1650
         },
         {
           "product": "PA-440",
           "vendor": "Palo Alto Networks",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 1.3,
+          "priceUsd": 6400
         },
         {
           "product": "Secure Firewall 1210",
           "vendor": "Cisco",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 1.2,
+          "priceUsd": 5800
         },
         {
           "product": "Quantum Spark 1600",
           "vendor": "Check Point",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.85,
+          "priceUsd": 4500
         }
       ]
     },
     {
-      "company": "Kurumsal Ağ Topolojisi ve Güvenlik Mimarisi",
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
+      "companySlug": "siber-guvenlik-sirketi",
+      "sector": "Cybersecurity services",
+      "author": "U*** B***",
+      "branch": "Istanbul HQ",
+      "branchId": "istanbul-hq",
+      "branchRole": "headquarters",
+      "location": "Istanbul, Turkey",
+      "segment": "ha-standby",
+      "product": "FortiGate 80F",
+      "vendor": "Fortinet",
+      "throughputGbps": 0.715,
+      "priceUsd": 2950,
+      "ruleCount": 2,
+      "actions": {
+        "allow": 2,
+        "deny": 0,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "FortiGate 60F",
+          "vendor": "Fortinet",
+          "throughputGbps": 0.7,
+          "priceUsd": 1650
+        },
+        {
+          "product": "PA-440",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": 1.3,
+          "priceUsd": 6400
+        },
+        {
+          "product": "Secure Firewall 1210",
+          "vendor": "Cisco",
+          "throughputGbps": 1.2,
+          "priceUsd": 5800
+        },
+        {
+          "product": "Quantum Spark 1600",
+          "vendor": "Check Point",
+          "throughputGbps": 0.85,
+          "priceUsd": 4500
+        }
+      ]
+    },
+    {
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
       "companySlug": "siber-guvenlik-sirketi",
       "sector": "Cybersecurity services",
       "author": "U*** B***",
@@ -4330,12 +4379,12 @@
       "segment": "perimeter",
       "product": "FortiGate 200F",
       "vendor": "Fortinet",
-      "throughputGbps": 3,
-      "priceUsd": null,
-      "ruleCount": 5,
+      "throughputGbps": 3.0,
+      "priceUsd": 11400,
+      "ruleCount": 23,
       "actions": {
-        "allow": 4,
-        "deny": 1,
+        "allow": 17,
+        "deny": 6,
         "reject": 0,
         "limit": 0
       },
@@ -4344,31 +4393,80 @@
         {
           "product": "FortiGate 100F",
           "vendor": "Fortinet",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 1.0,
+          "priceUsd": 6200
         },
         {
           "product": "FortiGate 400F",
           "vendor": "Fortinet",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 6.0,
+          "priceUsd": 26800
         },
         {
           "product": "PA-1410",
           "vendor": "Palo Alto Networks",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 3.4,
+          "priceUsd": 19500
         },
         {
           "product": "Quantum Force 9100",
           "vendor": "Check Point",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 4.0,
+          "priceUsd": 21000
         }
       ]
     },
     {
-      "company": "Kurumsal Ağ Topolojisi ve Güvenlik Mimarisi",
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
+      "companySlug": "siber-guvenlik-sirketi",
+      "sector": "Cybersecurity services",
+      "author": "U*** B***",
+      "branch": "Sivas SOC and R&D Hub",
+      "branchId": "sivas-soc",
+      "branchRole": "datacenter",
+      "location": "Sivas, Turkey",
+      "segment": "ha-standby",
+      "product": "FortiGate 200F",
+      "vendor": "Fortinet",
+      "throughputGbps": 3.0,
+      "priceUsd": 11400,
+      "ruleCount": 2,
+      "actions": {
+        "allow": 2,
+        "deny": 0,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "FortiGate 100F",
+          "vendor": "Fortinet",
+          "throughputGbps": 1.0,
+          "priceUsd": 6200
+        },
+        {
+          "product": "FortiGate 400F",
+          "vendor": "Fortinet",
+          "throughputGbps": 6.0,
+          "priceUsd": 26800
+        },
+        {
+          "product": "PA-1410",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": 3.4,
+          "priceUsd": 19500
+        },
+        {
+          "product": "Quantum Force 9100",
+          "vendor": "Check Point",
+          "throughputGbps": 4.0,
+          "priceUsd": 21000
+        }
+      ]
+    },
+    {
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
       "companySlug": "siber-guvenlik-sirketi",
       "sector": "Cybersecurity services",
       "author": "U*** B***",
@@ -4379,12 +4477,12 @@
       "segment": "perimeter",
       "product": "FortiGate 100F",
       "vendor": "Fortinet",
-      "throughputGbps": 1,
-      "priceUsd": null,
-      "ruleCount": 6,
+      "throughputGbps": 1.0,
+      "priceUsd": 6200,
+      "ruleCount": 21,
       "actions": {
-        "allow": 2,
-        "deny": 3,
+        "allow": 12,
+        "deny": 8,
         "reject": 0,
         "limit": 1
       },
@@ -4393,31 +4491,80 @@
         {
           "product": "FortiGate 80F",
           "vendor": "Fortinet",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.715,
+          "priceUsd": 2950
         },
         {
           "product": "FortiGate 60F",
           "vendor": "Fortinet",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.7,
+          "priceUsd": 1650
         },
         {
           "product": "PA-440",
           "vendor": "Palo Alto Networks",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 1.3,
+          "priceUsd": 6400
         },
         {
           "product": "Quantum Spark 1600",
           "vendor": "Check Point",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.85,
+          "priceUsd": 4500
         }
       ]
     },
     {
-      "company": "Kurumsal Ağ Topolojisi ve Güvenlik Mimarisi",
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
+      "companySlug": "siber-guvenlik-sirketi",
+      "sector": "Cybersecurity services",
+      "author": "U*** B***",
+      "branch": "Ankara Academy",
+      "branchId": "ankara-academy",
+      "branchRole": "campus",
+      "location": "Ankara, Turkey",
+      "segment": "ha-standby",
+      "product": "FortiGate 100F",
+      "vendor": "Fortinet",
+      "throughputGbps": 1.0,
+      "priceUsd": 6200,
+      "ruleCount": 2,
+      "actions": {
+        "allow": 2,
+        "deny": 0,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "FortiGate 80F",
+          "vendor": "Fortinet",
+          "throughputGbps": 0.715,
+          "priceUsd": 2950
+        },
+        {
+          "product": "FortiGate 60F",
+          "vendor": "Fortinet",
+          "throughputGbps": 0.7,
+          "priceUsd": 1650
+        },
+        {
+          "product": "PA-440",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": 1.3,
+          "priceUsd": 6400
+        },
+        {
+          "product": "Quantum Spark 1600",
+          "vendor": "Check Point",
+          "throughputGbps": 0.85,
+          "priceUsd": 4500
+        }
+      ]
+    },
+    {
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
       "companySlug": "siber-guvenlik-sirketi",
       "sector": "Cybersecurity services",
       "author": "U*** B***",
@@ -4428,12 +4575,12 @@
       "segment": "perimeter",
       "product": "FortiGate 60F",
       "vendor": "Fortinet",
-      "throughputGbps": null,
-      "priceUsd": null,
-      "ruleCount": 3,
+      "throughputGbps": 0.7,
+      "priceUsd": 1650,
+      "ruleCount": 21,
       "actions": {
-        "allow": 2,
-        "deny": 1,
+        "allow": 15,
+        "deny": 6,
         "reject": 0,
         "limit": 0
       },
@@ -4442,26 +4589,75 @@
         {
           "product": "FortiGate 40F",
           "vendor": "Fortinet",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.6,
+          "priceUsd": 1150
         },
         {
           "product": "PA-410",
           "vendor": "Palo Alto Networks",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.65,
+          "priceUsd": 3100
         },
         {
           "product": "Quantum Spark 1550",
           "vendor": "Check Point",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.65,
+          "priceUsd": 2750
         },
         {
           "product": "XGS 116",
           "vendor": "Sophos",
-          "throughputGbps": null,
-          "priceUsd": null
+          "throughputGbps": 0.68,
+          "priceUsd": 2600
+        }
+      ]
+    },
+    {
+      "company": "Kurumsal A? Topolojisi ve G?venlik Mimarisi",
+      "companySlug": "siber-guvenlik-sirketi",
+      "sector": "Cybersecurity services",
+      "author": "U*** B***",
+      "branch": "Dubai Trade Office",
+      "branchId": "dubai-field",
+      "branchRole": "branch",
+      "location": "Dubai, UAE",
+      "segment": "ha-standby",
+      "product": "FortiGate 60F",
+      "vendor": "Fortinet",
+      "throughputGbps": 0.7,
+      "priceUsd": 1650,
+      "ruleCount": 2,
+      "actions": {
+        "allow": 2,
+        "deny": 0,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "FortiGate 40F",
+          "vendor": "Fortinet",
+          "throughputGbps": 0.6,
+          "priceUsd": 1150
+        },
+        {
+          "product": "PA-410",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": 0.65,
+          "priceUsd": 3100
+        },
+        {
+          "product": "Quantum Spark 1550",
+          "vendor": "Check Point",
+          "throughputGbps": 0.65,
+          "priceUsd": 2750
+        },
+        {
+          "product": "XGS 116",
+          "vendor": "Sophos",
+          "throughputGbps": 0.68,
+          "priceUsd": 2600
         }
       ]
     },
