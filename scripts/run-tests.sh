@@ -93,6 +93,14 @@ else
   bad "source-lab/engine test suite"
 fi
 
+# PENT-02 extension scanner: standard library only, run from scripts/analysis.
+hdr "Extension scanner tests (pytest)"
+if [ -n "$PY" ] && ( cd "$ROOT/scripts/analysis" && "$PY" -m pytest ext_scan/tests -q ); then
+  ok "scripts/analysis/ext_scan test suite"
+else
+  bad "scripts/analysis/ext_scan test suite"
+fi
+
 # Cleanup Lab reference logic: standard library only, so plain unittest is enough.
 hdr "Cleanup Lab reference tests (unittest)"
 if [ -n "$PY" ] || pick_python; then
