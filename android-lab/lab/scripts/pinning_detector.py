@@ -30,11 +30,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import struct
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
@@ -45,6 +47,9 @@ TOOL_VERSION = "1.0.0"
 TASK_ID = "PENT-11"
 
 MAX_FILE_BYTES = 128 * 1024 * 1024      # skip anything larger (zip-bomb guard)
+MAX_TOTAL_FILES = 50_000                # aggregate work limits
+MAX_TOTAL_BYTES = 1024 * 1024 * 1024    # total (decompressed) bytes scanned
+REPORT_NAMES = ("pinning-report.json", "pinning-report.md")
 MAX_EVIDENCE_PER_RULE = 3               # evidence snippets kept per rule
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 
@@ -107,13 +112,14 @@ def _b(*pats: str) -> tuple:
     return tuple(re.compile(p.encode("utf-8")) for p in pats)
 
 
-PIN_B64 = r"[A-Za-z0-9+/]{43}="
+PIN_B64 = r"[A-Za-z0-9+/]{43}="          # SHA-256 digest, base64
+PIN_B64_SHA1 = r"[A-Za-z0-9+/]{27}="     # SHA-1 digest, base64
 
 RULES: tuple = (
     # -- OkHttp ----------------------------------------------------------
     Rule("okhttp.pin_string", "okhttp", WEIGHT_STRONG,
          "Hard-coded OkHttp pin literal (sha256/<base64>)",
-         _b(r"sha(?:256|1)/" + PIN_B64), ("any",), True),
+         _b(r"sha256/" + PIN_B64 + r"|sha1/" + PIN_B64_SHA1), ("any",), True),
     Rule("okhttp.builder_call", "okhttp", WEIGHT_STRONG,
          "CertificatePinner.Builder.add(...) / .certificatePinner(...) call site",
          _b(r"CertificatePinner\$Builder;->add\(|CertificatePinner\.Builder\(\)|\.certificatePinner\(|CertificatePinner\.Builder\b[\s\S]{0,200}\.add\("),
@@ -127,8 +133,8 @@ RULES: tuple = (
          "checkServerTrusted combined with public-key / digest comparison (key pinning in code)",
          _b(r"checkServerTrusted", r"getPublicKey|getEncoded|MessageDigest|SubjectPublicKeyInfo"),
          ("source",)),
-    Rule("trustmanager.custom_manager", "trustmanager", WEIGHT_MEDIUM,
-         "Class implementing X509TrustManager that also builds an SSLContext",
+    Rule("trustmanager.custom_manager", "trustmanager", WEIGHT_WEAK,
+         "Class implementing X509TrustManager that also builds an SSLContext (no pin comparison seen)",
          _b(r"X509TrustManager", r"checkServerTrusted", r"SSLContext"), ("source",)),
     Rule("trustmanager.factory_keystore", "trustmanager", WEIGHT_WEAK,
          "TrustManagerFactory + KeyStore referenced (app-supplied trust store?)",
@@ -147,11 +153,14 @@ RULES: tuple = (
     Rule("lib.trustkit_present", "third_party_library", WEIGHT_WEAK,
          "TrustKit library present",
          _b(r"com[/.]datatheorem[/.]android[/.]trustkit")),
-    Rule("lib.rn_ssl_pinning", "third_party_library", WEIGHT_MEDIUM,
-         "react-native-ssl-pinning module",
+    Rule("lib.rn_ssl_pinning", "third_party_library", WEIGHT_WEAK,
+         "react-native-ssl-pinning module present (no call-site evidence)",
          _b(r"react-native-ssl-pinning|RNSslPinning|RNSslPinningPackage"), ("any",)),
-    Rule("lib.cordova_plugin", "third_party_library", WEIGHT_MEDIUM,
-         "Cordova certificate-pinning plugin",
+    Rule("lib.rn_ssl_pinning_config", "third_party_library", WEIGHT_MEDIUM,
+         "react-native-ssl-pinning used with an sslPinning option (call-site evidence)",
+         _b(r"react-native-ssl-pinning|RNSslPinning", r"sslPinning\s*:"), ("any",)),
+    Rule("lib.cordova_plugin", "third_party_library", WEIGHT_WEAK,
+         "Cordova certificate-pinning plugin present (no call-site evidence)",
          _b(r"sslCertificateChecker|cordova-plugin-advanced-http|CordovaHttpPlugin|sslPinning"), ("any",)),
     Rule("lib.appmattus", "third_party_library", WEIGHT_WEAK,
          "Certificate-transparency / pinning library (appmattus)",
@@ -160,7 +169,7 @@ RULES: tuple = (
     # -- Flutter ----------------------------------------------------------
     Rule("flutter.security_context", "flutter", WEIGHT_MEDIUM,
          "Dart SecurityContext with custom trusted certificates",
-         _b(r"setTrustedCertificatesBytes|SecurityContext\(withTrustedRoots|setTrustedCertificates"), ("any",)),
+         _b(r"setTrustedCertificatesBytes|setTrustedCertificates"), ("any",)),
     Rule("flutter.bad_cert_callback", "flutter", WEIGHT_WEAK,
          "Dart badCertificateCallback referenced (may accept or reject certs)",
          _b(r"badCertificateCallback"), ("any",)),
@@ -176,8 +185,8 @@ RULES: tuple = (
          "OpenSSL/BoringSSL peer-certificate retrieval used for manual comparison",
          _b(r"SSL_get(?:1)?_peer_certificate|SSL_get_peer_cert_chain", r"X509_get_pubkey|X509_digest|X509_pubkey_digest|i2d_X509"),
          ("native",)),
-    Rule("native.verify_callback", "native", WEIGHT_MEDIUM,
-         "Custom verify callback installed (SSL_CTX_set_verify / set_custom_verify)",
+    Rule("native.verify_callback", "native", WEIGHT_WEAK,
+         "Verify callback installed (SSL_CTX_set_verify / set_custom_verify); may be ordinary CA validation",
          _b(r"SSL_CTX_set_verify|SSL_set_verify|SSL_CTX_set_cert_verify_callback|SSL_set_custom_verify|SSL_CTX_set_custom_verify"),
          ("native",)),
     Rule("native.x509_verify", "native", WEIGHT_WEAK,
@@ -241,12 +250,16 @@ def _parse_string_pool(data: bytes, pos: int) -> list:
     utf8 = bool(flags & 0x100)
     out = []
     offsets_at = pos + header_size
+    (chunk_size,) = struct.unpack_from("<I", data, pos + 4)
+    # the offset table must fit inside the chunk (and the file): never trust `count`
+    if count > (chunk_size - header_size) // 4 or offsets_at + 4 * count > len(data):
+        raise ValueError("string pool count exceeds chunk bounds")
     for i in range(count):
         (off,) = struct.unpack_from("<I", data, offsets_at + 4 * i)
         try:
             out.append(_read_pool_string(data, pos + strings_start + off, utf8))
-        except (IndexError, struct.error):
-            out.append("")
+        except (IndexError, struct.error) as exc:
+            raise ValueError("string pool offset out of bounds") from exc
     return out
 
 
@@ -306,7 +319,7 @@ def decode_axml(data: bytes):
                 if text:
                     stack[-1].text = (stack[-1].text or "") + text
             pos += csize
-    except (struct.error, IndexError):
+    except (struct.error, IndexError, ValueError):
         return root
     return root
 
@@ -439,6 +452,10 @@ class ScanState:
     frameworks: set = field(default_factory=set)
     native_libs: list = field(default_factory=list)
     cert_files: list = field(default_factory=list)
+    nsc_seen: set = field(default_factory=set)      # content hashes of NSC files already counted
+    skipped: list = field(default_factory=list)     # (path, reason): coverage is incomplete
+    total_bytes: int = 0
+    truncated: bool = False
 
 
 def _file_kind(path: str) -> str:
@@ -513,7 +530,10 @@ def scan_blob(state: ScanState, path: str, data: bytes) -> None:
     if ext == ".xml":
         root = parse_xml_bytes(data)
         if root is not None and root.tag == "network-security-config":
-            state.nsc_files.append((norm, analyze_nsc(root)))
+            digest = hashlib.sha256(data).hexdigest()
+            if digest not in state.nsc_seen:      # identical copies must not add score again
+                state.nsc_seen.add(digest)
+                state.nsc_files.append((norm, analyze_nsc(root)))
             return
         if root is not None and ext == ".xml" and low.startswith("res/"):
             # compiled resource XML that is not an NSC: nothing else to learn
@@ -548,38 +568,77 @@ def scan_blob(state: ScanState, path: str, data: bytes) -> None:
         bucket.append(Evidence(norm, where, snip))
 
 
+def _budget_exceeded(state: ScanState, path: str) -> bool:
+    if state.files_scanned >= MAX_TOTAL_FILES or state.total_bytes >= MAX_TOTAL_BYTES:
+        state.truncated = True
+        state.skipped.append((path, "aggregate scan limit reached"))
+        return True
+    return False
+
+
 def scan_apk(state: ScanState, apk_path: str) -> None:
     with zipfile.ZipFile(apk_path) as zf:
         for info in zf.infolist():
-            if info.is_dir() or info.file_size > MAX_FILE_BYTES:
+            if info.is_dir():
                 continue
             name = info.filename
-            if os.path.splitext(name.lower())[1] in SKIP_EXTENSIONS:
+            if os.path.splitext(name.lower())[1] in SKIP_EXTENSIONS or name.startswith("META-INF/"):
                 continue
-            if name.startswith("META-INF/"):
+            if info.file_size > MAX_FILE_BYTES:
+                state.skipped.append((name, "file larger than per-file limit"))
                 continue
+            if _budget_exceeded(state, name):
+                break
             try:
-                data = zf.read(info)
-            except (zipfile.BadZipFile, RuntimeError, OSError):
+                with zf.open(info) as fh:
+                    # bound the real decompressed size, not the declared one
+                    data = fh.read(min(MAX_FILE_BYTES, MAX_TOTAL_BYTES - state.total_bytes) + 1)
+            except (zipfile.BadZipFile, RuntimeError, OSError, EOFError, NotImplementedError) as exc:
+                state.skipped.append((name, f"unreadable: {exc.__class__.__name__}"))
                 continue
+            if len(data) > MAX_FILE_BYTES or state.total_bytes + len(data) > MAX_TOTAL_BYTES:
+                state.truncated = True
+                state.skipped.append((name, "decompressed size over limit"))
+                continue
+            state.total_bytes += len(data)
             scan_blob(state, name, data)
 
 
-def scan_dir(state: ScanState, root_dir: str) -> None:
-    for root, dirs, files in os.walk(root_dir):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+def scan_dir(state: ScanState, root_dir: str, exclude: tuple = ()) -> None:
+    excluded = {os.path.normcase(os.path.abspath(x)) for x in exclude}
+
+    def _on_error(err):
+        state.skipped.append((str(getattr(err, "filename", root_dir)), f"inaccessible: {err.__class__.__name__}"))
+
+    for root, dirs, files in os.walk(root_dir, onerror=_on_error):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS
+                   and os.path.normcase(os.path.abspath(os.path.join(root, d))) not in excluded]
         for fn in files:
             if os.path.splitext(fn.lower())[1] in SKIP_EXTENSIONS:
                 continue
             full = os.path.join(root, fn)
+            if os.path.normcase(os.path.abspath(full)) in excluded:
+                continue
+            if fn in REPORT_NAMES:      # never re-scan our own previous reports
+                continue
+            rel = os.path.relpath(full, root_dir)
+            if _budget_exceeded(state, rel):
+                return
             try:
-                if os.path.getsize(full) > MAX_FILE_BYTES:
+                size = os.path.getsize(full)
+                if size > MAX_FILE_BYTES:
+                    state.skipped.append((rel, "file larger than per-file limit"))
                     continue
                 with open(full, "rb") as fh:
-                    data = fh.read()
-            except OSError:
+                    data = fh.read(MAX_FILE_BYTES + 1)
+                if len(data) != size:
+                    state.skipped.append((rel, "file changed while scanning"))
+                    continue
+            except OSError as exc:
+                state.skipped.append((rel, f"unreadable: {exc.__class__.__name__}"))
                 continue
-            scan_blob(state, os.path.relpath(full, root_dir), data)
+            state.total_bytes += len(data)
+            scan_blob(state, rel, data)
 
 
 # ---------------------------------------------------------------------------
@@ -587,11 +646,25 @@ def scan_dir(state: ScanState, root_dir: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _confidence(score: int, strongest: int) -> str:
+    if strongest <= WEIGHT_WEAK:      # many weak hints never add up to real evidence
+        return "low"
     if strongest >= WEIGHT_STRONG or score >= 4:
         return "high"
     if score >= WEIGHT_MEDIUM:
         return "medium"
     return "low"
+
+
+def _nsc_referenced(manifest, path: str):
+    """True/False when the manifest reference can be matched to this file, None when unknown."""
+    if manifest is None:
+        return None
+    ref = manifest.get("network_security_config_ref")
+    if not ref:
+        return False
+    if ref.startswith("@xml/"):
+        return os.path.splitext(os.path.basename(path))[0] == ref[len("@xml/"):]
+    return None     # compiled resource id (@0x...): cannot be mapped to a file name here
 
 
 def classify(state: ScanState) -> dict:
@@ -616,32 +689,39 @@ def classify(state: ScanState) -> dict:
         if nsc["pin_count"] == 0:
             continue
         m = methods.setdefault("network_security_config", {"score": 0, "strongest": 0, "signals": []})
-        weight = WEIGHT_STRONG if nsc["pinning_active"] else WEIGHT_WEAK
+        referenced = _nsc_referenced(state.manifest, path)
+        weight = WEIGHT_STRONG if (nsc["pinning_active"] and referenced is not False) else WEIGHT_WEAK
         m["score"] += weight
         m["strongest"] = max(m["strongest"], weight)
         m["signals"].append({
             "rule": "nsc.pin_set", "weight": weight,
             "description": f"{nsc['pin_count']} pin(s) in {len(nsc['domain_configs'])} domain-config(s)"
-                           + ("" if nsc["pinning_active"] else " (all pin-sets expired)"),
+                           + ("" if nsc["pinning_active"] else " (all pin-sets expired)")
+                           + (" (not referenced by the manifest)" if referenced is False else ""),
             "evidence": [{"file": path, "where": "pin-set", "snippet": ", ".join(
                 d["name"] for c in nsc["domain_configs"] if c["pins"] for d in c["domains"])[:160]}],
         })
-        ref = (state.manifest or {}).get("network_security_config_ref")
-        if state.manifest is not None and not ref:
-            nsc["warnings"].append("manifest has no android:networkSecurityConfig - this file may be unused")
+        if referenced is False:
+            ref = (state.manifest or {}).get("network_security_config_ref")
+            nsc["warnings"].append(
+                "manifest has no android:networkSecurityConfig - this file may be unused" if not ref
+                else f"manifest references {ref}, not this file - pins here are probably not enforced")
 
     if state.cert_files:
         methods["embedded_certificate"] = {
-            "score": WEIGHT_MEDIUM, "strongest": WEIGHT_MEDIUM,
-            "signals": [{"rule": "cert.bundled", "weight": WEIGHT_MEDIUM,
-                         "description": f"{len(state.cert_files)} certificate/keystore file(s) bundled",
+            "score": WEIGHT_WEAK, "strongest": WEIGHT_WEAK,
+            "signals": [{"rule": "cert.bundled", "weight": WEIGHT_WEAK,
+                         "description": f"{len(state.cert_files)} certificate/keystore file(s) bundled "
+                                        "(no evidence yet that TLS validation uses them)",
                          "evidence": [{"file": f, "where": "file", "snippet": ""} for f in state.cert_files[:5]]}],
         }
 
     # Framework hints strengthen the matching method but never create pinning on their own.
-    if "flutter" in state.frameworks and "flutter" in methods:
+    # ...and only when the method already has independent (>= medium) evidence.
+    if "flutter" in state.frameworks and methods.get("flutter", {}).get("strongest", 0) >= WEIGHT_MEDIUM:
         methods["flutter"]["score"] += WEIGHT_WEAK
-    if "react-native" in state.frameworks and "third_party_library" in methods:
+    if "react-native" in state.frameworks and \
+            methods.get("third_party_library", {}).get("strongest", 0) >= WEIGHT_MEDIUM:
         methods["third_party_library"]["score"] += WEIGHT_WEAK
 
     ranked = []
@@ -667,8 +747,14 @@ def classify(state: ScanState) -> dict:
         status = "possible"
     else:
         status = "none_detected"
+    complete = not state.skipped
+    if not complete and status == "none_detected":
+        status = "incomplete_scan"
 
     return {
+        "scan_complete": complete,
+        "skipped": [{"path": pth, "reason": why} for pth, why in state.skipped[:200]],
+        "scan_truncated": state.truncated,
         "pinning_status": status,
         "primary_method": top["method"] if top and top["confidence"] != "low" else None,
         "methods": ranked,
@@ -678,12 +764,12 @@ def classify(state: ScanState) -> dict:
     }
 
 
-def analyze(target: str) -> dict:
+def analyze(target: str, exclude: tuple = ()) -> dict:
     """Run the full static analysis on an APK or decompiled directory."""
     state = ScanState()
     if os.path.isdir(target):
         kind = "directory"
-        scan_dir(state, target)
+        scan_dir(state, target, exclude)
     else:
         kind = "apk"
         scan_apk(state, target)
@@ -721,6 +807,9 @@ def render_markdown(r: dict) -> str:
         out.append(f"- **Package:** `{mf.get('package')}` (minSdk {mf.get('min_sdk')}, targetSdk {mf.get('target_sdk')})")
     if r["frameworks"]:
         out.append(f"- **Frameworks:** {', '.join(r['frameworks'])}")
+    if not r.get("scan_complete", True):
+        out.append(f"- **Coverage:** INCOMPLETE - {len(r['skipped'])} input(s) skipped"
+                   + (" (aggregate limit hit)" if r.get("scan_truncated") else ""))
     out += ["", f"> {r['scope_notice']}", "", "## Classification", ""]
     if not r["methods"]:
         out.append("No pinning indicators found.")
@@ -742,6 +831,9 @@ def render_markdown(r: dict) -> str:
                        + (f", expires {c['pin_set_expiration']}" if c["pin_set_expiration"] else ""))
         for w in nsc["warnings"]:
             out.append(f"- WARNING: {w}")
+    if r.get("skipped"):
+        out += ["", "## Skipped input (coverage incomplete)", ""]
+        out += [f"- `{s['path']}`: {s['reason']}" for s in r["skipped"]]
     if r["weak_validation"]:
         out += ["", "## Weak validation", ""]
         if r["weak_validation_note"]:
@@ -775,7 +867,8 @@ def main(argv=None) -> int:
         print(f"Error: not a valid APK/zip archive: {args.target}", file=sys.stderr)
         return 1
 
-    report = analyze(args.target)
+    out_dir = args.out or os.path.join("artifacts", "pinning-detect")
+    report = analyze(args.target, exclude=(out_dir,))
 
     if args.json:
         print(json.dumps(report, indent=2))
@@ -789,14 +882,24 @@ def main(argv=None) -> int:
     if report["weak_validation_note"]:
         print(f"WARNING: {report['weak_validation_note']}")
 
-    out_dir = args.out or os.path.join("artifacts", "pinning-detect")
     os.makedirs(out_dir, exist_ok=True)
-    json_path = os.path.join(out_dir, "pinning-report.json")
-    md_path = os.path.join(out_dir, "pinning-report.md")
-    with open(json_path, "w", encoding="utf-8") as fh:
-        json.dump(report, fh, indent=2)
-    with open(md_path, "w", encoding="utf-8") as fh:
-        fh.write(render_markdown(report))
+    json_path = os.path.join(out_dir, REPORT_NAMES[0])
+    md_path = os.path.join(out_dir, REPORT_NAMES[1])
+    # Write the pair into a private temp dir first, then publish both together,
+    # so a failed/concurrent run never leaves JSON and Markdown from different scans.
+    tmp = tempfile.mkdtemp(prefix=".pinning-", dir=out_dir)
+    try:
+        tj, tm = os.path.join(tmp, REPORT_NAMES[0]), os.path.join(tmp, REPORT_NAMES[1])
+        with open(tj, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, indent=2)
+        with open(tm, "w", encoding="utf-8") as fh:
+            fh.write(render_markdown(report))
+        os.replace(tj, json_path)
+        os.replace(tm, md_path)
+    finally:
+        for leftover in os.listdir(tmp):
+            os.remove(os.path.join(tmp, leftover))
+        os.rmdir(tmp)
     print(f"\nReports saved to:\n  JSON : {json_path}\n  MD   : {md_path}")
     return 0
 
