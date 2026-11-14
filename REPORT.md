@@ -1,5 +1,51 @@
 # OS-30 delivery report
 
+## Local submission review (2026-11-14)
+
+Prepared for owner review on `feat/os-30-delivery`; intended PR target:
+`keyvanarasteh/os-lab:master`. No commit, push, PR, live demo or new video was
+made during this preparation. The removed `23207910` commit was not restored.
+Starting HEAD is `d5ba261d27a8e50f862a22a3b8602c3fbef18354`.
+
+The target fetched on this date is
+`5924675c2edce5f88dbf68b46f3504d8dba2a051`: HEAD is three commits ahead,
+zero behind, with no merge conflict against that target. Before preparation,
+the 12 changed files covered OS-30 code, mock tests, documentation/image and test-runner integration.
+The local reservation now records MYO203 (the repository's Open Source OS
+course mapping) and `in-progress`; no PR URL or completed status is claimed.
+
+The full course `vize/vize-projesi.md` is not present in this checkout and was
+not located through accessible searches. The available
+[student reservation instructions](reservations/README.md#students-midterm)
+require verification and a proof video. No video link has been supplied; course
+acceptance therefore remains pending, as does checking the full course rubric.
+Existing UTM reports and the summary image do not prove live apply/rollback.
+No new live evidence was produced. See [VERIFY.md](VERIFY.md) for current tests.
+
+AI assistance: Codex inspected repository history, code and documentation, ran
+local mock/static checks and the repository runner, fixed quoted Ubuntu ID
+detection with a regression test, and updated submission records and reservation
+metadata. The student must review the changes and understand the implementation before submission.
+
+## Preparation changes
+
+- Fixed Bash platform detection for double-quoted `ID="ubuntu"`, consistent
+  with the Python entry point. The new read-only regression fails on the original
+  collector and passes with the fix. The mock now evaluates the actual grep
+  expression against synthetic os-release data rather than assuming success.
+- Added current revision-specific verification, distinguished historical WSL2
+  records, and documented pending rubric/video evidence.
+- Updated reservation course/status and knowledge-graph runner coverage.
+
+The final focused OS-30 suite passes **115 tests**. Bash syntax, ShellCheck and
+Python AST checks pass.
+
+The complete repository check is not green on this macOS ARM64 / Python 3.14
+host: Android/console and Cleanup Lab tests fail outside the OS-30 files.
+`lat check` also reports an existing paragraph-length error in
+`lat.md/cleanup-lab.md:237`. Those paths have no diff against the fetched PR
+target. See `VERIFY.md` for counts and commands; no general CI pass is claimed.
+
 ## Scope
 
 `linux-lab/scripts/harden_check.py` provides a local Ubuntu Server baseline audit,
@@ -98,9 +144,9 @@ system behavior. Video evidence has not been supplied.
 Current focused test commands/results are recorded in `VERIFY.md`. Historical
 local runs are labeled separately and are not presented as new executions.
 
-## Current focused verification
+## Historical WSL2 focused verification (2026-11-13)
 
-Latest run: uncommitted working tree on base commit `bdcc521`, Ubuntu 24.04.3
+Recorded run: uncommitted working tree on base commit `bdcc521`, Ubuntu 24.04.3
 LTS on WSL2 (x86_64), Python 3.12.3: `python3 -m unittest discover -s
 linux-lab/tests -v` passed **114 tests**, exit 0. The patch hash, environment
 details and a reverse check (the new regression tests fail on unpatched

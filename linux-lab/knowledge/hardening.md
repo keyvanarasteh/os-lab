@@ -10,6 +10,8 @@ The Python entry point refuses a missing/empty collector or a collector that
 returns no findings, rather than reporting a clean audit.
 The tool never connects to another machine, sources `.env`, or confuses host
 forwarding port 2222 with guest port 22. It rejects non-Ubuntu platforms.
+Both entry points recognize `ID=ubuntu` and
+`ID="ubuntu"` in `/etc/os-release` without executing the file.
 
 ## Read-only audit
 

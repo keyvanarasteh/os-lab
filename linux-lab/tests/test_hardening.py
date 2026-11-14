@@ -21,7 +21,7 @@ SS_SYSTEMD = ('LISTEN 0 4096 0.0.0.0:22 0.0.0.0:* users:(("systemd",pid=1,fd=50)
 LISTEN_PER_LINE = '0.0.0.0:22 (Stream)\n[::]:2222 (Stream)'
 LISTEN_ONE_LINE = '0.0.0.0:22 (Stream) [::]:2222 (Stream)'
 MOCK = r'''#!/usr/bin/env python3
-import json, os, sys
+import json, os, subprocess, sys
 from pathlib import Path
 name = Path(sys.argv[0]).name
 args = sys.argv[1:]
@@ -29,7 +29,9 @@ with open(os.environ['CALLS'], 'a') as f:
     f.write(json.dumps([name] + args) + '\n')
 case = os.environ.get('CASE', '')
 if name == 'uname': print('Darwin' if case == 'mac' else 'Linux'); sys.exit(0)
-if name == 'grep' and args == ['-q', '^ID=ubuntu$', '/etc/os-release']: sys.exit(0)
+if name == 'grep' and args[-1:] == ['/etc/os-release']:
+    release = os.environ.get('OS_RELEASE', 'ID=ubuntu') + '\n'
+    sys.exit(subprocess.run(['/usr/bin/grep', *args[:-1]], input=release, text=True).returncode)
 if name == 'grep':
     s = sys.stdin.read()
     sys.exit(0 if s.strip() == 'install ok installed' else 1)
@@ -162,6 +164,13 @@ class HardeningTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('[WARN] ssh.context', result.stdout)
         self.assertNotIn('PRIVATE', result.stdout)
+        self.assert_read_only()
+
+    def test_quoted_ubuntu_release_is_supported_without_mutations(self):
+        self.env['OS_RELEASE'] = 'ID="ubuntu"'
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Summary:', result.stdout)
         self.assert_read_only()
 
     def test_inactive_ufw_is_baseline_failure(self):

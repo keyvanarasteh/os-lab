@@ -49,6 +49,9 @@ Firecracker, gVisor) are recorded in [[linux-lab/knowledge/draft.md]].
 requested by the roadmap. It provides a read-only audit and selected,
 consent-gated repairs.
 
+Both entry points accept unquoted `ID=ubuntu` and double-quoted `ID="ubuntu"`
+in `/etc/os-release`, without sourcing that file.
+
 Its default audit delegates to [[linux-lab/scripts/hardening.sh]] for local SSH,
 user/sudo, cached-update and UFW checks; text or versioned JSON reports preserve
 WARN and FAIL evidence. A missing/empty collector or execution returning no

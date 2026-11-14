@@ -35,7 +35,7 @@ while (($#)); do
   esac
 done
 # No override for host paths: mocks replace commands, never the production root.
-if [[ $(uname -s) != Linux ]] || ! grep -q '^ID=ubuntu$' /etc/os-release 2>/dev/null; then
+if [[ $(uname -s) != Linux ]] || ! grep -Eq '^ID=(ubuntu|"ubuntu")$' /etc/os-release 2>/dev/null; then
   report SKIP platform 'Ubuntu required; no audit or application performed'; exit 2
 fi
 SSHD=$(command -v sshd || true)

@@ -1,6 +1,74 @@
 # OS-30 verification
 
-## Current focused regression: OS-30 fixes on `bdcc521` (2026-11-13)
+## Current local submission checks (2026-11-14)
+
+Starting HEAD: `d5ba261d27a8e50f862a22a3b8602c3fbef18354` on
+`feat/os-30-delivery`. Working tree was clean before preparation. The removed
+`23207910` commit is not an ancestor of HEAD and was not restored.
+Environment: macOS / Darwin arm64, Python 3.14.3.
+
+- `python3 -m unittest discover -s linux-lab/tests -v`: **114 tests passed in
+  44.626s**, exit 0. Fake commands, temporary files and fake PTY operations only.
+- `.venv-test/bin/shellcheck linux-lab/scripts/hardening.sh scripts/run-tests.sh`:
+  passed, exit 0, using the existing local executable.
+- `bash -n linux-lab/scripts/hardening.sh scripts/run-tests.sh`: passed, exit 0.
+- `git diff --check`: passed before documentation preparation.
+
+The new quoted-Ubuntu regression was first run against the original collector:
+`python3 -m unittest discover -s linux-lab/tests -p test_hardening.py -k quoted`
+failed as expected (exit 1): `ID="ubuntu"` was incorrectly rejected with exit 2.
+The collector now accepts that form consistently with Python. The test uses
+synthetic release data and checks that the audit performs no mutations.
+
+Final focused suite: `python3 -m unittest discover -s linux-lab/tests -v`:
+**115 tests passed in 54.810s**, exit 0, after the quoted-ID change.
+
+Post-change Python AST parsing passed for the entry point and three test files;
+Bash syntax, ShellCheck and `git diff --check` passed again.
+
+Repository runner command (existing virtualenv; dependency downloads disabled):
+
+```bash
+PATH="$PWD/.venv-test/bin:$PATH" CARGO_NET_OFFLINE=true PIP_NO_INDEX=1 \
+  PIP_DISABLE_PIP_VERSION_CHECK=1 ./scripts/run-tests.sh
+```
+
+The first sandboxed attempt failed in Android localhost tests and Cleanup Lab.
+It was rerun with local socket access. During that attempt the collector was
+edited while Bash was reading it, causing a transient `T: command not found`
+failure in one OS-30 test (115 run, one failure). This attempt is not final
+verification; the complete runner was restarted after all executable/test files
+were stable. The independent final focused run above passed all 115 tests.
+The final stable-source runner reports:
+
+- Android/console: 170 passed, 5 failed, 2 skipped. Failures cover ARM64 asset
+  selection versus amd64 fixtures, source-console guards/download, and lab-plan
+  HTTP status expectations. The earlier attempt also hit a connection reset.
+- OS-30: 115 tests passed in the final full runner as well.
+- Source Lab engine: 176 passed.
+- Cleanup reference: 35 passed.
+- Cleanup engine: 228 run; 4 failures and 5 errors, involving relocation paths
+  and safety expectations on this host.
+- Cargo absent; Rust suite skipped. Dashboard dependencies absent; dashboard
+  checks skipped (dashboard unchanged).
+
+Final runner result: exit 1; **5 stages passed, 2 failed, 3 skipped**.
+Sample analysis/report smoke and syntax parsing of all 71 shell scripts passed.
+Reservation required fields, allowed fields and status/course enum checks passed.
+
+The failing Android/console/Cleanup sources and `lat.md/cleanup-lab.md` have no
+changes against target `5924675c`. They were not edited as part of OS-30.
+
+`npx --offline --yes --cache /tmp/os30-delivery-npm-cache --package lat.md lat check`
+ran after graph edits and exited 1: the existing leading paragraph under
+`lat.md/cleanup-lab.md:237` is 339 characters (limit 250). No OS-30 graph error
+was reported. The tool was fetched into a temporary cache; no `lat init`,
+global installation or agent hooks were added.
+
+No live Ubuntu audit, repair, rollback, demo or new video was performed. Earlier WSL2
+and UTM records below describe their original revisions, not this new run.
+
+## Historical WSL2 regression: OS-30 fixes on `bdcc521` (2026-11-13)
 
 Tested tree: base commit `bdcc521981f0825310aee6f712c6d64b1ab12b70`
 (`feat/os-30-hardening-checker`) plus the **uncommitted** OS-30 fixes in
