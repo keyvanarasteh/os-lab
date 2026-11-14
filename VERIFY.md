@@ -1,5 +1,30 @@
 # OS-30 verification
 
+## UFW failure/interruption policy verification (2026-11-14)
+
+Current working-tree change: failed/interrupted apply never automatically deletes
+UFW rules, even after verified insertion. Attempted additions retain snapshots
+and manifest, report manual rule-state inspection and print the backup path.
+Successful applied runs retain the separately confirmed rollback path.
+
+- `python3 -m unittest discover -s linux-lab/tests -v`: **116 tests passed in
+  53.395s**, exit 0, macOS arm64 / Python 3.14.3.
+- Failure regression covers an add command failing after mutation, failed rule
+  verification and journal failure after verified insertion; no UFW delete call,
+  retained snapshots/manifest, failed status and manual-review/path messages.
+- Real SIGINT/SIGTERM/SIGHUP in forked fake apply after verified insertion leave
+  the rule intact, call no delete, retain the manifest and report manual review.
+  Unverified interrupted insertion is also retained without deletion.
+- Existing equivalent-rule SKIP, conflict refusal, quoted Ubuntu ID, exact-rule
+  rollback and explicit rollback consent regressions all pass.
+- Python syntax and `git diff --check`: passed.
+- `lat check`: the existing `lat.md/cleanup-lab.md:237` paragraph-length error
+  remains (339 characters; maximum 250). No OS-30 graph error was reported.
+
+All system commands are fakes and snapshots are temporary fixtures; no live UFW
+or host security changes were made. Earlier runs below retain their original
+behavior and results; their automatic-delete observations are historical.
+
 ## Current local submission checks (2026-11-14)
 
 Starting HEAD: `d5ba261d27a8e50f862a22a3b8602c3fbef18354` on

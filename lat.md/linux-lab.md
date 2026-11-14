@@ -64,8 +64,10 @@ repairs require root and exact interactive consent immediately before applicatio
 Snapshots, metadata checks, no-follow file descriptors and a repair lock protect
 against drift and overlapping application. SSH authentication and ports are not
 changed; no package upgrades, UFW reset or automatic UFW activation occur. Failed
-permission/timer changes are rolled back; an unverified UFW addition is reported
-as partial state with saved rules, never hidden behind a claimed rollback.
+permission/timer changes are rolled back. Failed or interrupted apply never
+automatically deletes UFW rules, including verified additions. Attempted
+additions retain the backup and manifest, with manual inspection required and
+the backup path reported.
 
 The allowlist and limitations are explained in [[linux-lab/knowledge/hardening.md]].
 [[linux-lab/tests/test_hardening.py]] and [[linux-lab/tests/test_harden_check.py]]

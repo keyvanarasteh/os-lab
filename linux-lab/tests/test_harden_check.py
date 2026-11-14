@@ -385,7 +385,7 @@ class RepairTests(unittest.TestCase):
             return {'signum': int(exc.signum), 'message': str(exc), 'mode': self.config.stat().st_mode & 0o777,
                     'enabled': self.system.enabled, 'rule_added': self.system.rule_added,
                     'extra_rules': self.system.extra_rules, 'manifest': manifest,
-                    'deletes': [list(c) for c in self.system.calls if c[:3] == ('ufw', '--force', 'delete')]}
+                    'deletes': [list(c) for c in self.system.calls if c[0] == 'ufw' and 'delete' in c]}
         return {'error': 'apply was not interrupted'}
 
     def test_sigterm_and_sighup_during_apply_revert_and_record_state(self):
@@ -408,19 +408,61 @@ class RepairTests(unittest.TestCase):
                                  {str(self.config), 'apt-daily-upgrade.timer enablement'})
         self.assertEqual(self.config.stat().st_mode & 0o777, 0o644)
 
-    def test_signal_after_verified_ufw_addition_removes_only_that_rule(self):
-        self.system.extra_rules = ['ufw allow 443/tcp']
-        result = self.forked(lambda: self.interrupted_apply(
-            ['ufw-ssh-rule'], ('ufw', 'allow'), signal.SIGTERM, self.root / 'backups-ufw',
-            source='192.0.2.10', port=22))
-        self.assertNotIn('error', result, result)
-        marker = result['manifest']['ufw']['marker']
-        self.assertFalse(result['rule_added'])
-        self.assertEqual(result['extra_rules'], ['ufw allow 443/tcp'])
-        self.assertEqual(len(result['deletes']), 1)
-        self.assertEqual(result['deletes'][0][-2:], ['comment', marker])
-        self.assertEqual(result['manifest']['status'], 'interrupted')
-        self.assertEqual(result['manifest']['recovery']['reverted'], [f'UFW rule {marker}'])
+    def test_signal_after_verified_ufw_addition_never_deletes_rule(self):
+        for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(signal=signum.name):
+                self.system = FakeSystem()
+                self.system.extra_rules = ['ufw allow 443/tcp']
+                backups = self.root / f'backups-ufw-{signum.name}'
+                result = self.forked(lambda: self.interrupted_apply(
+                    ['ufw-ssh-rule'], ('ufw', 'allow'), signum, backups,
+                    source='192.0.2.10', port=22))
+                self.assertNotIn('error', result, result)
+                self.assertTrue(result['rule_added'])
+                self.assertEqual(result['extra_rules'], ['ufw allow 443/tcp'])
+                self.assertEqual(result['deletes'], [])
+                self.assertIsNotNone(result['manifest']['ufw']['added_rule'])
+                self.assertEqual(result['manifest']['status'], 'interrupted')
+                self.assertEqual(result['manifest']['recovery']['reverted'], [])
+                self.assertIn('manually', result['manifest']['recovery']['unreverted'][0])
+                self.assertIn(str(backups), result['message'])
+                self.assertTrue(list(backups.glob('repair-*/manifest.json')))
+
+    def test_failed_ufw_apply_never_deletes_and_retains_evidence(self):
+        for failure in ('command', 'verification', 'after-verification'):
+            with self.subTest(failure=failure):
+                self.system = FakeSystem()
+                self.system.verify_rule = failure != 'verification'
+                plan = self.plan(['ufw-ssh-rule'], source='192.0.2.10', port=22)
+                original_run = self.system.run
+                original_save = hc.save_manifest
+                def run(*args):
+                    result = original_run(*args)
+                    if failure == 'command' and args[:2] == ('ufw', 'allow'):
+                        result.returncode = 1  # command mutated before reporting failure
+                    return result
+                def save(backup, manifest):
+                    if failure == 'after-verification' and manifest['status'] == 'applied':
+                        raise OSError('simulated final journal failure')
+                    original_save(backup, manifest)
+                self.system.run = run
+                backups = self.root / f'backups-{failure}'
+                with patch.object(hc, 'save_manifest', side_effect=save):
+                    with self.assertRaises(hc.Refused) as caught:
+                        plan.execute(backups)
+                self.assertTrue(self.system.rule_added)
+                self.assertFalse(any(c[0] == 'ufw' and 'delete' in c for c in self.system.calls))
+                manifest_path = next(backups.glob('repair-*/manifest.json'))
+                manifest = json.loads(manifest_path.read_text())
+                self.assertEqual(manifest['status'], 'failed')
+                self.assertIsNotNone(manifest['ufw'])
+                self.assertTrue(all((manifest_path.parent / e['backup']).is_file()
+                                    for e in manifest['files']))
+                self.assertIn('manually', manifest['recovery']['unreverted'][0])
+                self.assertIn(str(manifest_path.parent), str(caught.exception))
+                if failure == 'after-verification':
+                    self.assertIsNotNone(manifest['ufw']['added_rule'])
+                    self.assertIsNotNone(manifest['ufw']['after'])
 
     def test_unverified_ufw_addition_on_signal_is_left_and_recorded(self):
         self.system.verify_rule = False

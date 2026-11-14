@@ -92,9 +92,12 @@ input/output TTYs and the exact phrase `APPLY OS-30`. Supported repairs are:
 Apply retains private snapshots and schema-2 manifests under
 `/var/backups/os-30/repair-<run-id>`, including verified post-state. Shared locking,
 no-follow file access, target allowlists and drift checks protect repair/recovery.
-SIGINT/SIGTERM/SIGHUP during apply stop at a checkpoint, reverse only this run's
-proven changes and record status `interrupted` with reverted/unreverted items
-(exit 130/143/129). Manual recovery for unfinished runs is documented in
+SIGINT/SIGTERM/SIGHUP during apply stop at a checkpoint, reverse proven
+permission/timer changes and record status `interrupted` with reverted/unreverted items
+(exit 130/143/129). Failed or interrupted apply never deletes a UFW rule, even
+when verified. An attempted addition retains its backup and manifest and reports
+manual rule-state inspection with the backup path. Only an explicitly confirmed
+rollback of a successfully applied run may remove its verified rule. Manual recovery for unfinished runs is documented in
 `linux-lab/knowledge/hardening.md`.
 
 ```text

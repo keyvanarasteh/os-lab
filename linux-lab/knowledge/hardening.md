@@ -174,10 +174,14 @@ change:
 - a permission mode, only if the file still has its original or its new mode
   with unchanged content, owner and group;
 - the timer, only if this run enabled it (disabled again, never stopped/started);
-- the UFW rule, only if this run's single `OS-30:<run-id>` rule was already
-  verified and the complete rule list and status still equal the recorded
-  post-addition state. It is deleted by its exact rule specification, never by
-  number or reset. An unverified addition is left in place and reported.
+
+UFW rules are never automatically deleted after a failed or interrupted apply,
+even when the addition was verified. If rule addition was attempted, the backup
+and manifest are retained and the error names the backup path and requires
+manual inspection of the rule state. A failing command may have added a rule
+before returning an error; no absence or automatic restoration is inferred.
+Only a successfully completed `applied` run can use the separately confirmed
+`rollback` operation to remove its verified run-owned rule.
 
 Concurrent changes are never overwritten. The manifest records status `failed`
 (error) or `interrupted` (signal) and a `recovery` object with the signal name,

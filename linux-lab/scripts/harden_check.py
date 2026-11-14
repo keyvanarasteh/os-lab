@@ -662,7 +662,7 @@ class RepairPlan:
                 signum = signal.SIGINT
             # A second signal must not abandon the reversal half way.
             with deferred_signals(signals):
-                reverted, failures = self._revert(changed, timer_attempted, ufw_attempted, ufw)
+                reverted, failures = self._revert(changed, timer_attempted, ufw_attempted)
                 manifest['status'] = 'interrupted' if signum else 'failed'
                 manifest['recovery'] = {"signal": signal.Signals(signum).name if signum else None,
                                         "error": str(exc) or type(exc).__name__,
@@ -680,8 +680,7 @@ class RepairPlan:
                                           f'{detail}; backup: {backup}') from exc
             raise Refused(f'application failed: {exc}; {detail}; backup: {backup}') from exc
 
-    def _revert(self, changed: list[Path], timer_attempted: bool, ufw_attempted: bool,
-                ufw: dict | None) -> tuple[list[str], list[str]]:
+    def _revert(self, changed: list[Path], timer_attempted: bool, ufw_attempted: bool) -> tuple[list[str], list[str]]:
         """Undo only changes whose current state is proven to be this run's."""
         reverted, failures = [], []
         for path in reversed(changed):
@@ -702,33 +701,11 @@ class RepairPlan:
             except Refused:
                 failures.append('timer enablement')
         if ufw_attempted:
-            problem = self._remove_verified_rule(ufw)
-            if problem:
-                failures.append(problem)
-            else:
-                reverted.append(f"UFW rule {ufw['marker']}")
+            # Failed/interrupted apply never deletes firewall rules, even when
+            # the addition was verified. Preserve evidence for manual review.
+            failures.append('UFW rule may have been added; inspect rule state and saved rules manually '
+                            '(no automatic delete/reset)')
         return reverted, failures
-
-    def _remove_verified_rule(self, ufw: dict | None) -> str | None:
-        """Delete this run's rule only after its identity and the full rule list were proven.
-
-        Never reset UFW or delete by number. Returns None on success, else why
-        the rule was left for manual review.
-        """
-        if not ufw or not ufw.get('added_rule') or not ufw.get('after'):
-            return 'UFW rule may have been added; inspect saved rules manually (no automatic delete/reset)'
-        try:
-            if (ufw_rules(self.system.require('ufw', 'show', 'added')) != ufw['after']['rules']
-                    or self.system.require('ufw', 'status', 'verbose') != ufw['after']['status']):
-                return f"UFW rule {ufw['marker']} left in place: firewall changed after verification"
-            self.system.require('ufw', '--force', 'delete', 'allow', 'from', ufw['source'], 'to', 'any',
-                                'port', str(ufw['port']), 'proto', 'tcp', 'comment', ufw['marker'])
-            if (ufw_rules(self.system.require('ufw', 'show', 'added')) != ufw['before']['rules']
-                    or self.system.require('ufw', 'status', 'verbose') != ufw['before']['status']):
-                return f"UFW rule {ufw['marker']} removal could not be verified; inspect manually"
-        except (Refused, ValueError):
-            return f"UFW rule {ufw['marker']} state could not be verified; inspect manually"
-        return None
 
     def run_rule(self, rule: list[str], marker: str) -> bool:
         fields = ufw_rule_fields(rule)
