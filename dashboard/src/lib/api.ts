@@ -422,6 +422,10 @@ export interface BookmarkRecord {
   entry: { name: string; risk: string; category: string; needsPrivilege: boolean; paths: { template: string; path: string | null; reason: string }[] } | null;
 }
 export interface BookmarksPayload { bookmarks: BookmarkRecord[]; error: string | null }
+/** CLN-17: one typed ignore rule the engine enforces at scan and plan time. */
+export type IgnoreRuleType = "path" | "glob" | "extension";
+export interface IgnoreRule { id: string; type: IgnoreRuleType; value: string; note?: string }
+export interface IgnoreRulesPayload { rules: IgnoreRule[]; error: string | null }
 export interface BookmarkChanges {
   priority?: number; quickClean?: boolean;
   autoCleanHook?: { enabled: boolean; lastRunAt?: number | null };
@@ -553,6 +557,11 @@ export const api = {
   /** CLNP-20: the raw path appears exactly once, here; afterwards ids only. */
   cleanupCustomAdd: (name: string, path: string) => post<{ entries: { id: string; name: string; risk: string; paths: Record<string, string[]> }[]; error: string | null }>("/api/cleanup/custom-entries", { name, path }),
   cleanupCustomRemove: (entryId: string) => post<{ entries: unknown[]; bookmarks?: BookmarkRecord[]; error: string | null }>("/api/cleanup/custom-entries/remove", { entryId }),
+  /** CLN-17: the typed ignore rules; "error" carries a corrupt store's message. */
+  cleanupIgnoreRules: () => call<IgnoreRulesPayload>("/api/cleanup/ignore"),
+  cleanupIgnoreAdd: (type: IgnoreRuleType, value: string, note?: string) =>
+    post<IgnoreRulesPayload>("/api/cleanup/ignore", note ? { type, value, note } : { type, value }),
+  cleanupIgnoreRemove: (ruleId: string) => post<IgnoreRulesPayload>("/api/cleanup/ignore/remove", { ruleId }),
   /** CLNP-23: the Space Explorer (read-only size trees over registered roots). */
   cleanupExplorerRoots: () => call<{ roots: CleanupExplorerRoot[] }>("/api/cleanup/explorer/roots"),
   cleanupExplorerScan: (rootId: string) => post<CleanupExplorerJob>("/api/cleanup/explorer/scan", { rootId }),

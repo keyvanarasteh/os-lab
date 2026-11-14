@@ -1005,3 +1005,29 @@ Console endpoint tests were added to
 unknown-id 404, corrupt store reported in `error` and blocking writes) — this
 environment has no `pytest`, so they run in the normal environment before
 merge. The dashboard settings section is the remaining slice of CLN-17.
+
+### Slice 3 — the `/cleanup/` settings section (dashboard layer)
+
+```console
+$ cd dashboard && npm run check          # tsc --noEmit — clean after `npx astro sync`
+$ npm run test:i18n
+2519 keys match across 7 locales; no new untranslated TSX strings.
+$ npm run build                          # 513 page(s) built; committed dist regenerated
+```
+
+What landed: `dashboard/src/views/cleanup/ignore-card.tsx` (the Ignore rules
+section: typed list with type badge, value, note and remove; the add form with
+type select, value input whose placeholder and explanation follow the chosen
+type, optional note; the store's corrupt-state error shown as a Status card
+because the engine refuses scans and plans until it is fixed), the
+`cleanupIgnoreRules / cleanupIgnoreAdd / cleanupIgnoreRemove` client methods in
+`dashboard/src/lib/api.ts`, and the section mounted on the overview page under
+the bookmarks section. 18 new English strings translated into tr, de, fr, es,
+it, fa and ar (checked by `npm run test:i18n`; `*` and `?` never crossing a
+folder boundary and the per-type examples are part of the copy).
+
+Not run here: `npm run test:e2e` — the Playwright browser binary is not
+installed in this offline environment (`browserType.launch: Executable doesn't
+exist`), the same for a clean `master` checkout; scripted screenshots for
+`VERIFY.md` need the same browser. Both run in the normal environment before
+merge.

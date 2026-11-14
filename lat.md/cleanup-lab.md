@@ -409,7 +409,11 @@ during the fingerprint walk for glob and extension rules) and an unreadable
 rules store (`ignore-store-corrupt`). The console answers
 `GET/POST /api/cleanup/ignore` and `/api/cleanup/ignore/remove` (ids only,
 typed 400s), and `labctl cleanup ignore list|add|remove [--json]` runs the
-same store. The settings section on `/cleanup/` follows.
+same store. The `/cleanup/` settings section
+([[dashboard/src/views/cleanup/ignore-card.tsx]]) lists the rules, adds one
+with a per-type explanation and placeholder, removes one, and shows the
+corrupt-store error as its own status because the engine refuses to scan or
+plan until it is fixed.
 
 ## Dashboard pages
 
