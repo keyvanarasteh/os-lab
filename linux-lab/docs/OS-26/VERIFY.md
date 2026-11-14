@@ -216,6 +216,8 @@ olarak işaretlenmedi; OS-26'ya özgü testlerin tamamı geçti.
 
 ## Kanıt videosu (2–4 dakika)
 
+Paylaşılan kayıt: [OS-26 lab ve Git/PR akışı](https://streamable.com/4qy9w6).
+
 1. `mertksll/os-lab` fork'unu ve kabul edilmiş rezervasyon [#112](https://github.com/keyvanarasteh/os-lab/pull/112) kaydını gösterin.
 2. `git remote -v`, `git branch --show-current`, `git log -3 --oneline` ile akışı açıklayın.
 3. Yukarıdaki küçük labda bulgulu ve elle düzeltildikten sonraki temiz raporu gösterin.
@@ -226,7 +228,7 @@ olarak işaretlenmedi; OS-26'ya özgü testlerin tamamı geçti.
 
 Öğrencinin VM testleri ve lab çıktıları yukarıda kaydedildi. Kişisel Git/PR
 değerlendirmesi [REPORT.md](REPORT.md) içindedir; kanıt videosunun bağlantısı
-kayıt tamamlandıktan sonra PR'a eklenecek.
+yukarıda ve uygulama PR'ında paylaşılmıştır.
 
 ## Video kaydindaki ortam ve test sonucu
 

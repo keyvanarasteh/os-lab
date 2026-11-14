@@ -48,8 +48,8 @@ aktardığını ve aynı dala eklenen commitlerin mevcut PR'ı güncellediğini 
 
 ## Teslim durumu
 
-Linux lab doğrulaması ve kişisel değerlendirme eklendi. 2–4 dakikalık kanıt
-videosunun bağlantısı kayıt tamamlandıktan sonra PR'a eklenecek.
+Linux lab doğrulaması ve kişisel değerlendirme eklendi.
+Kanıt videosu: [OS-26 lab ve Git/PR akışı](https://streamable.com/4qy9w6).
 
 Kod, testler ve belge taslağı ChatGPT desteğiyle hazırlanmıştır. Çalıştırma
 komutları, beklenen çıktılar ve doğrulama sonuçları [VERIFY.md](VERIFY.md) içindedir.
