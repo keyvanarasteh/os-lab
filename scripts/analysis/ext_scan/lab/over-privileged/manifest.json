@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Lab Tab Counter",
+  "version": "1.0.0",
+  "description": "PENT-02 lab sample: harmless code, but asks for far more access than it needs.",
+  "permissions": ["tabs", "cookies", "history", "nativeMessaging", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" }
+}

