@@ -5,7 +5,7 @@
 | Öğrenci | Yusuf Yılmaz (`yusufiyilmaz`) |
 | Ders | MYO062 — vize projesi, seçenek 2 |
 | Görev | [PENT-02](../../../CONTRIBUTING.md) · Rezervasyon: [`reservations/PENT-02.json`](../../../reservations/PENT-02.json) |
-| Kanıt videosu | VIDEO_LINKI_BURAYA |
+| Kanıt videosu | https://youtu.be/LY6M0Z65f_8 (2 dk 25 sn, Kali Linux: 3 lab örneği → puan ve bulgular → CI çıkış kodları → 38 test → `run-tests.sh` özeti) |
 
 ## 1. Amaç
 
@@ -30,6 +30,7 @@ bilgisiyle bulgu listesidir.
 | [`scripts/analysis/ext_scan/__main__.py`](../../../scripts/analysis/ext_scan/__main__.py) | Komut satırı: `scan KLASÖR [--json] [--fail-on NOT]` |
 | [`scripts/analysis/ext_scan/lab/`](../../../scripts/analysis/ext_scan/lab/) | Bu görev için yazılmış 3 zararsız örnek eklenti |
 | [`scripts/analysis/ext_scan/tests/`](../../../scripts/analysis/ext_scan/tests/) | 38 pytest testi |
+| [`scripts/analysis/ext_scan/demo.sh`](../../../scripts/analysis/ext_scan/demo.sh) | Kanıt videosundaki akışı (çalıştır → çıktı → doğrula) tek komutla tekrar eden demo |
 | [`scripts/run-tests.sh`](../../../scripts/run-tests.sh), [`lat.md/tooling.md`](../../../lat.md/tooling.md) | Testler runner'a ayrı aşama olarak eklendi; dokümantasyon |
 
 ### Kod nasıl taranıyor?
@@ -113,6 +114,26 @@ için pozitif örnek, 5 yanlış alarm durumu, iki aşamalı ve sızdırma korel
 MV2/MV3 izinleri, CSP'nin iki biçimi, bozuk/eksik/BOM'lu manifest, lab örneklerinin beklenen
 puanları ve CLI çıkış kodları.
 
+`./scripts/run-tests.sh --no-venv` (Kali Linux, kernel 6.18.12, Python 3.13.12; kanıt videosunun sonunda da görünüyor):
+
+```
+[ok]   scripts/analysis/ext_scan test suite
+[ok]   source-lab/engine test suite
+[ok]   cleanup-lab/reference/python
+[ok]   sample analysis + report generated
+[ok]   all 71 shell scripts parse
+[fail] android-lab/lab test suite
+[fail] cleanup-lab/engine
+[skip] qrust-scan (cargo yok), lat check, dashboard
+Summary: 5 passed, 2 failed, 3 skipped
+```
+
+Kırmızı iki aşama bu değişiklikten önce de kırmızı. Aynı makinede değişiklik öncesi commit
+(`f04d8707`, güncel `master`) çalıştırıldığında sonuç aynı: `android-lab/lab` (1 failed, 219
+passed) ve `cleanup-lab/engine` (`test_relocation`) kırmızı, özet `4 passed, 2 failed, 3 skipped`.
+Bu PR ile eklenen tek fark yeni `ext_scan` aşamasının [ok] olması ve kabuk betiği sayısının
+`demo.sh` ile 70'ten 71'e çıkması (hepsi `bash -n` temiz).
+
 `./scripts/run-tests.sh --no-venv` (Windows 11, Git Bash):
 
 ```
@@ -131,7 +152,7 @@ Bu PR'ın yeni aşaması temiz geçiyor. Kalan kırmızı aşamalar bu değişik
 klasörlerde hiçbir dosyaya dokunmuyor (dışarıda değişen yalnızca `scripts/run-tests.sh`'e eklenen
 aşama ve `lat.md/tooling.md`). Hatalar Windows hostuna özgü: macOS/Linux yolları, sembolik link
 izni ve Rust derleme betiğinin Windows Akıllı Uygulama Denetimi tarafından engellenmesi
-(`os error 4551`). Linux'ta çalıştırma imkânım olmadı (WSL dağıtımı ve Docker kurulu değil).
+(`os error 4551`).
 
 ## 6. Sınırlamalar
 
