@@ -29,6 +29,17 @@ VM labs are kept `bash -n` clean and use `set -euo pipefail`.
 The [[source-lab]] engine tests run in their own process from
 [[source-lab/engine]] so their imports cannot collide with Android tests.
 
+## Extension scanner
+
+Static risk scanner for unpacked browser extensions (roadmap task PENT-02).
+
+[[scripts/analysis/ext_scan]] reads an MV2/MV3 `manifest.json` (permissions, host access,
+content-script matches, CSP) and scans every script after blanking comments, folding
+concatenated strings and masking string contents, so `eval` in a comment is ignored while
+`self['ev'+'al']` is found. A file that both makes network requests and runs text as code is
+reported as a two-stage payload. The score is capability (max 40) plus behaviour (max 60).
+Its tests run as their own stage of [[scripts/run-tests.sh]].
+
 ## Firewall rule renderer
 
 [[firewall-lab/vm/scripts/render-rules.py]] turns a company's abstract rules into UFW
