@@ -35,6 +35,16 @@ All guest state is in `storage/`; configuration is `.env` plus compose.
 before extracting, so restores are reversible. `make reset CONFIRM=yes` destroys
 the disk and reinstalls on next boot.
 
+## Planned: app mirror for Windows applications
+
+[[win-lab/APP_MIRROR_PLAN.md]] is the draft plan that brings the macOS Lab's
+app mirror abilities to Windows applications — a native ctypes path on a
+Windows host and a loopback-only guest agent for the Windows-in-Docker path.
+
+The WINMIR-01…06 tasks in the Contribute list implement it phase by phase;
+the plan records the permission honesty rules (elevation, DPI, UAC secure
+desktop) and the open lab-id decision.
+
 ## Research
 
 Windows-lab research and the command reference.
