@@ -18,13 +18,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.11'
 
       - name: Install Dependencies & Test Runner
         run: |
           python -m pip install --upgrade pip
-          # Static tests/reporting do not need Frida, mitmproxy or Windows drivers.
-          python -m pip install pytest requests cryptography
+          pip install pytest requests
+          if [ -f android-lab/lab/requirements.txt ]; then pip install -r android-lab/lab/requirements.txt; fi
 
       - name: Run Automated Test Suite
         run: |

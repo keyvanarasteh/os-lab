@@ -18,14 +18,8 @@ the committed `dashboard/dist` differs from a fresh build.
 The OS-30 standard-library suite in [[linux-lab/tests/test_hardening.py]],
 [[linux-lab/tests/test_harden_check.py]] and [[linux-lab/tests/test_rollback.py]]
 also runs in stage 1, using fake commands and temporary files rather than live
-security changes. `--quick` runs only the unit suites.
-
-[[.github/workflows/mobile-sec-scan.yml]] runs the Android tests and sample APK
-analysis/report pipeline on pushes to `master`, `main` and `feat/**`, and PRs to
-`master`/`main`. It uses Python 3.12 and installs only pytest, requests and
-cryptography. The full Android runtime requirements are not needed for this
-static job; they include mitmproxy (requiring Python 3.12+) and platform-specific
-drivers that should not be installed on the Ubuntu CI runner.
+security changes. `--quick` runs only the unit suites. The dormant workflow file
+[[.github/workflows/mobile-sec-scan.yml]] is kept for reference but is disabled.
 
 ## Tests
 
