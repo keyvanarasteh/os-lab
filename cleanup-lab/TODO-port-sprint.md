@@ -21,12 +21,15 @@ series; `VERIFY.md` gets an entry with real command output per task.
       fail-closed on an unreadable/corrupt store.
 - [x] `tests/test_ignore.py`: store roundtrip, validation, dedup, corrupt
       store, matching, scan prune, plan refusals, fail-closed plan.
-- [ ] Console CRUD: `GET /api/cleanup/ignore`, `POST /api/cleanup/ignore`
-      (add), `DELETE /api/cleanup/ignore/<id>` — ids only, typed 400s.
-- [ ] `labctl cleanup ignore add|remove|list [--json]`, exit codes 0/1/2.
+- [x] Console CRUD: `GET /api/cleanup/ignore`, `POST /api/cleanup/ignore`
+      (add), `POST /api/cleanup/ignore/remove` — ids only, typed 400s, corrupt
+      store reported in `error` and blocking writes; pytest tests added.
+- [x] `labctl cleanup ignore list|add|remove [--json]`, exit codes 0/1/2.
 - [ ] Settings section on `/cleanup/` (list, add, remove) + seven locales.
-- [ ] Deep-sweep and Space Explorer candidate pruning through the same rules.
-- [ ] Docs: `lat.md/cleanup-lab.md` section, README section, `VERIFY.md`.
+- [x] Deep-sweep and Space Explorer candidate pruning through the same rules
+      (sweep refuses candidates and prunes subtrees; explorer prunes entries
+      from the tree, counted per node; both fail closed on a corrupt store).
+- [x] Docs: `lat.md/cleanup-lab.md` section, README section, `VERIFY.md`.
 
 ## Task 2 — CLN-14 secure shred
 

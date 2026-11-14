@@ -26,6 +26,7 @@ import os
 import time
 
 from . import safety
+from . import ignore
 from .paths import platform_id
 
 #: Walk budgets: a tree bigger than this is reported truncated, not walked forever.
@@ -108,12 +109,14 @@ def _subtree_path(root_path, relative):
 
 
 def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
-         max_depth=MAX_DEPTH, seen_inodes=None, root_device=None, depth=0):
+         max_depth=MAX_DEPTH, seen_inodes=None, root_device=None, depth=0, rules=None):
     """One read-only size tree. Returns the node plus walk counters.
 
     Apparent sizes from ``lstat``; symlinks never followed; hard links counted
     once; descent stops at a mount boundary or the budgets. ``truncated`` is
-    honest: the tree may be incomplete when True.
+    honest: the tree may be incomplete when True. Ignore rules (CLN-17) prune
+    the walk: an entry a rule matches is absent from the tree — never counted
+    in sizes, never descended into — and is counted in the node's ``ignored``.
     """
     node = {
         "name": os.path.basename(root_path) or root_path,
@@ -124,6 +127,7 @@ def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
         "children": [],
         "truncated": False,
         "unreadable": 0,
+        "ignored": 0,
     }
     counters = {"nodes": 1, "truncated": False, "cancelled": False}
     try:
@@ -160,6 +164,9 @@ def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
             continue
         if entry_stat.st_dev != root_device:
             continue  # one filesystem: never descend across a mount
+        if rules is not None and ignore.match(rules, entry.path) is not None:
+            node["ignored"] += 1
+            continue  # ignored: absent from the tree, never descended into
         is_dir = entry_stat.st_mode & 0o170000 == 0o040000
         if is_dir:
             if counters["nodes"] >= max_nodes:
@@ -170,7 +177,7 @@ def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
             child, child_counters = walk(
                 entry.path, cancel=cancel, progress_callback=progress_callback,
                 max_nodes=max_nodes, max_depth=max_depth, seen_inodes=seen_inodes,
-                root_device=root_device, depth=depth + 1,
+                root_device=root_device, depth=depth + 1, rules=rules,
             )
             child_nodes.append(child)
             counters["nodes"] += child_counters["nodes"] - 1
@@ -199,14 +206,24 @@ def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
 
 def explore(root, root_id, *, platform=None, env=None, cancel=None, progress_callback=None,
             max_nodes=MAX_NODES, max_depth=MAX_DEPTH, relative=None, clock=time.time):
-    """The typed payload behind ``POST /api/cleanup/explorer/scan`` (and subtree)."""
+    """The typed payload behind ``POST /api/cleanup/explorer/scan`` (and subtree).
+
+    Ignore rules (CLN-17) prune the tree; a store that cannot be read refuses
+    the walk — the explorer never renders against rules it cannot see.
+    """
     platform = platform or platform_id()
     env = os.environ if env is None else env
     root_path = resolve_root(root, root_id, platform=platform, env=env)
     if relative is not None:
         root_path = _subtree_path(root_path, relative)
+    rules, rules_problem = ignore.load_rules(env, platform)
+    if rules_problem is not None:
+        raise ExplorerError(
+            "The ignore rules cannot be read ({0}); the explorer refuses to run "
+            "against rules it cannot see (ignore-store-corrupt).".format(rules_problem["message"])
+        )
     node, counters = walk(root_path, cancel=cancel, progress_callback=progress_callback,
-                          max_nodes=max_nodes, max_depth=max_depth)
+                          max_nodes=max_nodes, max_depth=max_depth, rules=rules)
     return {
         "rootId": root_id,
         "path": root_path,

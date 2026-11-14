@@ -9,6 +9,7 @@ import subprocess
 import time
 
 from .catalog import expand
+from . import ignore
 from . import artifacts
 from .clean import fingerprint_path
 from .paths import platform_id
@@ -42,13 +43,25 @@ def roots(root, *, platform=None, env=None):
 
 
 def sweep(root, root_ids, *, min_idle_days=0, platform=None, env=None, cancel=None, clock=time.time):
-    """Find proved build outputs; never follow links or descend into a match."""
+    """Find proved build outputs; never follow links or descend into a match.
+
+    Ignore rules (CLN-17) prune the sweep: a directory a rule matches is never
+    reported and never descended into, so nothing under it can become a
+    candidate. A rules store that cannot be read refuses the sweep — it never
+    runs against rules it cannot see.
+    """
     if not isinstance(root_ids, list) or not root_ids or any(not isinstance(x, str) for x in root_ids) or len(root_ids) != len(set(root_ids)):
         raise DeepError("rootIds must be a non-empty list of unique configured ids")
     if not isinstance(min_idle_days, int) or isinstance(min_idle_days, bool) or not 0 <= min_idle_days <= 3650:
         raise DeepError("minIdleDays must be an integer from 0 to 3650")
     configured = {item["id"]: item for item in roots(root, platform=platform, env=env)}
     signatures = artifacts.load(root)
+    rules, rules_problem = ignore.load_rules(env, platform or platform_id())
+    if rules_problem is not None:
+        raise DeepError(
+            "The ignore rules cannot be read ({0}); the sweep refuses to run "
+            "against rules it cannot see (ignore-store-corrupt).".format(rules_problem["message"])
+        )
     if any(item not in configured or not configured[item]["available"] for item in root_ids):
         raise DeepError("Every rootId must name an available configured project root")
     results, unreadable, visited = [], [], 0
@@ -76,6 +89,8 @@ def sweep(root, root_ids, *, min_idle_days=0, platform=None, env=None, cancel=No
                     continue
                 if not stat.S_ISDIR(mode):
                     continue
+                if ignore.match(rules, child.path) is not None:
+                    continue  # ignored: never reported, never descended into
                 match = artifacts.classify_dir(child.path, signatures)
                 if match:
                     try:
