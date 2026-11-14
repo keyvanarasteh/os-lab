@@ -917,3 +917,59 @@ reloads). `lat check`: All checks passed.
 ## CLN-04 … CLN-29
 
 Each task appends its own section when it lands.
+
+## CLN-17 — engine slice: ignore-rule store, scan prune and plan refusal
+
+Branch `feat/cleanup-port` (port sprint, plan in
+[`PLAN-port-sprint.md`](PLAN-port-sprint.md)). Scope of this slice:
+`cleanup_lab/ignore.py`, the scan prune, the plan refusals and their tests.
+Console CRUD, `labctl cleanup ignore` and the settings section follow in the
+next slice of the same task.
+
+### Ignore-rule tests
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_ignore -v
+Ran 22 tests in 0.034s
+OK
+```
+
+Covers: store roundtrip (add/list/remove, ids, note, extension dot-stripping
+and lowercasing, path trailing-separator normalisation), validation refusals
+(relative path, filesystem root, the home folder, NUL/newline, unknown type,
+wildcards or separators in an extension, empty values), duplicate type+value,
+missing store = no rules and no problem, corrupt store fails closed (bad JSON,
+wrong version, unknown shape, unknown rule type), symlinked store refused,
+loose-permission store refused (mode 0600), the write is atomic with a `0700`
+folder and a `0600` file and no `.tmp` left behind; matching semantics
+(`path` covers the subtree but not sibling prefixes, `glob` matches at any
+depth and never crosses a separator unless the pattern carries one, a matched
+folder covers everything under it, `extension` is case-insensitive and never
+matches a prefix, `contains` is strictly inside, equal is not contained);
+plan refusals (`ignored` for a direct match, `contains-ignored` for a folder
+holding an ignored path by rule, by glob and by extension through the
+fingerprint walk, `ignore-store-corrupt` refusing every plan mode); the scan
+skips ignored paths unmeasured with a reason and counts them in
+`totals.ignoredPaths`; an unreadable store refuses the scan fail closed.
+
+### Full engine suite
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 324 tests in 2.577s
+FAILED (failures=3, errors=5)
+```
+
+The 8 failing ids are the pre-existing `test_relocation` failures of a clean
+`master` checkout in this sandbox (verified by running the pristine
+`master` engine side by side — the failure sets are identical; the remaining
+difference was this harness missing `deep-roots.json` / `simulator-roots.json`
+next to the copied engine, not a test result). No failure is new to this
+branch; the 22 new `test_ignore` tests pass.
+
+### Console typed-job suite
+
+Not run in this environment: the suite imports `pytest`, which is not
+installed offline here. The change adds optional keyword parameters and
+payload fields only — no signature the console uses was removed or renamed.
+To be run in the normal environment before merge.
