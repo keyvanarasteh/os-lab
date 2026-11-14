@@ -1031,3 +1031,77 @@ installed in this offline environment (`browserType.launch: Executable doesn't
 exist`), the same for a clean `master` checkout; scripted screenshots for
 `VERIFY.md` need the same browser. Both run in the normal environment before
 merge.
+
+## CLN-14 — secure shred, done honestly
+
+Branch `feat/cleanup-port` (port sprint). Scope: `cleanup_lab/shred.py`,
+`cleanup_lab/settings.py`, the `shred` plan mode in `clean.py`, the console
+settings endpoints, `labctl cleanup settings`, the Secure shred card, and the
+tests. The staged first draft came from the maintainer's local working notes;
+three self-test defects were fixed on integration (the trash-mode expectation
+read the original path instead of the Trash destination; the FIFO refusal
+asserted on the status word instead of the error text; and the code removed an
+empty folder whose listing had failed — code and test are now aligned on the
+conservative behaviour: an uninspectable folder is refused and left in place,
+because shred never removes what it cannot verify).
+
+### Shred and settings tests
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_shred tests.test_ignore -v
+Ran 56 tests in 1.309s
+OK
+```
+
+Covers: the overwrite passes reach a real temp file (zeros, ones, random —
+snapshotted at `fsync` time), the random rename and its disappearance, every
+injected failure (open, write, rename, unlink) reported with honest bytes,
+bottom-up folder shredding, symlinks never followed (inside the tree unlinked
+as bare links, a planned symlink refused), FIFOs refused and their folders
+failing honestly with `ENOTEMPTY`, unreadable folders left in place, the
+settings policy gate (`shred-disabled`), Trash unaffected with the policy on,
+a corrupt settings store failing shred closed while Trash still works, the
+running-app guard applying to shred, a partial shred keeping the honest bytes
+and reporting the rest, the settings store roundtrip/validation/privacy/
+atomicity, `all_values` defaults and corrupt reporting, and the `labctl
+cleanup settings` show/set surface with exit codes 0/1/2.
+
+### Full engine suite
+
+```console
+$ python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 358 tests in 2.058s
+FAILED (failures=3, errors=5)
+```
+
+Failure set identical to clean `master` in this sandbox (8 pre-existing
+`test_relocation` ids; zero new failures).
+
+### Dashboard
+
+```console
+$ npm run check && npm run test:i18n && npm run build
+2527 keys match across 7 locales; no new untranslated TSX strings.
+513 page(s) built.
+```
+
+The Secure shred card (`dashboard/src/views/cleanup/shred-card.tsx`) mounts
+under the ignore-rules section: the policy picker (Off / 1-pass overwrite /
+3-pass overwrite), the limits copy ("Overwriting is not a guarantee on SSD,
+APFS or copy-on-write filesystems — wear levelling and copies can leave the
+original blocks elsewhere on the device") and the honesty note that the
+policy unlocks shred only as an explicit per-plan choice. 8 new strings
+translated into tr, de, fr, es, it, fa, ar. Playwright e2e and screenshots
+remain blocked offline here (browser binary missing); they run via CI on
+[`PR #228`](https://github.com/keyvanarasteh/os-lab/pull/228).
+
+### Incident note
+
+While testing the settings CLI before the env patch, two unpatched test runs
+wrote `{"shredPolicy": "1-pass"}` to the **real** per-install settings store
+(`~/Library/Application Support/os-lab/cleanup/settings.json`). The file held
+only that test value; it was removed immediately, restoring the defaults, and
+the tests now pin `OSLAB_CLEANUP_STATE` through `mock.patch.dict` for every
+CLI call. No user data was touched (the store contained nothing else), and
+the engine's own fail-closed behaviour was unaffected — but it is recorded
+here as the exact class of mistake rule 8 exists to prevent.

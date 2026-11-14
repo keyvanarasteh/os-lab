@@ -15,7 +15,7 @@ import sys
 
 from .catalog import CatalogError, report as catalog_report
 from .readiness import probe, repo_root
-from . import history, ignore, monitor, paths, volumes
+from . import history, ignore, monitor, paths, settings, volumes
 
 USAGE_EXIT = 2
 
@@ -328,12 +328,58 @@ def _ignore_command(args, stream):
     return 0
 
 
+def _settings_command(args, stream):
+    """`labctl cleanup settings [show] | settings set <key> <value>` — 0/1/2."""
+    if args.action == "show":
+        if args.first or args.second:
+            sys.stderr.write("cleanup settings show: no further arguments\n")
+            return USAGE_EXIT
+        values, problem = settings.all_values()
+        if problem is not None:
+            if args.json:
+                stream.write(json.dumps({"settings": values, "error": problem["message"]}, indent=2) + "\n")
+            else:
+                sys.stderr.write("cleanup settings: {0}\n".format(problem["message"]))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"settings": values, "error": None}, indent=2) + "\n")
+        else:
+            lines = ["Cleanup Lab settings · {0}".format(paths.platform_id())]
+            for key, allowed in settings.SETTINGS.items():
+                lines.append("  {0:<14} {1}   (one of: {2})".format(key, values[key], ", ".join(allowed)))
+            stream.write("\n".join(lines) + "\n")
+        return 0
+
+    # set
+    if not args.first or not args.second:
+        sys.stderr.write("cleanup settings set: usage is `settings set <key> <value>`\n")
+        return USAGE_EXIT
+    if args.first not in settings.SETTINGS:
+        sys.stderr.write("cleanup settings set: unknown setting {0}; known: {1}\n".format(
+            args.first, ", ".join(sorted(settings.SETTINGS))))
+        return USAGE_EXIT
+    if args.second not in settings.SETTINGS[args.first]:
+        sys.stderr.write("cleanup settings set: {0} must be one of: {1}\n".format(
+            args.first, ", ".join(settings.SETTINGS[args.first])))
+        return USAGE_EXIT
+    try:
+        stored = settings.set({args.first: args.second})
+    except settings.SettingsError as exc:
+        sys.stderr.write("cleanup settings set: {0}\n".format(exc))
+        return 1
+    if args.json:
+        stream.write(json.dumps({"settings": stored, "error": None}, indent=2) + "\n")
+    else:
+        stream.write("Set {0} = {1}\n".format(args.first, stored[args.first]))
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="labctl cleanup",
         description="Cleanup Lab: inspect readiness (read-only) and, from CLN-19, scan/plan/clean.",
     )
-    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore")
+    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore|settings")
     for name, text in (
         ("status", "one-screen readiness summary"),
         ("doctor", "every check, path and hint"),
@@ -359,6 +405,15 @@ def build_parser():
                             help="add: the rule value (absolute path, glob pattern, or bare suffix)")
     ignore_cmd.add_argument("--note", help="add: an optional note stored with the rule")
     ignore_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
+    settings_cmd = sub.add_parser(
+        "settings", help="the typed engine settings (CLN-14)",
+        description="Show the settings store or set one typed value. A corrupt store "
+                    "is reported honestly; shred fails closed until it is fixed.",
+    )
+    settings_cmd.add_argument("action", nargs="?", default="show", choices=("show", "set"))
+    settings_cmd.add_argument("first", nargs="?", metavar="KEY", help="set: the setting key (e.g. shredPolicy)")
+    settings_cmd.add_argument("second", nargs="?", metavar="VALUE", help="set: the value (e.g. 1-pass)")
+    settings_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
     return parser
 
 
@@ -371,6 +426,8 @@ def main(argv=None, stream=None):
         return USAGE_EXIT
     if args.command == "ignore":
         return _ignore_command(args, stream)
+    if args.command == "settings":
+        return _settings_command(args, stream)
     try:
         report = (catalog_report(repo_root()) if args.command == "catalog" else
                   history.read(verify=args.verify) if args.command == "history" else

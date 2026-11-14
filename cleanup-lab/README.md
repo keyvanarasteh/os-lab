@@ -134,6 +134,40 @@ sends type and value, never a pre-built rule. `labctl cleanup ignore list|add|
 remove [--json]` runs the same store with exit codes `0` ok / `1` problem /
 `2` usage.
 
+## Secure shred (CLN-14)
+
+`cleanup_lab/shred.py` overwrites a regular file in place pass by pass —
+`1-pass` writes zeros once, `3-pass` writes zeros, then ones (`0xFF`), then
+bytes from the OS — every pass flushed and `fsync`ed, then renames the file to
+a random name inside its own folder and unlinks it. Folders go bottom-up:
+files first, folders removed deepest-first, the planned root last. Opens use
+`O_NOFOLLOW`; after overwriting, the target is re-verified (same device and
+inode, same size) so a swapped or grown file fails instead of shredding the
+wrong thing. Symlinks are refused; sockets, FIFOs and device nodes are refused
+and left in place — their folder's removal then fails honestly with
+`ENOTEMPTY`. A folder whose listing fails is refused and left in place: shred
+never removes what it cannot verify. Every overwrite, rename and unlink
+failure is a reported failure (never success-on-error); bytes are credited
+only for files verifiably gone, so a partially shredded folder reports
+`failed` while still carrying the bytes it really destroyed.
+
+The mode is gated by the typed settings store (`cleanup_lab/settings.py`,
+`settings.json` in private state, same discipline as the rules store):
+`shredPolicy` is `off` (default), `1-pass` or `3-pass`. Only shred plans read
+it — `off` refuses the plan (`shred-disabled`) and a corrupt store refuses it
+too (`shred-settings-corrupt`) — while Trash and delete never touch the
+settings, so a broken file can never block the safe path. The plan payload
+names the pass count; a plan without a valid count fails the item instead of
+shredding once.
+
+The dashboard's Secure shred card shows the policy picker and the physical
+limits in the same words the confirmation uses: overwriting is not a
+guarantee on SSD, APFS or copy-on-write filesystems — wear levelling and
+copies can leave the original blocks elsewhere on the device. Console:
+`GET /api/cleanup/settings` (defaults filled, corrupt store reported in
+`error`) and `POST /api/cleanup/settings` (typed keys and values, `400`
+otherwise). CLI: `labctl cleanup settings [show] | set <key> <value> [--json]`.
+
 ## Volumes (CLN-28)
 
 `cleanup_lab/volumes.py` inventories the local mounted volumes read-only:

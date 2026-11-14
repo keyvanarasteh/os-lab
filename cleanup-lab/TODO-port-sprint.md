@@ -36,23 +36,25 @@ series; `VERIFY.md` gets an entry with real command output per task.
 
 ## Task 2 — CLN-14 secure shred
 
-- [ ] `cleanup_lab/shred.py`: overwrite passes (1/3, fsync per pass),
+- [x] `cleanup_lab/shred.py`: overwrite passes (1/3, fsync per pass),
       same-folder random rename, unlink, bottom-up folders, symlink and
       special-node refusal, TOCTOU re-verification, per-entry results.
-- [ ] `cleanup_lab/settings.py`: `shredPolicy` store, fail-closed read
+- [x] `cleanup_lab/settings.py`: `shredPolicy` store, fail-closed read
       (`shred-settings-corrupt`), Trash/delete never read it.
-- [ ] `shred` plan mode: settings gate (`shred-disabled`), pass count in the
+- [x] `shred` plan mode: settings gate (`shred-disabled`), pass count in the
       plan payload, corrupt-plan refusal, partial-shred honesty.
-- [ ] `tests/test_shred.py` for all of the above.
-- [ ] Fix the three known self-test defects: the trash-mode expectation reads
-      the original path instead of the Trash destination; the FIFO refusal
-      asserts on the status word instead of the error text; decide and align
-      the unreadable-empty-folder behaviour (remove vs keep) between code and
-      test.
-- [ ] Console settings endpoints + `labctl cleanup settings show|set`.
-- [ ] Dashboard settings policy picker + shred confirmation wording stating
-      the SSD/APFS/COW limits, seven locales.
-- [ ] Docs: README section, `VERIFY.md`, `PARITY.md` technique row.
+- [x] `tests/test_shred.py` for all of the above (26 tests).
+- [x] Fixed the three inherited self-test defects: the trash-mode expectation
+      now reads the Trash destination; the FIFO refusal asserts on the error
+      text; and an unreadable folder is refused and left in place (code and
+      test aligned on the conservative behaviour — shred never removes what
+      it cannot verify).
+- [x] Console settings endpoints (`GET/POST /api/cleanup/settings`) +
+      `labctl cleanup settings [show] | set <key> <value> [--json]`.
+- [x] Dashboard Secure shred card: policy picker + the SSD/APFS/COW limits
+      copy, seven locales. (The shred wording inside the plan confirmation
+      dialog lands with the shred-plan UI slice.)
+- [x] Docs: README section, `VERIFY.md`, `PARITY.md` technique row.
 
 ## Task 3 — CLN-19 headless CLI
 
