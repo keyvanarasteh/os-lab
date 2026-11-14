@@ -1175,3 +1175,39 @@ roundtrip, bad cron → usage exit). Dashboard: the Scheduled scans section
 (`schedules-card.tsx`) mounted under the Secure shred card, 14 new strings ×
 7 locales; `npm run check` clean, `npm run test:i18n` 2541 keys × 7, build OK
 (513 pages). Playwright e2e and screenshots stay CI-gated.
+
+## CLN-29 — simulator/emulator runtimes
+
+Branch `feat/cln-29` (stacked on `feat/cln-18`). Scope: `cleanup_lab/runtimes.py`
+(engine module by a parallel subagent + the typed delete actions added at
+integration), `GET /api/cleanup/runtimes` and the preview/run delete endpoints,
+`labctl cleanup runtimes`, the dashboard Simulator runtimes card, docs.
+
+### Runtimes tests
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_runtimes -v
+Ran 21 tests in 0.024s
+OK
+```
+
+Covers: the recorded `simctl runtime list -j` fixtures (wrapper and bare maps,
+garbage refused honestly), non-macOS refusal, failed/missing probes, outside-
+the-roots notes, avdmanager text parsing with the `.lock` in-use heuristic,
+`ANDROID_AVD_HOME` override, the SDK system-image walk (symlinks never
+followed, hard links once, unreadable branches skipped), and the typed delete
+actions: fixed argv per kind, id-shape refusals, the fresh-inventory candidate
+check, and honest delete outcomes. Full engine suite: the known pre-existing
+`test_relocation` set only; zero new failures.
+
+### Surfaces
+
+Console: `GET /api/cleanup/runtimes` (both probes), `POST .../delete/preview`
+(fixed argv + single-use preview id) and `POST .../delete/run` (audited job,
+mirroring the container-prune flow). CLI: `labctl cleanup runtimes` lists the
+inventory read-only; deletion is console-only (the page sends kind + id, never
+a command). Dashboard: the Simulator runtimes card on the extra-tools page
+(inventory with sizes and in-use badges, preview showing the exact argv,
+confirm then audited run), 9 new strings x 7 locales; `npm run check` clean,
+`test:i18n` 2550 keys x 7, build OK. Playwright e2e and screenshots remain
+CI-gated.

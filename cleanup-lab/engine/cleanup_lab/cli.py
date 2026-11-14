@@ -17,7 +17,7 @@ import time
 
 from .catalog import CatalogError, load as catalog_load, report as catalog_report
 from .readiness import probe, repo_root
-from . import clean, history, ignore, monitor, paths, plan_store, scan, schedules, settings, volumes
+from . import clean, history, ignore, monitor, paths, plan_store, runtimes, scan, schedules, settings, volumes
 
 USAGE_EXIT = 2
 
@@ -662,12 +662,34 @@ def _schedules_command(args, stream):
     return 0
 
 
+def _runtimes_command(args, stream):
+    """`labctl cleanup runtimes` — the report-only inventory (CLN-29)."""
+    result = {"xcode": runtimes.xcode_runtimes(repo_root()), "android": runtimes.android_avds(repo_root())}
+    if args.json:
+        stream.write(json.dumps(result, indent=2) + "\n")
+        return 0
+    items = [dict(item, group=group) for group in ("xcode", "android")
+             for item in result[group]["items"]]
+    lines = ["Cleanup Lab runtimes · {0} · {1} item(s)".format(
+        paths.platform_id(), len(items))]
+    for probe_name, probe in result.items():
+        if not probe["available"] and probe.get("reason"):
+            lines.append("  {0}: {1}".format(probe_name, probe["reason"]))
+    for item in items:
+        size = _bytes(item["sizeBytes"]) if item["sizeBytes"] is not None else "size unknown"
+        state = "in use" if item["inUse"] else "-"
+        lines.append("  {0:<15} {1:>10}  {2:<7} {3}  ({4})".format(
+            item["kind"], size, state, _safe(item["name"] or item["id"]), _safe(item["id"])))
+    stream.write("\n".join(lines) + "\n")
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="labctl cleanup",
         description="Cleanup Lab: inspect readiness (read-only) and, from CLN-19, scan/plan/clean.",
     )
-    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore|settings|schedules|scan|plan|clean")
+    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore|settings|schedules|runtimes|scan|plan|clean")
     for name, text in (
         ("status", "one-screen readiness summary"),
         ("doctor", "every check, path and hint"),
@@ -712,6 +734,12 @@ def build_parser():
                                help="add: the cron expression (quoted); remove/enable/disable: the schedule id")
     schedules_cmd.add_argument("second", nargs="?", help=argparse.SUPPRESS)
     schedules_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
+    runtimes_cmd = sub.add_parser(
+        "runtimes", help="simulator/emulator runtimes with sizes (CLN-29, report only)",
+        description="Xcode simulator runtimes, Android AVDs and SDK system images. "
+                    "Deletion runs through the console's previewed actions, never the CLI.",
+    )
+    runtimes_cmd.add_argument("--json", action="store_true", help="print the inventory as JSON")
     # --- CLN-19: the headless scan / plan / clean flow ---
     for name, text in (
         ("scan", "measure the catalog entries for this computer (read-only)"),
@@ -748,6 +776,8 @@ def main(argv=None, stream=None):
         return _settings_command(args, stream)
     if args.command == "schedules":
         return _schedules_command(args, stream)
+    if args.command == "runtimes":
+        return _runtimes_command(args, stream)
     if args.command == "scan":
         return _scan_command(args, stream)
     if args.command == "plan":

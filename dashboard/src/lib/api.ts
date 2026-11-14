@@ -432,6 +432,19 @@ export interface CleanupSettingsPayload { settings: { shredPolicy: ShredPolicy }
 /** CLN-18: one scheduled dry-run scan. */
 export interface ScheduleRecord { id: string; cron: string; enabled: boolean; createdAt: number; lastRunAt: number | null }
 export interface SchedulesPayload { schedules: ScheduleRecord[]; error: string | null }
+/** CLN-29: simulator/emulator runtimes, report-only inventory + typed deletes. */
+export interface RuntimeItem {
+  kind: string; id: string; name?: string; path?: string; basedOn?: string;
+  sizeBytes: number | null; sizeOnDiskBytes?: number | null; unreadable?: number;
+  inUse: boolean; deletable: boolean; note?: string;
+}
+export interface RuntimeProbe { available: boolean; reason?: string; items: RuntimeItem[] }
+export interface RuntimesPayload { xcode: RuntimeProbe; android: RuntimeProbe }
+export interface RuntimeDeletePreview { previewId: string; kind: string; id: string; argv: string[]; expiresAt: number }
+export interface RuntimeDeleteResult {
+  status: "completed" | "failed"; argv: string[]; kind?: string; id?: string;
+  returncode?: number; stdout?: string; stderr?: string; error?: string;
+}
 export interface BookmarkChanges {
   priority?: number; quickClean?: boolean;
   autoCleanHook?: { enabled: boolean; lastRunAt?: number | null };
@@ -577,6 +590,12 @@ export const api = {
     post<SchedulesPayload>("/api/cleanup/schedules", enabled === undefined ? { cron } : { cron, enabled }),
   cleanupScheduleRemove: (id: string) => post<SchedulesPayload>("/api/cleanup/schedules/remove", { id }),
   cleanupScheduleToggle: (id: string, enabled: boolean) => post<SchedulesPayload>("/api/cleanup/schedules/toggle", { id, enabled }),
+  /** CLN-29: report-only runtime inventory + typed previewed deletes. */
+  cleanupRuntimes: () => call<RuntimesPayload>("/api/cleanup/runtimes"),
+  cleanupRuntimeDeletePreview: (kind: string, id: string) =>
+    post<RuntimeDeletePreview>("/api/cleanup/runtimes/delete/preview", { kind, id }),
+  cleanupRuntimeDeleteRun: (previewId: string) =>
+    post<CleanupAuxJob<RuntimeDeleteResult>>("/api/cleanup/runtimes/delete/run", { previewId }),
   /** CLNP-23: the Space Explorer (read-only size trees over registered roots). */
   cleanupExplorerRoots: () => call<{ roots: CleanupExplorerRoot[] }>("/api/cleanup/explorer/roots"),
   cleanupExplorerScan: (rootId: string) => post<CleanupExplorerJob>("/api/cleanup/explorer/scan", { rootId }),

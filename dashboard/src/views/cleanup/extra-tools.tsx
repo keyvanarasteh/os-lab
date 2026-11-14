@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Badge, CopyButton, Empty, Section, Status } from "../../components/ui";
 import { api, type CleanupAuxJob, type CleanupContainerCapabilities, type CleanupContainerPreview, type CleanupContainerResult, type CleanupVMInventory } from "../../lib/api";
 import { bytes, containerActionLabel, riskLabel, riskTone } from "./format";
+import { RuntimesCard } from "./runtimes-card";
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
 
@@ -125,5 +126,6 @@ export function CleanupExtraTools({ now }: { now: number }) {
         {vmJob.result.unavailable.map((item, index) => <p key={`${item.id}-${index}`} className="text-sm"><span translate="no">{item.root || item.id}</span>: {item.reason}</p>)}
       </>}
     </Section>
+    <RuntimesCard now={now} />
   </>;
 }

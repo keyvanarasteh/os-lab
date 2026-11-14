@@ -444,6 +444,14 @@ nothing else, so a schedule can never clean — and the console, `labctl cleanup
 schedules …` and the dashboard's Scheduled scans section manage the list with
 the store's corrupt state reported until fixed.
 
+CLN-29 adds the simulator/emulator runtime inventory
+([[cleanup-lab/engine/cleanup_lab/runtimes.py]]): Xcode runtimes and Android
+AVDs and system images with sizes and in-use state, report-only on
+`GET /api/cleanup/runtimes` and `labctl cleanup runtimes`. Deletion is the
+CLN-08 pattern — fixed argv per kind, id shape validation, a fresh-inventory
+candidate check at preview, a single-use preview id and an audited run —
+surfaced in the dashboard's Simulator runtimes card.
+
 ## Dashboard pages
 
 [[dashboard/src/views/cleanup/pages.tsx]] renders the dashboard at `/cleanup/`:

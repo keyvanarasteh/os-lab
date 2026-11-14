@@ -9,6 +9,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import shutil
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -334,7 +335,7 @@ class AndroidAvdTests(RuntimesCase):
         self.assertTrue(result["available"])
         self.assertIn("Error while loading AVD", result["reason"])
         images = [item for item in result["items"] if item["kind"] == "system-image"]
-        self.assertEqual([item["id"] for item in images], ["android-34/google_apis/arm64-v8a"])
+        self.assertEqual([item["id"] for item in images], ["system-images;android-34;google_apis;arm64-v8a"])
         self.assertEqual(images[0]["sizeBytes"], 10)
 
     def test_system_images_are_walked_with_ids_relative_to_system_images(self):
@@ -351,10 +352,10 @@ class AndroidAvdTests(RuntimesCase):
         self.assertIsNone(result["reason"])  # both probes answered
         images = [item for item in result["items"] if item["kind"] == "system-image"]
         self.assertEqual([item["id"] for item in images],
-                         ["android-34/google_apis/arm64-v8a", "android-35/aosp_atd/x86_64"])
+                         ["system-images;android-34;google_apis;arm64-v8a", "system-images;android-35;aosp_atd;x86_64"])
         by_id = {item["id"]: item for item in images}
-        self.assertEqual(by_id["android-34/google_apis/arm64-v8a"]["sizeBytes"], 14)
-        self.assertEqual(by_id["android-35/aosp_atd/x86_64"]["sizeBytes"], 2)
+        self.assertEqual(by_id["system-images;android-34;google_apis;arm64-v8a"]["sizeBytes"], 14)
+        self.assertEqual(by_id["system-images;android-35;aosp_atd;x86_64"]["sizeBytes"], 2)
         self.assertFalse(images[0]["inUse"])
         self.assertTrue(images[0]["deletable"])
         self.assertTrue(os.path.exists(outside))  # the link was never followed
@@ -373,7 +374,7 @@ class AndroidAvdTests(RuntimesCase):
                                        run=self.fake_run(stdout=""))
         self.assertTrue(result["available"])
         images = [item for item in result["items"] if item["kind"] == "system-image"]
-        self.assertEqual([item["id"] for item in images], ["android-33/default/arm64-v8a"])
+        self.assertEqual([item["id"] for item in images], ["system-images;android-33;default;arm64-v8a"])
 
     def test_the_size_walk_never_follows_links_and_counts_a_hard_link_once(self):
         avd_dir = os.path.dirname(self.write(".android/avd/Hard.avd/one.bin", b"12345"))
@@ -417,3 +418,64 @@ class AndroidAvdTests(RuntimesCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeleteActionTests(unittest.TestCase):
+    """The typed delete actions: fixed argv, id shapes, fresh-candidate check."""
+
+    def run_fake(self, script):
+        def run(argv, **kwargs):
+            return SimpleNamespace(returncode=0, stdout=script, stderr="")
+        return run
+
+    def test_delete_argv_builds_the_fixed_prefixes(self):
+        runtime_id = "iOS-18.0-22A-1234"
+        payload = {"runtimes": {runtime_id: {"runtimeIdentifier": runtime_id,
+                                             "name": "iOS 18.0", "build": "22A"}}}
+        run = self.run_fake(json.dumps(payload))
+        argv = runtimes.delete_argv("xcode-runtime", runtime_id, platform="macos", run=run)
+        self.assertEqual(argv, ["xcrun", "simctl", "runtime", "delete", runtime_id])
+        fake = SimpleNamespace(returncode=0, stdout="Name: myavd\nPath: /tmp/x.avd\n", stderr="")
+        argv = runtimes.delete_argv("avd", "myavd", platform="macos", run=lambda a, **k: fake)
+        self.assertEqual(argv, ["avdmanager", "delete", "avd", "-n", "myavd"])
+        # the system-image fresh check walks a generated SDK tree
+        sdk = tempfile.mkdtemp(prefix="cln29-sdk-")
+        self.addCleanup(shutil.rmtree, sdk, ignore_errors=True)
+        image = os.path.join(sdk, "system-images", "android-33", "google_apis", "x86_64")
+        os.makedirs(image)
+        with open(os.path.join(image, "system.img"), "wb") as handle:
+            handle.write(b"x" * 64)
+        argv = runtimes.delete_argv(
+            "system-image", "system-images;android-33;google_apis;x86_64", platform="macos",
+            env={"ANDROID_SDK_ROOT": sdk},
+            run=lambda a, **k: SimpleNamespace(returncode=0, stdout="", stderr=""))
+        self.assertEqual(argv, ["sdkmanager", "uninstall", "system-images;android-33;google_apis;x86_64"])
+
+    def test_delete_argv_refuses_unknown_kinds_and_bad_ids(self):
+        run = self.run_fake("{}")
+        for kind, identifier in (
+            ("nope", "x"), ("xcode-runtime", "short"), ("xcode-runtime", "../evil"),
+            ("avd", "with space"), ("avd", ""), ("system-image", "only-two;segments"),
+            ("system-image", "a;b*;c;d"),
+        ):
+            with self.assertRaises(ValueError):
+                runtimes.delete_argv(kind, identifier, platform="macos", run=run)
+
+    def test_delete_argv_fresh_check_refuses_a_missing_candidate(self):
+        run = self.run_fake(json.dumps({"runtimes": {}}))
+        with self.assertRaises(ValueError) as caught:
+            runtimes.delete_argv("xcode-runtime", "iOS-18.0-22A-1234", platform="macos", run=run)
+        self.assertIn("no longer in the inventory", str(caught.exception))
+
+    def test_run_delete_reports_the_honest_outcome(self):
+        ok = runtimes.run_delete(["true"], run=lambda a, **k: SimpleNamespace(
+            returncode=0, stdout="done", stderr=""))
+        self.assertEqual(ok["status"], "completed")
+        self.assertEqual(ok["returncode"], 0)
+        bad = runtimes.run_delete(["false"], run=lambda a, **k: SimpleNamespace(
+            returncode=1, stdout="", stderr="refused"))
+        self.assertEqual(bad["status"], "failed")
+        self.assertEqual(bad["error"], "refused")
+        boom = runtimes.run_delete(["x"], run=lambda a, **k: (_ for _ in ()).throw(FileNotFoundError("gone")))
+        self.assertEqual(boom["status"], "failed")
+        self.assertIn("FileNotFoundError", boom["error"])

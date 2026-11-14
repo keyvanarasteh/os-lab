@@ -22,8 +22,10 @@ from __future__ import annotations
 import json
 import os
 import stat
+import re
 import subprocess
 
+from .readiness import repo_root
 from .paths import home_dir, platform_id
 
 #: The fixed probe arguments; no shell, no interpolation, five-second timeout.
@@ -339,7 +341,10 @@ def _system_images(images_root):
         if depth == 0:
             continue
         walked = _walk_size(current)
-        items.append({"kind": "system-image", "id": os.path.relpath(current, images_root),
+        # the id is sdkmanager's package form — the same string its uninstall
+        # command consumes — so the inventory id and the delete id match
+        items.append({"kind": "system-image",
+                      "id": "system-images;" + os.path.relpath(current, images_root).replace(os.sep, ";"),
                       "path": current,
                       "sizeBytes": walked["sizeBytes"] if walked else None,
                       "sizeOnDiskBytes": walked["sizeOnDiskBytes"] if walked else None,
@@ -398,3 +403,68 @@ def android_avds(root, *, platform=None, env=None, run=subprocess.run):
     return {"available": answered or sdk_answered,
             "reason": "; ".join(problems) if problems else None,
             "items": avds + images}
+
+
+# ── typed delete actions (CLN-29): fixed argv, fresh-candidate check ─────────
+
+
+#: Fixed argv prefixes for the typed delete actions. The id is the only
+#: variable part, validated per kind before it joins the argv — the page sends
+#: kind and id, never a command. System images go through sdkmanager's
+#: uninstall path, whose id is the ; -separated package path.
+_DELETE_PREFIXES = {
+    "xcode-runtime": ["xcrun", "simctl", "runtime", "delete"],
+    "avd": ["avdmanager", "delete", "avd", "-n"],
+    "system-image": ["sdkmanager", "uninstall"],
+}
+_ID_PATTERNS = {
+    "xcode-runtime": re.compile(r"^[A-Za-z0-9._-]{6,128}$"),
+    "avd": re.compile(r"^[A-Za-z0-9._-]{1,128}$"),
+    "system-image": re.compile(r"^[A-Za-z0-9._+-]+(;[A-Za-z0-9._+-]+){2,}$"),
+}
+
+
+def delete_argv(kind, identifier, *, platform=None, env=None, run=subprocess.run):
+    """The fixed argv for one typed delete action, with the fresh-candidate check.
+
+    Refuses an unknown kind, an id that fails its kind's shape, and — the
+    CLN-08 fresh-candidate check — an id that no longer appears in a fresh
+    inventory: the page confirms what the scan saw, and the run re-checks it
+    before anything executes. Returns the argv for the preview to show.
+    """
+    if kind not in _DELETE_PREFIXES:
+        raise ValueError("kind must be one of: {0}".format(", ".join(_DELETE_PREFIXES)))
+    if not isinstance(identifier, str) or not _ID_PATTERNS[kind].match(identifier):
+        raise ValueError("The id does not match the shape for {0}.".format(kind))
+    root = repo_root()
+    if kind == "xcode-runtime":
+        items = xcode_runtimes(root, platform=platform, env=env, run=run)["items"]
+    else:
+        items = android_avds(root, platform=platform, env=env, run=run)["items"]
+    if not any(item["kind"] == kind and item["id"] == identifier for item in items):
+        raise ValueError(
+            "The {0} {1} is no longer in the inventory; refresh and try again.".format(kind, identifier)
+        )
+    return [*_DELETE_PREFIXES[kind], identifier]
+
+
+def run_delete(argv, *, run=subprocess.run):
+    """Execute one delete argv exactly as previewed; reports the honest outcome."""
+    try:
+        completed = run(argv, capture_output=True, text=True, check=False, timeout=3600)
+    except subprocess.TimeoutExpired as exc:
+        return {"status": "failed", "argv": argv,
+                "error": "The delete timed out: {0}".format(exc)}
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"status": "failed", "argv": argv,
+                "error": "{0}: {1}".format(type(exc).__name__, exc)}
+    tail = (completed.stdout or "")[-2000:]
+    errors = (completed.stderr or "")[-2000:]
+    return {
+        "status": "completed" if completed.returncode == 0 else "failed",
+        "argv": argv,
+        "returncode": completed.returncode,
+        "stdout": tail,
+        "stderr": errors,
+        **({} if completed.returncode == 0 else {"error": errors.strip() or "The tool refused the delete."}),
+    }

@@ -67,6 +67,8 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "ignore-add": ("type", "value", "note"),
               "ignore-remove": ("ruleId",),
               "settings": ("shredPolicy",),
+              "runtime-delete-preview": ("kind", "id"),
+              "runtime-delete-run": ("previewId",),
               "schedules-add": ("cron", "enabled"),
               "schedules-remove": ("id",),
               "schedules-toggle": ("id", "enabled"),
@@ -710,6 +712,7 @@ class PreviewStore:
 #: One store per console process; the handler instances are per-request.
 JOBS = CleanupJobStore()
 PLANS = PlanStore()
+RUNTIME_PREVIEWS = PreviewStore("Runtime preview")
 CONTAINER_PREVIEWS = PreviewStore()
 PRIVILEGED_PREVIEWS = PreviewStore("Privileged preview")
 RELOCATION_PREVIEWS = PreviewStore("Relocation preview")
@@ -893,6 +896,27 @@ class MonitorRunner:
             except Exception:
                 self.stop.wait(self.IDLE_WAIT)  # a tick may fail; the runner must not die
 
+    def _run_runtime_delete(self, job, preview):
+        """CLN-29: run one previewed runtime delete; audited like a prune."""
+        try:
+            runtimes_mod = _module(self.root, "runtimes")
+            result = runtimes_mod.run_delete(preview.argv)
+            result.update({"kind": preview.kind, "id": preview.id})
+        except Exception as exc:
+            result = {"kind": preview.kind, "id": preview.id, "status": "failed",
+                      "error": "{0}: {1}".format(type(exc).__name__, exc)}
+        job.result = result
+        try:
+            _module(self.root, "history").append(result)
+            job.state = "done" if result["status"] == "completed" else "failed"
+            if job.state == "failed":
+                job.error = result.get("error")
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "Audit history could not record the result: {0}".format(exc)
+        finally:
+            job.finishedAt = time.time()
+
     def _run_due_schedules(self):
         """CLN-18: fire due schedules as scan-only jobs.
 
@@ -1030,6 +1054,14 @@ class CleanupAPI:
             settings_mod = _module(self.root, "settings")
             values, problem = settings_mod.all_values()
             return {"settings": values, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/runtimes":
+            # CLN-29: the report-only simulator/emulator runtime inventory.
+            _query(query)
+            runtimes_mod = _module(self.root, "runtimes")
+            return {
+                "xcode": runtimes_mod.xcode_runtimes(self.root),
+                "android": runtimes_mod.android_avds(self.root),
+            }
         if path == "/api/cleanup/schedules":
             # CLN-18: the scheduled dry-run scans; a corrupt store is reported
             # in "error" — due schedules are skipped until it is fixed.
@@ -1357,6 +1389,42 @@ class CleanupAPI:
                 raise CleanupError(500, "The schedules store cannot be written: {0}".format(exc)) from exc
             schedules, problem = schedules_mod.list_schedules()
             return {"schedules": schedules, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/runtimes/delete/preview":
+            # CLN-29: preview one typed delete. The page sends kind and id;
+            # the engine builds the fixed argv and re-checks the candidate.
+            _object_body(body, "runtime-delete-preview")
+            kind = body.get("kind")
+            identifier = body.get("id")
+            if not isinstance(kind, str) or not kind:
+                raise CleanupError(400, "kind must name a runtime kind")
+            if not isinstance(identifier, str) or not identifier:
+                raise CleanupError(400, "id must name an inventory item")
+            runtimes_mod = _module(self.root, "runtimes")
+            try:
+                argv = runtimes_mod.delete_argv(kind, identifier)
+            except ValueError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            except Exception as exc:
+                raise CleanupError(500, "The runtime inventory is unavailable: {0}".format(exc)) from exc
+            created = time.time()
+            preview_id = RUNTIME_PREVIEWS.register(type("RuntimePreview", (), {
+                "argv": argv, "kind": kind, "id": identifier, "created_at": created}))
+            return {"previewId": preview_id, "kind": kind, "id": identifier, "argv": argv,
+                    "expiresAt": created + 600}
+        if path == "/api/cleanup/runtimes/delete/run":
+            _object_body(body, "runtime-delete-run")
+            preview_id = body.get("previewId")
+            if not isinstance(preview_id, str) or not preview_id:
+                raise CleanupError(400, "previewId must name a previewed delete")
+            try:
+                _module(self.root, "history").prepare()
+            except Exception as exc:
+                raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+            preview = RUNTIME_PREVIEWS.claim(preview_id)
+            job = CleanupJob("runtime-delete", {"previewId": preview_id, "kind": preview.kind, "id": preview.id})
+            self._register(job)
+            self._spawn(job, self._run_runtime_delete, (job, preview))
+            return job.to_dict()
         if path == "/api/cleanup/explorer/roots":
             _query(query)
             return {"roots": _module(self.root, "explorer").roots(self.root)}
