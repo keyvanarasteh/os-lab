@@ -188,6 +188,25 @@ the console's own plans stay in its process. Text output sanitizes every path
 and name (control characters escaped), and the scan lists its first unreadable
 paths so the machine-readable detail in `--json` has a visible counterpart.
 
+## Schedules (CLN-18)
+
+`cleanup_lab/schedules.py` keeps scheduled **dry-run scans** as typed data in
+the private state store (`schedules.json`, the usual 0700/0600/no-symlink/
+atomic discipline). A schedule is a five-field cron expression (validated in
+the engine: ranges, lists, steps, Vixie OR semantics when both day fields are
+restricted) plus `enabled` and `lastRunAt`. The console's monitor runner
+thread checks the store on every tick: a due schedule is marked and spawns
+exactly the read-only catalog scan the page runs, as a `scheduled-scan` job —
+**a schedule can never clean**; there is no path from a schedule to a plan or
+a clean. A store that cannot be read skips the tick and is reported on
+`GET /api/cleanup/schedules` in `error` until it is fixed.
+
+Console: `GET /api/cleanup/schedules`, `POST` (add, `400` for invalid or
+duplicate cron), `POST …/toggle` (unknown id `404`), `POST …/remove`. CLI:
+`labctl cleanup schedules [list] | add '<cron>' | remove <id> | enable <id> |
+disable <id> [--json]` with the usual 0/1/2 exits. Dashboard: the Scheduled
+scans section with add/toggle/remove and the corrupt-store status.
+
 ## Volumes (CLN-28)
 
 `cleanup_lab/volumes.py` inventories the local mounted volumes read-only:

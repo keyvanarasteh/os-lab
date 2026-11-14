@@ -1141,3 +1141,37 @@ pre-existing `test_cli` case that used `scan` as its unknown-command example
 was updated (`scan` is now real; the case uses a genuinely unknown name).
 Console pytest suite and Playwright e2e remain CI-gated (offline sandbox) —
 they run on the PR.
+
+## CLN-18 — scheduled dry-run scans
+
+Branch `feat/cln-18` (stacked on `feat/cln-19`). Scope: `cleanup_lab/schedules.py`
+(engine module built by a parallel subagent, integrated here), the monitor-runner
+hook, console CRUD, `labctl cleanup schedules`, the Scheduled scans section, docs.
+
+### Schedules tests
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_schedules -v
+Ran 33 tests in 0.377s
+OK
+```
+
+Covers: cron validation (ranges/lists/steps; empty, wrong field count,
+out-of-range values, step 0, non-integers refused with the field named),
+next_run correctness across day/hour/dow boundaries, store roundtrip with the
+settings-store discipline (0700/0600/no symlink/atomic, corrupt fail-closed,
+duplicate cron refused), mark_run and due() truth table. Full engine suite:
+failure set identical to clean master in this sandbox; zero new failures.
+
+### Surfaces
+
+Console: `GET/POST /api/cleanup/schedules`, `/remove`, `/toggle` (typed 400s,
+unknown id 404, corrupt store reported in `error`); pytest tests added to
+`android-lab/lab/tests/test_cleanup_console.py` including the
+runner-hook test asserting a due schedule spawns a `scheduled-scan` job and
+never a plan or clean (CI-gated). CLI: `labctl cleanup schedules
+list|add|remove|enable|disable [--json]` — smoke-tested locally (add/list
+roundtrip, bad cron → usage exit). Dashboard: the Scheduled scans section
+(`schedules-card.tsx`) mounted under the Secure shred card, 14 new strings ×
+7 locales; `npm run check` clean, `npm run test:i18n` 2541 keys × 7, build OK
+(513 pages). Playwright e2e and screenshots stay CI-gated.
