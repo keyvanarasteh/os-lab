@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "session_id": "out-of-scope-test-001",
+    "operator": "test-runner",
+    "scope": "SHOULD BE REJECTED"
+  },
+  "events": [
+    {
+      "timestamp": "2026-11-14T10:00:00Z",
+      "phase": "reconnaissance",
+      "tool": "nmap",
+      "command": "nmap -sV 8.8.8.8",
+      "target": "8.8.8.8",
+      "output": "Port scan against public Google DNS server — THIS IS OUT OF SCOPE"
+    },
+    {
+      "timestamp": "2026-11-14T10:05:00Z",
+      "phase": "reconnaissance",
+      "tool": "nmap",
+      "command": "nmap -sV 192.168.10.10",
+      "target": "192.168.10.10",
+      "output": "This event is fine, but the session contains 8.8.8.8 above"
+    },
+    {
+      "timestamp": "2026-11-14T10:10:00Z",
+      "phase": "exploitation",
+      "tool": "sqlmap",
+      "command": "sqlmap -u 'http://example.com/search?q=test'",
+      "target": "example.com",
+      "output": "Targeting public domain — unauthorized"
+    }
+  ]
+}
