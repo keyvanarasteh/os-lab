@@ -227,3 +227,13 @@ olarak işaretlenmedi; OS-26'ya özgü testlerin tamamı geçti.
 Öğrencinin VM testleri ve lab çıktıları yukarıda kaydedildi. Kişisel Git/PR
 değerlendirmesi [REPORT.md](REPORT.md) içindedir; kanıt videosunun bağlantısı
 kayıt tamamlandıktan sonra PR'a eklenecek.
+
+## Video kaydindaki ortam ve test sonucu
+
+```text
+Kontrol zamani: 2026-11-14 00:04:16 UTC
+Isletim sistemi: Ubuntu 26.04.1 LTS
+Python 3.14.4
+.........................................                                [100%]
+41 passed in 0.55s
+```
