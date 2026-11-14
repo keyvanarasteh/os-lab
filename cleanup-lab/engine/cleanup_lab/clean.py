@@ -13,12 +13,20 @@ Ports the *behaviour* of Qleaner's ``clean_items`` / ``clean_leftovers`` /
   and carries a fingerprint per item. Running re-measures first: an item that
   changed or vanished since the plan was made expires the whole plan. A plan is
   single-use and short-lived (:data:`PLAN_TTL`).
-* **Honest results.** Per item one of ``trashed`` / ``deleted`` / ``skipped``
-  (with a stable ``code`` and reason) / ``failed`` (with the error). Bytes are
-  credited only when the item is really gone from its original path, and only in
-  the amount measured in this run — never the plan's estimate, never a failed
-  item's size. Transient ``OSError``s (EBUSY, ETXTBSY, …) are retried with a
+* **Honest results.** Per item one of ``trashed`` / ``deleted`` / ``shredded`` /
+  ``skipped`` (with a stable ``code`` and reason) / ``failed`` (with the error).
+  Bytes are credited only when the item is really gone from its original path,
+  and only in the amount measured in this run — never the plan's estimate, never
+  a failed item's size. Transient ``OSError``s (EBUSY, ETXTBSY, …) are retried with a
   short backoff (:func:`retry`).
+* **Shred is explicit and honest (CLN-14).** ``shred`` is a third plan mode, only
+  ever built on request, and only while the settings policy is on: policy ``off``
+  refuses the plan (``shred-disabled``) and a corrupt settings store refuses it
+  too (``shred-settings-corrupt``) — shred fails closed, while Trash and delete
+  never read the settings at all. Shred targets pass the same guard and the same
+  fingerprints as delete. Every overwrite, rename and unlink failure is a
+  ``failed`` item with the error; bytes are credited only for files verifiably
+  gone, as recorded per entry by :mod:`cleanup_lab.shred`.
 * **Guarded.** Every item goes through ``safety.check_target`` (CLN-12): resolved
   containment, ownership, running apps, privilege. The fingerprint walk never
   follows symlinks (rule 1).
@@ -31,7 +39,8 @@ walk of the original, and only then removed from the source — and when removin
 the original fails, the verified copy stays in the Trash instead of being
 discarded, because it may hold the item's only remaining bytes.
 
-Nothing here writes outside the Trash: planning and verifying are read-only.
+Nothing here writes outside the Trash — or, for shred, outside the planned paths
+themselves: planning and verifying are read-only.
 """
 from __future__ import annotations
 
@@ -51,11 +60,14 @@ from . import scan
 from . import ignore
 from .catalog import load, resolve as catalog_resolve
 from .paths import platform_id, trash_dir
+from . import settings
+from . import shred
 
 #: The modes a plan may name. ``trash`` is the default and the only automatic
-#: choice; ``delete`` must be requested explicitly and is executed exactly as
-#: planned (Qleaner's bug was the *fallback*, not the mode).
-MODES = ("trash", "delete")
+#: choice; ``delete`` and ``shred`` must be requested explicitly and are
+#: executed exactly as planned (Qleaner's bug was the *fallback*, not the mode).
+#: ``shred`` additionally needs the settings policy to be on (CLN-14).
+MODES = ("trash", "delete", "shred")
 DEFAULT_MODE = "trash"
 #: A plan expires after this many seconds even when nothing changed.
 PLAN_TTL = 600.0
@@ -74,7 +86,10 @@ class PlanError(ValueError):
     Codes: ``plan-invalid`` (bad request), ``unknown-plan``, ``expired`` (past
     :data:`PLAN_TTL`), ``stale`` (an item changed since the plan was made),
     ``used`` (the plan was already run), ``cancelled``, ``ignore-store-corrupt``
-    (the ignore-rules store cannot be read; the plan fails closed, CLN-17).
+    (the ignore-rules store cannot be read; the plan fails closed, CLN-17),
+    ``shred-disabled`` (the settings policy keeps secure shred off, CLN-14) and
+    ``shred-settings-corrupt`` (the settings store cannot be read; shred fails
+    closed).
     """
 
     def __init__(self, message, code="plan-invalid"):
@@ -398,7 +413,10 @@ def build_plan(
     (``ignored``), a folder holding an ignored path is refused
     (``contains-ignored``), and a rules store that cannot be read refuses the
     whole plan (``ignore-store-corrupt``) — the plan never runs against rules
-    it cannot see.
+    it cannot see. A ``shred`` plan additionally needs the settings policy to
+    be on: ``off`` refuses the plan (``shred-disabled``) and an unreadable
+    settings store refuses it too (``shred-settings-corrupt``), because shred
+    fails closed (CLN-14).
     """
     clock = time.time if clock is None else clock
     env = os.environ if env is None else env
@@ -413,6 +431,22 @@ def build_plan(
                 "against rules it cannot see.".format(rules_problem["message"]),
                 "ignore-store-corrupt",
             )
+    shred_passes = None
+    if mode == "shred":
+        policy, problem = settings.shred_policy(env=env, platform=target)
+        if problem is not None:
+            raise PlanError(
+                "Secure shred cannot start because the settings store cannot be read "
+                "({0}); shred fails closed.".format(problem["message"]),
+                "shred-settings-corrupt",
+            )
+        if policy == "off":
+            raise PlanError(
+                "Secure shred is disabled. Turn it on in the cleanup settings "
+                "(1-pass or 3-pass) before planning a shred; Trash stays the default.",
+                "shred-disabled",
+            )
+        shred_passes = shred.passes_for(policy)
     if (
         not isinstance(entry_ids, (list, tuple))
         or not entry_ids
@@ -592,6 +626,7 @@ def build_plan(
         "ttlSeconds": PLAN_TTL,
         "mode": mode,
         "platform": target,
+        **({"shredPasses": shred_passes} if mode == "shred" else {}),
         "items": items,
         "totals": {
             "items": len(items),
@@ -898,9 +933,28 @@ def _run_delete(path, *, unlink, rmdir, lexists, lstat, sleep):
         raise CleanError("The item is still present after deletion.")
 
 
-def _result_item(item, status, *, code="", reason="", error=None, measure=None, trash_path=None):
+def _run_shred(path, plan, *, rename, unlink, rmdir, lexists, lstat):
+    """Shred one verified item; returns ``(summary, entries)`` for the result row.
+
+    The pass count comes from the plan payload, which :func:`build_plan` filled
+    from the settings policy; a payload without it is a corrupt plan and fails
+    the item instead of shredding once and calling it done. Every failure inside
+    :func:`cleanup_lab.shred.shred_path` is reported in ``entries`` — nothing is
+    swallowed, nothing is retried.
+    """
+    passes = plan.payload.get("shredPasses")
+    if not isinstance(passes, int) or isinstance(passes, bool) or passes < 1:
+        raise CleanError("The plan does not name a valid number of overwrite passes.")
+    return shred.shred_path(
+        path, passes,
+        rename=rename, unlink=unlink, rmdir=rmdir, lexists=lexists, lstat=lstat,
+    )
+
+
+def _result_item(item, status, *, code="", reason="", error=None, measure=None, trash_path=None,
+                 shred=None):
     filled = measure or {"bytes": 0, "files": 0, "folders": 0}
-    return {
+    result = {
         "entryId": item["entryId"],
         "entryName": item["entryName"],
         "template": item["template"],
@@ -916,6 +970,9 @@ def _result_item(item, status, *, code="", reason="", error=None, measure=None, 
         "folders": filled["folders"],
         "trashPath": trash_path,
     }
+    if shred is not None:
+        result["shred"] = shred
+    return result
 
 
 def execute_plan(
@@ -963,7 +1020,7 @@ def execute_plan(
 
     emit()
     results = []
-    counts = {"trashed": 0, "deleted": 0, "skipped": 0, "failed": 0}
+    counts = {"trashed": 0, "deleted": 0, "shredded": 0, "skipped": 0, "failed": 0}
     totals = {"bytes": 0, "files": 0, "folders": 0}
     cancelled = False
     now = clock()
@@ -998,15 +1055,45 @@ def execute_plan(
                     )
                     results.append(_result_item(item, "trashed", measure=measure, trash_path=destination))
                     counts["trashed"] += 1
+                    credited = measure
+                elif plan.mode == "shred":
+                    summary, entries = _run_shred(
+                        path, plan,
+                        rename=rename, unlink=unlink, rmdir=rmdir, lexists=lexists, lstat=lstat,
+                    )
+                    destroyed = {
+                        "bytes": summary["bytes"],
+                        "files": summary["files"],
+                        "folders": summary["folders"],
+                    }
+                    error = next(
+                        (entry["error"] for entry in entries if entry["status"] == "failed"), None
+                    )
+                    # Every failure is reported; the files that were nevertheless
+                    # verifiably destroyed stay counted (their bytes are gone),
+                    # which is why a failed shred item can still carry bytes.
+                    results.append(_result_item(
+                        item,
+                        "failed" if summary["errors"] else "shredded",
+                        error=error,
+                        measure=destroyed,
+                        shred=entries,
+                    ))
+                    if summary["errors"]:
+                        counts["failed"] += 1
+                    else:
+                        counts["shredded"] += 1
+                    credited = destroyed
                 else:
                     _run_delete(
                         path, unlink=unlink, rmdir=rmdir, lexists=lexists, lstat=lstat, sleep=sleep
                     )
                     results.append(_result_item(item, "deleted", measure=measure))
                     counts["deleted"] += 1
-                totals["bytes"] += measure["bytes"]
-                totals["files"] += measure["files"]
-                totals["folders"] += measure["folders"]
+                    credited = measure
+                totals["bytes"] += credited["bytes"]
+                totals["files"] += credited["files"]
+                totals["folders"] += credited["folders"]
             except (OSError, CleanError) as exc:
                 results.append(
                     _result_item(item, "failed", error="{0}: {1}".format(type(exc).__name__, exc))
@@ -1032,6 +1119,7 @@ def execute_plan(
             "items": len(items),
             "trashed": counts["trashed"],
             "deleted": counts["deleted"],
+            **({"shredded": counts["shredded"]} if plan.mode == "shred" else {}),
             "skipped": counts["skipped"],
             "failed": counts["failed"],
             "bytes": totals["bytes"],

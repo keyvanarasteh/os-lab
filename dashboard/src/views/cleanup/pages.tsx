@@ -14,9 +14,10 @@ import { CrossPlatformLeftovers } from "./cross-leftovers";
 import { MonitorBanner, MonitorCard } from "./monitor-card";
 import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
 import { IgnoreSection } from "./ignore-card";
+import { ShredSection } from "./shred-card";
 import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
-import type { BookmarksPayload, CleanupVolume, IgnoreRulesPayload } from "../../lib/api";
+import type { BookmarksPayload, CleanupSettingsPayload, CleanupVolume, IgnoreRulesPayload } from "../../lib/api";
 
 export type CleanupPageId = "" | "scan" | "results" | "leftovers" | "history" | "space";
 export const CLEANUP_PAGES: CleanupPageId[] = ["", "scan", "results", "leftovers", "history", "space"];
@@ -216,6 +217,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const [permissions, setPermissions] = useState<CleanupPermissions | null>(null);
   const [bookmarks, setBookmarks] = useState<BookmarksPayload | null>(null);
   const [ignoreRules, setIgnoreRules] = useState<IgnoreRulesPayload | null>(null);
+  const [shredSettings, setShredSettings] = useState<CleanupSettingsPayload | null>(null);
   const [loading, setLoading] = useState(!PUBLIC);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -287,11 +289,15 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     void api.cleanupIgnoreRules()
       .then((payload) => { if (alive) setIgnoreRules(payload); })
       .catch(() => { if (alive) setIgnoreRules(null); });
+    void api.cleanupSettings()
+      .then((payload) => { if (alive) setShredSettings(payload); })
+      .catch(() => { if (alive) setShredSettings(null); });
     return () => { alive = false; };
   }, []);
 
   const reloadBookmarks = () => { void api.cleanupBookmarks().then(setBookmarks).catch(() => {}); };
   const reloadIgnoreRules = () => { void api.cleanupIgnoreRules().then(setIgnoreRules).catch(() => {}); };
+  const reloadShredSettings = () => { void api.cleanupSettings().then(setShredSettings).catch(() => {}); };
   const bookmarkedIds = new Set((bookmarks?.bookmarks ?? []).map((item) => item.entryId));
 
   /** CLNP-21: a capability card either navigates a tab or scrolls to its section. */
@@ -459,6 +465,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
             onQuickClean={(job) => { setActive(job); setJobs((old) => [job, ...old.filter((row) => row.id !== job.id)]); setBookmarkConfirm(true); }}
             onCatalogChanged={() => { void api.cleanupCatalog().then((catalog) => setEntries(catalog.entries)).catch(() => {}); }} />}
           {page === "" && !PUBLIC && <IgnoreSection rules={ignoreRules} reload={reloadIgnoreRules} />}
+          {page === "" && !PUBLIC && <ShredSection settings={shredSettings} reload={reloadShredSettings} />}
           {page === "" && !PUBLIC && bookmarkConfirm && active && isPlan(active) &&
             <ConfirmDialog plan={active.result} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
               onRun={() => void start(() => api.cleanupClean(active.result.planId))}

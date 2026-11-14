@@ -361,6 +361,20 @@ with a per-type explanation and placeholder, removes one, and shows the
 corrupt-store error as its own status because the engine refuses to scan or
 plan until it is fixed.
 
+CLN-14 has landed the same way: `cleanup_lab/shred.py` overwrites in place
+(`1-pass` zeros; `3-pass` zeros → ones → OS random, each pass `fsync`ed),
+renames to a random same-folder name and unlinks, folders bottom-up, with
+`O_NOFOLLOW` opens, a post-overwrite identity re-check, symlink and
+special-node refusals, and a folder that cannot be inspected left in place.
+Every failure is reported and bytes are credited only for files verifiably
+gone. The `shred` plan mode is gated by `cleanup_lab/settings.py`
+(`shredPolicy: off | 1-pass | 3-pass`, default off): `off` refuses the plan
+(`shred-disabled`) and a corrupt store refuses it too
+(`shred-settings-corrupt`), while Trash and delete never read the settings.
+The console answers `GET/POST /api/cleanup/settings`, `labctl cleanup
+settings [show] | set <key> <value>` runs the same store, and the Secure
+shred card shows the policy picker with the honest SSD/APFS/COW limits.
+
 ## Dashboard pages
 
 [[dashboard/src/views/cleanup/pages.tsx]] renders the dashboard at `/cleanup/`:

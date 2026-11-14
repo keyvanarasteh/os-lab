@@ -332,6 +332,9 @@ export interface BookmarksPayload { bookmarks: BookmarkRecord[]; error: string |
 export type IgnoreRuleType = "path" | "glob" | "extension";
 export interface IgnoreRule { id: string; type: IgnoreRuleType; value: string; note?: string }
 export interface IgnoreRulesPayload { rules: IgnoreRule[]; error: string | null }
+/** CLN-14: the typed engine settings (the shred policy lives here). */
+export type ShredPolicy = "off" | "1-pass" | "3-pass";
+export interface CleanupSettingsPayload { settings: { shredPolicy: ShredPolicy }; error: string | null }
 export interface BookmarkChanges {
   priority?: number; quickClean?: boolean;
   autoCleanHook?: { enabled: boolean; lastRunAt?: number | null };
@@ -423,6 +426,9 @@ export const api = {
   cleanupIgnoreAdd: (type: IgnoreRuleType, value: string, note?: string) =>
     post<IgnoreRulesPayload>("/api/cleanup/ignore", note ? { type, value, note } : { type, value }),
   cleanupIgnoreRemove: (ruleId: string) => post<IgnoreRulesPayload>("/api/cleanup/ignore/remove", { ruleId }),
+  /** CLN-14: the typed settings; "error" carries a corrupt store's message. */
+  cleanupSettings: () => call<CleanupSettingsPayload>("/api/cleanup/settings"),
+  cleanupSettingsSet: (shredPolicy: ShredPolicy) => post<CleanupSettingsPayload>("/api/cleanup/settings", { shredPolicy }),
   /** CLNP-23: the Space Explorer (read-only size trees over registered roots). */
   cleanupExplorerRoots: () => call<{ roots: CleanupExplorerRoot[] }>("/api/cleanup/explorer/roots"),
   cleanupExplorerScan: (rootId: string) => post<CleanupExplorerJob>("/api/cleanup/explorer/scan", { rootId }),
