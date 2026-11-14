@@ -31,6 +31,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from .catalog import load, resolve
+from . import ignore
 from .paths import platform_id
 
 PROGRESS_INTERVAL = 0.12  # seconds between progress callbacks (qrust-scan: 120 ms)
@@ -291,6 +292,7 @@ def _path_report(template, path, reason, *, missing=False, symlink=False, source
         "unreadable": [],
         "error": None,
         "measured": False,
+        "ignored": False,
     }
 
 
@@ -304,6 +306,7 @@ def scan_catalog(
     env=None,
     platform=None,
     catalog_entries=None,
+    rules=None,
 ):
     """Scan the catalog's resolved paths for this operating system.
 
@@ -311,6 +314,11 @@ def scan_catalog(
     scans every entry that names a path on this platform. Returns the JSON-ready
     result dict; a cancelled scan carries the partial per-path reports and
     ``"cancelled": true``. One unreadable path never fails the scan.
+
+    Ignore rules (CLN-17) prune the scan: an ignored path is reported with a
+    reason and never measured. The rules come from the private-state store; a
+    store that cannot be read fails the scan (``ignore-store-corrupt``) — the
+    scan never runs against rules it cannot see.
     """
     env = os.environ if env is None else env
     target = platform or platform_id()
@@ -318,6 +326,14 @@ def scan_catalog(
     workers = DEFAULT_WORKERS if workers is None else int(workers)
     if workers < 1 or workers > MAX_WORKERS:
         raise ScanError("workers must be between 1 and {0}".format(MAX_WORKERS))
+
+    if rules is None:
+        rules, rules_problem = ignore.load_rules(env, target)
+        if rules_problem is not None:
+            raise ScanError(
+                "The ignore rules cannot be read ({0}); the scan refuses to run "
+                "against rules it cannot see (ignore-store-corrupt).".format(rules_problem["message"])
+            )
 
     entries = catalog_entries if catalog_entries is not None else load(root, env)
     by_id = {entry["id"]: entry for entry in entries}
@@ -345,6 +361,15 @@ def scan_catalog(
                 result["paths"].append(
                     _path_report(item["template"], None, item["reason"], missing=True)
                 )
+                continue
+            if ignore.match(rules, item["path"]) is not None:
+                report = _path_report(
+                    item["template"], item["path"],
+                    "This path is ignored by the user's rules.",
+                    source=item.get("source", "catalog"),
+                )
+                report["ignored"] = True
+                result["paths"].append(report)
                 continue
             report = _path_report(item["template"], item["path"], "", source=item.get("source", "catalog"))
             result["paths"].append(report)
@@ -387,6 +412,7 @@ def scan_catalog(
         result["files"] = sum(p["files"] for p in measured)
         result["folders"] = sum(p["folders"] for p in measured)
         result["unreadable"] = [item for p in measured for item in p["unreadable"]]
+        result["ignored"] = sum(1 for p in result["paths"] if p.get("ignored"))
         result["missing"] = all(p["missing"] for p in result["paths"]) if result["paths"] else False
 
     finished = time.time()
@@ -412,6 +438,7 @@ def scan_catalog(
             "folders": sum(r["folders"] for r in results),
             "paths": sum(len(r["paths"]) for r in results),
             "unreadable": sum(len(r["unreadable"]) for r in results),
+            "ignoredPaths": sum(r["ignored"] for r in results),
             "entries": len(results),
         },
     }

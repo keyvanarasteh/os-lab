@@ -7,16 +7,19 @@ series; `VERIFY.md` gets an entry with real command output per task.
 
 ## Task 1 — CLN-17 engine-enforced ignore rules
 
-- [ ] `cleanup_lab/ignore.py`: typed store (`ignore-rules.json`, `0700`/`0600`,
+- [x] `cleanup_lab/ignore.py`: typed store (`ignore-rules.json`, `0700`/`0600`,
       no symlink, atomic replace), rule validation (absolute `path`, sane
       `glob`, bare `extension`), dedup on type+value, fail-closed read.
-- [ ] Matching semantics: `path` covers the path and everything under it;
-      `glob` matches the full path and any suffix; `extension` case-insensitive.
-- [ ] Scan prune: catalog scan skips ignored paths, counted and reported.
-- [ ] Plan refusal: `ignored` for a direct match, `contains-ignored` when an
-      ignored path lies inside a planned folder, `ignore-store-corrupt`
+- [x] Matching semantics: `path` covers the path and everything under it;
+      `glob` matches the full path and any suffix (and a matched folder covers
+      its subtree, with `*` never crossing a separator); `extension`
+      case-insensitive.
+- [x] Scan prune: catalog scan skips ignored paths, counted and reported.
+- [x] Plan refusal: `ignored` for a direct match, `contains-ignored` when an
+      ignored path lies inside a planned folder (path rules by containment,
+      glob/extension rules during the fingerprint walk), `ignore-store-corrupt`
       fail-closed on an unreadable/corrupt store.
-- [ ] `tests/test_ignore.py`: store roundtrip, validation, dedup, corrupt
+- [x] `tests/test_ignore.py`: store roundtrip, validation, dedup, corrupt
       store, matching, scan prune, plan refusals, fail-closed plan.
 - [ ] Console CRUD: `GET /api/cleanup/ignore`, `POST /api/cleanup/ignore`
       (add), `DELETE /api/cleanup/ignore/<id>` — ids only, typed 400s.

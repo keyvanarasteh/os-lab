@@ -48,6 +48,7 @@ from dataclasses import dataclass
 
 from . import safety
 from . import scan
+from . import ignore
 from .catalog import load, resolve as catalog_resolve
 from .paths import platform_id, trash_dir
 
@@ -72,7 +73,8 @@ class PlanError(ValueError):
 
     Codes: ``plan-invalid`` (bad request), ``unknown-plan``, ``expired`` (past
     :data:`PLAN_TTL`), ``stale`` (an item changed since the plan was made),
-    ``used`` (the plan was already run), ``cancelled``.
+    ``used`` (the plan was already run), ``cancelled``, ``ignore-store-corrupt``
+    (the ignore-rules store cannot be read; the plan fails closed, CLN-17).
     """
 
     def __init__(self, message, code="plan-invalid"):
@@ -131,7 +133,7 @@ def _cancelled(cancel):
 # ── Fingerprint: one read-only pass for the preview and the expiry check ────
 
 
-def fingerprint_path(path, *, cancel=None, progress=None):
+def fingerprint_path(path, *, cancel=None, progress=None, visit=None):
     """Measure ``path`` once, read-only, and describe it for the plan.
 
     Returns a dict with ``kind`` (``file`` / ``dir`` / ``other`` / ``missing`` /
@@ -140,6 +142,11 @@ def fingerprint_path(path, *, cancel=None, progress=None):
     ``unreadable``, ``maxMtimeNs``, ``dev``, ``ino``). Symlinks are counted,
     never followed; sockets, FIFOs and device nodes are ``other``. ``None`` when
     the cancel fired mid-walk.
+
+    ``visit`` is an optional predicate called with every regular file and folder
+    inside the walk; when it returns ``True`` the measure records
+    ``"ignoredInside": True`` without changing the counters — the caller decides
+    what an ignored descendant means (CLN-17: the planned folder is refused).
     """
     try:
         root_stat = os.lstat(path)
@@ -177,10 +184,10 @@ def fingerprint_path(path, *, cancel=None, progress=None):
     if not stat_mod.S_ISDIR(mode):
         return measure  # a socket, FIFO or device node: "other"
     measure["kind"] = "dir"
-    return _walk_fingerprint(path, measure, cancel=cancel, progress=progress)
+    return _walk_fingerprint(path, measure, cancel=cancel, progress=progress, visit=visit)
 
 
-def _walk_fingerprint(root, measure, *, cancel, progress):
+def _walk_fingerprint(root, measure, *, cancel, progress, visit=None):
     """Depth-first ``lstat`` walk of one folder; never follows links."""
     poll = 0
     has_blocks = False
@@ -214,6 +221,8 @@ def _walk_fingerprint(root, measure, *, cancel, progress):
             if stat_mod.S_ISLNK(child_mode):
                 measure["symlinks"] += 1
                 continue
+            if visit is not None and visit(child.path):
+                measure["ignoredInside"] = True
             if stat_mod.S_ISDIR(child_mode):
                 stack.append(child.path)
                 measure["maxMtimeNs"] = max(measure["maxMtimeNs"], stat.st_mtime_ns)
@@ -376,6 +385,7 @@ def build_plan(
     names=None,
     runner=None,
     clock=None,
+    rules=None,
 ):
     """Plan the cleaning of catalog entries: guard, measure, fingerprint — read-only.
 
@@ -383,12 +393,26 @@ def build_plan(
     accepts a path list). Every resolved path goes through ``safety.check_target``;
     every ready item is measured and fingerprinted in one read-only walk. Returns
     a :class:`Plan`; its ``payload`` is ``None`` when the build was cancelled.
+
+    Ignore rules (CLN-17) are enforced here: an ignored path is refused
+    (``ignored``), a folder holding an ignored path is refused
+    (``contains-ignored``), and a rules store that cannot be read refuses the
+    whole plan (``ignore-store-corrupt``) — the plan never runs against rules
+    it cannot see.
     """
     clock = time.time if clock is None else clock
     env = os.environ if env is None else env
     target = platform or platform_id()
     if mode not in MODES:
         raise PlanError("mode must be one of {0}".format(", ".join(MODES)))
+    if rules is None:
+        rules, rules_problem = ignore.load_rules(env, target)
+        if rules_problem is not None:
+            raise PlanError(
+                "The ignore rules cannot be read ({0}); the plan refuses to run "
+                "against rules it cannot see.".format(rules_problem["message"]),
+                "ignore-store-corrupt",
+            )
     if (
         not isinstance(entry_ids, (list, tuple))
         or not entry_ids
@@ -446,6 +470,15 @@ def build_plan(
                     )
                 )
                 continue
+            if ignore.match(rules, path) is not None:
+                items.append(
+                    _plan_item(
+                        entry, template, path, "skipped", mode=mode,
+                        code="ignored", source=resolved["source"],
+                        reason="This path is ignored by the user's rules.",
+                    )
+                )
+                continue
             verdict = safety.check_target(
                 path, entry, env=env, platform=target, uid=uid, lstat=lstat, names=names, runner=runner
             )
@@ -454,6 +487,16 @@ def build_plan(
                     _plan_item(
                         entry, template, verdict.path or path, "skipped", mode=mode,
                         code=verdict.code, reason=verdict.reason, source=resolved["source"],
+                    )
+                )
+                continue
+            if ignore.contains(rules, verdict.path) is not None:
+                items.append(
+                    _plan_item(
+                        entry, template, verdict.path, "skipped", mode=mode,
+                        code="contains-ignored", source=resolved["source"],
+                        reason="A path inside this folder is ignored by the user's rules; "
+                               "the folder is not removed.",
                     )
                 )
                 continue
@@ -484,7 +527,10 @@ def build_plan(
     progress = _PlanProgress(len(pending), progress_callback)
 
     def walk_one(item):
-        measure = fingerprint_path(item["path"], cancel=cancel, progress=progress)
+        measure = fingerprint_path(
+            item["path"], cancel=cancel, progress=progress,
+            visit=lambda child: ignore.match(rules, child) is not None,
+        )
         progress.finish_path()
         return measure
 
@@ -509,6 +555,11 @@ def build_plan(
         if measure["kind"] == "unreadable":
             item["status"], item["code"] = "skipped", "unreadable"
             item["reason"] = "The path cannot be read."
+            continue
+        if measure.get("ignoredInside"):
+            item["status"], item["code"] = "skipped", "contains-ignored"
+            item["reason"] = "A path inside this folder is ignored by the user's rules; " \
+                             "the folder is not removed."
             continue
         if measure["kind"] == "other":
             item["status"], item["code"] = "skipped", "not-cleanable"
