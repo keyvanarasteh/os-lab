@@ -59,7 +59,8 @@ make fuzz                 # AFL++ kuruluysa 60 sn fuzz + triage
 ## 4. Doğrulama ve Test Çıktıları
 
 - Çalıştırılan komut: `bash linux-lab/tests/pent05_test.sh`
-- Sonuç: `PENT-05: 28 geçti, 0 başarısız`
+- Sonuç: `PENT-05: 41 geçti, 0 başarısız, 4 atlandı` (atlanan 4 test python3/jq ile JSON doğrulaması; bu makinede yoktu, Linux CI'da çalışır)
+- `linux-lab/tests/test_pent05.py`: bash suite'ini çalıştırır ve her iki aracın `--json` çıktısını `json.loads` ile doğrular
 
 <!-- Linux'ta make audit ve make fuzz çıktısını buraya yapıştırın -->
 
@@ -69,6 +70,7 @@ make fuzz                 # AFL++ kuruluysa 60 sn fuzz + triage
   `-fstack-protector-strong` ile derlense bile `__stack_chk_fail` içermeyebilir.
 - Statik ve strip edilmiş ikililerde sembol tabanlı kontroller (canary, FORTIFY)
   sonuç veremeyebilir.
+- Kabuk, 128 üzeri normal bir çıkış kodunu sinyalden ayıramaz; bu durum `signal:` olarak raporlanır (ASAN `abort_on_error=1` ile crash'ler zaten sinyaldir).
 - Triage gruplaması üst iki çerçeveye dayanır. Aynı hatanın farklı çağrı
   yollarından gelmesi ayrı bucket oluşturabilir.
 
