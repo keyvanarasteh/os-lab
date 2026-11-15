@@ -11,6 +11,19 @@ import shlex
 import stat
 
 
+MAX_REPORT_RECORDS = 1000
+SUGGESTION_WARNING = (
+    "Path-based examples only, not safe automatic remediation: paths can change "
+    "after scanning. Stop concurrent writers, revalidate device/inode and parents "
+    "before any manual change; revalidation alone is not atomic. Never run these "
+    "commands on an untrusted or concurrently modified tree. No changes were made."
+)
+
+
+class ReportLimitReached(Exception):
+    """Stop scanning before retained report records exceed the fixed budget."""
+
+
 def parse_mode(value):
     """Accept rwx masks, not special bits or symbolic chmod expressions."""
     if not re.fullmatch(r"0?[0-7]{3}", value):
@@ -69,14 +82,17 @@ def inspect_entry(path, info, owner, group, file_mode, dir_mode):
     # Remove only flagged bits: never grant permissions absent from the original.
     # Preserve directory sticky/setgid bits (shared-directory semantics).
     target_mode = mode & ~(excess | privileged | stat.S_IWOTH)
-    if target_mode != mode:
-        suggestions.append(["chmod", f"{target_mode:04o}", "--", path])
-    if "owner-drift" in rules or "group-drift" in rules:
+    ownership_change = "owner-drift" in rules or "group-drift" in rules
+    if ownership_change:
         target_owner = str(owner) if "owner-drift" in rules else ""
         if "group-drift" in rules:
             target_owner += f":{group}"
         suggestions.append(["chown", "--no-dereference", target_owner, "--", path])
+    if target_mode != mode or (ownership_change and is_dir and mode & stat.S_ISGID):
+        suggestions.append(["chmod", f"{target_mode:04o}", "--", path])
     return {
+        "device": info.st_dev, "inode": info.st_ino,
+        "suggestion_warning": SUGGESTION_WARNING,
         "path": path, "type": "directory" if is_dir else "file",
         "mode": f"{mode:04o}", "symbolic_mode": stat.filemode(info.st_mode),
         "uid": info.st_uid, "gid": info.st_gid, "rules": rules,
@@ -88,21 +104,31 @@ def inspect_entry(path, info, owner, group, file_mode, dir_mode):
 def audit_tree(root, owner=None, group=None, file_mode=0o644, dir_mode=0o755,
                max_entries=10000):
     """Inspect root and descendants using directory-relative, no-follow stat."""
-    root = os.path.abspath(os.fspath(root))
+    root = os.path.abspath(os.fsdecode(root))
     owner = os.getuid() if owner is None else owner
     report = {
         "schema_version": 1, "root": root, "complete": True,
         "policy": {"owner_uid": owner, "group_gid": group,
                    "file_mode_max": f"{file_mode:04o}",
                    "dir_mode_max": f"{dir_mode:04o}",
-                   "max_entries": max_entries, "follow_symlinks": False,
+                   "max_entries": max_entries, "max_report_records": MAX_REPORT_RECORDS,
+                   "follow_symlinks": False,
                    "cross_filesystems": False},
         "visited": 0, "audited": 0,
         "skipped": {"symlinks": 0, "special_files": 0, "other_filesystems": 0},
         "findings": [], "errors": [],
     }
 
+    def check_report_budget():
+        # Reserve one record for the explicit truncation error.
+        if len(report["findings"]) + len(report["errors"]) >= MAX_REPORT_RECORDS - 1:
+            report["complete"] = False
+            report["errors"].append({"path": root, "message":
+                "report record limit reached; scan is incomplete"})
+            raise ReportLimitReached
+
     def error(path, message):
+        check_report_budget()
         report["complete"] = False
         report["errors"].append({"path": os.fsdecode(path), "message": str(message)})
 
@@ -110,6 +136,7 @@ def audit_tree(root, owner=None, group=None, file_mode=0o644, dir_mode=0o755,
         report["audited"] += 1
         finding = inspect_entry(path, info, owner, group, file_mode, dir_mode)
         if finding:
+            check_report_budget()
             report["findings"].append(finding)
 
     try:
@@ -117,7 +144,8 @@ def audit_tree(root, owner=None, group=None, file_mode=0o644, dir_mode=0o755,
         if not stat.S_ISDIR(root_info.st_mode):
             error(root, "root must be a directory, not a file or symbolic link")
             return report
-        if os.path.realpath(root) == os.path.sep:
+        filesystem_root = os.stat(os.path.sep)
+        if (root_info.st_dev, root_info.st_ino) == (filesystem_root.st_dev, filesystem_root.st_ino):
             error(root, "choose a specific lab directory instead of the filesystem root")
             return report
         report["visited"] = 1
@@ -126,6 +154,7 @@ def audit_tree(root, owner=None, group=None, file_mode=0o644, dir_mode=0o755,
         def walk_error(exc):
             error(exc.filename or root, exc.strerror or str(exc))
 
+        expected_directories = {root: (root_info.st_dev, root_info.st_ino)}
         root_opened = False
         with closing(os.fwalk(root, topdown=True, onerror=walk_error,
                               follow_symlinks=False)) as walker:
@@ -136,6 +165,11 @@ def audit_tree(root, owner=None, group=None, file_mode=0o644, dir_mode=0o755,
                     if (opened_info.st_dev, opened_info.st_ino) != (root_info.st_dev, root_info.st_ino):
                         error(root, "root directory changed during the scan")
                         return report
+                expected_identity = expected_directories.pop(directory, None)
+                if expected_identity != (opened_info.st_dev, opened_info.st_ino):
+                    dirs[:] = []
+                    error(directory, "directory changed during the scan; contents skipped")
+                    continue
                 # Also check the opened directory: a mount could change while walking.
                 if opened_info.st_dev != root_info.st_dev:
                     dirs[:] = []
@@ -163,6 +197,7 @@ def audit_tree(root, owner=None, group=None, file_mode=0o644, dir_mode=0o755,
                         # Do not add a file that changed to a directory to fwalk's list.
                         if name in original_dirs:
                             descend.append(name)
+                            expected_directories[path] = (info.st_dev, info.st_ino)
                     elif stat.S_ISREG(info.st_mode):
                         audit(path, info)
                     else:
@@ -170,8 +205,13 @@ def audit_tree(root, owner=None, group=None, file_mode=0o644, dir_mode=0o755,
                 dirs[:] = descend
         if not root_opened and report["complete"]:
             error(root, "root directory could not be opened; it may have changed during the scan")
+    except ReportLimitReached:
+        pass
     except (OSError, RecursionError) as exc:
-        error(root, str(exc))
+        try:
+            error(root, str(exc))
+        except ReportLimitReached:
+            pass
     return report
 
 
@@ -191,7 +231,7 @@ def render_text(report):
              f"Visited: {report['visited']} | Audited: {report['audited']} | "
              f"Entries with findings: {len(report['findings'])}",
              f"Skipped: {report['skipped']}",
-             "Suggestions require review; no changes were made."]
+             SUGGESTION_WARNING]
     for item in report["findings"]:
         lines += ["", f"{item['path']!r} [{item['type']}]",
                   f"  {item['mode']} {item['symbolic_mode']} "
