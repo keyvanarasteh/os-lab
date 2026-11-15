@@ -289,3 +289,86 @@ def test_names_and_numeric_ids_resolve_to_same_policy(tmp_path):
     assert proc.returncode == 0
     policy = json.loads(proc.stdout)["policy"]
     assert (policy["owner_uid"], policy["group_gid"]) == (os.getuid(), os.getgid())
+
+
+@pytest.mark.parametrize("root", [b"/", "//", b"//", "/tmp/.."])
+def test_filesystem_root_aliases_are_refused(root):
+    report = audit.audit_tree(root)
+    assert audit.exit_status(report) == 2 and report["audited"] == 0
+
+
+@pytest.mark.parametrize("pathlike", [False, True])
+def test_bytes_paths_render_as_text_and_json(tmp_path, pathlike):
+    raw = os.fsencode(tmp_path) + b"/nonutf8-\xff"
+    os.mkdir(raw)
+    os.chmod(raw, 0o777)
+
+    class BytePath:
+        def __fspath__(self):
+            return raw
+
+    report = audit.audit_tree(BytePath() if pathlike else raw)
+    assert isinstance(report["root"], str)
+    assert json.loads(json.dumps(report))["root"] == os.fsdecode(raw)
+    assert "Suggestion" in audit.render_text(report)
+    assert report["findings"][0]["path"] == os.fsdecode(raw)
+
+
+def test_replaced_child_directory_contents_are_not_scanned(tmp_path, monkeypatch):
+    child = tmp_path / "child"
+    child.mkdir(mode=0o755)
+    child.chmod(0o755)
+    original_walk = os.fwalk
+
+    def racing_walk(root, **kwargs):
+        with audit.closing(original_walk(root, **kwargs)) as walker:
+            yield next(walker)
+            # The auditor has statted child; replace it before fwalk opens it.
+            child.rename(tmp_path / "original")
+            child.mkdir(mode=0o755)
+            make_file(child, "replacement.txt", 0o666)
+            yield from walker
+
+    monkeypatch.setattr(audit.os, "fwalk", racing_walk)
+    report = audit.audit_tree(tmp_path)
+    assert audit.exit_status(report) == 2
+    assert any("directory changed" in e["message"] for e in report["errors"])
+    assert not any("replacement.txt" in f["path"] for f in report["findings"])
+
+
+@pytest.mark.parametrize("mode", [0o2755, 0o2777])
+def test_chown_precedes_restoration_of_directory_setgid(tmp_path, mode):
+    tmp_path.chmod(mode)
+    item = finding_for(audit.audit_tree(tmp_path, owner=os.getuid() + 1), tmp_path)
+    assert [cmd[0] for cmd in item["suggested_commands"]] == ["chown", "chmod"]
+    assert item["suggested_commands"][-1][1] == "2755"
+    assert stat.S_IMODE(tmp_path.stat().st_mode) == mode
+
+
+def test_suggestions_warn_about_stale_paths_and_record_identity(tmp_path):
+    path = make_file(tmp_path, mode=0o666)
+    report = audit.audit_tree(tmp_path)
+    item = finding_for(report, path)
+    assert (item["device"], item["inode"]) == (path.stat().st_dev, path.stat().st_ino)
+    assert "not safe automatic remediation" in item["suggestion_warning"]
+    assert "not atomic" in audit.render_text(report)
+
+
+@pytest.mark.parametrize("deny_stat", [False, True])
+def test_report_records_are_bounded_and_incomplete(tmp_path, monkeypatch, deny_stat):
+    monkeypatch.setattr(audit, "MAX_REPORT_RECORDS", 5)
+    for n in range(10):
+        make_file(tmp_path, f"file{n}", 0o666)
+    if deny_stat:
+        original_stat = os.stat
+
+        def denied(path, *args, **kwargs):
+            if kwargs.get("dir_fd") is not None:
+                raise PermissionError(13, "denied", path)
+            return original_stat(path, *args, **kwargs)
+
+        monkeypatch.setattr(audit.os, "stat", denied)
+    report = audit.audit_tree(tmp_path, max_entries=1_000_000)
+    assert len(report["findings"]) + len(report["errors"]) == 5
+    assert audit.exit_status(report) == 2
+    assert "report record limit" in report["errors"][-1]["message"]
