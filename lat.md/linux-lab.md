@@ -54,6 +54,17 @@ Offline cases in [[android-lab/lab/tests/test_permission_audit.py]] cover rules,
 root changes, links, limits, failure reporting and read-only behavior.
 [[linux-lab/docs/OS-26/VERIFY.md]] supplies the reproducible lab and video steps.
 
+OS-26 review hardening normalizes byte paths with `fsdecode`, rejects filesystem
+root aliases by device/inode, and compares opened child directories with their
+previously observed identities before inspecting contents. Changed directories
+make coverage incomplete. Findings include device/inode and stale-path warnings;
+commands are manual examples, never race-safe remediation. Ownership commands
+precede chmod; setgid directory mode restoration is suggested after chown.
+At most 1000 combined finding/error records are retained, including a terminal
+limit error; reaching that budget stops the audit with exit 2. `fwalk` directory
+name lists remain a limitation for very wide directories; use small owned labs.
+
+
 ## Why qemux/qemu
 
 The engine was chosen to match the Windows and macOS labs' compose+web-viewer UX.
