@@ -17,7 +17,7 @@ import time
 
 from .catalog import CatalogError, load as catalog_load, report as catalog_report
 from .readiness import probe, repo_root
-from . import clean, history, ignore, monitor, paths, plan_store, scan, settings, volumes
+from . import clean, history, ignore, monitor, paths, plan_store, scan, schedules, settings, volumes
 
 USAGE_EXIT = 2
 
@@ -583,12 +583,91 @@ def _clean_command(args, stream):
     return 1 if totals["failed"] or result["cancelled"] else 0
 
 
+def _schedules_command(args, stream):
+    """`labctl cleanup schedules list|add|remove|enable|disable` — 0/1/2."""
+    if args.action == "list":
+        if args.first or args.second:
+            sys.stderr.write("cleanup schedules list: no further arguments\n")
+            return USAGE_EXIT
+        rows, problem = schedules.list_schedules()
+        if problem is not None:
+            if args.json:
+                stream.write(json.dumps({"schedules": [], "error": problem["message"]}, indent=2) + "\n")
+            else:
+                sys.stderr.write("cleanup schedules: {0}\n".format(problem["message"]))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"schedules": rows, "error": None}, indent=2) + "\n")
+        else:
+            lines = ["Cleanup Lab schedules · {0} · {1} {2}".format(
+                paths.platform_id(), len(rows), "schedule" if len(rows) == 1 else "schedules")]
+            for row in rows:
+                state = "enabled" if row["enabled"] else "disabled"
+                last = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row["lastRunAt"])) if row["lastRunAt"] else "never"
+                lines.append("  {0:<9} {1}  last run {2}  ({3})".format(
+                    state, _safe(row["cron"]), last, row["id"]))
+            stream.write("\n".join(lines) + "\n")
+        return 0
+    if args.action == "add":
+        if not args.first or args.second:
+            sys.stderr.write("cleanup schedules add: usage is `schedules add '<cron>'`\n")
+            return USAGE_EXIT
+        try:
+            row = schedules.add(args.first)
+        except ValueError as exc:
+            sys.stderr.write("cleanup schedules add: {0}\n".format(exc))
+            return USAGE_EXIT
+        except schedules.SchedulesError as exc:
+            sys.stderr.write("cleanup schedules add: {0}\n".format(exc))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"added": row, "error": None}, indent=2) + "\n")
+        else:
+            stream.write("Added schedule {0}  ({1})\n".format(row["cron"], row["id"]))
+        return 0
+    if args.action in ("enable", "disable"):
+        if not args.first or args.second:
+            sys.stderr.write("cleanup schedules {0}: usage is `schedules {0} <id>`\n".format(args.action))
+            return USAGE_EXIT
+        try:
+            row = schedules.set_enabled(args.first, args.action == "enable")
+        except ValueError as exc:
+            sys.stderr.write("cleanup schedules {0}: {1}\n".format(args.action, exc))
+            return 1
+        except schedules.SchedulesError as exc:
+            sys.stderr.write("cleanup schedules {0}: {1}\n".format(args.action, exc))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"schedule": row, "error": None}, indent=2) + "\n")
+        else:
+            stream.write("{0} schedule {1}  ({2})\n".format(
+                "Enabled" if row["enabled"] else "Disabled", row["cron"], row["id"]))
+        return 0
+    # remove
+    if not args.first or args.second:
+        sys.stderr.write("cleanup schedules remove: usage is `schedules remove <id>`\n")
+        return USAGE_EXIT
+    try:
+        removed = schedules.remove(args.first)
+    except schedules.SchedulesError as exc:
+        sys.stderr.write("cleanup schedules remove: {0}\n".format(exc))
+        return 1
+    if not removed:
+        sys.stderr.write("cleanup schedules remove: no schedule with id {0}\n".format(args.first))
+        return 1
+    if args.json:
+        stream.write(json.dumps({"removed": args.first, "error": None}, indent=2) + "\n")
+    else:
+        stream.write("Removed schedule {0}\n".format(args.first))
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="labctl cleanup",
         description="Cleanup Lab: inspect readiness (read-only) and, from CLN-19, scan/plan/clean.",
     )
-    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore|settings|scan|plan|clean")
+    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore|settings|schedules|scan|plan|clean")
     for name, text in (
         ("status", "one-screen readiness summary"),
         ("doctor", "every check, path and hint"),
@@ -623,6 +702,16 @@ def build_parser():
     settings_cmd.add_argument("first", nargs="?", metavar="KEY", help="set: the setting key (e.g. shredPolicy)")
     settings_cmd.add_argument("second", nargs="?", metavar="VALUE", help="set: the value (e.g. 1-pass)")
     settings_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
+    schedules_cmd = sub.add_parser(
+        "schedules", help="scheduled dry-run scans (CLN-18)",
+        description="A schedule fires a scan-only job on its cron; it can never clean.",
+    )
+    schedules_cmd.add_argument("action", nargs="?", default="list",
+                               choices=("list", "add", "remove", "enable", "disable"))
+    schedules_cmd.add_argument("first", nargs="?", metavar="CRON_OR_ID",
+                               help="add: the cron expression (quoted); remove/enable/disable: the schedule id")
+    schedules_cmd.add_argument("second", nargs="?", help=argparse.SUPPRESS)
+    schedules_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
     # --- CLN-19: the headless scan / plan / clean flow ---
     for name, text in (
         ("scan", "measure the catalog entries for this computer (read-only)"),
@@ -657,6 +746,8 @@ def main(argv=None, stream=None):
         return _ignore_command(args, stream)
     if args.command == "settings":
         return _settings_command(args, stream)
+    if args.command == "schedules":
+        return _schedules_command(args, stream)
     if args.command == "scan":
         return _scan_command(args, stream)
     if args.command == "plan":

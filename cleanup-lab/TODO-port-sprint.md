@@ -70,10 +70,14 @@ series; `VERIFY.md` gets an entry with real command output per task.
 
 ## Task 4 — CLN-18 scheduled dry-run scans
 
-- [ ] Schedule store in private state (add/toggle/delete, cron validation).
-- [ ] Runner hook in the monitor thread: due schedule → scan-only pass,
-      recorded result; schedules can never clean.
-- [ ] Wake-catch-up semantics; tests; `/cleanup/` schedules section + locales.
+- [x] Schedule store in private state (add/toggle/delete, full cron
+      validation with ranges/lists/steps and Vixie OR semantics).
+- [x] Runner hook in the monitor thread: due schedule → `scheduled-scan`
+      scan-only job, lastRunAt recorded; schedules can never clean.
+- [x] Console CRUD (typed 400s, unknown id 404, corrupt store in `error`),
+      `labctl cleanup schedules list|add|remove|enable|disable`, dashboard
+      Scheduled scans section, seven locales; engine 33 tests + console
+      pytest tests (CI-gated).
 
 ## Task 5 — CLN-29 simulator/emulator runtimes
 

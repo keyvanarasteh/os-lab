@@ -429,6 +429,9 @@ export interface IgnoreRulesPayload { rules: IgnoreRule[]; error: string | null 
 /** CLN-14: the typed engine settings (the shred policy lives here). */
 export type ShredPolicy = "off" | "1-pass" | "3-pass";
 export interface CleanupSettingsPayload { settings: { shredPolicy: ShredPolicy }; error: string | null }
+/** CLN-18: one scheduled dry-run scan. */
+export interface ScheduleRecord { id: string; cron: string; enabled: boolean; createdAt: number; lastRunAt: number | null }
+export interface SchedulesPayload { schedules: ScheduleRecord[]; error: string | null }
 export interface BookmarkChanges {
   priority?: number; quickClean?: boolean;
   autoCleanHook?: { enabled: boolean; lastRunAt?: number | null };
@@ -568,6 +571,12 @@ export const api = {
   /** CLN-14: the typed settings; "error" carries a corrupt store's message. */
   cleanupSettings: () => call<CleanupSettingsPayload>("/api/cleanup/settings"),
   cleanupSettingsSet: (shredPolicy: ShredPolicy) => post<CleanupSettingsPayload>("/api/cleanup/settings", { shredPolicy }),
+  /** CLN-18: scheduled dry-run scans; "error" carries a corrupt store's message. */
+  cleanupSchedules: () => call<SchedulesPayload>("/api/cleanup/schedules"),
+  cleanupScheduleAdd: (cron: string, enabled?: boolean) =>
+    post<SchedulesPayload>("/api/cleanup/schedules", enabled === undefined ? { cron } : { cron, enabled }),
+  cleanupScheduleRemove: (id: string) => post<SchedulesPayload>("/api/cleanup/schedules/remove", { id }),
+  cleanupScheduleToggle: (id: string, enabled: boolean) => post<SchedulesPayload>("/api/cleanup/schedules/toggle", { id, enabled }),
   /** CLNP-23: the Space Explorer (read-only size trees over registered roots). */
   cleanupExplorerRoots: () => call<{ roots: CleanupExplorerRoot[] }>("/api/cleanup/explorer/roots"),
   cleanupExplorerScan: (rootId: string) => post<CleanupExplorerJob>("/api/cleanup/explorer/scan", { rootId }),

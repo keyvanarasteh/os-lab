@@ -1054,3 +1054,48 @@ def test_a_corrupt_ignore_store_is_reported_and_blocks_writes(tmp_path):
     with pytest.raises(cleanup_api.CleanupError) as caught:
         api.post("/api/cleanup/ignore", {"type": "glob", "value": "*.tmp"})
     assert caught.value.status == 500
+
+
+def test_schedules_roundtrip_through_the_console(tmp_path):
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    assert api.get("/api/cleanup/schedules", {}) == {"schedules": [], "error": None}
+    added = api.post("/api/cleanup/schedules", {"cron": "30 2 * * *"})
+    assert added["error"] is None and len(added["schedules"]) == 1
+    row = added["schedules"][0]
+    assert row["cron"] == "30 2 * * *" and row["enabled"] is True and row["lastRunAt"] is None
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/schedules", {"cron": "30 2 * * *"})
+    assert caught.value.status == 400  # duplicate cron
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/schedules", {"cron": "25 * *"})
+    assert caught.value.status == 400  # invalid cron
+    toggled_id = row["id"]
+    toggled = api.post("/api/cleanup/schedules/toggle", {"id": toggled_id, "enabled": False})
+    assert toggled["schedules"][0]["enabled"] is False
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/schedules/toggle", {"id": "nope", "enabled": True})
+    assert caught.value.status == 404
+    removed = api.post("/api/cleanup/schedules/remove", {"id": toggled_id})
+    assert removed["schedules"] == []
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/schedules/remove", {"id": toggled_id})
+    assert caught.value.status == 404
+
+
+def test_a_scheduled_scan_job_never_cleans(tmp_path, monkeypatch):
+    # the runner hook spawns scan jobs only: the job kind is "scheduled-scan"
+    # and no plan/clean job can be spawned by a schedule.
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    api.post("/api/cleanup/schedules", {"cron": "* * * * *"})
+    MONITOR = cleanup_api.MONITOR
+    MONITOR.ensure_started(REPO_ROOT)
+    deadline = time.time() + 70  # the runner wakes at most IDLE_WAIT later
+    kinds = set()
+    while time.time() < deadline:
+        kinds = {job.kind for job in cleanup_api.JOBS.list()}
+        if "scheduled-scan" in kinds:
+            break
+        time.sleep(0.5)
+    assert "scheduled-scan" in kinds
+    assert not any(kind.startswith("clean") or kind == "plan" for kind in kinds)
+    MONITOR.shutdown()
