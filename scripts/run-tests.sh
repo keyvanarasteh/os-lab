@@ -6,7 +6,7 @@
 #
 # Usage:
 #   scripts/run-tests.sh            run everything
-#   scripts/run-tests.sh --quick    only the Android and Source Lab unit tests
+#   scripts/run-tests.sh --quick    only the unit tests (Android, Source Lab, extension scanner)
 #   scripts/run-tests.sh --no-venv  use the current environment, do not create .venv
 #   scripts/run-tests.sh -h|--help  show this help
 #
