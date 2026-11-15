@@ -28,7 +28,7 @@ Usage:
   ./labctl <lab> <command> [options]
   ./labctl all <command> [options]
   ./labctl ui [--port N]      Open the web console (default port 5050)
-  ./labctl cleanup <command>  Cleanup Lab readiness (see below)
+  ./labctl cleanup <command>  Cleanup Lab readiness, scan, plan and clean (see below)
 
 Labs:
   win | windows      Windows VM lab (win-lab/)
@@ -85,9 +85,12 @@ Profiles:
   ios:      lightweight, development, performance
   linux:    lightweight, development, performance
 
-Cleanup Lab commands (read-only; scanning and cleaning arrive with CLN-03/CLN-13):
+Cleanup Lab commands:
   ./labctl cleanup status [--json]   One-screen readiness summary; exit 0 ready, 1 problem
   ./labctl cleanup doctor [--json]   Every check, path and hint
+  ./labctl cleanup scan [--entry ID] [--json]   Read-only detector scan
+  ./labctl cleanup plan --entry ID [--mode trash|delete] [--json]   Save a ten-minute plan
+  ./labctl cleanup clean --plan ID --yes [--json]   Consume that plan once
 
 Examples:
   ./labctl win profile use lightweight

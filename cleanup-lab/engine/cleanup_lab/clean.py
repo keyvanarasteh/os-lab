@@ -444,7 +444,7 @@ def build_plan(
                     _plan_item(
                         entry, template, path, "skipped", mode=mode,
                         code="privileged",
-                        reason="This entry needs administrator rights; a privileged plan arrives in a later task.",
+                        reason="This entry needs administrator approval; use the separate privileged preview.",
                     )
                 )
                 continue

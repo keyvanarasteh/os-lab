@@ -1,0 +1,51 @@
+{
+  "$schema": "./schema.json",
+  "version": 1,
+  "family": "system",
+  "entries": [
+    {
+      "id": "system.journald-vacuum",
+      "name": "Archived system journals",
+      "category": "system",
+      "risk": "medium",
+      "hint": "Archived logs older than seven days; use the separate privileged preview to vacuum them.",
+      "impact": "Old system diagnostics will no longer be available.",
+      "defaultSelected": false,
+      "needsPrivilege": true,
+      "paths": {"linux": ["/var/log/journal"]}
+    },
+    {
+      "id": "system.apt-cache-clean",
+      "name": "APT package archives",
+      "category": "system",
+      "risk": "medium",
+      "hint": "Downloaded APT packages can be removed with an authorized apt-get clean.",
+      "impact": "Packages must be downloaded again if reinstalled.",
+      "defaultSelected": false,
+      "needsPrivilege": true,
+      "paths": {"linux": ["/var/cache/apt/archives"]}
+    },
+    {
+      "id": "system.system-font-rebuild",
+      "name": "Shared font cache rebuild",
+      "category": "system",
+      "risk": "medium",
+      "hint": "Rebuild the shared font cache through an authorized fixed command.",
+      "impact": "Font lookup may be slower until the cache is rebuilt.",
+      "defaultSelected": false,
+      "needsPrivilege": true,
+      "paths": {"linux": ["/var/cache/fontconfig"]}
+    },
+    {
+      "id": "system.spotlight-rebuild",
+      "name": "Spotlight index rebuild",
+      "category": "system",
+      "risk": "high",
+      "hint": "Rebuild the startup volume Spotlight index through an authorized fixed command.",
+      "impact": "Search results may be incomplete until indexing finishes.",
+      "defaultSelected": false,
+      "needsPrivilege": true,
+      "paths": {"macos": ["/.Spotlight-V100"]}
+    }
+  ]
+}

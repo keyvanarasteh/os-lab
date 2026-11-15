@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "cleanup-lab", "engine"))
 import cleanup_api  # noqa: E402
 from cleanup_lab import catalog as catalog_module  # noqa: E402
 from cleanup_lab import paths as paths_module  # noqa: E402
+from cleanup_lab import privileged as privileged_module  # noqa: E402
 
 
 def wait_for(job, state=None, timeout=10):
@@ -175,6 +176,24 @@ def test_scheduled_scan_crud_and_runner(tmp_path, monkeypatch):
         with pytest.raises(cleanup_api.CleanupError) as caught:
             api.post("/api/cleanup/schedules", body)
         assert caught.value.status == 400
+
+
+def test_privileged_contract_requires_preview_and_audits_result(monkeypatch):
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    assert api.get("/api/cleanup/disk-access", {})["state"] in ("not-applicable", "unknown", "accessible", "limited")
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/privileged/plan", {"actionIds": ["system.apt-cache-clean"], "command": "sh"})
+    assert caught.value.status == 400
+
+    monkeypatch.setattr(privileged_module, "preview", lambda ids: {"planId": "abc", "actions": ids})
+    monkeypatch.setattr(privileged_module, "run", lambda plan_id: {
+        "planId": plan_id, "mode": "privileged", "results": [],
+        "totals": {"items": 0, "failed": 0, "bytes": 0}, "cancelled": False})
+    preview = api.post("/api/cleanup/privileged/plan", {"actionIds": ["system.apt-cache-clean"]})
+    assert preview["planId"] == "abc"
+    result = api.post("/api/cleanup/privileged/run", {"planId": preview["planId"]})
+    assert result["mode"] == "privileged"
+    assert api.get("/api/cleanup/history", {})["total"] == 1
 
 
 def test_the_scan_request_accepts_catalog_ids_only():

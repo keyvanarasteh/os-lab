@@ -162,6 +162,36 @@ every Qleaner detector id to a catalog id, or to a written reason for dropping i
 | HMAC-signed audit history | `db.rs` | CLN-15 |
 | Ignore rules, schedules, headless CLI, disk-access check | `rules`, `schedules` pages, `cli.rs`, `check_system_disk_access` | CLN-17 … CLN-20 |
 
+### Headless commands (CLN-19)
+
+```sh
+./labctl cleanup scan --entry system.user-caches --json
+./labctl cleanup plan --entry system.user-caches --json
+./labctl cleanup clean --plan PLAN_ID --yes --json
+```
+
+Repeat `--entry` to select multiple catalog detectors. `plan` defaults to Trash;
+`--mode delete` must be explicit. The plan id expires after ten minutes, is
+signed in the private state folder, and can be consumed only once. `clean`
+verifies the paths and ignore rules again and writes the signed audit history.
+Exit codes: 0 complete, 1 problem or partial result, 2 usage. No command accepts
+a free-form path or shell command.
+
+### Privileged maintenance (CLN-20)
+
+The ordinary clean plan leaves administrator targets skipped. The local console
+has a separate typed `POST /api/cleanup/privileged/plan` preview accepting only
+known `actionIds`, followed by `POST /api/cleanup/privileged/run` with its
+single-use `planId`. The preview lists exact arguments and expires in ten
+minutes. Only root-owned system binaries in trusted directories can run; the
+runner uses `pkexec` on Linux when present or noninteractive `sudo`, never a
+shell or stored password. A failed authorization is reported as a failed action
+and the result is written to audit history. Actions are: Linux journal vacuum
+(archived logs older than seven days), APT archive cleanup, shared font-cache
+rebuild, and macOS startup-volume Spotlight rebuild. Other platforms do not
+list them. `GET /api/cleanup/disk-access` gives a read-only macOS Full Disk
+Access hint; it cannot prove a complete operating-system grant.
+
 ## What the reference code adds
 
 | Capability | Reference | Task |

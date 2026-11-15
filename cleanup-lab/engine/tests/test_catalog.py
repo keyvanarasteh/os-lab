@@ -105,10 +105,13 @@ class LoadTest(unittest.TestCase):
         entries = catalog.load(ROOT, BASE_ENV)
         ids = [entry["id"] for entry in entries]
         self.assertEqual(
-            ids, ["system.user-caches", "system.user-logs", "system.trash"], "file order, family order"
+            ids, ["system.journald-vacuum", "system.apt-cache-clean",
+                  "system.system-font-rebuild", "system.spotlight-rebuild",
+                  "system.user-caches", "system.user-logs", "system.trash"], "file order, family order"
         )
         self.assertTrue(all(entry["family"] == "system" for entry in entries))
-        self.assertTrue(all(entry["file"] == "system.json" for entry in entries))
+        self.assertEqual([entry["file"] for entry in entries],
+                         ["system-privileged.json"] * 4 + ["system.json"] * 3)
 
     def test_for_platform_filters_without_dropping_the_entry(self):
         with tempfile.TemporaryDirectory() as base:

@@ -1,10 +1,4 @@
-"""`labctl cleanup status|doctor|catalog|history [--json]`.
-
-All three read: they print the readiness probe or the detector catalog and change
-nothing. The exit code follows the lab CLI contract — ``0`` when the engine is
-ready, ``1`` when it needs setup or the platform is unsupported, ``2`` for a usage
-error (argparse).
-"""
+"""Headless Cleanup Lab status, scan, plan and single-use clean commands."""
 from __future__ import annotations
 
 import argparse
@@ -13,7 +7,7 @@ import sys
 
 from .catalog import CatalogError, report as catalog_report
 from .readiness import probe, repo_root
-from . import history
+from . import history, scan, clean, cli_plans
 
 USAGE_EXIT = 2
 
@@ -110,9 +104,9 @@ def _catalog_lines(report, stream):
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="labctl cleanup",
-        description="Cleanup Lab: inspect readiness (read-only) and, from CLN-19, scan/plan/clean.",
+        description="Cleanup Lab: inspect readiness, scan, plan and confirmed clean.",
     )
-    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history")
+    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|scan|plan|clean")
     for name, text in (
         ("status", "one-screen readiness summary"),
         ("doctor", "every check, path and hint"),
@@ -123,6 +117,18 @@ def build_parser():
         command.add_argument("--json", action="store_true", help="print the probe as JSON")
         if name == "history":
             command.add_argument("--verify", action="store_true", help="verify the full HMAC chain")
+    scan_cmd = sub.add_parser("scan", help="measure catalog targets read-only")
+    scan_cmd.add_argument("--entry", action="append", dest="entry_ids", help="catalog detector id; repeatable")
+    scan_cmd.add_argument("--json", action="store_true")
+    plan_cmd = sub.add_parser("plan", help="build and save a ten-minute clean plan")
+    plan_cmd.add_argument("--entry", action="append", required=True, dest="entry_ids",
+                          help="catalog detector id; repeatable")
+    plan_cmd.add_argument("--mode", choices=clean.MODES, default=clean.DEFAULT_MODE)
+    plan_cmd.add_argument("--json", action="store_true")
+    clean_cmd = sub.add_parser("clean", help="consume a confirmed plan once")
+    clean_cmd.add_argument("--plan", required=True, dest="plan_id")
+    clean_cmd.add_argument("--yes", action="store_true", help="confirm the plan's named mode")
+    clean_cmd.add_argument("--json", action="store_true")
     return parser
 
 
@@ -133,6 +139,46 @@ def main(argv=None, stream=None):
     if not args.command:
         parser.print_help(stream)
         return USAGE_EXIT
+    if args.command in ("scan", "plan", "clean"):
+        if args.command == "clean" and not args.yes:
+            sys.stderr.write("cleanup clean: --yes is required to confirm the plan\n")
+            return USAGE_EXIT
+        try:
+            if args.command == "scan":
+                report = scan.scan_catalog(repo_root(), args.entry_ids)
+            elif args.command == "plan":
+                plan = clean.build_plan(repo_root(), args.entry_ids, mode=args.mode)
+                cli_plans.save(plan)
+                report = plan.to_dict()
+            else:
+                plan = cli_plans.claim(args.plan_id)
+                measures = clean.verify_plan(plan)
+                report = clean.execute_plan(plan, measures)
+                history.append(report)
+        except (clean.PlanError, history.HistoryError, CatalogError, OSError, ValueError) as exc:
+            if args.json:
+                stream.write(json.dumps({"error": str(exc)}) + "\n")
+            else:
+                sys.stderr.write("cleanup {0}: {1}\n".format(args.command, exc))
+            return 1
+        if args.json:
+            stream.write(json.dumps(report, indent=2) + "\n")
+        elif args.command == "scan":
+            totals = report["totals"]
+            stream.write("Scanned {0} path(s) · {1} bytes\n".format(totals["paths"], totals["sizeBytes"]))
+        elif args.command == "plan":
+            totals = report["totals"]
+            stream.write("Plan {0} · {1} ready · {2} bytes · {3}\n".format(
+                report["planId"], totals["ready"], totals["bytes"], report["mode"]))
+        else:
+            totals = report["totals"]
+            stream.write("Cleaned {0} byte(s) · {1} failed · {2} skipped\n".format(
+                totals["bytes"], totals["failed"], totals["skipped"]))
+        if args.command == "clean":
+            return 1 if report["cancelled"] or report["totals"]["failed"] or report["totals"]["skipped"] else 0
+        if args.command == "plan":
+            return 1 if report["totals"]["ready"] == 0 else 0
+        return 1 if report.get("cancelled") or report["totals"]["unreadable"] else 0
     try:
         report = (catalog_report(repo_root()) if args.command == "catalog" else
                   history.read(verify=args.verify) if args.command == "history" else probe())

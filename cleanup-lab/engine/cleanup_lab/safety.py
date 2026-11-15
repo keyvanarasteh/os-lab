@@ -44,6 +44,12 @@ SYSTEM_ROOTS = {
         "C:\\ProgramData",
     ),
 }
+PRIVILEGED_ACTIONS = {
+    "system.journald-vacuum": ("linux", "Vacuum archived journal files older than seven days", ("journalctl", "--vacuum-time=7d")),
+    "system.apt-cache-clean": ("linux", "Clear downloaded APT package archives", ("apt-get", "clean")),
+    "system.system-font-rebuild": ("linux", "Rebuild the shared font cache", ("fc-cache", "-r")),
+    "system.spotlight-rebuild": ("macos", "Rebuild the startup volume Spotlight index", ("mdutil", "-E", "/")),
+}
 
 
 class PathPolicyError(ValueError):
@@ -60,6 +66,13 @@ class SafetyError(ValueError):
     def __init__(self, message, code="unsafe"):
         super().__init__(message)
         self.code = code
+
+
+def assert_privileged_action(action_id, platform, argv):
+    """A system action may execute only its fixed, platform-specific arguments."""
+    spec = PRIVILEGED_ACTIONS.get(action_id)
+    if spec is None or spec[0] != platform or tuple(argv) != spec[2]:
+        raise SafetyError("Unknown or changed privileged action", "privileged-action")
 
 
 @dataclass(frozen=True)

@@ -539,3 +539,60 @@ passed. Dashboard checks were skipped because this worktree has no dependencies
 and no dashboard source changed.
 
 The plain schedules section on `/cleanup/` depends on CLN-16's page branch.
+
+## CLN-19 — headless CLI
+
+Branch `codex/cln-19-headless-cli`, stacked on CLN-18. `labctl cleanup scan`,
+`plan` and `clean` use catalog ids and JSON output. A plan is signed with the
+private per-install key and saved for ten minutes; `clean --plan ID --yes`
+atomically claims it, rechecks rules and fingerprints, then appends audit history.
+Exit codes are 0 complete, 1 problem or partial result, 2 usage. No arbitrary
+path or command field exists.
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 126 tests — OK
+$ uv run --with pytest python -m pytest android-lab/lab/tests/test_cleanup_console.py -q
+12 passed
+$ /Volumes/Projects/iQ/os-lab/.venv-test/bin/python -m pytest source-lab/engine/tests -q
+176 passed
+$ PATH=/Volumes/Projects/iQ/os-lab/.venv-test/bin:$PATH ./scripts/run-tests.sh --no-venv
+6 passed, 2 failed, 1 skipped
+$ lat check
+All checks passed
+$ bash -n labctl
+(clean)
+```
+
+The broader gate retains the six documented host/baseline Android failures.
+Source Lab errored when the volume ran out of space during temp-file creation;
+its 176 tests passed when rerun after removing ignored Cargo build output. The Cleanup Lab, Rust,
+shell, smoke and graph stages passed. Dashboard checks were skipped because
+this worktree has no dependencies and no dashboard source changed.
+
+## CLN-20 — typed privileged actions and disk-access guidance
+
+Branch `codex/cln-20-privileged-targets`, stacked on CLN-19. Four fixed
+maintenance actions are available on their applicable OS only. A preview shows
+exact command arguments; a one-use, ten-minute token is required to run.
+Root-owned protected binaries are rechecked before each action, the runner uses
+no shell or stored password, and the result is audited. The standard clean plan
+continues to skip privileged catalog entries. The macOS Full Disk Access hint
+reads protected folder metadata only and says when evidence is inconclusive.
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 130 tests — OK
+$ uv run --with pytest python -m pytest android-lab/lab/tests/test_cleanup_console.py -q
+13 passed
+$ lat check
+All checks passed
+$ git diff --check
+(clean)
+```
+
+No real elevation was attempted. Fake binaries and a fake runner verify fixed
+argv, the one-use token, platform refusal, trusted-binary checks and no shell.
+The full repository gate was not rerun because its unchanged Rust stage filled
+the remaining volume space on CLN-19; the focused engine and console suites cover
+this change. Dashboard checks await the plain CLN-16 integration.

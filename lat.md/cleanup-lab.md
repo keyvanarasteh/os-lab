@@ -26,6 +26,12 @@ fallthrough. Long work becomes a console job with preview, progress and cancel.
 `labctl cleanup status|doctor|history [--json]` runs the same engine through
 `cleanup_lab.cli`: exit `0` when ready, `1` when a required check fails, `2` for a
 usage error, matching [[lat.md/labctl.md]].
+`labctl cleanup scan --entry ID --json` measures catalog targets, `plan --entry ID
+--json` saves a short-lived signed plan, and `clean --plan ID --yes --json`
+consumes it once. These commands return `0` for a complete operation, `1` for a
+problem or partial result, and `2` for usage. Plans live in the private state
+folder and use the audit store's per-install HMAC key; a separate CLI invocation
+rechecks fingerprints and rules before moving anything, then records the run.
 
 ## Catalog
 
@@ -117,6 +123,19 @@ replay missed minutes. `GET /api/cleanup/schedules` lists schedules;
 `POST /api/cleanup/schedules` adds one with catalog detector ids, and
 `POST /api/cleanup/schedules/<id>/toggle|delete` changes it. A schedule cannot
 start a plan or clean job.
+
+[[cleanup-lab/engine/cleanup_lab/privileged.py]] permits only four fixed
+maintenance actions: Linux archived-journal vacuum, APT archive cleanup and
+shared font-cache rebuild, and macOS startup-volume Spotlight rebuild. Each
+requires `POST /api/cleanup/privileged/plan {actionIds}` followed by an explicit
+`POST /api/cleanup/privileged/run {planId}`. The one-use preview includes the
+exact argv and expires after ten minutes. The runner rechecks root-owned system
+binaries, executes without a shell via `pkexec` (Linux when available) or
+noninteractive `sudo`, stores no password and appends an audit result. Ordinary
+clean plans keep privileged entries skipped. Catalog reporting excludes actions
+on other operating systems. `GET /api/cleanup/disk-access` is a read-only macOS
+probe that reports limited/unknown/accessible evidence and points to Full Disk
+Access settings without claiming to prove an OS grant.
 
 ## Safety
 
