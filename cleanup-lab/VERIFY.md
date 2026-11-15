@@ -481,6 +481,89 @@ CLN-13 (three AppImage architecture expectations, invalid `JAVA_HOME` for JADX,
 source console mutation guard, and web UI preview status): 6 failed, 158 passed,
 1 skipped. No dashboard files changed; CLN-16 owns the history view.
 
+## CLN-27 — relocate a cache to another volume behind a symlink
+
+Branch `codex/cln-27-cache-relocation`, stacked on CLN-28. Engine, console API,
+tests and the knowledge graph. No file under `dashboard/` changed; the plain
+functional controls are the open page gate (see `STATUS.md` and the PR checklist).
+
+### Engine unit tests
+
+```console
+$ cd cleanup-lab/engine && ../../.venv-test/bin/python -m unittest discover -s tests -p 'test_*.py'
+Ran 157 tests in 1.151s
+
+OK
+```
+
+The 24 new tests cover: the seven link states; a relative link target; a
+fingerprint that counts symlinks without following; the move step order with
+`verify_copy` before any removal; no-space, wrong-state, destination-outside,
+nested and interrupted refusals; a successful move that leaves a working link and
+removes only the aside copy; file and in-tree-symlink relocation; a failed copy,
+mismatched copy, failed rename, failed symlink, wrong link and failed aside removal
+each leaving the original or a verified copy; resume finishing an interrupted move;
+resume rolling back when no copy survived; cancel between steps; restore keeping or
+removing the store; relink of a missing and a wrong link; relink refusing a real
+folder; and resume of an interrupted restore.
+
+### Console tests
+
+```console
+$ cd android-lab/lab && ../../.venv-test/bin/python -m pytest tests/test_cleanup_console.py -q
+....................                                                     [100%]
+20 passed in 2.10s
+```
+
+Covers: `GET /api/cleanup/relocations` states and actions over a generated
+two-volume host; a plan → run job that links the cache and writes one audit record;
+typed refusal of a free path, command, unknown entry/volume, home volume, bad index
+and bad action; single-use and expired plans; an interrupted move listed as
+`resume` and resumed to a working link; and the browser route returning `202` for
+the run and polling to `done`.
+
+### Repository checks
+
+```console
+$ PATH=.../.venv-test/bin:$PATH CARGO_TARGET_DIR=/Volumes/Projects/iQ/.cargo-target-cln27 \
+    ./scripts/run-tests.sh --no-venv
+...
+5 failed, 169 passed, 1 skipped in 16.17s
+[fail] android-lab/lab test suite
+[ok]   source-lab/engine test suite         176 passed
+[ok]   cleanup-lab/reference/python          35 tests, OK
+[ok]   cleanup-lab/engine                    157 tests, OK
+[ok]   cleanup-lab/reference/qrust-scan      27 tests, OK
+[ok]   sample analysis + report generated
+[ok]   all 70 shell scripts parse
+[ok]   lat check
+[skip] dashboard dependencies not installed
+7 passed, 1 failed, 1 skipped
+```
+
+The only failure is the known android stage: `test_app_update` ×3,
+`test_jadx_decompiler_on_real_dex` and the `test_web_ui` plan preview, all
+pre-existing on `master`; the stage otherwise has `169 passed`, including the new
+console cases. The dashboard stage was skipped because this worktree has no
+`node_modules`; nothing under `dashboard/` changed.
+
+```console
+$ lat check
+All checks passed in 392ms
+$ git diff --check
+(clean)
+$ python -m py_compile cleanup-lab/engine/cleanup_lab/relocation.py console/cleanup_api.py \
+    android-lab/lab/web_ui.py android-lab/lab/tests/test_cleanup_console.py
+(ok)
+```
+
+### Not run
+
+`npm run check` / `build` / `test:e2e` and dashboard screenshots — no dashboard
+file changed and this worktree has no Node dependencies; the functional controls
+remain the open page gate. Rust `fmt`/`clippy` — no Rust changed. No Windows host
+ran the symlink/rename paths; those use generated temp trees and injected steps.
+
 ## CLN-04 … CLN-29
 
 Each task appends its own section when it lands.
