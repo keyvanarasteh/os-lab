@@ -37,3 +37,25 @@ sudo bash install.sh --install
 ## Guvenlik
 Kurulum sistem paketlerini degistirir.
 Once test ortaminda denenmelidir.
+
+
+
+## Test Sonuçları
+
+Test ortamı: Ubuntu (WSL)
+
+Çalıştırılan komut:
+`bash install.sh --check`
+
+Kontrol sonuçları:
+- Node.js: v22.22.1 - Başarılı
+- npm: 9.2.0 - Başarılı
+- Python 3: 3.14.4 - Başarılı
+- python komutu: Python 3.14.4 - Başarılı
+
+Sonuç: Sistem kontrolü başarıyla tamamlandı.
+Node.js, npm ve Python sürümleri doğrulandı.
+
+Not: Kurulum modu henüz test edilmedi.
+
+
