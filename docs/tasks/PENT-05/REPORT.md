@@ -2,7 +2,7 @@
 
 - **Öğrenci:** Tuğba Soğanlı · 2520191023 (GitHub: niltuvba-dotcom)
 - **Ders:** MYO062 İleri Sızma Testi (Vize -> PENT-05)
-- **Pull Request:** PR_LINKI
+- **Pull Request:** https://github.com/keyvanarasteh/os-lab/pull/284 (rezervasyon: https://github.com/keyvanarasteh/os-lab/pull/283)
 - **Kanıt Videosu (2-4 dk):** VIDEO_LINKI
 
 ## 1. Amaç ve Kapsam
