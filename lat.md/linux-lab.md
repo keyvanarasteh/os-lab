@@ -114,3 +114,26 @@ Validation and install steps, in order:
 
 Only install trusted `.deb` packages. Installation requires sudo
 permissions and may modify the operating system.
+
+## PENT-05 Binary hardening and crash triage
+
+PENT-05 verifies compiler/linker mitigations on ELF binaries and triages AFL++ crashes.
+
+[[linux-lab/scripts/pent-05-hardening-audit.sh]] reads `readelf -h/-l/-d/-s` output
+and reports, per binary: NX (non-executable `GNU_STACK`), PIE (`DYN` + `INTERP`;
+shared objects are `dso`), stack canary (`__stack_chk_fail`), RELRO (`GNU_RELRO` +
+`BIND_NOW` = full), and FORTIFY (`__*_chk` count, informational). It also reads
+the system ASLR level from `/proc/sys/kernel/randomize_va_space`. Exit 0 means all
+hardened, 1 means a weakness (or ASLR off), 2 means a usage, file or tool error.
+`--json` prints a machine-readable result.
+
+[[linux-lab/scripts/pent-05-afl-triage.sh]] has two modes. `triage` replays each
+crash input against a target (`@@` = file path, else stdin) and buckets results
+by ASAN error type plus top two app frames, signal, hang, or no-crash. `fuzz`
+builds `linux-lab/pent-05/hedef.c` with `afl-cc` + ASAN, runs `afl-fuzz -V N`,
+and triages the crashes; without AFL++ it prints `[skip]` and exits 0.
+
+`linux-lab/pent-05/` holds the deliberately vulnerable lab target, seeds, and a
+Makefile that builds `hedef-weak` (all mitigations off) and `hedef-hardened`
+(all on). Offline tests in [[linux-lab/tests/pent05_test.sh]] use a fake
+`readelf` and a fake crash target, so they need only bash and coreutils.
