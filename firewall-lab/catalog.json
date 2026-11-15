@@ -1,23 +1,25 @@
 {
   "generatedBy": "firewall-lab/scripts/catalog.py",
   "summary": {
-    "companies": 12,
-    "branches": 48,
-    "firewalls": 52,
-    "rules": 538,
+    "companies": 13,
+    "branches": 53,
+    "firewalls": 57,
+    "rules": 556,
     "priceUsd": {
       "min": 700,
       "max": 205357,
       "total": 439026
     },
     "chosenByVendor": {
-      "Fortinet": 35,
+      "Fortinet": 36,
       "Netgate": 5,
       "Netfilter project": 5,
-      "Palo Alto Networks": 3,
+      "Palo Alto Networks": 4,
       "Cloudflare": 2,
+      "Check Point": 2,
       "WatchGuard": 1,
-      "Check Point": 1
+      "Fortinet & Netfilter Project": 1,
+      "Cisco": 1
     },
     "chosenByProduct": {
       "Fortinet FortiGate 60F": 6,
@@ -43,6 +45,11 @@
       "Fortinet FortiGate 100F (HA)": 1,
       "Fortinet FortiGate 90G": 1,
       "Check Point Check Point Quantum Spark 1800": 1,
+      "Fortinet & Netfilter Project FortiGate 200F with UFW Host-Based Layer": 1,
+      "Palo Alto Networks Palo Alto PA-1410 High Availability Cluster": 1,
+      "Cisco Cisco Meraki MX68": 1,
+      "Fortinet FortiGate 4400F": 1,
+      "Check Point Check Point Quantum 6400": 1,
       "Fortinet FortiGate 400F (HA)": 1,
       "Fortinet FortiGate 3500F (HA)": 1,
       "Palo Alto Networks Palo Alto Networks PA-5410": 1,
@@ -55,15 +62,15 @@
       "Fortinet FortiGate 80F": 1
     },
     "vendorsConsidered": {
-      "Fortinet": 57,
-      "Palo Alto Networks": 39,
-      "Check Point": 34,
-      "Sophos": 32,
-      "Cisco": 25,
+      "Fortinet": 61,
+      "Palo Alto Networks": 44,
+      "Check Point": 38,
+      "Sophos": 36,
+      "Cisco": 30,
       "Netgate": 22,
       "Deciso": 18,
+      "WatchGuard": 5,
       "Netfilter project": 5,
-      "WatchGuard": 4,
       "Juniper": 4,
       "SonicWall": 3,
       "Palo Alto": 2,
@@ -77,6 +84,8 @@
       "Imperva": 1,
       "OWASP / açık kaynak": 1,
       "Imperva (Thales)": 1,
+      "Fortinet & Netfilter Project": 1,
+      "Juniper Networks": 1,
       "Forcepoint": 1
     }
   },
@@ -1546,6 +1555,251 @@
         {
           "product": "Cisco ASA (Packet Tracer)",
           "vendor": "Cisco",
+          "throughputGbps": null,
+          "priceUsd": null
+        }
+      ]
+    },
+    {
+      "company": "Kalkan A.Ş.",
+      "companySlug": "kalkan-as",
+      "sector": "Cyber Security / Enterprise IT",
+      "author": "Emre",
+      "branch": "Ankara Bölge Müdürlüğü (İdari & Satış)",
+      "branchId": "ankara-office",
+      "branchRole": "branch",
+      "location": "Ankara, Turkey",
+      "segment": "perimeter",
+      "product": "FortiGate 200F with UFW Host-Based Layer",
+      "vendor": "Fortinet & Netfilter Project",
+      "throughputGbps": null,
+      "priceUsd": null,
+      "ruleCount": 4,
+      "actions": {
+        "allow": 2,
+        "deny": 2,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "Palo Alto PA-440",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Sophos XGS 2100",
+          "vendor": "Sophos",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Check Point Quantum 3600",
+          "vendor": "Check Point",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Cisco Meraki MX100",
+          "vendor": "Cisco",
+          "throughputGbps": null,
+          "priceUsd": null
+        }
+      ]
+    },
+    {
+      "company": "Kalkan A.Ş.",
+      "companySlug": "kalkan-as",
+      "sector": "Cyber Security / Enterprise IT",
+      "author": "Emre",
+      "branch": "İstanbul Genel Merkez (HQ) ve Veri Merkezi",
+      "branchId": "istanbul-office",
+      "branchRole": "headquarters",
+      "location": "Istanbul, Turkey",
+      "segment": "perimeter",
+      "product": "Palo Alto PA-1410 High Availability Cluster",
+      "vendor": "Palo Alto Networks",
+      "throughputGbps": null,
+      "priceUsd": null,
+      "ruleCount": 4,
+      "actions": {
+        "allow": 3,
+        "deny": 1,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "FortiGate 400F",
+          "vendor": "Fortinet",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Check Point Quantum 6200",
+          "vendor": "Check Point",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Cisco Secure Firewall 3110",
+          "vendor": "Cisco",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Sophos XGS 3300",
+          "vendor": "Sophos",
+          "throughputGbps": null,
+          "priceUsd": null
+        }
+      ]
+    },
+    {
+      "company": "Kalkan A.Ş.",
+      "companySlug": "kalkan-as",
+      "sector": "Cyber Security / Enterprise IT",
+      "author": "Emre",
+      "branch": "Londra Uydu Şube",
+      "branchId": "london-office",
+      "branchRole": "branch",
+      "location": "London, United Kingdom",
+      "segment": "perimeter",
+      "product": "Cisco Meraki MX68",
+      "vendor": "Cisco",
+      "throughputGbps": null,
+      "priceUsd": null,
+      "ruleCount": 3,
+      "actions": {
+        "allow": 2,
+        "deny": 1,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "FortiGate 60F",
+          "vendor": "Fortinet",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Sophos XGS 116",
+          "vendor": "Sophos",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Palo Alto PA-410",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "WatchGuard M290",
+          "vendor": "WatchGuard",
+          "throughputGbps": null,
+          "priceUsd": null
+        }
+      ]
+    },
+    {
+      "company": "Kalkan A.Ş.",
+      "companySlug": "kalkan-as",
+      "sector": "Cyber Security / Enterprise IT",
+      "author": "Emre",
+      "branch": "Üniversite Kampüsü (Akademik Şube)",
+      "branchId": "academic-branch",
+      "branchRole": "campus",
+      "location": "Ankara, Turkey",
+      "segment": "perimeter",
+      "product": "FortiGate 4400F",
+      "vendor": "Fortinet",
+      "throughputGbps": null,
+      "priceUsd": null,
+      "ruleCount": 4,
+      "actions": {
+        "allow": 2,
+        "deny": 2,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "Palo Alto PA-5450",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Cisco Firepower 9300",
+          "vendor": "Cisco",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Check Point Quantum 16600",
+          "vendor": "Check Point",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Juniper SRX4600",
+          "vendor": "Juniper Networks",
+          "throughputGbps": null,
+          "priceUsd": null
+        }
+      ]
+    },
+    {
+      "company": "Kalkan A.Ş.",
+      "companySlug": "kalkan-as",
+      "sector": "Cyber Security / Enterprise IT",
+      "author": "Emre",
+      "branch": "Yazılım Geliştirme ve DevOps Şubesi",
+      "branchId": "software-team",
+      "branchRole": "branch",
+      "location": "Ankara, Turkey",
+      "segment": "perimeter",
+      "product": "Check Point Quantum 6400",
+      "vendor": "Check Point",
+      "throughputGbps": null,
+      "priceUsd": null,
+      "ruleCount": 3,
+      "actions": {
+        "allow": 2,
+        "deny": 1,
+        "reject": 0,
+        "limit": 0
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "Palo Alto PA-1420",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "FortiGate 600F",
+          "vendor": "Fortinet",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Cisco Secure Firewall 3120",
+          "vendor": "Cisco",
+          "throughputGbps": null,
+          "priceUsd": null
+        },
+        {
+          "product": "Sophos XGS 4300",
+          "vendor": "Sophos",
           "throughputGbps": null,
           "priceUsd": null
         }
