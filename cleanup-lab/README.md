@@ -188,6 +188,25 @@ the console's own plans stay in its process. Text output sanitizes every path
 and name (control characters escaped), and the scan lists its first unreadable
 paths so the machine-readable detail in `--json` has a visible counterpart.
 
+## Simulator runtimes (CLN-29)
+
+`cleanup_lab/runtimes.py` inventories Xcode simulator runtimes (fixed
+`xcrun simctl runtime list -j` probe, parsed defensively) and Android AVDs and
+SDK system images (fixed `avdmanager list avd` plus the SDK's system-images
+tree), each with size, on-disk size and in-use state (a `.lock` beside the AVD
+marks it in use — a heuristic, documented in-code). Report-only inventory on
+`GET /api/cleanup/runtimes` and `labctl cleanup runtimes`; nothing here
+deletes anything.
+
+Deletion is a typed action, not a path: `POST
+/api/cleanup/runtimes/delete/preview {kind, id}` builds **fixed argv** per
+kind (`xcrun simctl runtime delete <id>`, `avdmanager delete avd -n <name>`,
+`sdkmanager uninstall <package>`), validates the id shape and re-checks the
+candidate against a fresh inventory (CLN-08 pattern); `POST .../delete/run
+{previewId}` claims the single-use preview, runs the argv as an audited job
+and reports the honest outcome. The dashboard's Simulator runtimes card lists
+the inventory and previews deletes; in-use items carry no delete button.
+
 ## Schedules (CLN-18)
 
 `cleanup_lab/schedules.py` keeps scheduled **dry-run scans** as typed data in

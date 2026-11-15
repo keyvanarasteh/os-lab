@@ -81,11 +81,15 @@ series; `VERIFY.md` gets an entry with real command output per task.
 
 ## Task 5 — CLN-29 simulator/emulator runtimes
 
-- [ ] Xcode simulator runtimes + unavailable devices (fixed `simctl` argv,
-      parser tests on recorded JSON).
-- [ ] Android AVDs + SDK system images (fixed argv, sizes, in-use state).
-- [ ] Typed preview → single-use id → audited run for removals (ids, never
-      paths); booted-device runtime skipped with a reason; readiness gating.
+- [x] Xcode simulator runtimes (fixed `simctl` argv, defensive parsing, 21
+      engine tests incl. recorded JSON fixtures) — engine module by a parallel
+      subagent, integrated here.
+- [x] Android AVDs + SDK system images (fixed argv, sizes, `.lock` in-use
+      heuristic, ids in sdkmanager package form).
+- [x] Typed preview → single-use id → audited run for removals (fixed argv per
+      kind, id shape validation, fresh-inventory candidate check); in-use items
+      carry no delete control. Unavailable devices ride the per-probe honest
+      shapes; the devices list stays with CLN-07.
 
 ## Task 6 — CLN-23 Space Explorer deltas
 
