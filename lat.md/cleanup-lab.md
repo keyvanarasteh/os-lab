@@ -429,6 +429,21 @@ The console answers `GET/POST /api/cleanup/settings`, `labctl cleanup
 settings [show] | set <key> <value>` runs the same store, and the Secure
 shred card shows the policy picker with the honest SSD/APFS/COW limits.
 
+CLN-19 adds the headless flow: `labctl cleanup scan | plan | clean` run the
+console's engine directly. Plans built headless persist in the private plan
+store ([[cleanup-lab/engine/cleanup_lab/plan_store.py]]), claimed by atomic
+rename so a plan is single-use and a crash leaves the claim behind; the TTL is
+enforced again at claim time. `clean` refuses without `--yes`, verifies the
+fingerprints again, executes and audits; exit codes stay 0/1/2, and text
+output sanitizes paths and lists the first unreadable scan paths.
+
+CLN-18 adds scheduled dry-run scans: `cleanup_lab/schedules.py` keeps
+cron-validated schedules in the private store, the monitor runner's tick fires
+due schedules as `scheduled-scan` jobs — the read-only catalog scan and
+nothing else, so a schedule can never clean — and the console, `labctl cleanup
+schedules …` and the dashboard's Scheduled scans section manage the list with
+the store's corrupt state reported until fixed.
+
 ## Dashboard pages
 
 [[dashboard/src/views/cleanup/pages.tsx]] renders the dashboard at `/cleanup/`:

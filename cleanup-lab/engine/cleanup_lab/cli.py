@@ -11,13 +11,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import time
 
-from .catalog import CatalogError, report as catalog_report
+from .catalog import CatalogError, load as catalog_load, report as catalog_report
 from .readiness import probe, repo_root
-from . import history, ignore, monitor, paths, settings, volumes
+from . import clean, history, ignore, monitor, paths, plan_store, scan, schedules, settings, volumes
 
 USAGE_EXIT = 2
+
+
+def _load_catalog():
+    """The catalog for this computer, resolved against the real environment."""
+    return catalog_load(repo_root(), dict(os.environ))
 
 
 def _bookmarks_report():
@@ -374,12 +381,293 @@ def _settings_command(args, stream):
     return 0
 
 
+def _scan_lines(result):
+    """The labctl scan summary: one row per entry, then the honest totals."""
+    lines = ["Cleanup Lab scan · {0} · {1} · measured {2} across {3} categories".format(
+        result["platform"], "cancelled" if result["cancelled"] else "complete",
+        _bytes(result["totals"]["sizeBytes"]), result["totals"]["entries"])]
+    for entry in result["entries"]:
+        ignored = sum(1 for p in entry["paths"] if p.get("ignored"))
+        bits = []
+        if ignored:
+            bits.append("{0} ignored".format(ignored))
+        if entry["unreadable"]:
+            bits.append("{0} unreadable".format(len(entry["unreadable"])))
+        lines.append("  {0:<28} {1:>12}  {2}".format(
+            _safe(entry["id"]), _bytes(entry["sizeBytes"]), " · ".join(bits)))
+        for item in entry["unreadable"][:3]:  # the first few, sanitised; more in --json
+            lines.append("      unreadable: {0}".format(_safe(item)))
+    return lines
+
+
+def _plan_lines(payload):
+    """The labctl plan preview: what is ready, what is refused, and the deadline."""
+    totals = payload["totals"]
+    lines = ["Cleanup Lab plan · {0} · {1} · {2} ready ({3}) · {4} skipped · expires in {5}s".format(
+        payload["planId"], payload["mode"], totals["ready"], _bytes(totals["bytes"]),
+        totals["items"] - totals["ready"], max(0, int(payload["expiresAt"] - payload["createdAt"])))]
+    lines.append("  Review it, then clean with: labctl cleanup clean --plan {0} --yes".format(payload["planId"]))
+    for item in payload["items"]:
+        if item["status"] == "ready":
+            lines.append("  + {0:>12}  {1}".format(_bytes(item["sizeBytes"]), _safe(item["path"])))
+        else:
+            lines.append("  - {0:<10} {1} · {2}".format(item["code"], _safe(item["path"] or "-"), item["reason"]))
+    return lines
+
+
+def _clean_lines(result):
+    """The labctl clean report: honest counts first, then every path."""
+    totals = result["totals"]
+    lines = ["Cleanup Lab clean · {0} · {1} · {2} item(s) · {3}".format(
+        result["mode"], "cancelled" if result["cancelled"] else "finished",
+        totals["items"], _bytes(totals["bytes"]))]
+    for row in result["results"]:
+        if row["status"] in ("trashed", "deleted", "shredded"):
+            lines.append("  {0:>10}  {1}  {2}".format(row["status"], _bytes(row["bytes"]), _safe(row["path"])))
+        elif row["status"] == "skipped":
+            lines.append("  {0:>10}  {1}  {2}".format("skipped", row["code"], row["reason"]))
+        else:
+            lines.append("  {0:>10}  {1}  {2}".format(row["status"], _safe(row["path"] or "-"), row["error"] or ""))
+    return lines
+
+
+def _bytes(value):
+    """A short human byte count for the CLI summaries."""
+    size = float(value or 0)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if size < 1024 or unit == "TiB":
+            return "{0:.0f} {1}".format(size, unit) if unit == "B" else "{0:.1f} {1}".format(size, unit)
+        size /= 1024
+    return "{0:.1f} TiB".format(size)
+
+
+def _collect_entries(args, catalog_entries):
+    """Validate the ``--entry`` list against the catalog; ``None`` means all."""
+    if not args.entry:
+        return None
+    known = {entry["id"] for entry in catalog_entries}
+    unknown = [eid for eid in args.entry if eid not in known]
+    if unknown:
+        raise ValueError("Unknown detector id(s): {0}".format(", ".join(unknown)))
+    return list(args.entry)
+
+
+def _scan_command(args, stream):
+    """`labctl cleanup scan` — read-only, the same engine the console job runs."""
+    scan_mod = scan
+    if args.workers is not None and not 1 <= args.workers <= scan_mod.MAX_WORKERS:
+        sys.stderr.write("cleanup scan: workers must be between 1 and {0}\n".format(scan_mod.MAX_WORKERS))
+        return USAGE_EXIT
+    try:
+        entries = _load_catalog()
+        entry_ids = _collect_entries(args, entries)
+    except ValueError as exc:
+        sys.stderr.write("cleanup scan: {0}\n".format(exc))
+        return USAGE_EXIT
+    except Exception as exc:
+        sys.stderr.write("cleanup scan: the detector catalog is invalid: {0}\n".format(exc))
+        return 1
+    try:
+        result = scan_mod.scan_catalog(
+            repo_root(), entry_ids, workers=args.workers, env=dict(os.environ),
+        )
+    except KeyboardInterrupt:
+        sys.stderr.write("cleanup scan: cancelled\n")
+        return 1
+    except scan_mod.ScanError as exc:
+        sys.stderr.write("cleanup scan: {0}\n".format(exc))
+        return 1
+    if args.json:
+        stream.write(json.dumps(result, indent=2) + "\n")
+    else:
+        stream.write("\n".join(_scan_lines(result)) + "\n")
+    return 0
+
+
+def _plan_command(args, stream):
+    """`labctl cleanup plan` — build and store a confirmable plan (read-only)."""
+    clean_mod = clean
+    scan_mod = scan
+    if args.workers is not None and not 1 <= args.workers <= scan_mod.MAX_WORKERS:
+        sys.stderr.write("cleanup plan: workers must be between 1 and {0}\n".format(scan_mod.MAX_WORKERS))
+        return USAGE_EXIT
+    try:
+        entries = _load_catalog()
+        entry_ids = _collect_entries(args, entries)
+    except ValueError as exc:
+        sys.stderr.write("cleanup plan: {0}\n".format(exc))
+        return USAGE_EXIT
+    except Exception as exc:
+        sys.stderr.write("cleanup plan: the detector catalog is invalid: {0}\n".format(exc))
+        return 1
+    try:
+        plan = clean_mod.build_plan(repo_root(), entry_ids, mode=args.mode, workers=args.workers,
+                                    env=dict(os.environ))
+        if plan.payload is None:
+            sys.stderr.write("cleanup plan: the plan build was cancelled\n")
+            return 1
+        plan_store.save(plan, env=dict(os.environ))
+    except clean_mod.PlanError as exc:
+        sys.stderr.write("cleanup plan: {0} (code: {1})\n".format(exc, exc.code))
+        return 1
+    if args.json:
+        stream.write(json.dumps(plan.payload, indent=2) + "\n")
+    else:
+        stream.write("\n".join(_plan_lines(plan.payload)) + "\n")
+    return 0
+
+
+def _clean_command(args, stream):
+    """`labctl cleanup clean --plan <id> --yes` — the only mutating command.
+
+    The plan is claimed from the store (single-use, atomically), verified
+    again, executed and audited — the same engine flow the console job runs.
+    Without ``--yes`` nothing is ever removed.
+    """
+    clean_mod = clean
+    if not args.yes:
+        sys.stderr.write(
+            "cleanup clean: refusing to run without --yes; review the plan with "
+            "`labctl cleanup plan` first.\n"
+        )
+        return USAGE_EXIT
+    if not args.plan:
+        sys.stderr.write("cleanup clean: --plan <id> is required\n")
+        return USAGE_EXIT
+    try:
+        history.prepare()
+    except (history.HistoryError, OSError) as exc:
+        sys.stderr.write("cleanup clean: audit history is unavailable: {0}\n".format(exc))
+        return 1
+    try:
+        claimed, record = plan_store.claim(args.plan, env=dict(os.environ))
+    except plan_store.PlanStoreError as exc:
+        sys.stderr.write("cleanup clean: {0}\n".format(exc))
+        return 1
+    try:
+        plan = clean_mod.Plan(
+            id=record["id"], mode=record["mode"],
+            created_at=record["createdAt"], expires_at=record["expiresAt"],
+            payload=record["payload"],
+            # JSON round-trips the fingerprint tuples as lists; rebuild them so
+            # verify_plan compares like with like.
+            fingerprints={path: tuple(key) for path, key in record["fingerprints"].items()},
+            progress=record.get("progress", {}),
+        )
+        try:
+            if plan.expires_at < time.time():
+                raise clean_mod.PlanError("This plan expired; build a new one.", "expired")
+            if plan.mode not in clean_mod.MODES:
+                raise clean_mod.PlanError("The plan names an unknown mode.", "plan-invalid")
+            measures = clean_mod.verify_plan(plan)
+            result = clean_mod.execute_plan(plan, measures)
+        except clean_mod.PlanError as exc:
+            sys.stderr.write("cleanup clean: {0} (code: {1})\n".format(exc, exc.code))
+            return 1
+        except (OSError, clean_mod.CleanError) as exc:
+            sys.stderr.write("cleanup clean: {0}\n".format(exc))
+            return 1
+        try:
+            history.append(result)
+        except (history.HistoryError, OSError) as exc:
+            # The run happened and is reported; the audit gap is a problem (rule 6).
+            sys.stderr.write("cleanup clean: the run could not be audited: {0}\n".format(exc))
+            result = dict(result, auditError=str(exc))
+    finally:
+        plan_store.discard(claimed)
+    if args.json:
+        stream.write(json.dumps(result, indent=2) + "\n")
+    else:
+        stream.write("\n".join(_clean_lines(result)) + "\n")
+    totals = result["totals"]
+    return 1 if totals["failed"] or result["cancelled"] else 0
+
+
+def _schedules_command(args, stream):
+    """`labctl cleanup schedules list|add|remove|enable|disable` — 0/1/2."""
+    if args.action == "list":
+        if args.first or args.second:
+            sys.stderr.write("cleanup schedules list: no further arguments\n")
+            return USAGE_EXIT
+        rows, problem = schedules.list_schedules()
+        if problem is not None:
+            if args.json:
+                stream.write(json.dumps({"schedules": [], "error": problem["message"]}, indent=2) + "\n")
+            else:
+                sys.stderr.write("cleanup schedules: {0}\n".format(problem["message"]))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"schedules": rows, "error": None}, indent=2) + "\n")
+        else:
+            lines = ["Cleanup Lab schedules · {0} · {1} {2}".format(
+                paths.platform_id(), len(rows), "schedule" if len(rows) == 1 else "schedules")]
+            for row in rows:
+                state = "enabled" if row["enabled"] else "disabled"
+                last = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row["lastRunAt"])) if row["lastRunAt"] else "never"
+                lines.append("  {0:<9} {1}  last run {2}  ({3})".format(
+                    state, _safe(row["cron"]), last, row["id"]))
+            stream.write("\n".join(lines) + "\n")
+        return 0
+    if args.action == "add":
+        if not args.first or args.second:
+            sys.stderr.write("cleanup schedules add: usage is `schedules add '<cron>'`\n")
+            return USAGE_EXIT
+        try:
+            row = schedules.add(args.first)
+        except ValueError as exc:
+            sys.stderr.write("cleanup schedules add: {0}\n".format(exc))
+            return USAGE_EXIT
+        except schedules.SchedulesError as exc:
+            sys.stderr.write("cleanup schedules add: {0}\n".format(exc))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"added": row, "error": None}, indent=2) + "\n")
+        else:
+            stream.write("Added schedule {0}  ({1})\n".format(row["cron"], row["id"]))
+        return 0
+    if args.action in ("enable", "disable"):
+        if not args.first or args.second:
+            sys.stderr.write("cleanup schedules {0}: usage is `schedules {0} <id>`\n".format(args.action))
+            return USAGE_EXIT
+        try:
+            row = schedules.set_enabled(args.first, args.action == "enable")
+        except ValueError as exc:
+            sys.stderr.write("cleanup schedules {0}: {1}\n".format(args.action, exc))
+            return 1
+        except schedules.SchedulesError as exc:
+            sys.stderr.write("cleanup schedules {0}: {1}\n".format(args.action, exc))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"schedule": row, "error": None}, indent=2) + "\n")
+        else:
+            stream.write("{0} schedule {1}  ({2})\n".format(
+                "Enabled" if row["enabled"] else "Disabled", row["cron"], row["id"]))
+        return 0
+    # remove
+    if not args.first or args.second:
+        sys.stderr.write("cleanup schedules remove: usage is `schedules remove <id>`\n")
+        return USAGE_EXIT
+    try:
+        removed = schedules.remove(args.first)
+    except schedules.SchedulesError as exc:
+        sys.stderr.write("cleanup schedules remove: {0}\n".format(exc))
+        return 1
+    if not removed:
+        sys.stderr.write("cleanup schedules remove: no schedule with id {0}\n".format(args.first))
+        return 1
+    if args.json:
+        stream.write(json.dumps({"removed": args.first, "error": None}, indent=2) + "\n")
+    else:
+        stream.write("Removed schedule {0}\n".format(args.first))
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="labctl cleanup",
         description="Cleanup Lab: inspect readiness (read-only) and, from CLN-19, scan/plan/clean.",
     )
-    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore|settings")
+    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore|settings|schedules|scan|plan|clean")
     for name, text in (
         ("status", "one-screen readiness summary"),
         ("doctor", "every check, path and hint"),
@@ -414,6 +702,36 @@ def build_parser():
     settings_cmd.add_argument("first", nargs="?", metavar="KEY", help="set: the setting key (e.g. shredPolicy)")
     settings_cmd.add_argument("second", nargs="?", metavar="VALUE", help="set: the value (e.g. 1-pass)")
     settings_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
+    schedules_cmd = sub.add_parser(
+        "schedules", help="scheduled dry-run scans (CLN-18)",
+        description="A schedule fires a scan-only job on its cron; it can never clean.",
+    )
+    schedules_cmd.add_argument("action", nargs="?", default="list",
+                               choices=("list", "add", "remove", "enable", "disable"))
+    schedules_cmd.add_argument("first", nargs="?", metavar="CRON_OR_ID",
+                               help="add: the cron expression (quoted); remove/enable/disable: the schedule id")
+    schedules_cmd.add_argument("second", nargs="?", help=argparse.SUPPRESS)
+    schedules_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
+    # --- CLN-19: the headless scan / plan / clean flow ---
+    for name, text in (
+        ("scan", "measure the catalog entries for this computer (read-only)"),
+        ("plan", "build a confirmable plan and store it (read-only)"),
+        ("clean", "run one stored plan; requires --plan <id> and --yes"),
+    ):
+        command = sub.add_parser(name, help=text, description=text)
+        command.add_argument("--entry", action="append", metavar="ID",
+                             help="restrict to this catalog id (repeatable; default: every entry)")
+        command.add_argument("--workers", type=int, default=None, metavar="N",
+                             help="parallel measurement workers (1-{0})".format(scan.MAX_WORKERS))
+        command.add_argument("--json", action="store_true", help="print the full result as JSON")
+        if name == "plan":
+            command.add_argument("--mode", default=clean.DEFAULT_MODE,
+                                 choices=list(clean.MODES), metavar="MODE",
+                                 help="trash (default), delete or shred (shred needs the settings policy)")
+        if name == "clean":
+            command.add_argument("--plan", metavar="ID", help="the plan id from `labctl cleanup plan`")
+            command.add_argument("--yes", action="store_true",
+                                 help="required: cleaning never runs without it")
     return parser
 
 
@@ -428,6 +746,14 @@ def main(argv=None, stream=None):
         return _ignore_command(args, stream)
     if args.command == "settings":
         return _settings_command(args, stream)
+    if args.command == "schedules":
+        return _schedules_command(args, stream)
+    if args.command == "scan":
+        return _scan_command(args, stream)
+    if args.command == "plan":
+        return _plan_command(args, stream)
+    if args.command == "clean":
+        return _clean_command(args, stream)
     try:
         report = (catalog_report(repo_root()) if args.command == "catalog" else
                   history.read(verify=args.verify) if args.command == "history" else

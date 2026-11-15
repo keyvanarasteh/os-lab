@@ -67,6 +67,9 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "ignore-add": ("type", "value", "note"),
               "ignore-remove": ("ruleId",),
               "settings": ("shredPolicy",),
+              "schedules-add": ("cron", "enabled"),
+              "schedules-remove": ("id",),
+              "schedules-toggle": ("id", "enabled"),
               "explorer-scan": ("rootId",),
               "explorer-subtree": ("rootId", "relative"),
               "leftovers": ()}
@@ -233,18 +236,19 @@ class CleanupJobStore:
             job.finishedAt = time.time()
         return job
 
-    def start_scan(self, root, request):
+    def start_scan(self, root, request, *, kind="scan"):
         """Validate the scan request, then run it on a worker thread.
 
         ``request`` may name ``entryIds`` (catalog ids only) and ``workers``;
         anything else — a path, a command, an unknown key — is refused before a
-        thread exists.
+        thread exists. ``kind`` distinguishes a scheduled dry-run (CLN-18) from
+        a page-initiated scan in the jobs list.
         """
         scan = _module(root, "scan")
         catalog = _module(root, "catalog")
         entry_ids = _validate_entry_ids(root, catalog, request.get("entryIds"))
         workers = _validate_workers(scan, request.get("workers"))
-        job = CleanupJob("scan", {"entryIds": entry_ids, "workers": workers})
+        job = CleanupJob(kind, {"entryIds": entry_ids, "workers": workers})
         self._register(job)
         return self._spawn(job, self._run_scan, (root, job, entry_ids, workers))
 
@@ -873,6 +877,7 @@ class MonitorRunner:
     def _loop(self):
         while not self.stop.is_set():
             try:
+                self._run_due_schedules()
                 monitor = _module(self.root, "monitor")
                 config = monitor.load()["config"]
                 if config["enabled"]:
@@ -887,6 +892,28 @@ class MonitorRunner:
                     self.stop.wait(self.IDLE_WAIT)
             except Exception:
                 self.stop.wait(self.IDLE_WAIT)  # a tick may fail; the runner must not die
+
+    def _run_due_schedules(self):
+        """CLN-18: fire due schedules as scan-only jobs.
+
+        A schedule can never clean: the hook spawns exactly the read-only
+        catalog scan the page runs, marked `scheduled-scan` in the jobs list,
+        and records the run time so the next fire waits for its cron. A store
+        that cannot be read skips the tick silently — the runner must not die.
+        """
+        try:
+            schedules_mod = _module(self.root, "schedules")
+            schedules, problem = schedules_mod.list_schedules()
+            if problem is not None or not schedules:
+                return
+            now = time.time()
+            for schedule in schedules:
+                if not schedules_mod.due(schedule, now):
+                    continue
+                schedules_mod.mark_run(schedule["id"], now)
+                JOBS.start_scan(self.root, {}, kind="scheduled-scan")
+        except Exception:
+            pass  # the schedule trigger is optional; a failure never kills the runner
 
     def _evaluate_bookmark_sizes(self):
         """CLNP-17: measure alerted bookmarks read-only and record their events."""
@@ -1003,6 +1030,13 @@ class CleanupAPI:
             settings_mod = _module(self.root, "settings")
             values, problem = settings_mod.all_values()
             return {"settings": values, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/schedules":
+            # CLN-18: the scheduled dry-run scans; a corrupt store is reported
+            # in "error" — due schedules are skipped until it is fixed.
+            _query(query)
+            schedules_mod = _module(self.root, "schedules")
+            schedules, problem = schedules_mod.list_schedules()
+            return {"schedules": schedules, "error": problem["message"] if problem else None}
         if path == "/api/cleanup/jobs":
             _query(query)
             return {"jobs": JOBS.list()}
@@ -1273,6 +1307,56 @@ class CleanupAPI:
                 raise CleanupError(500, "The settings store cannot be written: {0}".format(exc)) from exc
             values, problem = settings_mod.all_values()
             return {"settings": values, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/schedules":
+            # CLN-18: add one schedule. The page sends a cron expression; the
+            # engine validates it and the answer carries the store.
+            _object_body(body, "schedules-add")
+            cron = body.get("cron")
+            enabled = body.get("enabled", True)
+            if not isinstance(cron, str) or not cron.strip():
+                raise CleanupError(400, "cron must be a non-empty cron expression")
+            if not isinstance(enabled, bool):
+                raise CleanupError(400, "enabled must be a boolean")
+            schedules_mod = _module(self.root, "schedules")
+            try:
+                schedules_mod.add(cron, enabled=enabled)
+            except ValueError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            except Exception as exc:
+                raise CleanupError(500, "The schedules store cannot be written: {0}".format(exc)) from exc
+            schedules, problem = schedules_mod.list_schedules()
+            return {"schedules": schedules, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/schedules/remove":
+            _object_body(body, "schedules-remove")
+            schedule_id = body.get("id")
+            if not isinstance(schedule_id, str) or not schedule_id:
+                raise CleanupError(400, "id must name a schedule")
+            schedules_mod = _module(self.root, "schedules")
+            try:
+                removed = schedules_mod.remove(schedule_id)
+            except Exception as exc:
+                raise CleanupError(500, "The schedules store cannot be written: {0}".format(exc)) from exc
+            if not removed:
+                raise CleanupError(404, "No schedule with that id")
+            schedules, problem = schedules_mod.list_schedules()
+            return {"schedules": schedules, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/schedules/toggle":
+            _object_body(body, "schedules-toggle")
+            schedule_id = body.get("id")
+            enabled = body.get("enabled")
+            if not isinstance(schedule_id, str) or not schedule_id:
+                raise CleanupError(400, "id must name a schedule")
+            if not isinstance(enabled, bool):
+                raise CleanupError(400, "enabled must be a boolean")
+            schedules_mod = _module(self.root, "schedules")
+            try:
+                schedules_mod.set_enabled(schedule_id, enabled)
+            except ValueError as exc:
+                raise CleanupError(404, str(exc)) from exc
+            except Exception as exc:
+                raise CleanupError(500, "The schedules store cannot be written: {0}".format(exc)) from exc
+            schedules, problem = schedules_mod.list_schedules()
+            return {"schedules": schedules, "error": problem["message"] if problem else None}
         if path == "/api/cleanup/explorer/roots":
             _query(query)
             return {"roots": _module(self.root, "explorer").roots(self.root)}
