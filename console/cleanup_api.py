@@ -67,6 +67,7 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "ignore-add": ("type", "value", "note"),
               "ignore-remove": ("ruleId",),
               "settings": ("shredPolicy",),
+              "ledger-clear": (),
               "runtime-delete-preview": ("kind", "id"),
               "runtime-delete-run": ("previewId",),
               "schedules-add": ("cron", "enabled"),
@@ -344,6 +345,12 @@ class CleanupJobStore:
         except Exception as exc:
             job.state = "failed"
             job.error = "Audit history could not record the result: {0}".format(exc)
+        try:
+            # CLN-26: the learning ledger records what was really cleaned.
+            # A ledger failure never fails the clean that already happened.
+            _module(root, "ledger").record(result.get("results", []))
+        except Exception:
+            pass
         finally:
             job.finishedAt = time.time()
 
@@ -1069,6 +1076,21 @@ class CleanupAPI:
             schedules_mod = _module(self.root, "schedules")
             schedules, problem = schedules_mod.list_schedules()
             return {"schedules": schedules, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/ledger":
+            # CLN-26: the learning ledger — stats plus the soft pre-selection
+            # suggestions ("Why is this selected?") for the current catalog.
+            _query(query)
+            ledger_mod = _module(self.root, "ledger")
+            stats, problem = ledger_mod.stats()
+            suggestions = []
+            if problem is None:
+                try:
+                    entries = _module(self.root, "catalog").load(self.root)
+                    suggestions, _ = ledger_mod.suggest(entries)
+                except Exception as exc:
+                    problem = {"code": "ledger-suggest", "message": str(exc)}
+            return {"stats": stats, "suggestions": suggestions,
+                    "error": problem["message"] if problem else None}
         if path == "/api/cleanup/jobs":
             _query(query)
             return {"jobs": JOBS.list()}
@@ -1425,6 +1447,18 @@ class CleanupAPI:
             self._register(job)
             self._spawn(job, self._run_runtime_delete, (job, preview))
             return job.to_dict()
+        if path == "/api/cleanup/ledger/clear":
+            # CLN-26: the learning ledger stays in private state and is
+            # clearable from the page; the corrupt-aside copies survive.
+            _object_body(body, "ledger-clear")
+            ledger_mod = _module(self.root, "ledger")
+            try:
+                existed = ledger_mod.clear()
+            except Exception as exc:
+                raise CleanupError(500, "The learning ledger cannot be cleared: {0}".format(exc)) from exc
+            stats, problem = ledger_mod.stats()
+            return {"cleared": existed, "stats": stats,
+                    "error": problem["message"] if problem else None}
         if path == "/api/cleanup/explorer/roots":
             _query(query)
             return {"roots": _module(self.root, "explorer").roots(self.root)}
