@@ -127,6 +127,34 @@ def _tool_capabilities(platform, env):
     return items
 
 
+def disk_access(*, platform=None, env=None, scandir=os.scandir):
+    """Read-only macOS access hint; TCC has no reliable Python grant query."""
+    target = platform or platform_id()
+    if target != "macos":
+        return {"state": "not-applicable", "guidance": "Full Disk Access is a macOS setting."}
+    env = os.environ if env is None else env
+    home = home_dir(env)
+    checked = []
+    denied = []
+    for name in ("Mail", "Safari", "Messages"):
+        folder = os.path.join(home, "Library", name)
+        if not os.path.isdir(folder):
+            continue
+        try:
+            with scandir(folder) as listing:
+                next(listing, None)
+            checked.append(folder)
+        except PermissionError:
+            denied.append(folder)
+        except OSError:
+            pass
+    return {
+        "state": "limited" if denied else "unknown" if not checked else "accessible",
+        "checked": checked, "denied": denied,
+        "guidance": "Open System Settings → Privacy & Security → Full Disk Access and grant access to the local app if protected folders are unavailable. This probe cannot prove a complete grant.",
+    }
+
+
 def probe(root=None, env=None, sys_platform=None, version=None):
     """Report readiness without writing anything.
 

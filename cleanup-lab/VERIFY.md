@@ -569,3 +569,30 @@ Source Lab errored when the volume ran out of space during temp-file creation;
 its 176 tests passed when rerun after removing ignored Cargo build output. The Cleanup Lab, Rust,
 shell, smoke and graph stages passed. Dashboard checks were skipped because
 this worktree has no dependencies and no dashboard source changed.
+
+## CLN-20 — typed privileged actions and disk-access guidance
+
+Branch `codex/cln-20-privileged-targets`, stacked on CLN-19. Four fixed
+maintenance actions are available on their applicable OS only. A preview shows
+exact command arguments; a one-use, ten-minute token is required to run.
+Root-owned protected binaries are rechecked before each action, the runner uses
+no shell or stored password, and the result is audited. The standard clean plan
+continues to skip privileged catalog entries. The macOS Full Disk Access hint
+reads protected folder metadata only and says when evidence is inconclusive.
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 130 tests — OK
+$ uv run --with pytest python -m pytest android-lab/lab/tests/test_cleanup_console.py -q
+13 passed
+$ lat check
+All checks passed
+$ git diff --check
+(clean)
+```
+
+No real elevation was attempted. Fake binaries and a fake runner verify fixed
+argv, the one-use token, platform refusal, trusted-binary checks and no shell.
+The full repository gate was not rerun because its unchanged Rust stage filled
+the remaining volume space on CLN-19; the focused engine and console suites cover
+this change. Dashboard checks await the plain CLN-16 integration.
