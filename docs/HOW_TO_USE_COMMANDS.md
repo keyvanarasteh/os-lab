@@ -16,6 +16,7 @@ Usage:
   ./labctl all <command> [options]
   ./labctl ui [--port N]      Open the web console (default port 5050)
   ./labctl cleanup <command>  Cleanup Lab readiness (see below)
+  ./labctl web <command>      Web Lab engine (see below)
 
 Labs:
   win | windows      Windows VM lab (win-lab/)
@@ -24,6 +25,7 @@ Labs:
   linux | lin        Linux VM lab (linux-lab/)
   source             Local source/package analysis (source-lab/)
   cleanup            Cleanup Lab disk scan/clean engine (cleanup-lab/)
+  web                Web Lab embedded browser engine (web-lab/)
   all                Run a command for Linux-host labs
 
 Commands:
@@ -75,6 +77,16 @@ Profiles:
 Cleanup Lab commands (read-only; scanning and cleaning arrive with CLN-03/CLN-13):
   ./labctl cleanup status [--json]   One-screen readiness summary; exit 0 ready, 1 problem
   ./labctl cleanup doctor [--json]   Every check, path and hint
+
+Web Lab commands (make -C web-lab):
+  ./labctl web doctor                Check cargo and the platform webview runtime
+  ./labctl web setup                 Build the engine (cargo build --release)
+  ./labctl web up [PORT=N]           Start the engine (default port 5077)
+  ./labctl web stop                  Stop the engine
+  ./labctl web status                Report engine readiness
+  ./labctl web open URL              Open a lab browser window (engine must run)
+  ./labctl web events                Dump captured events
+  ./labctl web test | clean          Engine unit tests | cargo clean
 
 Examples:
   ./labctl win profile use lightweight
@@ -194,9 +206,19 @@ Run from the checkout root as `make -C ios-lab TARGET [VARIABLE=value ...]`.
 - `mac-profile` — macOS host: apply a device preset: make mac-profile PROFILE=iphone
 - `mac-sim` — macOS host: boot the configured Simulator and open Simulator.app
 - `mac-stop` — macOS host: shut down simulators and the Simulator app
-- `mac-appium` — macOS host: start Appium (XCUITest driver)
+- `mac-appium` — macOS host: start Appium (XCUITest and mac2 drivers)
 - `mac-appium-stop` — macOS host: stop Appium
+- `mac-idb-install` — macOS host: install idb companion (Homebrew) and client
+- `mac-idb` — macOS host: start an idb companion for the booted simulator
+- `mac-idb-stop` — macOS host: stop the idb companion
+- `mac-xcuitest` — macOS host: run one XCUITest session through Appium on the booted simulator
+- `mac-app-doctor` — macOS host: check the macOS Lab's app automation stack (Appium mac2)
+- `mac-app-smoke` — macOS host: run one mac2 session that activates Finder on this Mac
+- `mac-app-repl` — macOS host: interactive mac2 REPL for macOS apps (APP=<bundle-id>, default Finder)
 - `mac-status` — macOS host: show Xcode, booted simulators and Appium state
+- `mac-ax-helper` — macOS host: compile the native AX helper for rich element reads (MIR-09)
+- `mac-mcp` — macOS host: run the guarded MCP server for computer-use agents (MIR-12)
+- `mac-cleanup-verify` — macOS host: audit the running app's Cleanup panel + scans (BOOKMARK=1 RECORD=1 PORT=)
 
 ## Make targets: `android-lab/lab/Makefile`
 
@@ -222,6 +244,7 @@ Run from the checkout root as `make -C android-lab/lab TARGET [VARIABLE=value ..
 - `install` — Install an APK into the emulator: make install APK=path/to/app.apk
 - `wf1` — WF1 static: MobSF scan → JADX decompile → report. make wf1 APK=app.apk
 - `wf2` — WF2 dynamic: boot → deploy → mitmproxy → frida (optional). make wf2 APK=app.apk [PKG=com.example]
+- `pinning` — PENT-11 static SSL-pinning classifier (no device needed): make pinning APK=app.apk
 - `hook` — Run a Frida hook against a running app: make hook PKG=com.example HOOK=hooks/ssl-pinning-bypass.js
 - `report` — Collect logs, device status and flows into artifacts/
 - `install-service` — Install a systemd unit that starts the stack at boot
@@ -530,7 +553,7 @@ From android-lab/lab: `.\lab.ps1 COMMAND [parameters]`.
 
 Accepted commands (from the actual ValidateSet):
 
-"help", "preflight", "setup", "vbox-create", "vbox-download-iso", "vbox-start", "vbox-autoinstall", "vbox-deploy-android", "vbox-stop", "vbox-status", "podman-status", "mobsf-status", "mobsf-start", "mobsf-scan", "wf1", "wf2", "hook", "report", "clean", "monitor", "telemetry", "dump-sandbox", "scan-secrets", "trace-crypto", "parse-flows", "analyze-app", "generate-report", "fuzz-ipc", "patch-apk", "agentic-plan", "ui"
+"help", "preflight", "win-preflight", "setup", "vbox-create", "vbox-download-iso", "vbox-start", "vbox-autoinstall", "vbox-deploy-android", "vbox-stop", "vbox-status", "podman-status", "mobsf-status", "mobsf-start", "mobsf-scan", "wf1", "wf2", "hook", "report", "clean", "monitor", "telemetry", "dump-sandbox", "scan-secrets", "trace-crypto", "parse-flows", "analyze-app", "generate-report", "fuzz-ipc", "patch-apk", "agentic-plan", "ui"
 
 Parameters (names/types only; values are supplied by the operator):
 
@@ -548,6 +571,7 @@ Parameters (names/types only; values are supplied by the operator):
 - `string $Iso`
 - `switch $Gui`
 - `string $Distro`
+- `switch $Json`
 
 ## Configuration keys: `win-lab/.env.example`
 
@@ -563,7 +587,7 @@ Parameters (names/types only; values are supplied by the operator):
 
 ## Configuration keys: `ios-lab/mac/config.env.example`
 
-`SIM_DEVICE`, `IOS_RUNTIME`, `APPIUM_HOST`, `APPIUM_PORT`, `APPIUM_LOG`, `BOOT_TIMEOUT`
+`SIM_DEVICE`, `IOS_RUNTIME`, `APPIUM_HOST`, `APPIUM_PORT`, `APPIUM_LOG`, `IDB_PORT`, `BOOT_TIMEOUT`
 
 ## Configuration keys: `android-lab/lab/.env.example`
 

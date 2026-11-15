@@ -105,10 +105,11 @@ class LoadTest(unittest.TestCase):
         entries = catalog.load(ROOT, BASE_ENV)
         ids = [entry["id"] for entry in entries]
         self.assertEqual(ids[:2], ["browser.chrome.cache", "browser.chrome.history"])
+        self.assertEqual(ids[-11], "simulators.coresimulator-devices")
         self.assertEqual(ids[-10:], ['system.user-caches', 'system.user-logs', 'system.trash', 'system.temp', 'system.local-temp', 'system.shared-temp', 'system.crash-reports', 'system.font-caches', 'system.shared-font-caches', 'system.spotlight-index'])
-        self.assertEqual(len(ids), 66)
-        self.assertEqual({entry["family"] for entry in entries}, {"browser", "developers", "system"})
-        self.assertEqual({entry["file"] for entry in entries}, {"browser.json", "developers.json", "system.json"})
+        self.assertEqual(len(ids), 67)
+        self.assertEqual({entry["family"] for entry in entries}, {"browser", "developers", "system", "simulators"})
+        self.assertEqual({entry["file"] for entry in entries}, {"browser.json", "developers.json", "system.json", "simulators.json"})
 
     def test_for_platform_filters_without_dropping_the_entry(self):
         with tempfile.TemporaryDirectory() as base:

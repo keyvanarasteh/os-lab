@@ -2,8 +2,9 @@ name: release-win
 
 # Builds the Windows installers on a GitHub-hosted runner (free for public repositories), optionally
 # signs them through SignPath Foundation, and uploads them to the release app-v<version>.
-# Signing runs only for tag or manual builds after SignPath credentials are configured.
-# Without SignPath, tag builds are kept as artifacts instead of publishing unsigned installers.
+# Tag builds always publish: they ship unsigned (SmartScreen warns) until SignPath credentials
+# are configured, and sign automatically once they exist. Manual builds keep the explicit
+# publish and allow_unsigned inputs.
 
 on:
   push:
@@ -27,14 +28,16 @@ on:
 
 permissions:
   actions: read
+  attestations: write
   contents: write
+  id-token: write
 
 jobs:
   windows:
     runs-on: windows-latest
     env:
       SIGN: ${{ github.event_name != 'pull_request' && vars.SIGNPATH_ORGANIZATION_ID != '' && secrets.SIGNPATH_API_TOKEN != '' }}
-      PUBLISH: ${{ (github.event_name == 'push' && vars.SIGNPATH_ORGANIZATION_ID != '' && secrets.SIGNPATH_API_TOKEN != '') || (inputs.publish && ((vars.SIGNPATH_ORGANIZATION_ID != '' && secrets.SIGNPATH_API_TOKEN != '') || inputs.allow_unsigned)) }}
+      PUBLISH: ${{ github.event_name == 'push' || (inputs.publish && ((vars.SIGNPATH_ORGANIZATION_ID != '' && secrets.SIGNPATH_API_TOKEN != '') || inputs.allow_unsigned)) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -114,6 +117,17 @@ jobs:
           name: os-lab-windows
           path: ship/*
 
+      # Build provenance for the shipped installers: verifiable without any code-signing
+      # certificate (gh attestation verify <file> -R keyvanarasteh/os-lab). Pull request runs
+      # have no OIDC token, so only tag and manual builds attest.
+      - name: Attest the shipped installers
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            ship/*.exe
+            ship/*.msi
+
       - name: Install, launch and uninstall MSI
         shell: pwsh
         run: |
@@ -162,3 +176,45 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not update release notes for $tag" }
           }
           gh release upload $tag (Get-ChildItem ship).FullName --clobber
+
+  notify:
+    # Optional Telegram report for real builds: define the TELEGRAM_BOT_TOKEN and
+    # TELEGRAM_CHAT_ID repository secrets to enable it. Without them the send step
+    # skips silently; pull-request dry runs never report.
+    if: ${{ always() && github.event_name != 'pull_request' }}
+    needs: [windows]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Send the Telegram report
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NAMES: windows
+          RESULTS: ${{ needs.windows.result }}
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        run: |
+          set -euo pipefail
+          read -ra names <<< "$NAMES"
+          read -ra results <<< "$RESULTS"
+          overall="✅"
+          lines=""
+          for index in "${!names[@]}"; do
+            result="${results[index]}"
+            if [ "$result" = skipped ]; then continue; fi
+            case "$result" in
+              success) icon="✅" ;;
+              *) icon="❌"; overall="❌" ;;
+            esac
+            lines="${lines}${icon} ${names[index]} (${result})
+          "
+          done
+          if [ -z "$lines" ]; then exit 0; fi
+          text="${overall} ${GITHUB_WORKFLOW} — ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}
+          ${lines}
+          ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          payload="$(jq -nc --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$text" \
+            '{chat_id:$chat_id, text:$text, disable_web_page_preview:true}')"
+          curl -fsS --max-time 20 -H 'Content-Type: application/json' \
+            -d "$payload" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" > /dev/null

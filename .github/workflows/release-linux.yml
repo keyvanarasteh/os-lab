@@ -123,3 +123,45 @@ jobs:
               || gh release view "$tag" >/dev/null
           fi
           gh release upload "$tag" ship/* --clobber
+
+  notify:
+    # Optional Telegram report for real builds: define the TELEGRAM_BOT_TOKEN and
+    # TELEGRAM_CHAT_ID repository secrets to enable it. Without them the send step
+    # skips silently; pull-request dry runs never report.
+    if: ${{ always() && github.event_name != 'pull_request' }}
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Send the Telegram report
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NAMES: build publish
+          RESULTS: ${{ needs.build.result }} ${{ needs.publish.result }}
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        run: |
+          set -euo pipefail
+          read -ra names <<< "$NAMES"
+          read -ra results <<< "$RESULTS"
+          overall="✅"
+          lines=""
+          for index in "${!names[@]}"; do
+            result="${results[index]}"
+            if [ "$result" = skipped ]; then continue; fi
+            case "$result" in
+              success) icon="✅" ;;
+              *) icon="❌"; overall="❌" ;;
+            esac
+            lines="${lines}${icon} ${names[index]} (${result})
+          "
+          done
+          if [ -z "$lines" ]; then exit 0; fi
+          text="${overall} ${GITHUB_WORKFLOW} — ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}
+          ${lines}
+          ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          payload="$(jq -nc --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$text" \
+            '{chat_id:$chat_id, text:$text, disable_web_page_preview:true}')"
+          curl -fsS --max-time 20 -H 'Content-Type: application/json' \
+            -d "$payload" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" > /dev/null

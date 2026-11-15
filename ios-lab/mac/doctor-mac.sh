@@ -23,6 +23,10 @@ say "xcode"
 if command -v xcodebuild >/dev/null 2>&1 && xcodebuild -version >/dev/null 2>&1; then
   ok "$(xcodebuild -version | tr '\n' ' ')"
   ok "developer dir: $(xcode-select -p)"
+  # The resolved path proves detection follows xcode-select: an Xcode installed
+  # on another volume is reported where it actually lives.
+  RESOLVED="$(xcrun --find xcodebuild 2>/dev/null || true)"
+  if [ -n "$RESOLVED" ]; then ok "resolved tool: $RESOLVED"; fi
 else
   bad "Xcode or the command line tools are missing; run: xcode-select --install"
 fi
@@ -44,6 +48,18 @@ else
   bad "simctl is unavailable"
 fi
 
+say "real devices"
+if command -v xcrun >/dev/null 2>&1 && xcrun devicectl list devices >/dev/null 2>&1; then
+  DEVICE_LINES="$(xcrun devicectl list devices 2>/dev/null | awk 'NR > 2 && NF' || true)"
+  if [ -n "$DEVICE_LINES" ]; then
+    printf '%s\n' "$DEVICE_LINES" | sed 's/^/       /'
+  else
+    warn "no real devices are paired with this Mac"
+  fi
+else
+  warn "devicectl is unavailable (needs Xcode 15 or newer); real-device listing is skipped"
+fi
+
 say "appium"
 if command -v node >/dev/null 2>&1; then ok "node: $(node --version)"; else warn "node not found (brew install node)"; fi
 if command -v appium >/dev/null 2>&1; then
@@ -56,6 +72,17 @@ if curl -fsS --max-time 2 "http://${APPIUM_HOST}:${APPIUM_PORT}/status" >/dev/nu
   ok "Appium is listening on ${APPIUM_HOST}:${APPIUM_PORT}"
 else
   warn "Appium is not running on ${APPIUM_HOST}:${APPIUM_PORT}"
+fi
+
+say "idb"
+IDB_BIN="$(command -v idb 2>/dev/null || true)"
+if [ -z "$IDB_BIN" ] && [ -x "$HOME/.oslab/idb/bin/idb" ]; then IDB_BIN="$HOME/.oslab/idb/bin/idb"; fi
+if [ -n "$IDB_BIN" ]; then ok "idb client: $IDB_BIN"; else warn "idb client not found (Install idb in the dashboard, or pipx install fb-idb)"; fi
+if command -v idb_companion >/dev/null 2>&1; then ok "idb companion: present"; else warn "idb companion not found (brew install facebook/fb/idb-companion)"; fi
+if [ -f "$MAC_DIR/.idb-companion.pid" ] && kill -0 "$(cat "$MAC_DIR/.idb-companion.pid")" 2>/dev/null; then
+  ok "idb companion is running (grpc :$IDB_PORT)"
+else
+  warn "idb companion is not running (make mac-idb)"
 fi
 
 say "config"

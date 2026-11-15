@@ -790,6 +790,130 @@ All checks passed
 * Dashboard checks — no dashboard file changed; the relocation card is the
   handoff.
 
+## CLNP-01…23 — cleaner pro (PR #214)
+
+**2026-11-14 — cleaner pro workstream.** Permissions, background monitor,
+bookmarks, custom entries, overview and Space Explorer, landed as eleven
+feature commits plus test/docs commits on `feat/cleaner-pro`.
+
+### Engine
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 321 tests in ~3s
+OK (except the 8 pre-existing test_relocation failures/errors, identical on master)
+```
+
+New suites: test_permissions (19), test_monitor (18), test_bookmarks (14),
+test_custom_catalog (12), test_explorer (8), plus purgeable tests in
+test_volumes (27 total).
+
+### Console contract
+
+```console
+$ cd android-lab/lab && python3 -m pytest tests/test_cleanup_console.py -q
+36 passed
+```
+
+Covers the permissions, monitor, bookmark, custom-entry and explorer typed
+contracts, including the guarded automated hook run (Trash-only, audited,
+`automated: true`) and the no-overlap refusal.
+
+### Dashboard
+
+```console
+$ cd dashboard && npm run check && npm run test:i18n && npm run build
+tsc clean · 2478 keys match across 7 locales · 513 pages built
+$ npm run test:e2e
+60 passed, 1 skipped
+```
+
+The cleanup specs drive the overview (storage hero, Review-cleanup CTA),
+the in-place tab navigation (a window marker survives a tab change), the
+permissions/monitor/bookmarks cards and the Space Explorer (registry,
+drill-down containment, breadcrumbs, typed refusal) over mocked typed
+endpoints. `lat check`: All checks passed.
+
+### Not run
+
+* A real macOS TCC denial on the FDA probe (rule 8: probes run through fake
+  probers in tests; the real grant belongs to the user).
+* A real free-space crossing with the monitor enabled for days — the
+  hysteresis and cooldown are covered by injected-snapshot tests.
+* A live custom-folder walk on a huge tree — budgets covered by fixture
+  trees; real forests belong to the user.
+
+## CLW-01…13 — cleaner widgets (PR #226)
+
+**2026-11-15 — cleaner widgets workstream** on `feat/cleaner-widgets`.
+
+### Engine
+
+14 tests in [[cleanup-lab/engine/tests/test_widget.py]] (unittest): the fold
+covers every capability (disk numbers from the home volume, last scan totals,
+history reclaim sums, monitor schedule and warnings, bookmark flag counts, FDA
+state); status follows the reference derivation (cleaning → scanning →
+ready-to-clean → up-to-date); progress comes from the running job; missing
+data, a broken history and stale scan jobs degrade without raising; the
+container exists-only probe honours `OSLAB_WIDGET_GROUP_DIR`; the published
+file carries no absolute paths beyond the mount point; `publish` writes
+atomically with 0600 and refuses honestly without a container.
+
+### Console contract
+
+```console
+$ cd android-lab/lab && python3 -m pytest tests/test_cleanup_console.py -q
+39 passed
+```
+
+New: the widget endpoint returns the typed snapshot and publishes into the
+overridden container, publishes honestly (false + reason) without one, and
+the job-completion hook writes the file without any poll — a finished scan
+reaches the widget.
+
+### Desktop app
+
+```console
+$ cd app/src-tauri && cargo check && cargo test widget::
+check clean · 5 passed
+```
+
+5 tests: group-dir layout, missing request, fresh request consumed exactly
+once, stale request refused and cleared, garbage refused and cleared. The
+Swift targets build universal (arm64 + x86_64) with xcodegen + xcodebuild;
+the appex carries the widgetkit extension point and the framework exports
+`OBJC_CLASS_$_OSLabWidgetReloader`. `bash app/scripts/release-mac.sh
+--no-notarize` was run locally: the embed, re-sign (appex → framework → app
+with the App Group entitlement), updater rebuild + re-sign and nested-code
+verification all pass; notarization itself is covered only on CI.
+
+### Dashboard
+
+```console
+$ cd dashboard && npm run check && npm run test:i18n && npm run build
+tsc clean · 2528 keys match across 7 locales · 513 pages built
+$ npx playwright test e2e/cleanup-widgets.spec.ts
+5 passed
+```
+
+The widgets spec drives the live preview (status badge, metric tiles, FDA
+badge, published timestamp), Publish now, the honest not-capable note, the
+empty-payload degradation, the overview card scrolling to the section, and
+both app globals (`__oslabNavigate` for tab and section routes,
+`__oslabQuickClean` ending in the confirm dialog — the document never
+reloads). `lat check`: All checks passed.
+
+### Not run
+
+* The signed, notarized widget inside the shipped app on a real desktop —
+  the local smoke ran `--no-notarize`; the first 0.3.8 tag exercises the
+  full path on CI.
+* The App Group entitlement on a Developer-ID-signed host app (the CLW-03
+  spike): the console's `capable` probe and the honest dashboard notes cover
+  the failure path, but a real widget install belongs to the user.
+* The quick-clean intent through LaunchServices — the request-file handshake
+  is tested in Rust; invoking it needs the installed, signed app.
+
 ## CLN-04 … CLN-29
 
 Each task appends its own section when it lands.

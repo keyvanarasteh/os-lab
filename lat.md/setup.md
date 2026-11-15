@@ -52,8 +52,8 @@ or `OSLAB_DASHBOARD_BUILD=0`, the committed `dashboard/dist` is used.
 
 ## Source Lab distribution
 
-[[app/scripts/stage-runtime.mjs]] includes Source engine/adapters and the Cleanup
-Lab engine/catalog. It refuses private resource/storage/archive inputs. Desktop
+[[app/scripts/stage-runtime.mjs]] includes Source engine/adapters, the Cleanup
+Lab engine/catalog, and the Web Lab engine manifest and binary. It refuses private resource/storage/archive inputs. Desktop
 updates preserve private state.
 
 Minimal installers skip pip package upgrades and report Source readiness through

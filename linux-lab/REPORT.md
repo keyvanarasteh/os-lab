@@ -1,4 +1,21 @@
-# Lab Report
+## Ne Yapıldı?
+OS-10 görevi kapsamında Linux dosya sistemindeki temel dizinleri (/, /home, /etc, /opt, /root) tanıtan, içeriklerini listeleyen ve gizli dosya yapısını örnekleyen "os-10-filesystem-explorer.sh" Bash aracı geliştirildi.
 
-- **What I Did:** Implemented sys_audit.py to audit system services, file permissions, and network configuration.
-- **What I Learned:** Gained hands-on experience with Linux system administration scripts, Git version control workflows, and GitHub Pull Requests.
+## Neler Öğrenildi?
+- Linux temel dizinlerinin sistemdeki görevleri ve /root dizininin erişim kısıtlamaları öğrenildi.
+- Nokta (.) ile başlayan gizli dosyaların kullanım amacı ve ls -a komutu ile görüntülenmesi öğrenildi.
+- Script oluşturma, chmod +x ile çalıştırma izni verme,echo ve ls ile script yazma öğrenildi.
+- GitHub üzerinde fork, branch oluşturma, git status / add / commit / push ve Pull Request açma iş akışı deneyimlendi.
+
+---
+
+# OS-10 Proje Raporu
+
+## Ne Yapıldı?
+OS-10 görevi kapsamında Linux dosya sistemindeki temel dizinleri (/, /home, /etc, /opt, /root) tanıtan, içeriklerini listeleyen ve gizli dosya yapısını örnekleyen "os-10-filesystem-explorer.sh" Bash aracı geliştirildi.
+
+## Neler Öğrenildi?
+- Linux temel dizinlerinin sistemdeki görevleri ve /root dizininin erişim kısıtlamaları öğrenildi.
+- Nokta (.) ile başlayan gizli dosyaların kullanım amacı ve ls -a komutu ile görüntülenmesi öğrenildi.
+- Script oluşturma, chmod +x ile çalıştırma izni verme, echo ve ls ile script yazma öğrenildi.
+- GitHub üzerinde fork, branch oluşturma, git status / add / commit / push ve Pull Request açma iş akışı deneyimlendi.

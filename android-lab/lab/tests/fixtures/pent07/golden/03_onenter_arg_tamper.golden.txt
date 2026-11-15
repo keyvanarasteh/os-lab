@@ -1,0 +1,15 @@
+[PENT-07] policy=03_onenter_arg_tamper | target=android-lab/lab/tests/targets/hedef.c | fn=parola_kontrol | scope=VERIFIED
+[PENT-07] schedule=3x2000ms | inputs=parola:"deneme123",yetki_seviyesi:1 | hook_active=true
+[t=0ms] [INTERCEPTOR] onEnter parola_kontrol | observed={"girilen_parola": "deneme123", "yetki_seviyesi": 1} | tampered=[{"after": "gizli123", "before": "deneme123", "index": 0, "name": "girilen_parola", "type": "utf8"}]
+[t=0ms] [HEDEF] native parola_kontrol("gizli123", 1) -> 1
+[t=0ms] [INTERCEPTOR] onLeave parola_kontrol | observed_retval=1 | final_retval=1 | retval_replaced=false
+[t=0ms] [HEDEF] iter=1/3 | girilen="deneme123" | seviye=1 | sonuc=1 | durum=ONAYLANDI
+[t=2000ms] [INTERCEPTOR] onEnter parola_kontrol | observed={"girilen_parola": "deneme123", "yetki_seviyesi": 1} | tampered=[{"after": "gizli123", "before": "deneme123", "index": 0, "name": "girilen_parola", "type": "utf8"}]
+[t=2000ms] [HEDEF] native parola_kontrol("gizli123", 1) -> 1
+[t=2000ms] [INTERCEPTOR] onLeave parola_kontrol | observed_retval=1 | final_retval=1 | retval_replaced=false
+[t=2000ms] [HEDEF] iter=2/3 | girilen="deneme123" | seviye=1 | sonuc=1 | durum=ONAYLANDI
+[t=4000ms] [INTERCEPTOR] onEnter parola_kontrol | observed={"girilen_parola": "deneme123", "yetki_seviyesi": 1} | tampered=[{"after": "gizli123", "before": "deneme123", "index": 0, "name": "girilen_parola", "type": "utf8"}]
+[t=4000ms] [HEDEF] native parola_kontrol("gizli123", 1) -> 1
+[t=4000ms] [INTERCEPTOR] onLeave parola_kontrol | observed_retval=1 | final_retval=1 | retval_replaced=false
+[t=4000ms] [HEDEF] iter=3/3 | girilen="deneme123" | seviye=1 | sonuc=1 | durum=ONAYLANDI
+[SUMMARY] calls=3 | approved=3 | rejected=0 | arg_tampers=3 | retval_replacements=0 | final=ONAYLANDI

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "task_id": "PENT-07",
+  "policy_id": "04_onleave_retval_replace",
+  "target": {
+    "source": "android-lab/lab/tests/targets/hedef.c",
+    "function": "parola_kontrol",
+    "scope_verified": true
+  },
+  "schedule": {
+    "iterations": 3,
+    "interval_ms": 2000
+  },
+  "inputs": {
+    "parola": "deneme123",
+    "yetki_seviyesi": 1
+  },
+  "summary": {
+    "total_calls": 3,
+    "approved_calls": 3,
+    "rejected_calls": 0,
+    "arg_tampers_applied": 0,
+    "retval_replacements_applied": 3,
+    "final_status": "ONAYLANDI"
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "total_iterations": 3,
+      "elapsed_ms": 0,
+      "caller_inputs": {
+        "parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "onEnter": {
+        "hooked": true,
+        "observed_args": {
+          "girilen_parola": "deneme123",
+          "yetki_seviyesi": 1
+        },
+        "tampered_args": []
+      },
+      "effective_args": {
+        "girilen_parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "native_retval": 0,
+      "onLeave": {
+        "hooked": true,
+        "observed_retval": 0,
+        "retval_replaced": true,
+        "final_retval": 1
+      },
+      "durum": "ONAYLANDI"
+    },
+    {
+      "iteration": 2,
+      "total_iterations": 3,
+      "elapsed_ms": 2000,
+      "caller_inputs": {
+        "parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "onEnter": {
+        "hooked": true,
+        "observed_args": {
+          "girilen_parola": "deneme123",
+          "yetki_seviyesi": 1
+        },
+        "tampered_args": []
+      },
+      "effective_args": {
+        "girilen_parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "native_retval": 0,
+      "onLeave": {
+        "hooked": true,
+        "observed_retval": 0,
+        "retval_replaced": true,
+        "final_retval": 1
+      },
+      "durum": "ONAYLANDI"
+    },
+    {
+      "iteration": 3,
+      "total_iterations": 3,
+      "elapsed_ms": 4000,
+      "caller_inputs": {
+        "parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "onEnter": {
+        "hooked": true,
+        "observed_args": {
+          "girilen_parola": "deneme123",
+          "yetki_seviyesi": 1
+        },
+        "tampered_args": []
+      },
+      "effective_args": {
+        "girilen_parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "native_retval": 0,
+      "onLeave": {
+        "hooked": true,
+        "observed_retval": 0,
+        "retval_replaced": true,
+        "final_retval": 1
+      },
+      "durum": "ONAYLANDI"
+    }
+  ]
+}

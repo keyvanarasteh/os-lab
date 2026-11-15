@@ -20,6 +20,11 @@ Source Lab dispatches directly to [[source-lab/run.py#main]] through
 `source` or `source-lab`. It is included in `all status`, `all doctor` and
 `all monitor`, but not in VM start/stop/restart/profile fan-out.
 
+Web Lab dispatches through `web` or `web-lab` to
+`make -C web-lab` ([[web-lab/Makefile]]): doctor, setup, up/start, stop,
+status, monitor, open, events, test and clean. It is not part of `all`
+fan-out, and it has no profiles, resize or service verbs.
+
 ## Commands
 
 The CLI exposes profiles, config, lifecycle, status/monitor, logs, shell, urls,

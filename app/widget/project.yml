@@ -1,0 +1,60 @@
+# CLW-06: the os-lab widget extension and its reload bridge, generated into
+# an Xcode project with `xcodegen generate` (app/widget/build.sh). The appex
+# requires macOS 14 (AppIntents widget buttons); the reloader framework
+# targets macOS 12 to match the host app's minimum version. On macOS 12/13
+# hosts the system never loads the extension — graceful degradation.
+name: OSLabWidgets
+options:
+  bundleIdPrefix: com.keyvanarasteh.oslab
+  createIntermediateGroups: true
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGN_IDENTITY: ""
+    ONLY_ACTIVE_ARCH: "NO"
+    SWIFT_VERSION: "5.9"
+targets:
+  OSLabWidgets:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Widget
+    entitlements:
+      path: entitlements-widget.plist
+    info:
+      path: build-gen/OSLabWidgets-Info.plist
+      properties:
+        CFBundleDisplayName: os-lab Cleanup
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.keyvanarasteh.oslab.widget
+        PRODUCT_NAME: OSLabWidgets
+        SKIP_INSTALL: "YES"
+  OSLabWidgetReloader:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Reloader
+    info:
+      path: build-gen/OSLabWidgetReloader-Info.plist
+      properties:
+        CFBundleDisplayName: os-lab Widget Reloader
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+    settings:
+      base:
+        MACOSX_DEPLOYMENT_TARGET: "12.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.keyvanarasteh.oslab.widget-reloader
+        PRODUCT_NAME: OSLabWidgetReloader
+        SKIP_INSTALL: "YES"
+schemes:
+  OSLabWidgets:
+    build:
+      targets:
+        OSLabWidgets: all
+        OSLabWidgetReloader: all

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "policy_id": "01_baseline_unhooked",
+  "description": "Baseline execution of hedef.c without Frida Interceptor hooks; authentication fails.",
+  "target": {
+    "source": "android-lab/lab/tests/targets/hedef.c",
+    "function": "parola_kontrol"
+  },
+  "schedule": {
+    "iterations": 3,
+    "interval_ms": 2000
+  },
+  "inputs": {
+    "parola": "deneme123",
+    "yetki_seviyesi": 1
+  },
+  "rules": []
+}

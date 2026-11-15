@@ -153,7 +153,7 @@ export function ProvidersPage() {
   const [apk] = useApk();
   return (
     <Frame id="providers" title="Code & Providers">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<PlugsConnectedIcon size={22} />}
         title="Code & target providers"
         description="Where the lab gets its targets: attached ADB devices, staged APKs, the emulator stack's endpoints and the bundled Frida hooks."
@@ -266,7 +266,7 @@ export function WorkflowsPage() {
   );
   return (
     <Frame id="workflows" title="Agentic Workflows & DAG">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<TreeStructureIcon size={22} />}
         title="Agentic Orchestration & Workflows"
         description="Multi-phase pipelines for autonomous mobile penetration testing and reverse engineering."
@@ -321,7 +321,7 @@ export function ConsolePage() {
   const lines = (data?.logs ?? []).map((l) => l.replace(/^\n+|\n+$/g, "")).filter((l, i) => l || i > 0);
   return (
     <Frame id="console" title="Execution & Progress Console">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<TerminalIcon size={22} />}
         title="Execution Engine & Progress Console"
         description="Live output of workbench jobs (WF1, scanners, fuzzer, patcher, playbooks) and their outcome."
@@ -443,7 +443,7 @@ export function AnalyticsPage() {
   }, [wasRunning]);
   return (
     <Frame id="analytics" title="Security Analytics">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<ChartBarIcon size={22} />}
         title="Analytics & reports"
         description="Outcomes of this session's runs and the security reports generated so far."
@@ -515,7 +515,7 @@ export function SitemapPage() {
   );
   return (
     <Frame id="sitemap" title="Routes & Sitemap">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<MapTrifoldIcon size={22} />}
         title="Routes & capability sitemap"
         description="Every page, workflow, endpoint and lab of the console, and where it leads."

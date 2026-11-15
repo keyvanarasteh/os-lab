@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -56,6 +57,17 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "container-preview": CONTAINER_PREVIEW_KEYS, "container-prune": CONTAINER_PRUNE_KEYS,
               "privileged-preview": CONTAINER_PREVIEW_KEYS, "privileged-run": CONTAINER_PRUNE_KEYS,
               "relocation-plan": ("action", "entryId", "destination"), "relocation-run": ("previewId",),
+              "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "volumes"),
+              "monitor-evaluate": (),
+              "permissions-open": ("permissionId",),
+              "bookmarks-add": ("entryId",),
+              "bookmarks-update": ("entryId", "priority", "quickClean", "autoCleanHook", "sizeAlert"),
+              "bookmarks-remove": ("entryId",),
+              "bookmarks-quick-clean": (),
+              "custom-add": ("name", "path"),
+              "custom-remove": ("entryId",),
+              "explorer-scan": ("rootId",),
+              "explorer-subtree": ("rootId", "relative"),
               "leftovers": ()}
 
 
@@ -203,8 +215,17 @@ class CleanupJobStore:
         return job
 
     def _spawn(self, job, target, args):
+        def run_and_refresh():
+            try:
+                target(*args)
+            finally:
+                # CLW-04: every finished job changes what the widget shows.
+                # Workers with no root argument (the hook clean closes over
+                # it) skip the refresh here — their completion paths publish.
+                if args:
+                    publish_widget(args[0])
         try:
-            threading.Thread(target=target, args=args, daemon=True).start()
+            threading.Thread(target=run_and_refresh, args=(), daemon=True).start()
         except RuntimeError as exc:
             job.state = "failed"
             job.error = "Could not start the job worker: {0}".format(exc)
@@ -408,6 +429,42 @@ class CleanupJobStore:
                 })
             except Exception:
                 pass
+        finally:
+            job.finishedAt = time.time()
+
+    def start_explorer(self, root, request, *, relative=None):
+        """CLNP-23: a read-only size-tree walk over a registered root id."""
+        explorer = _module(root, "explorer")
+        root_id = request.get("rootId")
+        if not isinstance(root_id, str) or not root_id:
+            raise CleanupError(400, "rootId must name a registered root")
+        try:
+            explorer.resolve_root(root, root_id)
+        except explorer.ExplorerError as exc:
+            raise CleanupError(400, str(exc)) from exc
+        request_payload = {"rootId": root_id}
+        if relative is not None:
+            if not isinstance(relative, str):
+                raise CleanupError(400, "relative must be a path relative to the root")
+            request_payload["relative"] = relative
+        job = CleanupJob("explorer", request_payload)
+        self._register(job)
+        return self._spawn(job, self._run_explorer, (root, job, root_id, relative))
+
+    def _run_explorer(self, root, job, root_id, relative):
+        def update(payload):
+            job.progress = {"phase": "walking", "currentPath": payload.get("currentPath", ""),
+                            "nodes": payload.get("nodes", 0)}
+
+        try:
+            result = _module(root, "explorer").explore(
+                root, root_id, cancel=job.cancel, progress_callback=update, relative=relative
+            )
+            job.result = result
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
         finally:
             job.finishedAt = time.time()
 
@@ -661,10 +718,215 @@ class RelocationPreview:
         self.created_at = time.time()
 
 
+def _bookmark_book(root):
+    """CLNP-14/15: the engine bookmark module against this console's engine."""
+    return _module(root, "bookmarks")
+
+
+def _bookmark_catalog_ids(root):
+    """Today's catalog ids, or None when the catalog cannot be read (fail-open:
+    bookmark rows the catalog no longer lists are then kept, as before)."""
+    try:
+        return {entry["id"] for entry in _module(root, "catalog").load(root)}
+    except Exception:
+        return None
+
+
+def publish_widget(root):
+    """CLW-04: refresh the macOS widget snapshot after a state change.
+
+    Builds the snapshot from this process's job list and the engine stores and
+    writes it into the App Group container the widget extension reads. Always
+    best-effort: a machine without the widget (or without macOS) simply skips
+    the write, and no failure here may ever reach a request or the monitor
+    thread.
+    """
+    try:
+        widget = _module(root, "widget")
+        jobs = JOBS.list()
+        payload = widget.build(jobs, jobs)
+        payload["publish"] = widget.publish(payload)
+    except Exception:
+        pass  # the widget is an optional surface; it never breaks the API
+
+
+def _bookmark_entries(root, loaded):
+    """Join each bookmark with its catalog record for display."""
+    try:
+        entries = {entry["id"]: entry for entry in _module(root, "catalog").load(root)}
+    except Exception:
+        entries = {}
+    resolved = []
+    for item in loaded["bookmarks"]:
+        entry = entries.get(item["entryId"])
+        resolved.append(dict(item, entry=None if entry is None else {
+            "name": entry.get("name"), "risk": entry.get("risk"),
+            "category": entry.get("category"), "needsPrivilege": entry.get("needsPrivilege"),
+            "paths": entry.get("paths", []),
+        }))
+    return resolved
+
+
+def run_hook_clean(root):
+    """CLNP-16: the Trash-only automated clean the free-space hook triggers.
+
+    Runs in the monitor thread, never on a request path. Guards, in order:
+    the engine must be ready, hooked bookmarks must exist and pass the risk
+    refusal, and no plan/clean job may be running. The engine's own plan
+    fingerprinting, safety guard and owning-app check still apply; the run is
+    audited with ``automated: True`` and lands in the job list like any clean.
+    """
+    try:
+        bookmarks_mod = _bookmark_book(root)
+        loaded = bookmarks_mod.load()
+        if loaded["error"] or not loaded["bookmarks"]:
+            return None
+        if _module(root, "readiness").probe(root)["state"] != "ready":
+            return None
+        entries = _module(root, "catalog").load(root)
+        ids, _refusals = bookmarks_mod.plan_entry_ids(loaded["bookmarks"], entries, flag="autoCleanHook")
+        if not ids:
+            return None
+        if any(job.state == "running" and job.kind in ("plan", "clean")
+               for job in JOBS.list()):
+            return None
+        clean = _module(root, "clean")
+        job = CleanupJob("clean", {"automated": True, "trigger": "disk-free-space", "entryIds": ids})
+        JOBS._register(job)
+
+        def work():
+            try:
+                _module(root, "history").prepare()
+                plan = clean.build_plan(root, ids, mode="trash")
+                if plan.payload is None:
+                    job.state = "cancelled"
+                    return
+                job.request["planId"] = plan.id
+                measures = clean.verify_plan(plan)
+                result = clean.execute_plan(plan, measures)
+                result["automated"] = True
+                job.result = result
+                job.progress = result.get("progress", job.progress)
+                _module(root, "history").append(result)
+                job.state = "cancelled" if result["cancelled"] else "done"
+                loaded = bookmarks_mod.load()
+                now = time.time()
+                records = [
+                    dict(item, autoCleanHook=dict(item["autoCleanHook"], lastRunAt=now))
+                    if item["autoCleanHook"]["enabled"] else item
+                    for item in loaded["bookmarks"]
+                ]
+                bookmarks_mod.save(records)
+            except Exception as exc:
+                job.state = "failed"
+                job.error = "{0}: {1}".format(type(exc).__name__, exc)
+            finally:
+                job.finishedAt = time.time()
+                publish_widget(root)  # CLW-04: the hook run changed the widget's story
+
+        return JOBS._spawn(job, work, ())
+
+    except Exception:
+        return None
+
+
+def measure_bookmark_sizes(root, entry_ids):
+    """CLNP-17: read-only entry-scoped measurement for the size alerts."""
+    if not entry_ids:
+        return {}
+    try:
+        result = _module(root, "scan").scan_catalog(root, entry_ids)
+        return {item["id"]: item["sizeBytes"] for item in result["entries"]}
+    except Exception:
+        return {}
+
+
+class MonitorRunner:
+    """CLNP-10: the console's optional background monitor thread.
+
+    One daemon thread for the whole process, started with the first cleanup
+    API access. While the config is disabled it sleeps quietly and probes
+    nothing; while enabled it evaluates on the configured interval and
+    persists the state through the engine (CLNP-09). Reconfiguration needs no
+    restart: every tick re-reads the store, so a saved config applies on the
+    next wake-up. A single thread also means one evaluation at a time by
+    construction — a slow tick delays the next one instead of overlapping.
+    """
+
+    IDLE_WAIT = 30.0
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.thread = None
+        self.root = None
+        self.stop = threading.Event()
+
+    def ensure_started(self, root):
+        with self.lock:
+            self.root = root
+            if self.thread is not None and self.thread.is_alive():
+                return
+            self.stop = threading.Event()
+            try:
+                self.thread = threading.Thread(target=self._loop, name="cleanup-monitor", daemon=True)
+            except RuntimeError:
+                self.thread = None
+                return
+            self.thread.start()
+
+    def alive(self):
+        with self.lock:
+            return self.thread is not None and self.thread.is_alive()
+
+    def _loop(self):
+        while not self.stop.is_set():
+            try:
+                monitor = _module(self.root, "monitor")
+                config = monitor.load()["config"]
+                if config["enabled"]:
+                    result = monitor.run_evaluation()
+                    # CLNP-16: a fresh free-space crossing arms the bookmark hook.
+                    if any(event["kind"] == "warning" for event in result.get("newEvents", [])):
+                        run_hook_clean(self.root)
+                    self._evaluate_bookmark_sizes()
+                    publish_widget(self.root)  # CLW-04: monitor ticks refresh the widget
+                    self.stop.wait(config["intervalSeconds"])
+                else:
+                    self.stop.wait(self.IDLE_WAIT)
+            except Exception:
+                self.stop.wait(self.IDLE_WAIT)  # a tick may fail; the runner must not die
+
+    def _evaluate_bookmark_sizes(self):
+        """CLNP-17: measure alerted bookmarks read-only and record their events."""
+        try:
+            bookmarks_mod = _bookmark_book(self.root)
+            loaded = bookmarks_mod.load()
+            alerted = [item["entryId"] for item in loaded["bookmarks"] if item["sizeAlert"]["enabled"]]
+            if not alerted:
+                return
+            measurements = measure_bookmark_sizes(self.root, alerted)
+            updated, events = bookmarks_mod.evaluate_size_alerts(loaded["bookmarks"], measurements, time.time())
+            if events:
+                bookmarks_mod.save(updated)
+                _module(self.root, "monitor").append_events(events)
+        except Exception:
+            pass  # the size trigger is optional; a failure never kills the runner
+
+    def shutdown(self):
+        self.stop.set()
+
+
+#: One runner per console process.
+MONITOR = MonitorRunner()
+
+
 class CleanupAPI:
     # @lat: [[cleanup-lab#Console API]]
     def __init__(self, root):
         self.root = os.path.realpath(root)
+        # CLNP-10: the monitor thread starts with the first API access and
+        # stays quiet (no probes) while its config is disabled.
+        MONITOR.ensure_started(self.root)
 
     def get(self, path, query):
         if path == "/api/cleanup/status":
@@ -686,6 +948,25 @@ class CleanupAPI:
         if path == "/api/cleanup/volumes":
             _query(query)
             return _module(self.root, "volumes").inventory()
+        if path == "/api/cleanup/monitor":
+            _query(query)
+            payload = _module(self.root, "monitor").status()
+            payload["running"] = bool(payload["enabled"] and MONITOR.alive())
+            return payload
+        if path == "/api/cleanup/permissions":
+            # CLNP-03: read-only probes plus the reactive classification of the
+            # latest scan's unreadable paths (deduplicated), when one exists.
+            _query(query)
+            permissions = _module(self.root, "permissions")
+            unreadable = []
+            for job in JOBS.list():
+                result = job.get("result")
+                if job["kind"] == "scan" and isinstance(result, dict):
+                    for entry in result.get("entries", []):
+                        for item in entry.get("unreadable", []):
+                            if item not in unreadable:
+                                unreadable.append(item)
+            return permissions.report(unreadable)
         if path == "/api/cleanup/relocation":
             _query(query)
             return _module(self.root, "relocation").status(self.root)
@@ -701,9 +982,29 @@ class CleanupAPI:
                 return _module(self.root, "history").read()
             except Exception as exc:
                 raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+        if path == "/api/cleanup/bookmarks":
+            _query(query)
+            loaded = _bookmark_book(self.root).load(catalog_ids=_bookmark_catalog_ids(self.root))
+            return {"bookmarks": _bookmark_entries(self.root, loaded), "error": loaded["error"]}
+        if path == "/api/cleanup/widget":
+            # CLW-02: the widget snapshot — one read-only fold of the lab's
+            # state, published into the App Group container as a side effect
+            # (the widget re-reads that file per timeline build).
+            _query(query)
+            widget = _module(self.root, "widget")
+            jobs = JOBS.list()
+            payload = widget.build(jobs, jobs)
+            payload["publish"] = widget.publish(payload)
+            return payload
         if path == "/api/cleanup/jobs":
             _query(query)
             return {"jobs": JOBS.list()}
+        if path == "/api/cleanup/explorer/roots":
+            # CLNP-23: the read-only root list the Space Explorer opens with.
+            # The dashboard GETs this; it used to live in post(), which both
+            # 404'd the GET and NameError'd on _query's missing variable.
+            _query(query)
+            return {"roots": _module(self.root, "explorer").roots(self.root)}
         if path.startswith("/api/cleanup/jobs/"):
             _query(query)
             parts = path.strip("/").split("/")
@@ -780,6 +1081,170 @@ class CleanupAPI:
         if path == "/api/cleanup/leftovers/scan":
             _object_body(body, "leftovers")
             return JOBS.start_leftovers(self.root)
+        if path == "/api/cleanup/permissions/open-settings":
+            # The grant deep link: the page can only name a permission; the
+            # console opens the engine's fixed links (modern pane first, then
+            # the legacy pane) with ``open``. The in-app dashboard cannot open
+            # a custom scheme itself — the webview swallows the navigation —
+            # so the OS call lives here, exactly like app_update's ``open``.
+            _object_body(body, "permissions-open")
+            permission_id = body.get("permissionId")
+            if not isinstance(permission_id, str) or not permission_id:
+                raise CleanupError(400, "permissionId must name a permission record")
+            urls = _module(self.root, "permissions").settings_urls(permission_id)
+            if not urls:
+                raise CleanupError(409, "{0} has no settings pane to open on this platform".format(permission_id))
+            opened = None
+            for url in urls:
+                try:
+                    run = subprocess.run(["open", url], capture_output=True, timeout=10)
+                except (OSError, subprocess.SubprocessError):
+                    continue
+                if run.returncode == 0:
+                    opened = url
+                    break
+            if opened is None:
+                raise CleanupError(500, "Could not open System Settings; follow the guidance link instead")
+            return {"permissionId": permission_id, "opened": opened}
+        if path == "/api/cleanup/monitor/config":
+            _object_body(body, "monitor-config")
+            monitor = _module(self.root, "monitor")
+            try:
+                monitor.save_config(body)
+            except monitor.MonitorConfigError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            publish_widget(self.root)
+            payload = monitor.status()
+            payload["running"] = bool(payload["enabled"] and MONITOR.alive())
+            return payload
+        if path == "/api/cleanup/monitor/evaluate":
+            _object_body(body, "monitor-evaluate")
+            monitor = _module(self.root, "monitor")
+            monitor.run_evaluation()
+            publish_widget(self.root)
+            payload = monitor.status()
+            payload["running"] = bool(payload["enabled"] and MONITOR.alive())
+            return payload
+        if path == "/api/cleanup/bookmarks":
+            _object_body(body, "bookmarks-add")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a catalog entry")
+            bookmarks_mod = _bookmark_book(self.root)
+            try:
+                catalog_ids = {entry["id"] for entry in _module(self.root, "catalog").load(self.root)}
+            except Exception as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+            if entry_id not in catalog_ids:
+                raise CleanupError(400, "Unknown detector id: {0}".format(entry_id))
+            try:
+                loaded = bookmarks_mod.load(catalog_ids=catalog_ids)
+                result = bookmarks_mod.add(entry_id, loaded["bookmarks"], clock=time.time, catalog_ids=catalog_ids)
+            except bookmarks_mod.BookmarksError as exc:
+                raise CleanupError(409, str(exc)) from exc
+            publish_widget(self.root)
+            return {"bookmarks": _bookmark_entries(self.root, result), "error": result["error"]}
+        if path == "/api/cleanup/bookmarks/update":
+            _object_body(body, "bookmarks-update")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a bookmarked entry")
+            bookmarks_mod = _bookmark_book(self.root)
+            changes = {key: body[key] for key in ("priority", "quickClean", "autoCleanHook", "sizeAlert") if key in body}
+            if not changes:
+                raise CleanupError(400, "An update names at least one change")
+            try:
+                loaded = bookmarks_mod.load(catalog_ids=_bookmark_catalog_ids(self.root))
+                result = bookmarks_mod.update(entry_id, changes, loaded["bookmarks"])
+            except bookmarks_mod.BookmarksError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            publish_widget(self.root)
+            return {"bookmarks": _bookmark_entries(self.root, result), "error": result["error"]}
+        if path == "/api/cleanup/bookmarks/remove":
+            _object_body(body, "bookmarks-remove")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a bookmarked entry")
+            bookmarks_mod = _bookmark_book(self.root)
+            try:
+                loaded = bookmarks_mod.load(catalog_ids=_bookmark_catalog_ids(self.root))
+                result = bookmarks_mod.remove(entry_id, loaded["bookmarks"])
+            except bookmarks_mod.BookmarksError as exc:
+                raise CleanupError(404, str(exc)) from exc
+            publish_widget(self.root)
+            return {"bookmarks": _bookmark_entries(self.root, result), "error": result["error"]}
+        if path == "/api/cleanup/bookmarks/quick-clean":
+            _object_body(body, "bookmarks-quick-clean")
+            bookmarks_mod = _bookmark_book(self.root)
+            loaded = bookmarks_mod.load(catalog_ids=_bookmark_catalog_ids(self.root))
+            if loaded["error"]:
+                raise CleanupError(500, loaded["error"])
+            try:
+                entries = _module(self.root, "catalog").load(self.root)
+            except Exception as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+            ids, refusals = bookmarks_mod.plan_entry_ids(loaded["bookmarks"], entries, flag="quickClean")
+            if not ids:
+                if refusals:
+                    raise CleanupError(400, "; ".join(
+                        "{0}: {1}".format(item["entryId"], item["reason"]) for item in refusals
+                    ))
+                raise CleanupError(400, "No bookmark is marked for quick cleanup")
+            job = JOBS.start_plan(self.root, {"entryIds": ids, "mode": "trash"})
+            return {"job": job, "refusals": refusals}
+        if path == "/api/cleanup/custom-entries":
+            # CLNP-20: the raw path appears exactly once, here, validated by
+            # the engine before anything is stored. Afterwards only the
+            # custom.<slug> id travels through the API.
+            _object_body(body, "custom-add")
+            name = body.get("name")
+            raw_path = body.get("path")
+            if not isinstance(name, str) or not name.strip():
+                raise CleanupError(400, "A display name is required")
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise CleanupError(400, "path must be an absolute folder path")
+            overlay = _module(self.root, "custom_catalog")
+            platform = _module(self.root, "paths").platform_id()
+            try:
+                catalog_ids = {entry["id"] for entry in _module(self.root, "catalog").load(self.root)}
+            except Exception as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+            try:
+                result = overlay.add(name, raw_path, overlay.load()["entries"],
+                                     platform=platform, catalog_ids=catalog_ids)
+            except overlay.CustomCatalogError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            publish_widget(self.root)  # the new folder is bookmarkable material
+            return {"entries": result["entries"], "error": result["error"]}
+        if path == "/api/cleanup/custom-entries/remove":
+            _object_body(body, "custom-remove")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a custom entry")
+            if not entry_id.startswith("custom."):
+                raise CleanupError(400, "Only custom.<slug> entries can be removed here")
+            overlay = _module(self.root, "custom_catalog")
+            platform = _module(self.root, "paths").platform_id()
+            try:
+                result = overlay.remove(entry_id, overlay.load()["entries"], platform=platform)
+            except overlay.CustomCatalogError as exc:
+                raise CleanupError(404, str(exc)) from exc
+            # A removed entry cannot stay bookmarked: clear it and its flags.
+            bookmarks_mod = _bookmark_book(self.root)
+            loaded = bookmarks_mod.load()
+            if any(item["entryId"] == entry_id for item in loaded["bookmarks"]):
+                try:
+                    result["bookmarks"] = bookmarks_mod.remove(entry_id, loaded["bookmarks"])["bookmarks"]
+                except bookmarks_mod.BookmarksError:
+                    pass
+            publish_widget(self.root)
+            return result
+        if path == "/api/cleanup/explorer/scan":
+            _object_body(body, "explorer-scan")
+            return JOBS.start_explorer(self.root, body)
+        if path == "/api/cleanup/explorer/subtree":
+            _object_body(body, "explorer-subtree")
+            return JOBS.start_explorer(self.root, body, relative=body.get("relative"))
         if path == "/api/cleanup/deep-scan":
             _object_body(body, "deep-scan")
             return JOBS.start_deep_scan(self.root, body)

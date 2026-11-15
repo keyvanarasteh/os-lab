@@ -18,6 +18,7 @@ import {
   FireIcon,
   ChatCircleTextIcon,
   GitPullRequestIcon,
+  GlobeIcon,
   HeartbeatIcon,
   ScalesIcon,
   LaptopIcon,
@@ -49,7 +50,8 @@ export const LAB_ICON: Record<LabId, (size?: number) => ReactNode> = {
   linux: (s = 16) => <TerminalWindowIcon size={s} />,
   ios: (s = 16) => <AppleLogoIcon size={s} />,
   source: (s = 16) => <TerminalWindowIcon size={s} />,
-  macos: (s = 16) => <LaptopIcon size={s} />
+  macos: (s = 16) => <LaptopIcon size={s} />,
+  web: (s = 16) => <GlobeIcon size={s} />
 };
 
 /** Where a section id leads. Pages are static files, so every section is a plain href. */
@@ -65,6 +67,7 @@ export function sectionHref(id: string): string {
   if (id === "feedback") return localized("/feedback/");
   if (id === "content") return localized("/content/");
   if (id.startsWith("cleanup-")) return localized(`/cleanup/${id === "cleanup-scan" ? "" : id.slice(8) + "/"}`);
+  if (id === "web-lab") return localized("/web-lab/");
   if (id === "firewall") {
     const locale = typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname);
     return firewallPath(locale);
@@ -163,10 +166,14 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
           ] },
         { id: "cleanup", label: "Cleanup Lab", icon: <BroomIcon size={16} />,
           children: [
-            { id: "cleanup-scan", label: "Scan & clean" },
-            { id: "cleanup-results", label: "Results" },
-            { id: "cleanup-leftovers", label: "Leftovers" },
-            { id: "cleanup-history", label: "History" }
+            { id: "cleanup-scan", label: "Dashboard" },
+            { id: "cleanup-settings", label: "Settings" }
+          ] },
+        { id: "web", label: "Web Lab", icon: LAB_ICON.web(),
+          badge: running.has("web") ? <RunningDot /> : <StatePill lab={lab("web")} />,
+          children: [
+            { id: "web-lab", label: "Workbench" },
+            { id: "lab-web", label: "Readiness & setup" }
           ] },
         ...(labShown(labs, "ios", activeId) ? [labItem("ios", "iOS Lab")] : []),
         ...(labShown(labs, "windows", activeId) ? [labItem("windows", "Windows Lab")] : []),
@@ -213,6 +220,8 @@ function buildMeta(): Record<string, SpotlightMeta> {
     "lab-windows": { description: "Windows VM with web desktop and RDP", aliases: ["windows", "rdp", "vm"] },
     "lab-macos": { description: "Native Xcode Simulator and Appium on a Mac", aliases: ["mac", "appium", "xcuitest"] },
     "lab-linux": { description: "Linux VM with web console and SSH", aliases: ["linux", "ssh", "vm"] },
+    "web-lab": { description: "Embedded in-app browser: open windows, inject JavaScript, read captured page activity", aliases: ["web", "browser", "webview", "injection", "javascript"] },
+    "lab-web": { description: "Web Lab engine readiness: cargo, make and the built engine", aliases: ["web", "engine", "setup"] },
     firewall: { description: "BGT207 dream-company firewall designs — branches, segmentation, products and rule sets", aliases: ["firewall", "bgt207", "ufw", "rules", "vlan", "dmz", "company"] },
     health: { description: "GET /api/health", aliases: ["status", "api"] },
     contribute: { description: "How to set up, test, rebuild, open a pull request and view roadmap TODOs", aliases: ["contribute", "contributing", "pull request", "pr", "development", "tests", "todos", "roadmap", "pentesting", "firewall", "tasks"] },

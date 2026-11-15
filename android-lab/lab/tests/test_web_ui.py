@@ -113,7 +113,7 @@ def test_artifacts_cannot_escape_folder(web_server):
 def test_host_reports_every_lab(web_server):
     data = json.loads(urllib.request.urlopen(f"{web_server}/api/host").read().decode("utf-8"))
     assert data["host"]["os"]
-    assert [lab["id"] for lab in data["labs"]] == ["android", "windows", "linux", "ios", "macos", "source"]
+    assert [lab["id"] for lab in data["labs"]] == ["android", "windows", "linux", "ios", "macos", "source", "web"]
     for lab in data["labs"]:
         assert lab["state"] in ("ready", "needs-setup", "unavailable")
 
@@ -122,6 +122,18 @@ def test_health_capabilities_are_served_by_console(web_server):
     data = json.loads(urllib.request.urlopen(f"{web_server}/api/capabilities").read().decode("utf-8"))
     assert len(data["platforms"]) == 3
     assert any(item.get("lab") == "ios" for group in data["groups"] for item in group["items"])
+
+
+def test_scope_endpoint_reports_the_declared_scope(web_server, tmp_path, monkeypatch):
+    path = tmp_path / "scope.json"
+    monkeypatch.setenv("OSLAB_SCOPE_FILE", str(path))
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/scope").read().decode("utf-8"))
+    assert data["valid"] is False and data["declared"] is False and "No lab scope is declared" in data["error"]
+    path.write_text(json.dumps({"version": 1, "name": "web test lab", "authorization": "Owned fixtures",
+                                "hosts": ["127.0.0.1"], "devices": ["emulator-*"]}), encoding="utf-8")
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/scope").read().decode("utf-8"))
+    assert data["valid"] is True and data["name"] == "web test lab"
+    assert data["counts"] == {"hosts": 1, "packages": 0, "devices": 1, "paths": 0}
 
 
 def test_lab_start_requires_a_previewed_plan(web_server):

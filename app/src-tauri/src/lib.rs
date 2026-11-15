@@ -14,12 +14,14 @@ mod console;
 mod container_runtime;
 mod python_runtime;
 mod runtime;
+mod widget;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri::menu::{MenuBuilder, SubmenuBuilder};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
@@ -393,6 +395,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(Console::new())
         .on_menu_event(|app, event| {
             if event.id().as_ref() == "files_settings" {
@@ -435,6 +438,18 @@ pub fn run() {
             let menu = MenuBuilder::new(app).item(&file_menu).build()?;
             app.set_menu(menu)?;
             build_window(app.handle(), None)?;
+            // CLW-04: reload the macOS widgets whenever the console publishes
+            // a new snapshot; CLW-03: oslab:// deep links route in place.
+            widget::start_reload_watcher();
+            let nav = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() {
+                    if url.scheme() == "oslab" {
+                        let route = url.path().trim_start_matches('/').to_string();
+                        navigate_widget_route(&nav, &route);
+                    }
+                }
+            });
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -445,7 +460,50 @@ pub fn run() {
             // Stop the console (and the jobs in its process group) with the app.
             handle.state::<Console>().stop();
         }
+        if let tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::Focused(true), .. } = event {
+            // CLW-05: the widget's quick-clean intent opens the app; its
+            // request is picked up once, on focus, while it is still fresh.
+            if let Some(w) = handle.get_webview_window("main") {
+                let on_dashboard = w.url().map(|u| u.scheme() == "http" || u.scheme() == "https").unwrap_or(false);
+                if on_dashboard && widget::consume_pending_quick_clean() {
+                    let _ = w.eval("window.__oslabQuickClean && window.__oslabQuickClean()");
+                }
+            }
+            widget::reload_timelines();
+        }
     });
+}
+
+/// CLW-03: routes an oslab:// deep link into the dashboard in place. A known
+/// route only — unknown routes are refused rather than navigated blind. When
+/// the window still shows the launcher, the console URL hands it straight to
+/// the matching dashboard page.
+const WIDGET_ROUTES: [&str; 10] = [
+    "dashboard", "scan", "results", "leftovers", "history", "space",
+    "cleanup-bookmarks", "cleanup-monitor", "cleanup-permissions", "cleanup-widgets",
+];
+
+fn navigate_widget_route(app: &AppHandle, route: &str) {
+    if !WIDGET_ROUTES.contains(&route) {
+        return;
+    }
+    let Some(w) = app.get_webview_window("main") else { return };
+    let on_dashboard = w.url().map(|u| u.scheme() == "http" || u.scheme() == "https").unwrap_or(false);
+    if on_dashboard {
+        let _ = w.eval(format!(
+            "window.__oslabNavigate && window.__oslabNavigate({})",
+            serde_json::to_string(route).unwrap_or_default()
+        ));
+        return;
+    }
+    let Some(base) = app.state::<Console>().running_url() else { return };
+    let tab = match route {
+        "scan" | "results" | "leftovers" | "history" | "space" => format!("cleanup/{route}/"),
+        _ => "cleanup/".to_string(),
+    };
+    if let Ok(url) = url::Url::parse(&format!("{}/{}", base.trim_end_matches('/'), tab)) {
+        let _ = w.navigate(url);
+    }
 }
 
 #[cfg(test)]

@@ -168,8 +168,8 @@ original is gone.
 [[cleanup-lab/engine/cleanup_lab/readiness.py]] checks the operating system, the
 interpreter, the home folder, the Trash target and the private state folder; those
 decide `ready`, `needs-setup` or `unavailable`. The detector catalog, the native
-scan backend and the tools on `PATH` are optional capabilities, so a missing one
-never blocks a scan.
+scan backend, the tools on `PATH` and the permission probes are optional
+capabilities, so a missing one never blocks a scan.
 
 The desktop launcher selects Python 3.11 or newer to satisfy Cleanup Lab. If the
 host has only an older interpreter, its Get Python action installs an app-managed
@@ -231,16 +231,217 @@ owning application must not be running, and there is no elevated fallback. An
 interrupted move is flagged in the status and continued by a typed resume that
 re-verifies the store copy before touching the aside. `POST
 /api/cleanup/relocation/plan` and `POST /api/cleanup/relocation/run` follow the
-typed preview → single-use job pattern and are audited. The `/cleanup/`
-relocation card is the dashboard layer's part.
+typed preview → single-use job pattern and are audited.
+
+The dashboard layer is the `/cleanup/relocation/` tab
+([[dashboard/src/views/cleanup/relocation-card.tsx]]): one row per relocatable
+entry with its path, a Local folder / Linked / Interrupted chip (the status
+payload reports relocatable and interrupted; link detail appears on the plan),
+a destination select fed by the volume inventory, and the plan preview behind
+the confirm dialog that names the entry, the destination and the symlink fact
+before anything moves. A run shows per-step progress with a Cancel that stops
+between steps; a completed move shows the store path, a failure says the
+original or a verified copy is still in place, and relocation results render
+as their own rows on the History tab. The overview's Relocation tile opens the
+tab. The first entry in the family is
+`simulators.coresimulator-devices`
+([[cleanup-lab/catalog/simulators.json]]): the CoreSimulator devices folder,
+`cleanable: false` (relocation-only — cleaning is refused), owning processes
+Simulator and Xcode, so an iOS Simulator setup can live outside the OS disk
+while simulator runtimes stay system-managed.
+
+## Cleaner Pro (CLNP)
+
+The cleaner-pro workstream (PR #214) adds five layers on top of the roadmap.
+Task ids are `CLNP-01…23`; the plan and its honest deviations live in
+[[cleanup-lab/PLAN-cleaner-pro.md]].
+
+### Permissions (CLNP-01…05)
+
+The read-only permission surface lives in
+[[cleanup-lab/engine/cleanup_lab/permissions.py]].
+
+The CLN-20 FDA probe moved here —
+`privilege.disk_access()` delegates with a byte-compatible payload. Only the
+two silent-failure FDA folders are probed proactively; Desktop/Documents/
+Downloads grants are decided reactively, because probing them would raise
+the macOS consent dialog. `classify_unreadable()` re-probes each unreadable
+scan path read-only and classifies only what still fails with
+PermissionError, by demonstrable scope (TCC-protected Library folders →
+FDA; the user-folder grants; dot components → hidden roots); a recovered
+path makes no claim. Readiness gains the optional `permissions` capability,
+`labctl cleanup doctor` prints the probes, and
+`GET /api/cleanup/permissions` merges the probes with the latest scan's
+classification. The dashboard renders a Permissions card whose grant button
+posts `POST /api/cleanup/permissions/open-settings`: the page names a
+permission, and the console opens the engine's fixed panes with `open` —
+the modern privacy-extension pane first, the legacy pane as fallback. The
+old plain anchor is gone: the app webview swallows custom-scheme
+navigations, so clicking it never opened anything. The engine stays free of
+subprocesses; `settings_urls()` is the whole steerable surface, an unknown
+or non-macOS id opens nothing. The page also re-probes the records when the
+window regains focus, so a finished grant flips the chips without a reload.
+
+### Background monitor (CLNP-09…13)
+
+The trigger registry, config schema and evaluation are pure functions in
+[[cleanup-lab/engine/cleanup_lab/monitor.py]].
+
+The first trigger, `disk-free-space`, warns per volume (absolute and percent
+floors from the CLN-28 inventory) with re-arm hysteresis and a cooldown. Config and
+bounded events persist as atomic JSON in the private state folder; a corrupt
+store disables the monitor and reports why. The console runs one daemon
+`MonitorRunner` thread — silent while disabled, re-reading the store every
+tick so a saved config applies without a restart. Typed endpoints:
+`GET /api/cleanup/monitor`, `POST /api/cleanup/monitor/config` and
+`POST /api/cleanup/monitor/evaluate`; `labctl cleanup monitor` prints the
+read-only status. The dashboard's monitor card and page-top warning banner
+share one poller that only runs while the runner is enabled.
+
+### Bookmarks (CLNP-14…19)
+
+One typed bookmark per catalog entry — never a raw path — lives in
+[[cleanup-lab/engine/cleanup_lab/bookmarks.py]], with priority ordering, a
+quick-clean flag, a Trash-only `autoCleanHook` and a `sizeAlert` threshold.
+
+Loads that know the catalog drop rows naming entries it no longer lists and
+name them in `error` — one stale row used to 409 every add, update and
+remove with `Unknown catalog entry` for an entry the request never named.
+The healing load persists the healed store itself, so the drop notice is
+one-time; a bare load stays a fail-open read that writes nothing.
+
+`plan_entry_ids()` filters by flag in priority order and refuses the
+catalog's never-preselect risk classes with per-entry reasons. Quick clean
+(`POST /api/cleanup/bookmarks/quick-clean`) runs the existing plan →
+confirm → run flow. `run_hook_clean()` in the console executes the
+automated clean inside the monitor thread when a free-space crossing fires:
+engine-ready and no-overlap guards, Trash-only, audited with
+`automated: true`, announced by a post-run banner. The `bookmark-size`
+trigger measures alerted bookmarks with a read-only entry-scoped scan and
+folds its events into the monitor store. `labctl cleanup bookmarks` lists
+them read-only.
+
+### Custom entries (CLNP-20)
+
+User folders join as `custom.<slug>` entries through
+[[cleanup-lab/engine/cleanup_lab/custom_catalog.py]], validated by the
+shipped catalog's own `_check_entry`.
+
+They are merged by `catalog.load` after the shipped entries (shipped ids
+win; a broken overlay is reported through `catalog.report`'s
+`overlayError`). The raw path is validated exactly once
+at creation — absolute, an existing folder, never a symlink, never a
+protected or system directory — then only ids travel through the API.
+Removing a custom entry clears its bookmark and flags.
+
+### Overview and Space Explorer (CLNP-21…23)
+
+The dashboard gains an overview page and a new `space` tab; the walker
+behind it is [[cleanup-lab/engine/cleanup_lab/explorer.py]].
+
+`volumes.inventory()` reports `purgeableBytes` from the fixed macOS
+`diskutil info -plist` probe; where the system does not answer, the field
+is `null` and the dashboard omits the purgeable segment — purgeable is
+never guessed. The `/cleanup/` dashboard renders the overview: a readiness
+chip and last-scan note in the page head, the storage hero (segmented
+used/available bar), the Quick clean and Clean cards and, on the Settings
+tab, the grouped capability card grids tied to live readiness. The
+Dashboard, Settings and detail tabs (including the `space` tab) navigate
+in place (island-internal `pushState`/`popstate` router; static routes and
+Public Pages URLs unchanged; core data fetched once per session, per-tab
+data live).
+
+[[cleanup-lab/engine/cleanup_lab/explorer.py]] walks a parent-summed size
+tree read-only (lstat only, symlinks never followed, hard links counted
+once, one filesystem, node/depth budgets that report `truncated`) over
+registered roots only — `deep-roots.json` ids plus custom overlay entries.
+A drill-down walks a relative path that must stay inside the same root, so
+no request steers the walker. Console: `GET /api/cleanup/explorer/roots`
+and typed `explorer`/`explorer-subtree` jobs. The Space Explorer tab never
+deletes; it links cleaning back to the plan flow.
+
+## Cleaner Widgets (CLW)
+
+The cleaner-widgets workstream (PR #226) ports the reference app's macOS
+WidgetKit feature to the desktop app. Task ids are `CLW-01…13`; the plan
+lives in [[cleanup-lab/PLAN-cleaner-widgets.md]].
+
+### Widget snapshot (CLW-01/02)
+
+[[cleanup-lab/engine/cleanup_lab/widget.py]] folds existing engine payloads
+into one typed, path-free snapshot and publishes it into the macOS App
+Group container.
+
+The fold covers home-volume disk numbers, the latest finished scan, history
+reclaim totals, the monitor's schedule and warnings, bookmark flag counts
+and the FDA probe. The container (`group.com.keyvanarasteh.oslab`) is never
+created; `OSLAB_WIDGET_GROUP_DIR` is the test seam, and a machine without
+the container publishes nothing, honestly. `GET /api/cleanup/widget` builds
+and publishes in one call.
+
+### Publishing (CLW-04)
+
+The console republishes the snapshot after job completions, monitor ticks
+and the mutating handlers.
+
+The job hook lives once in the spawn wrapper (tolerating rootless workers);
+monitor ticks, evaluations, bookmark and custom-entry mutations and monitor
+config saves refresh it too. The write is atomic (temp file +
+`os.replace`, 0600); the widget re-reads the file per timeline build, so a
+corrupt write is never observable.
+
+### Desktop app (CLW-03/05/06)
+
+[[app/widget]] builds two macOS targets with xcodegen + xcodebuild: the
+WidgetKit extension and `OSLabWidgetReloader.framework`.
+
+The extension renders small/medium/large layouts in the dashboard's token
+mirror (macOS 14+, so older hosts simply never load it). The framework's
+`@objc` class is dlopen'd by the Tauri host from `Contents/Frameworks` to
+call WidgetCenter. The intent writes a timestamped request file; the host
+consumes it once on window focus with a 120-second max age, then drives
+`window.__oslabQuickClean`, which follows the dashboard's plan → confirm →
+run flow. `oslab://` deep links register through tauri-plugin-deep-link and
+land as whitelisted routes in `window.__oslabNavigate` (tab ids or overview
+section ids, each section id retargeting to the tab that hosts it:
+permissions, widgets and bookmarks live on Settings).
+
+### Release embedding (CLW-08/09)
+
+`app/scripts/release-mac.sh` builds the widget products first, embeds them
+and rebuilds the app's seal.
+
+After the embed it re-signs appex (with App Sandbox and App Group) →
+framework → app (with App Group) with hardened runtime, regenerates and re-signs
+the updater tar.gz, re-notarizes the app, and verifies the nested code and
+entitlements. Pull-request dry runs compile the widget targets. Build timings,
+entitlements checks, codesign verification, and test execution profiles are
+documented in [[docs/debug-widget-build.md]].
 
 ## Dashboard pages
 
-[[dashboard/src/views/cleanup/pages.tsx]] renders the compact default dashboard at
-`/cleanup/`: one read-only catalog scan, measured suggestions, plan review,
-confirmation, progress and a result summary. Its confirmation opens the shared
-native dialog (focus containment, Escape/backdrop close, focus return) that
-lists ready items with sizes and skipped items with their reasons.
+[[dashboard/src/views/cleanup/pages.tsx]] splits the dashboard at `/cleanup/`
+into a compact main view and a Settings tab.
+
+The main view keeps only the
+cleaning actions and the stats around them: the storage hero, the Quick clean
+card (one confirmed Trash run over the bookmarks flagged for quick clean,
+stating the reason when none are flagged), the Clean card (scan, the
+Recommended / More-safe presets, plan review, confirmation, progress) and the
+latest clean report, plus a compact read-only Monitor stats card
+([[dashboard/src/views/cleanup/monitor-card.tsx]] exports `MonitorStatsCard`;
+thresholds and volumes are configured in Settings). The Settings tab at
+`/cleanup/settings/` hosts the Bookmarks section, the Permissions card, the
+full Background monitor card, the Desktop widgets card and the capability
+card grid that links to the detail tools. The detail routes — Space Explorer,
+Advanced scan, Results, Leftovers, History, Relocation — keep their routes and
+behavior; the shared tab row renders on the Settings and detail pages, the
+local main page reaches Settings through the page-head action, and Public
+Pages keeps the full tab row without engine calls.
+
+Its confirmation opens the shared native dialog (focus containment,
+Escape/backdrop close, focus return) that lists ready items with sizes and
+skipped items with their reasons.
 
 The recommended preset uses default-selected, nonprivileged entries outside
 high/privacy/credentials risk. The extended preset adds other low/medium risk
@@ -274,6 +475,15 @@ the seven translated locales.
 before the static dashboard fallthrough.
 
 `GET /api/cleanup/status`, `GET /api/cleanup/catalog` and `GET /api/cleanup/volumes` are read-only.
+The cleaner-pro layers add `GET /api/cleanup/permissions` plus the grant
+round-trip `POST /api/cleanup/permissions/open-settings`, `GET /api/cleanup/monitor`
+(with typed `monitor/config` and `monitor/evaluate` POSTs), the bookmark
+endpoints (`bookmarks`, `bookmarks/add|update|remove|quick-clean`), the
+custom-entry endpoints (`custom-entries`, `custom-entries/remove`) and the
+explorer (`explorer/roots`, typed `explorer` and `explorer-subtree` jobs) —
+each typed and validated again by the engine. The cleaner-widgets layer
+adds `GET /api/cleanup/widget` (read-only fold, published into the App
+Group container as a side effect).
 `POST /api/cleanup/scan`, `POST /api/cleanup/plan` and `POST /api/cleanup/clean
 {planId}` start jobs whose requests carry catalog ids, an optional worker count or
 mode, and a plan id only. `GET /api/cleanup/jobs/<id>` returns progress and result;
@@ -315,7 +525,10 @@ The engine tests run under `unittest` from the engine folder.
 `cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'`
 covers the probe, the catalog, the scan, plan → clean (guard, fingerprints,
 Trash by default, honest failures), the path rules, the CLI exit codes, the
-volume inventory, the privileged actions and the relocation executor.
+volume inventory, the privileged actions, the relocation executor, the
+permission probes and classification, the monitor triggers and store, the
+bookmarks, the custom overlay, the explorer walker and the widget snapshot
+fold; the desktop app's Rust bridge adds `cargo test widget::`.
 Tests live in [[cleanup-lab/engine/tests]]; the console's typed job contract is
 covered by [[android-lab/lab/tests/test_cleanup_console.py]]. [[scripts/run-tests.sh]]
 runs the same suites next to the reference code tests, the Android suite, `bash -n`,

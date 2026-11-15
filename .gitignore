@@ -10,6 +10,8 @@
 **/config.env
 !**/config.env.example
 android-lab/lab/.sim-device
+# Your declared lab scope (start from console/scope.example.json)
+/scope.json
 ios-lab/mac/config.env
 ios-lab/mac/.sim-device
 ios-lab/mac/.appium.pid
@@ -54,9 +56,23 @@ secrets/*
 !secrets/README.md
 app/out/
 app/src-tauri/resources/tools/uv-*
+# CLW-06/08: generated widget build products and Xcode project
+app/widget/build/
+app/widget/build-gen/
+app/widget/OSLabWidgets.xcodeproj/
 app/**/*.p8
 app/**/*.p12
 app/**/*.pfx
 
 # Built content pack (scripts/build-content.py)
 dist-content/
+
+# Compiled lab C targets & binaries (PENT-07)
+*.exe
+*.out
+*.o
+*.obj
+hedef
+
+# Web Lab engine build artifacts (web-lab/browser)
+web-lab/browser/target/
