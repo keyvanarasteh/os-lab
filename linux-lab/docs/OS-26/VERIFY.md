@@ -104,7 +104,7 @@ npx --yes --package lat.md lat check
 ```
 
 Var olan `.venv-test` ve pytest kurulumu kullanılabilir. OS-26 için beklenen
-sonuç **41 passed**. Testler geçici dosyalar kullanır; ağ, `sudo` veya gerçek
+sonuç **53 passed**. Testler geçici dosyalar kullanır; ağ, `sudo` veya gerçek
 sahiplik değişikliği gerektirmez. `lat`, proje belgelerinin grafik kontrolüdür;
 denetleyicinin bağımlılığı değildir. Genel runner diğer labları da test eder.
 
@@ -239,3 +239,29 @@ Python 3.14.4
 .........................................                                [100%]
 41 passed in 0.55s
 ```
+
+## 15 Kasım 2026 inceleme düzeltmeleri
+
+Geliştirme ortamında güncellenen OS-26 testleri: **53 passed in 0.56s**.
+Bu sonuç, yukarıdaki videoda kayıtlı 41 testlik VM sonucunun yerine geçmez.
+
+- `/`, `//` ve bayt yolu biçimleri kök cihaz/inode kimliğiyle reddedilir.
+  Bayt ve bayt döndüren PathLike girdileri `os.fsdecode` ile raporlanabilir
+  metne dönüştürülür; JSON dosya adlarını kaçışlayarak korur.
+- Açılan alt dizinin cihaz/inode kimliği, önceki no-follow stat ile karşılaştırılır.
+  Değişmiş dizinin içeriği taranmaz; rapor eksik ve çıkış kodu 2 olur.
+- Bulgular cihaz/inode bilgisi ve komutların eskiyebileceği uyarısını içerir.
+  Öneriler güvenli otomatik onarım değildir: yol veya üst dizin değişirse başka
+  nesneye uygulanabilir. Eşzamanlı yazan işlemleri durdurup kimliği ve üst yolları
+  yeniden kontrol edin; tek başına tekrar stat yapmak atomiklik sağlamaz.
+  Güvenilmeyen veya değişmekte olan ağaçlarda önerileri çalıştırmayın.
+- Sahiplik değişikliği önce, gerekiyorsa chmod sonra önerilir. Setgid dizininde
+  yalnızca sahiplik sapması olsa bile korunan modun geri yüklenmesi önerilir.
+- Bulgular ve hatalar toplamı en fazla 1000 kayıt tutulur (son kayıt sınır hatası
+  için ayrılır); sınıra ulaşınca tarama durur, complete=false ve çıkış 2 olur.
+  Bu, rapor birikimini sınırlar; `fwalk` bir dizinin adlarını bellekte listelediği
+  için devasa tek dizinler için sabit toplam bellek garantisi verilmez. Araç
+  küçük, kullanıcıya ait lab ağaçları içindir; büyük üretim tarayıcısı değildir.
+
+`lat check` tekrar çalıştırıldı: önceden kayıtlı `lat.md/cleanup-lab.md:237`
+339/250 karakter paragraf hatası sürüyor; OS-26 düğümünde hata yok.
