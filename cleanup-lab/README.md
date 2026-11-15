@@ -10,16 +10,18 @@ behaviour is ported, not the code or the look.** Qleaner has known bugs (below) 
 its own visual style; Cleanup Lab pages use the os-lab dashboard shell and follow
 [`docs/UX_READINESS.md`](../docs/UX_READINESS.md).
 
-Status: **Engine skeleton (CLN-01), detector catalog (CLN-02), safety guard
-(CLN-12), the read-only scan job (CLN-03) and the plan → clean flow (CLN-13) are
-in place; the rest is roadmap.** The engine package, the readiness probe (`labctl
-cleanup status|doctor`, `GET /api/cleanup/status`) and the catalog (`GET
-/api/cleanup/catalog`) exist; `POST /api/cleanup/scan` runs a catalog scan as a
-console job with progress and cancel, `POST /api/cleanup/plan` previews a clean,
-and `POST /api/cleanup/clean {planId}` runs that confirmed plan. The `/cleanup/`
-page is **not built yet**: the dashboard layer lands separately, and
-[`STATUS.md`](STATUS.md) carries the endpoint contract, page states and strings it
-must use. Audit history is stored privately with a per-install HMAC key (CLN-15). The work
+Status: **The engine, scan job, plan → clean flow, audit history, ignore rules,
+schedules, headless CLI, privileged actions, volume inventory and cache relocation
+are in place on this stack; the dashboard layer and the rest of the roadmap
+remain.** The engine package, the readiness probe (`labctl cleanup status|doctor`,
+`GET /api/cleanup/status`) and the catalog (`GET /api/cleanup/catalog`) exist;
+`POST /api/cleanup/scan` runs a catalog scan as a console job, `POST
+/api/cleanup/plan` previews a clean, `POST /api/cleanup/clean {planId}` runs that
+confirmed plan, and `POST /api/cleanup/relocations/plan|run` moves a cache behind a
+symlink on another local volume. The `/cleanup/` page is **not built yet**: the
+dashboard layer lands separately, and [`STATUS.md`](STATUS.md) carries the
+endpoint contracts, page states and strings it must use. Audit history is stored
+privately with a per-install HMAC key (CLN-15). The work
 is split into tasks `CLN-01` … `CLN-29` on the dashboard **Contribute → Roadmap &
 TODOs** tab (filter: Open Source OS, label "Cleanup Lab"). Reserve a task before you
 start, as with every os-lab task
@@ -99,6 +101,28 @@ reports `trashed`, `deleted`, `skipped` (code + reason) or `failed` (error). Byt
 are credited only after the item is really gone from its original path, using this
 run's measurement — never the plan estimate. Privileged items and items whose app
 is running stay skipped.
+
+## Relocation
+
+`cleanup_lab/relocation.py` moves a cache folder or file to a store path on another
+local volume and leaves a symlink behind. It reports one of seven link states
+(`local_only`, `linked_ok`, `missing_link`, `broken_link`, `wrong_target`,
+`conflict`, `missing`); planning is read-only. `GET
+/api/cleanup/relocations` lists every catalog path with its state against each
+reported non-home volume and the typed actions that make sense (move / restore /
+relink / resume). `POST /api/cleanup/relocations/plan` names a catalog entry, a
+path index, a volume from `GET /api/cleanup/volumes` and an action — never a raw
+path. `POST /api/cleanup/relocations/run {planId}` runs the confirmed plan as a
+console job with progress and cancel.
+
+The executor is `copy → verify → rename aside → symlink → verify link → remove
+aside`. A failure at any step leaves the original, the set-aside original, or a
+verified copy; the result says which. Transient errors are retried, and there is no
+elevated shell fallback — a permission error fails with a reason. The owning tool
+must not be running (the CLN-12 lock). An interrupted move (`.oslab-moving`) or
+restore (`.oslab-restoring`) is detected; a resume either completes it or rolls the
+set-aside original back, never guessing. The store is kept on restore unless the
+plan explicitly removes it.
 
 ## Safety guard
 
