@@ -69,3 +69,5 @@ dist-content/
 
 # Web Lab engine build artifacts (web-lab/browser)
 web-lab/browser/target/
+# Local git worktrees (never committed)
+.worktrees/

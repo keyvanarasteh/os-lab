@@ -917,3 +917,191 @@ reloads). `lat check`: All checks passed.
 ## CLN-04 … CLN-29
 
 Each task appends its own section when it lands.
+
+## CLN-17 — engine slice: ignore-rule store, scan prune and plan refusal
+
+Branch `feat/cleanup-port` (port sprint, plan in
+[`PLAN-port-sprint.md`](PLAN-port-sprint.md)). Scope of this slice:
+`cleanup_lab/ignore.py`, the scan prune, the plan refusals and their tests.
+Console CRUD, `labctl cleanup ignore` and the settings section follow in the
+next slice of the same task.
+
+### Ignore-rule tests
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_ignore -v
+Ran 22 tests in 0.034s
+OK
+```
+
+Covers: store roundtrip (add/list/remove, ids, note, extension dot-stripping
+and lowercasing, path trailing-separator normalisation), validation refusals
+(relative path, filesystem root, the home folder, NUL/newline, unknown type,
+wildcards or separators in an extension, empty values), duplicate type+value,
+missing store = no rules and no problem, corrupt store fails closed (bad JSON,
+wrong version, unknown shape, unknown rule type), symlinked store refused,
+loose-permission store refused (mode 0600), the write is atomic with a `0700`
+folder and a `0600` file and no `.tmp` left behind; matching semantics
+(`path` covers the subtree but not sibling prefixes, `glob` matches at any
+depth and never crosses a separator unless the pattern carries one, a matched
+folder covers everything under it, `extension` is case-insensitive and never
+matches a prefix, `contains` is strictly inside, equal is not contained);
+plan refusals (`ignored` for a direct match, `contains-ignored` for a folder
+holding an ignored path by rule, by glob and by extension through the
+fingerprint walk, `ignore-store-corrupt` refusing every plan mode); the scan
+skips ignored paths unmeasured with a reason and counts them in
+`totals.ignoredPaths`; an unreadable store refuses the scan fail closed.
+
+### Full engine suite
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 324 tests in 2.577s
+FAILED (failures=3, errors=5)
+```
+
+The 8 failing ids are the pre-existing `test_relocation` failures of a clean
+`master` checkout in this sandbox (verified by running the pristine
+`master` engine side by side — the failure sets are identical; the remaining
+difference was this harness missing `deep-roots.json` / `simulator-roots.json`
+next to the copied engine, not a test result). No failure is new to this
+branch; the 22 new `test_ignore` tests pass.
+
+### Console typed-job suite
+
+Not run in this environment: the suite imports `pytest`, which is not
+installed offline here. The change adds optional keyword parameters and
+payload fields only — no signature the console uses was removed or renamed.
+To be run in the normal environment before merge.
+
+### Slice 2 — enforcement surfaces (sweep, explorer, console, CLI)
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_ignore -v
+Ran 34 tests in 0.045s
+OK
+```
+
+New in this slice: the project sweep refuses an ignored candidate and prunes
+the subtree of an ignored folder (`glob` and `path` rules); the sweep and the
+Space Explorer refuse a corrupt store (`ignore-store-corrupt`); the explorer
+prunes ignored entries from the tree (absent from children and sizes, counted
+per node in `ignored`); `labctl cleanup ignore list|add|remove` exit codes
+(0 ok, 1 corrupt store or unknown id, 2 usage), JSON output, a real-store
+add→remove roundtrip through `OSLAB_CLEANUP_STATE`, and argparse usage errors.
+
+```console
+$ python3 -m unittest discover -s tests -p 'test_*.py'   # full engine suite
+Ran 336 tests in 1.859s
+FAILED (failures=3, errors=5)
+```
+
+The 8 failing ids are identical to the clean-`master` set in this sandbox
+(verified side by side; zero new failures on this branch).
+
+Console endpoint tests were added to
+`android-lab/lab/tests/test_cleanup_console.py` (roundtrip through
+`GET/POST /api/cleanup/ignore` and `/remove`, typed 400s, duplicate refusal,
+unknown-id 404, corrupt store reported in `error` and blocking writes) — this
+environment has no `pytest`, so they run in the normal environment before
+merge. The dashboard settings section is the remaining slice of CLN-17.
+
+### Slice 3 — the `/cleanup/` settings section (dashboard layer)
+
+```console
+$ cd dashboard && npm run check          # tsc --noEmit — clean after `npx astro sync`
+$ npm run test:i18n
+2519 keys match across 7 locales; no new untranslated TSX strings.
+$ npm run build                          # 513 page(s) built; committed dist regenerated
+```
+
+What landed: `dashboard/src/views/cleanup/ignore-card.tsx` (the Ignore rules
+section: typed list with type badge, value, note and remove; the add form with
+type select, value input whose placeholder and explanation follow the chosen
+type, optional note; the store's corrupt-state error shown as a Status card
+because the engine refuses scans and plans until it is fixed), the
+`cleanupIgnoreRules / cleanupIgnoreAdd / cleanupIgnoreRemove` client methods in
+`dashboard/src/lib/api.ts`, and the section mounted on the overview page under
+the bookmarks section. 18 new English strings translated into tr, de, fr, es,
+it, fa and ar (checked by `npm run test:i18n`; `*` and `?` never crossing a
+folder boundary and the per-type examples are part of the copy).
+
+Not run here: `npm run test:e2e` — the Playwright browser binary is not
+installed in this offline environment (`browserType.launch: Executable doesn't
+exist`), the same for a clean `master` checkout; scripted screenshots for
+`VERIFY.md` need the same browser. Both run in the normal environment before
+merge.
+
+## CLN-14 — secure shred, done honestly
+
+Branch `feat/cleanup-port` (port sprint). Scope: `cleanup_lab/shred.py`,
+`cleanup_lab/settings.py`, the `shred` plan mode in `clean.py`, the console
+settings endpoints, `labctl cleanup settings`, the Secure shred card, and the
+tests. The staged first draft came from the maintainer's local working notes;
+three self-test defects were fixed on integration (the trash-mode expectation
+read the original path instead of the Trash destination; the FIFO refusal
+asserted on the status word instead of the error text; and the code removed an
+empty folder whose listing had failed — code and test are now aligned on the
+conservative behaviour: an uninspectable folder is refused and left in place,
+because shred never removes what it cannot verify).
+
+### Shred and settings tests
+
+```console
+$ cd cleanup-lab/engine && python3 -m unittest tests.test_shred tests.test_ignore -v
+Ran 56 tests in 1.309s
+OK
+```
+
+Covers: the overwrite passes reach a real temp file (zeros, ones, random —
+snapshotted at `fsync` time), the random rename and its disappearance, every
+injected failure (open, write, rename, unlink) reported with honest bytes,
+bottom-up folder shredding, symlinks never followed (inside the tree unlinked
+as bare links, a planned symlink refused), FIFOs refused and their folders
+failing honestly with `ENOTEMPTY`, unreadable folders left in place, the
+settings policy gate (`shred-disabled`), Trash unaffected with the policy on,
+a corrupt settings store failing shred closed while Trash still works, the
+running-app guard applying to shred, a partial shred keeping the honest bytes
+and reporting the rest, the settings store roundtrip/validation/privacy/
+atomicity, `all_values` defaults and corrupt reporting, and the `labctl
+cleanup settings` show/set surface with exit codes 0/1/2.
+
+### Full engine suite
+
+```console
+$ python3 -m unittest discover -s tests -p 'test_*.py'
+Ran 358 tests in 2.058s
+FAILED (failures=3, errors=5)
+```
+
+Failure set identical to clean `master` in this sandbox (8 pre-existing
+`test_relocation` ids; zero new failures).
+
+### Dashboard
+
+```console
+$ npm run check && npm run test:i18n && npm run build
+2527 keys match across 7 locales; no new untranslated TSX strings.
+513 page(s) built.
+```
+
+The Secure shred card (`dashboard/src/views/cleanup/shred-card.tsx`) mounts
+under the ignore-rules section: the policy picker (Off / 1-pass overwrite /
+3-pass overwrite), the limits copy ("Overwriting is not a guarantee on SSD,
+APFS or copy-on-write filesystems — wear levelling and copies can leave the
+original blocks elsewhere on the device") and the honesty note that the
+policy unlocks shred only as an explicit per-plan choice. 8 new strings
+translated into tr, de, fr, es, it, fa, ar. Playwright e2e and screenshots
+remain blocked offline here (browser binary missing); they run via CI on
+[`PR #228`](https://github.com/keyvanarasteh/os-lab/pull/228).
+
+### Incident note
+
+While testing the settings CLI before the env patch, two unpatched test runs
+wrote `{"shredPolicy": "1-pass"}` to the **real** per-install settings store
+(`~/Library/Application Support/os-lab/cleanup/settings.json`). The file held
+only that test value; it was removed immediately, restoring the defaults, and
+the tests now pin `OSLAB_CLEANUP_STATE` through `mock.patch.dict` for every
+CLI call. No user data was touched (the store contained nothing else), and
+the engine's own fail-closed behaviour was unaffected — but it is recorded
+here as the exact class of mistake rule 8 exists to prevent.

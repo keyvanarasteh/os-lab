@@ -330,7 +330,7 @@ no request steers the walker. Console: `GET /api/cleanup/explorer/roots`
 and typed `explorer`/`explorer-subtree` jobs. The Space Explorer tab never
 deletes; it links cleaning back to the plan flow.
 
-## Cleaner Widgets (CLW)
+## Cleaner Widgets (CLW)## Cleaner Widgets (CLW)
 
 The cleaner-widgets workstream (PR #226) ports the reference app's macOS
 WidgetKit feature to the desktop app. Task ids are `CLW-01…13`; the plan
@@ -384,6 +384,50 @@ After the embed it re-signs appex → framework → app with the App Group
 entitlement and hardened runtime, regenerates and re-signs the updater
 tar.gz, re-notarizes the app, and verifies the nested code and entitlement.
 Pull-request dry runs compile the widget targets.
+## Port sprint
+
+The `feat/cleanup-port` workstream ports the remaining roadmap tasks and
+approved additions as original os-lab code; the plan lives in
+[[cleanup-lab/PLAN-port-sprint.md]], the checklist in
+[[cleanup-lab/TODO-port-sprint.md]].
+
+Series: pending `CLN-14`, `CLN-17`, `CLN-18`, `CLN-19`, `CLN-21`, `CLN-29`,
+the not-done deltas of the merged CLNP-21…23 Space Explorer and CLNP-14…19
+quick clean, and provisional `CLN-30…36`. Behaviours were specified from a
+read-only study of mature open-source cleaners; the implementation names no
+external project. Every task obeys the architecture contract, the safety
+rules and the do-not-port tables, lands as its own commit series, and updates
+this node, `cleanup-lab/README.md`, `VERIFY.md` and `PARITY.md` together.
+
+CLN-17's engine and CLI slices have landed: `cleanup_lab/ignore.py` keeps
+typed rules (`path` / `glob` / `extension`) in the private state store with
+the settings store's discipline, the scan skips ignored paths unmeasured and
+counts them, the project sweep and the Space Explorer prune ignored
+directories from their walks, and the plan refuses an ignored path
+(`ignored`), a folder holding an ignored path (`contains-ignored`, enforced
+during the fingerprint walk for glob and extension rules) and an unreadable
+rules store (`ignore-store-corrupt`). The console answers
+`GET/POST /api/cleanup/ignore` and `/api/cleanup/ignore/remove` (ids only,
+typed 400s), and `labctl cleanup ignore list|add|remove [--json]` runs the
+same store. The `/cleanup/` settings section
+([[dashboard/src/views/cleanup/ignore-card.tsx]]) lists the rules, adds one
+with a per-type explanation and placeholder, removes one, and shows the
+corrupt-store error as its own status because the engine refuses to scan or
+plan until it is fixed.
+
+CLN-14 has landed the same way: `cleanup_lab/shred.py` overwrites in place
+(`1-pass` zeros; `3-pass` zeros → ones → OS random, each pass `fsync`ed),
+renames to a random same-folder name and unlinks, folders bottom-up, with
+`O_NOFOLLOW` opens, a post-overwrite identity re-check, symlink and
+special-node refusals, and a folder that cannot be inspected left in place.
+Every failure is reported and bytes are credited only for files verifiably
+gone. The `shred` plan mode is gated by `cleanup_lab/settings.py`
+(`shredPolicy: off | 1-pass | 3-pass`, default off): `off` refuses the plan
+(`shred-disabled`) and a corrupt store refuses it too
+(`shred-settings-corrupt`), while Trash and delete never read the settings.
+The console answers `GET/POST /api/cleanup/settings`, `labctl cleanup
+settings [show] | set <key> <value>` runs the same store, and the Secure
+shred card shows the policy picker with the honest SSD/APFS/COW limits.
 
 ## Dashboard pages
 

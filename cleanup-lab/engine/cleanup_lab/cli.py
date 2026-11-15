@@ -1,10 +1,11 @@
 """`labctl cleanup status|doctor|catalog|history|volumes [--json]`.
 
-All read: they print the readiness probe, the detector catalog, the audit
-history or the volume inventory and change nothing. The exit code follows the
-lab CLI contract — ``0`` when the engine is ready, ``1`` when it needs setup or
-the platform is unsupported (or a volumes probe failed), ``2`` for a usage
-error (argparse).
+Mostly read: they print the readiness probe, the detector catalog, the audit
+history or the volume inventory and change nothing. The `ignore` command
+manages the typed ignore rules (CLN-17): `list` is read-only, `add` and
+`remove` write the private-state store. The exit code follows the lab CLI
+contract — ``0`` when the command succeeded, ``1`` when it could not (a
+corrupt rules store, an unknown rule id), ``2`` for a usage error.
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ import sys
 
 from .catalog import CatalogError, report as catalog_report
 from .readiness import probe, repo_root
-from . import history, monitor, paths, volumes
+from . import history, ignore, monitor, paths, settings, volumes
 
 USAGE_EXIT = 2
 
@@ -257,12 +258,128 @@ def _bookmarks_lines(report, stream):
     return lines
 
 
+def _ignore_lines(rules):
+    """The labctl ignore list: one row per rule, with type, value, note and id."""
+    lines = ["Cleanup Lab ignore rules · {0} · {1} {2}".format(
+        paths.platform_id(), len(rules), "rule" if len(rules) == 1 else "rules")]
+    for rule in rules:
+        note = "  — {0}".format(_safe(rule["note"])) if rule.get("note") else ""
+        lines.append("  {0:<10} {1}{2}  ({3})".format(
+            rule["type"], _safe(rule["value"]), note, rule["id"]))
+    return lines
+
+
+def _ignore_command(args, stream):
+    """`labctl cleanup ignore list|add|remove` — exit 0 ok, 1 problem, 2 usage."""
+    if args.action == "list":
+        if args.first or args.second:
+            sys.stderr.write("cleanup ignore list: no further arguments\n")
+            return USAGE_EXIT
+        rules, problem = ignore.load_rules()
+        if problem is not None:
+            if args.json:
+                stream.write(json.dumps({"rules": [], "error": problem["message"]}, indent=2) + "\n")
+            else:
+                sys.stderr.write("cleanup ignore: {0}\n".format(problem["message"]))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"rules": rules, "error": None}, indent=2) + "\n")
+        else:
+            stream.write("\n".join(_ignore_lines(rules)) + "\n")
+        return 0
+
+    if args.action == "add":
+        if not args.first or not args.second or args.first not in ignore.RULE_TYPES:
+            sys.stderr.write(
+                "cleanup ignore add: usage is `ignore add <path|glob|extension> <value> [--note ...]`\n"
+            )
+            return USAGE_EXIT
+        try:
+            rule = ignore.add_rule(args.first, args.second, note=args.note)
+        except ValueError as exc:
+            sys.stderr.write("cleanup ignore add: {0}\n".format(exc))
+            return USAGE_EXIT
+        except ignore.RulesError as exc:
+            sys.stderr.write("cleanup ignore add: {0}\n".format(exc))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"added": rule, "error": None}, indent=2) + "\n")
+        else:
+            stream.write("Added {0} rule: {1}  ({2})\n".format(
+                rule["type"], rule["value"], rule["id"]))
+        return 0
+
+    # remove
+    if not args.first or args.second:
+        sys.stderr.write("cleanup ignore remove: usage is `ignore remove <rule-id>`\n")
+        return USAGE_EXIT
+    try:
+        removed = ignore.remove_rule(args.first)
+    except ignore.RulesError as exc:
+        sys.stderr.write("cleanup ignore remove: {0}\n".format(exc))
+        return 1
+    if not removed:
+        sys.stderr.write("cleanup ignore remove: no rule with id {0}\n".format(args.first))
+        return 1
+    if args.json:
+        stream.write(json.dumps({"removed": args.first, "error": None}, indent=2) + "\n")
+    else:
+        stream.write("Removed ignore rule {0}\n".format(args.first))
+    return 0
+
+
+def _settings_command(args, stream):
+    """`labctl cleanup settings [show] | settings set <key> <value>` — 0/1/2."""
+    if args.action == "show":
+        if args.first or args.second:
+            sys.stderr.write("cleanup settings show: no further arguments\n")
+            return USAGE_EXIT
+        values, problem = settings.all_values()
+        if problem is not None:
+            if args.json:
+                stream.write(json.dumps({"settings": values, "error": problem["message"]}, indent=2) + "\n")
+            else:
+                sys.stderr.write("cleanup settings: {0}\n".format(problem["message"]))
+            return 1
+        if args.json:
+            stream.write(json.dumps({"settings": values, "error": None}, indent=2) + "\n")
+        else:
+            lines = ["Cleanup Lab settings · {0}".format(paths.platform_id())]
+            for key, allowed in settings.SETTINGS.items():
+                lines.append("  {0:<14} {1}   (one of: {2})".format(key, values[key], ", ".join(allowed)))
+            stream.write("\n".join(lines) + "\n")
+        return 0
+
+    # set
+    if not args.first or not args.second:
+        sys.stderr.write("cleanup settings set: usage is `settings set <key> <value>`\n")
+        return USAGE_EXIT
+    if args.first not in settings.SETTINGS:
+        sys.stderr.write("cleanup settings set: unknown setting {0}; known: {1}\n".format(
+            args.first, ", ".join(sorted(settings.SETTINGS))))
+        return USAGE_EXIT
+    if args.second not in settings.SETTINGS[args.first]:
+        sys.stderr.write("cleanup settings set: {0} must be one of: {1}\n".format(
+            args.first, ", ".join(settings.SETTINGS[args.first])))
+        return USAGE_EXIT
+    try:
+        stored = settings.set({args.first: args.second})
+    except settings.SettingsError as exc:
+        sys.stderr.write("cleanup settings set: {0}\n".format(exc))
+        return 1
+    if args.json:
+        stream.write(json.dumps({"settings": stored, "error": None}, indent=2) + "\n")
+    else:
+        stream.write("Set {0} = {1}\n".format(args.first, stored[args.first]))
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="labctl cleanup",
         description="Cleanup Lab: inspect readiness (read-only) and, from CLN-19, scan/plan/clean.",
     )
-    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks")
+    sub = parser.add_subparsers(dest="command", metavar="status|doctor|catalog|history|volumes|monitor|bookmarks|ignore|settings")
     for name, text in (
         ("status", "one-screen readiness summary"),
         ("doctor", "every check, path and hint"),
@@ -276,6 +393,27 @@ def build_parser():
         command.add_argument("--json", action="store_true", help="print the probe as JSON")
         if name == "history":
             command.add_argument("--verify", action="store_true", help="verify the full HMAC chain")
+    ignore_cmd = sub.add_parser(
+        "ignore", help="the user's ignore rules the engine enforces (CLN-17)",
+        description="List, add or remove ignore rules. The scan and the plan refuse "
+                    "ignored paths and any folder holding an ignored path.",
+    )
+    ignore_cmd.add_argument("action", choices=("list", "add", "remove"))
+    ignore_cmd.add_argument("first", nargs="?", metavar="TYPE_OR_ID",
+                            help="add: the rule type (path, glob, extension); remove: the rule id")
+    ignore_cmd.add_argument("second", nargs="?", metavar="VALUE",
+                            help="add: the rule value (absolute path, glob pattern, or bare suffix)")
+    ignore_cmd.add_argument("--note", help="add: an optional note stored with the rule")
+    ignore_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
+    settings_cmd = sub.add_parser(
+        "settings", help="the typed engine settings (CLN-14)",
+        description="Show the settings store or set one typed value. A corrupt store "
+                    "is reported honestly; shred fails closed until it is fixed.",
+    )
+    settings_cmd.add_argument("action", nargs="?", default="show", choices=("show", "set"))
+    settings_cmd.add_argument("first", nargs="?", metavar="KEY", help="set: the setting key (e.g. shredPolicy)")
+    settings_cmd.add_argument("second", nargs="?", metavar="VALUE", help="set: the value (e.g. 1-pass)")
+    settings_cmd.add_argument("--json", action="store_true", help="print the result as JSON")
     return parser
 
 
@@ -286,6 +424,10 @@ def main(argv=None, stream=None):
     if not args.command:
         parser.print_help(stream)
         return USAGE_EXIT
+    if args.command == "ignore":
+        return _ignore_command(args, stream)
+    if args.command == "settings":
+        return _settings_command(args, stream)
     try:
         report = (catalog_report(repo_root()) if args.command == "catalog" else
                   history.read(verify=args.verify) if args.command == "history" else

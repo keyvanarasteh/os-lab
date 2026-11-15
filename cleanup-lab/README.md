@@ -102,6 +102,72 @@ are credited only after the item is really gone from its original path, using th
 run's measurement — never the plan estimate. Privileged items and items whose app
 is running stay skipped.
 
+## Ignore rules (CLN-17)
+
+`cleanup_lab/ignore.py` keeps the user's never-touch rules as typed data in the
+private state store (`ignore-rules.json`, same discipline as the settings store:
+`0700` folder, `0600` file, no symlink, atomic replace) and the engine enforces
+them everywhere. Three rule types: `path` (an absolute folder or file; the rule
+covers the path and everything under it), `glob` (matched against the full path
+and any path suffix, so a bare name matches at any depth; `*` and `?` never
+cross a separator unless the pattern carries one; a folder matched by the
+pattern covers its subtree; there is no negation — a rule can only protect) and
+`extension` (a bare, case-insensitive suffix). A `path` rule may not be the
+filesystem root or the home folder: ignoring either would ignore everything,
+and the store refuses instead of honouring it.
+
+Enforcement: the catalog scan skips ignored paths unmeasured and counts them
+(`totals.ignoredPaths`); the project sweep never reports and never descends
+into an ignored directory; the Space Explorer prunes ignored entries from the
+tree (counted per node in `ignored`); and the plan refuses an ignored item
+(`ignored`) and any folder holding an ignored path (`contains-ignored`, enforced
+for glob and extension rules during the fingerprint walk). The store fails
+closed: a file that cannot be read or trusted refuses the scan, the sweep, the
+explorer walk and every plan (`ignore-store-corrupt`) — rules that cannot be
+seen are never silently dropped.
+
+`GET /api/cleanup/ignore` lists the rules (a corrupt store is reported in
+`error`); `POST /api/cleanup/ignore` adds one (`type`, `value`, optional
+`note`; duplicates and invalid values are `400`); `POST
+/api/cleanup/ignore/remove` removes one by id (unknown id is `404`). The page
+sends type and value, never a pre-built rule. `labctl cleanup ignore list|add|
+remove [--json]` runs the same store with exit codes `0` ok / `1` problem /
+`2` usage.
+
+## Secure shred (CLN-14)
+
+`cleanup_lab/shred.py` overwrites a regular file in place pass by pass —
+`1-pass` writes zeros once, `3-pass` writes zeros, then ones (`0xFF`), then
+bytes from the OS — every pass flushed and `fsync`ed, then renames the file to
+a random name inside its own folder and unlinks it. Folders go bottom-up:
+files first, folders removed deepest-first, the planned root last. Opens use
+`O_NOFOLLOW`; after overwriting, the target is re-verified (same device and
+inode, same size) so a swapped or grown file fails instead of shredding the
+wrong thing. Symlinks are refused; sockets, FIFOs and device nodes are refused
+and left in place — their folder's removal then fails honestly with
+`ENOTEMPTY`. A folder whose listing fails is refused and left in place: shred
+never removes what it cannot verify. Every overwrite, rename and unlink
+failure is a reported failure (never success-on-error); bytes are credited
+only for files verifiably gone, so a partially shredded folder reports
+`failed` while still carrying the bytes it really destroyed.
+
+The mode is gated by the typed settings store (`cleanup_lab/settings.py`,
+`settings.json` in private state, same discipline as the rules store):
+`shredPolicy` is `off` (default), `1-pass` or `3-pass`. Only shred plans read
+it — `off` refuses the plan (`shred-disabled`) and a corrupt store refuses it
+too (`shred-settings-corrupt`) — while Trash and delete never touch the
+settings, so a broken file can never block the safe path. The plan payload
+names the pass count; a plan without a valid count fails the item instead of
+shredding once.
+
+The dashboard's Secure shred card shows the policy picker and the physical
+limits in the same words the confirmation uses: overwriting is not a
+guarantee on SSD, APFS or copy-on-write filesystems — wear levelling and
+copies can leave the original blocks elsewhere on the device. Console:
+`GET /api/cleanup/settings` (defaults filled, corrupt store reported in
+`error`) and `POST /api/cleanup/settings` (typed keys and values, `400`
+otherwise). CLI: `labctl cleanup settings [show] | set <key> <value> [--json]`.
+
 ## Volumes (CLN-28)
 
 `cleanup_lab/volumes.py` inventories the local mounted volumes read-only:

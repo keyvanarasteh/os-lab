@@ -13,10 +13,12 @@ import { CleanupExtraTools } from "./extra-tools";
 import { CrossPlatformLeftovers } from "./cross-leftovers";
 import { MonitorBanner, MonitorCard } from "./monitor-card";
 import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
+import { IgnoreSection } from "./ignore-card";
+import { ShredSection } from "./shred-card";
 import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
 import { WidgetsCard } from "./widgets-card";
-import type { BookmarksPayload, CleanupVolume, CleanupWidgetSnapshot } from "../../lib/api";
+import type { BookmarksPayload, CleanupVolume, CleanupSettingsPayload, CleanupWidgetSnapshot, IgnoreRulesPayload } from "../../lib/api";
 
 /** CLW-03: overview sections the desktop app's deep links may target. */
 const WIDGET_SECTIONS = new Set(["cleanup-widgets", "cleanup-monitor", "cleanup-permissions", "cleanup-bookmarks", "overview-review", "overview-storage"]);
@@ -219,6 +221,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const [permissions, setPermissions] = useState<CleanupPermissions | null>(null);
   const [bookmarks, setBookmarks] = useState<BookmarksPayload | null>(null);
   const [widget, setWidget] = useState<CleanupWidgetSnapshot | null>(null);
+  const [ignoreRules, setIgnoreRules] = useState<IgnoreRulesPayload | null>(null);
+  const [shredSettings, setShredSettings] = useState<CleanupSettingsPayload | null>(null);
   const [loading, setLoading] = useState(!PUBLIC);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -292,11 +296,19 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     void api.cleanupWidget()
       .then((snapshot) => { if (alive) setWidget(snapshot); })
       .catch(() => { if (alive) setWidget(null); });
+    void api.cleanupIgnoreRules()
+      .then((payload) => { if (alive) setIgnoreRules(payload); })
+      .catch(() => { if (alive) setIgnoreRules(null); });
+    void api.cleanupSettings()
+      .then((payload) => { if (alive) setShredSettings(payload); })
+      .catch(() => { if (alive) setShredSettings(null); });
     return () => { alive = false; };
   }, []);
 
   const reloadBookmarks = () => { void api.cleanupBookmarks().then(setBookmarks).catch(() => {}); };
   const reloadWidget = () => { void api.cleanupWidget().then(setWidget).catch(() => {}); };
+  const reloadIgnoreRules = () => { void api.cleanupIgnoreRules().then(setIgnoreRules).catch(() => {}); };
+  const reloadShredSettings = () => { void api.cleanupSettings().then(setShredSettings).catch(() => {}); };
   const bookmarkedIds = new Set((bookmarks?.bookmarks ?? []).map((item) => item.entryId));
 
   /** CLNP-21: a capability card either navigates a tab or scrolls to its section. */
@@ -496,6 +508,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           {page === "" && !PUBLIC && <BookmarksSection bookmarks={bookmarks} reload={reloadBookmarks}
             onQuickClean={(job) => { setActive(job); setJobs((old) => [job, ...old.filter((row) => row.id !== job.id)]); setBookmarkConfirm(true); }}
             onCatalogChanged={() => { void api.cleanupCatalog().then((catalog) => setEntries(catalog.entries)).catch(() => {}); }} />}
+          {page === "" && !PUBLIC && <IgnoreSection rules={ignoreRules} reload={reloadIgnoreRules} />}
+          {page === "" && !PUBLIC && <ShredSection settings={shredSettings} reload={reloadShredSettings} />}
           {page === "" && !PUBLIC && bookmarkConfirm && active && isPlan(active) &&
             <ConfirmDialog plan={active.result} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
               onRun={() => void start(() => api.cleanupClean(active.result.planId))}

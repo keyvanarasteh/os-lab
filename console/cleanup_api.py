@@ -64,6 +64,9 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "bookmarks-quick-clean": (),
               "custom-add": ("name", "path"),
               "custom-remove": ("entryId",),
+              "ignore-add": ("type", "value", "note"),
+              "ignore-remove": ("ruleId",),
+              "settings": ("shredPolicy",),
               "explorer-scan": ("rootId",),
               "explorer-subtree": ("rootId", "relative"),
               "leftovers": ()}
@@ -985,6 +988,21 @@ class CleanupAPI:
             payload = widget.build(jobs, jobs)
             payload["publish"] = widget.publish(payload)
             return payload
+        if path == "/api/cleanup/ignore":
+            # CLN-17: the typed ignore rules; a store that cannot be read is
+            # reported in "error" — the scan and the plan refuse to run until
+            # it is fixed, so the page must show it (docs/UX_READINESS.md).
+            _query(query)
+            ignore_mod = _module(self.root, "ignore")
+            rules, problem = ignore_mod.load_rules()
+            return {"rules": rules, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/settings":
+            # CLN-14: the typed engine settings; a corrupt store is reported in
+            # "error" — shred refuses to plan until it is fixed (fail closed).
+            _query(query)
+            settings_mod = _module(self.root, "settings")
+            values, problem = settings_mod.all_values()
+            return {"settings": values, "error": problem["message"] if problem else None}
         if path == "/api/cleanup/jobs":
             _query(query)
             return {"jobs": JOBS.list()}
@@ -1197,6 +1215,64 @@ class CleanupAPI:
                     pass
             publish_widget(self.root)
             return result
+        if path == "/api/cleanup/ignore":
+            # CLN-17: add one rule. The page sends type/value/note — never a
+            # pre-built rule object; the engine validates and stores it.
+            _object_body(body, "ignore-add")
+            rule_type = body.get("type")
+            value = body.get("value")
+            note = body.get("note")
+            if rule_type not in ("path", "glob", "extension"):
+                raise CleanupError(400, "type must be one of path, glob, extension")
+            if not isinstance(value, str) or not value.strip():
+                raise CleanupError(400, "value must be a non-empty string")
+            if note is not None and not isinstance(note, str):
+                raise CleanupError(400, "note must be a string")
+            ignore_mod = _module(self.root, "ignore")
+            try:
+                ignore_mod.add_rule(rule_type, value, note=note)
+            except ValueError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            except Exception as exc:
+                raise CleanupError(500, "The ignore rules cannot be written: {0}".format(exc)) from exc
+            rules, problem = ignore_mod.load_rules()
+            return {"rules": rules, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/ignore/remove":
+            # CLN-17: remove one rule by id.
+            _object_body(body, "ignore-remove")
+            rule_id = body.get("ruleId")
+            if not isinstance(rule_id, str) or not rule_id:
+                raise CleanupError(400, "ruleId must name an ignore rule")
+            ignore_mod = _module(self.root, "ignore")
+            try:
+                removed = ignore_mod.remove_rule(rule_id)
+            except ValueError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            except Exception as exc:
+                raise CleanupError(500, "The ignore rules cannot be written: {0}".format(exc)) from exc
+            if not removed:
+                raise CleanupError(404, "No ignore rule with that id")
+            rules, problem = ignore_mod.load_rules()
+            return {"rules": rules, "error": problem["message"] if problem else None}
+        if path == "/api/cleanup/settings":
+            # CLN-14: update typed settings. The page sends a key and its value;
+            # the engine validates both and the answer carries the merged store.
+            _object_body(body, "settings")
+            if not body:
+                raise CleanupError(400, "A settings update names at least one key")
+            settings_mod = _module(self.root, "settings")
+            for key, value in body.items():
+                if key not in settings_mod.SETTINGS:
+                    raise CleanupError(400, "Unknown setting: {0}".format(key))
+                if value not in settings_mod.SETTINGS[key]:
+                    raise CleanupError(400, "{0} must be one of: {1}".format(
+                        key, ", ".join(settings_mod.SETTINGS[key])))
+            try:
+                settings_mod.set(body)
+            except settings_mod.SettingsError as exc:
+                raise CleanupError(500, "The settings store cannot be written: {0}".format(exc)) from exc
+            values, problem = settings_mod.all_values()
+            return {"settings": values, "error": problem["message"] if problem else None}
         if path == "/api/cleanup/explorer/roots":
             _query(query)
             return {"roots": _module(self.root, "explorer").roots(self.root)}
