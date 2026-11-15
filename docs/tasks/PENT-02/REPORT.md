@@ -5,7 +5,7 @@
 | Öğrenci | Yusuf Yılmaz (`yusufiyilmaz`) |
 | Ders | MYO062 — vize projesi, seçenek 2 |
 | Görev | [PENT-02](../../../CONTRIBUTING.md) · Rezervasyon: [`reservations/PENT-02.json`](../../../reservations/PENT-02.json) |
-| Kanıt videosu | https://youtu.be/LY6M0Z65f_8 (2 dk 25 sn, Kali Linux: 3 lab örneği → puan ve bulgular → CI çıkış kodları → 38 test → `run-tests.sh` özeti) |
+| Kanıt videosu | https://youtu.be/LY6M0Z65f_8 (2 dk 25 sn, Kali Linux: 3 lab örneği → puan ve bulgular → CI çıkış kodları → 38 test → `run-tests.sh` özeti; inceleme düzeltmelerinden önce çekildi, bkz. §3.4) |
 
 ## 1. Amaç
 
@@ -25,11 +25,11 @@ bilgisiyle bulgu listesidir.
 | Dosya | Açıklama |
 |---|---|
 | [`scripts/analysis/ext_scan/manifest.py`](../../../scripts/analysis/ext_scan/manifest.py) | `manifest.json` okuma; MV2/MV3 izinleri, tüm siteler (`<all_urls>`), content script eşleşmeleri, CSP (`'unsafe-eval'`, uzak script) |
-| [`scripts/analysis/ext_scan/patterns.py`](../../../scripts/analysis/ext_scan/patterns.py) | Kod tarayıcı: yorum silme, string birleştirme, string maskeleme ve 9 kural; iki korelasyon (iki aşamalı yük, çerez sızdırma); URL listesi |
+| [`scripts/analysis/ext_scan/patterns.py`](../../../scripts/analysis/ext_scan/patterns.py) | Kod tarayıcı: yorum silme, string birleştirme, string maskeleme ve 10 kural; iki korelasyon (iki aşamalı yük, çerez sızdırma); URL listesi |
 | [`scripts/analysis/ext_scan/scanner.py`](../../../scripts/analysis/ext_scan/scanner.py) | Puan (yetenek ≤ 40 + davranış ≤ 60), not, metin rapor |
 | [`scripts/analysis/ext_scan/__main__.py`](../../../scripts/analysis/ext_scan/__main__.py) | Komut satırı: `scan KLASÖR [--json] [--fail-on NOT]` |
 | [`scripts/analysis/ext_scan/lab/`](../../../scripts/analysis/ext_scan/lab/) | Bu görev için yazılmış 3 zararsız örnek eklenti |
-| [`scripts/analysis/ext_scan/tests/`](../../../scripts/analysis/ext_scan/tests/) | 38 pytest testi |
+| [`scripts/analysis/ext_scan/tests/`](../../../scripts/analysis/ext_scan/tests/) | 66 pytest testi |
 | [`scripts/analysis/ext_scan/demo.sh`](../../../scripts/analysis/ext_scan/demo.sh) | Kanıt videosundaki akışı (çalıştır → çıktı → doğrula) tek komutla tekrar eden demo |
 | [`scripts/run-tests.sh`](../../../scripts/run-tests.sh), [`lat.md/tooling.md`](../../../lat.md/tooling.md) | Testler runner'a ayrı aşama olarak eklendi; dokümantasyon |
 
@@ -64,6 +64,22 @@ Sadece izinlerle en fazla **medium** olunabilir; critical için tehlikeli kod ge
    maskeleme ile 0 bulguya indi. Test: `test_no_false_alarm` (5 durum).
 3. **PowerShell 5.1'de `&&` yok.** Windows PowerShell 5.1'de `cd ... && python ...` satırı parse
    hatası verdi; README'deki komutlar tek tek verilecek şekilde yazıldı.
+4. **Otomatik kod incelemesi (Sourcery, PR #207).** 24 bulgu geldi; 22'si düzeltildi ve her biri
+   için test eklendi (`# --- review fixes` bölümü, 28 test):
+   - Kaçan davranışlar: Firefox `browser.cookies`, `document["cookie"]`, WebSocket/`EventSource`
+     ve `wss://` uç noktaları, `userScripts.register`, `.mjs` modülleri, template literal içindeki
+     `${...}` kodu, `fetch` + script elementi (iki aşamalı sayılıyor).
+   - Yanlış alarmlar: çağrılmayan `self['eval']`, string içindeki örnek kod, açılmayan
+     `XMLHttpRequest`, CSP'de script dışı yönergelerdeki URL'ler.
+   - Manifest: yanlış tipteki alanlar artık traceback değil çıkış kodu 2; tekrarlanan izin bir kez
+     sayılıyor; `file:///*`, belirli site erişimi, `userScripts`, `webNavigation`,
+     `declarativeNetRequestWithHostAccess` ve isteğe bağlı izinler (yarım puan) puanlanıyor.
+   - Sağlamlık: 2 MiB'tan büyük ya da okunamayan dosya sessizce atlanmıyor, bulgu olarak
+     raporlanıyor; satır numaraları büyük dosyada doğrusal sürede hesaplanıyor; terminal kontrol
+     karakterleri escape ediliyor; `demo.sh` başarısız adımda duruyor.
+   - Düzeltilmeyen 2 bulgu: `lat check` (araç bu makinede kurulu değil) ve `--quick` modunda bu
+     aşamanın da çalışması (Cleanup Lab aşamaları da `--quick` kontrolünden önce çalışıyor; bu
+     aşama 1 saniyenin altında).
 
 ## 4. Lab örnekleri ve sonuçlar
 
@@ -82,7 +98,7 @@ Sadece izinlerle en fazla **medium** olunabilir; critical için tehlikeli kod ge
 Lab Coupon Finder 1.0.0 (MV3)
 Risk: 100/100  CRITICAL   (capability 40/40, behaviour 60/60)
 
-  [CRITICAL] CODE-HIDDEN-EVAL     sw.js:14               hidden eval: called through a string name like self['ev'+'al']
+  [CRITICAL] CODE-HIDDEN-EVAL     sw.js:14               hidden eval: called through a string name like self['ev'+'al'](...)
   [CRITICAL] CODE-TWO-STAGE       sw.js:14               downloads data and runs code from text in the same file (two-stage payload, 'clean dropper')
   [HIGH    ] PERM-ALL-SITES       manifest.json          runs on every website (<all_urls>)
   [HIGH    ] PERM-COOKIES         manifest.json          permission 'cookies': can read session cookies (account takeover)
@@ -109,7 +125,7 @@ python -m pytest ext_scan\tests -q
 
 ### Test sonuçları
 
-`ext_scan/tests`: **38 passed** (Windows 11, Python 3.14). Kapsam: temizleme adımları, her kural
+`ext_scan/tests`: **66 passed** (Windows 11, Python 3.14; 38 ilk sürüm + 28 inceleme düzeltmesi testi). Kapsam: temizleme adımları, her kural
 için pozitif örnek, 5 yanlış alarm durumu, iki aşamalı ve sızdırma korelasyonu, satır numarası,
 MV2/MV3 izinleri, CSP'nin iki biçimi, bozuk/eksik/BOM'lu manifest, lab örneklerinin beklenen
 puanları ve CLI çıkış kodları.
@@ -137,7 +153,7 @@ Bu PR ile eklenen tek fark yeni `ext_scan` aşamasının [ok] olması ve kabuk b
 `./scripts/run-tests.sh --no-venv` (Windows 11, Git Bash):
 
 ```
-[ok]   scripts/analysis/ext_scan test suite          38 passed
+[ok]   scripts/analysis/ext_scan test suite          38 passed (inceleme öncesi; şimdi 66)
 [ok]   sample analysis + report generated
 [ok]   all 70 shell scripts parse
 [fail] android-lab/lab test suite                   7 failed, 204 passed
