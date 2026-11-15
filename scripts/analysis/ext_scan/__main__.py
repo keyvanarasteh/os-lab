@@ -27,7 +27,7 @@ def main(argv=None):
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    print(json.dumps(result, indent=2, ensure_ascii=False) if args.json else format_text(result))
+    print(json.dumps(result, indent=2, ensure_ascii=True) if args.json else format_text(result))
 
     grade = result["risk"]["grade"]
     if args.fail_on and GRADE_ORDER.index(grade) >= GRADE_ORDER.index(args.fail_on):

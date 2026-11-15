@@ -5,6 +5,7 @@ score = capability (max 40) + behaviour (max 60)
   behaviour  = what its code actually does (each code rule counts once)
 A scary manifest alone cannot reach "critical"; dangerous code is needed for that.
 """
+import re
 from pathlib import Path
 
 from . import __version__
@@ -55,11 +56,19 @@ def scan(folder):
     }
 
 
+_UNSAFE = re.compile("[\x00-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩﻿]")
+
+
+def clean(value):
+    """Escape control and bidi characters, so an extension cannot draw on the terminal."""
+    return _UNSAFE.sub(lambda m: f"\\u{ord(m.group(0)):04x}", str(value))
+
+
 def format_text(result):
     """Short human readable report for the terminal."""
     ext, risk = result["extension"], result["risk"]
     lines = [
-        f"{ext['name']} {ext['version']} (MV{ext['manifest_version']})",
+        f"{clean(ext['name'])} {clean(ext['version'])} (MV{clean(ext['manifest_version'])})",
         f"Risk: {risk['score']}/100  {risk['grade'].upper()}"
         f"   (capability {risk['capability']}/{CAPABILITY_MAX},"
         f" behaviour {risk['behaviour']}/{BEHAVIOUR_MAX})",
@@ -69,8 +78,8 @@ def format_text(result):
     if not shown:
         lines.append("No risky permissions or code patterns found.")
     for f in shown:
-        where = f["file"] + (f":{f['line']}" if f["line"] else "")
-        lines.append(f"  [{f['severity'].upper():8}] {f['rule']:20} {where:22} {f['message']}")
+        where = clean(f["file"]) + (f":{f['line']}" if f["line"] else "")
+        lines.append(f"  [{f['severity'].upper():8}] {f['rule']:20} {where:22} {clean(f['message'])}")
     if result["endpoints"]:
-        lines += ["", "Endpoints:"] + [f"  {u}" for u in result["endpoints"]]
+        lines += ["", "Endpoints:"] + [f"  {clean(u)}" for u in result["endpoints"]]
     return "\n".join(lines)

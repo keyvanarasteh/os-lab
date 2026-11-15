@@ -14,7 +14,12 @@ say() { printf '\n\033[1;33m# %s\033[0m\n' "$1"; sleep 2; }
 run() {
   printf '\033[1;32m$ %s\033[0m\n' "$1"
   sleep 1
-  bash -c "$1" || true
+  # A failing step stops the demo, so a broken run can never look successful.
+  # (The --fail-on steps below print their exit code themselves and return 0.)
+  if ! bash -c "$1"; then
+    printf '\n\033[1;31mFAILED: %s\033[0m\n' "$1"
+    exit 1
+  fi
   sleep "$PAUSE"
 }
 

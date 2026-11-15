@@ -4,15 +4,18 @@ Plain text search gives false alarms ("eval(" inside a comment) and misses
 hidden calls (self["ev" + "al"]). So each file is cleaned first:
   1. comments are blanked out,
   2. string pieces joined with + are folded ("ev" + "al" -> "eval"),
-  3. for most rules the inside of strings is masked, so text in strings is ignored.
+  3. the inside of strings is masked, so text in strings is ignored. Code inside
+     template interpolations (`${...}`) is kept, because it runs.
 Newlines are kept, so line numbers stay correct.
 """
+import bisect
 import re
 from pathlib import Path
 
 from . import Finding
 
-MAX_FILE = 2 * 1024 * 1024  # skip files over 2 MiB
+MAX_FILE = 2 * 1024 * 1024                 # larger files are reported, not scanned
+SCRIPT_SUFFIXES = {".js", ".mjs", ".cjs"}  # classic scripts and ES modules
 
 
 def strip_comments(src):
@@ -28,8 +31,7 @@ def strip_comments(src):
             i = j + 1
         elif src.startswith("//", i):        # line comment
             j = src.find("\n", i)
-            j = n if j == -1 else j
-            i = j
+            i = n if j == -1 else j
         elif src.startswith("/*", i):        # block comment, keep its newlines
             j = src.find("*/", i + 2)
             j = n if j == -1 else j + 2
@@ -54,50 +56,112 @@ def fold_strings(code):
         code = new
 
 
-_STRING = re.compile(r"""(["'`])(?:\\.|(?!\1).)*\1""", re.S)
+def _skip_string(code, i):
+    """Index just after the quoted string that starts at code[i]."""
+    quote, j, n = code[i], i + 1, len(code)
+    while j < n and code[j] != quote:
+        j += 2 if code[j] == "\\" else 1
+    return j + 1
 
 
-def mask_strings(code):
-    """Replace the inside of every string with spaces (keeps newlines)."""
-    return _STRING.sub(lambda m: m.group(0)[0]
-                       + re.sub(r"[^\n]", " ", m.group(0)[1:-1])
-                       + m.group(0)[-1], code)
+def string_ranges(code, offset=0):
+    """(start, end) of every piece of string *text*; template ${...} code is excluded."""
+    ranges, i, n = [], 0, len(code)
+    while i < n:
+        c = code[i]
+        if c in "'\"":
+            end = _skip_string(code, i)
+            ranges.append((offset + i + 1, offset + min(end - 1, n)))
+            i = end
+        elif c == "`":
+            j, start = i + 1, i + 1
+            while j < n and code[j] != "`":
+                if code[j] == "\\":
+                    j += 2
+                elif code.startswith("${", j):
+                    ranges.append((offset + start, offset + j))
+                    k, depth = j + 2, 1          # find the matching }
+                    while k < n and depth:
+                        if code[k] in "'\"`":
+                            k = _skip_string(code, k)
+                            continue
+                        depth += {"{": 1, "}": -1}.get(code[k], 0)
+                        k += 1
+                    ranges += string_ranges(code[j + 2:k - 1], offset + j + 2)
+                    j = start = k
+                else:
+                    j += 1
+            ranges.append((offset + start, offset + min(j, n)))
+            i = j + 1
+        else:
+            i += 1
+    return ranges
+
+
+def mask_strings(code, ranges=None):
+    """Replace string text with spaces (keeps length, quotes and newlines)."""
+    chars = list(code)
+    for start, end in ranges if ranges is not None else string_ranges(code):
+        for k in range(start, end):
+            if chars[k] != "\n":
+                chars[k] = " "
+    return "".join(chars)
 
 
 # (rule, severity, points, regex, message, searched text)
-# "masked" = strings hidden, "folded" = strings visible (after folding).
+# "masked" = string text hidden; "folded" = string text visible, used when the
+# pattern itself contains a string ('eval', 'iframe'). A folded match that starts
+# inside a string is ignored, so an example written in a string is not reported.
 RULES = [
     ("CODE-EVAL", "high", 18, r"\beval\s*\(", "eval() runs text as code", "masked"),
-    ("CODE-HIDDEN-EVAL", "critical", 35, r"\[\s*[\"'](?:eval|Function)[\"']\s*\]",
-     "hidden eval: called through a string name like self['ev'+'al']", "folded"),
+    ("CODE-HIDDEN-EVAL", "critical", 35, r"\[\s*[\"'](?:eval|Function)[\"']\s*\]\s*\(",
+     "hidden eval: called through a string name like self['ev'+'al'](...)", "folded"),
     ("CODE-FUNCTION", "high", 18, r"\b(?:new\s+)?Function\s*\(",
      "Function() constructor builds code from text", "masked"),
     ("CODE-STRING-TIMER", "medium", 8, r"\bset(?:Timeout|Interval)\s*\(\s*[\"'`]",
      "setTimeout/setInterval with a string runs it as code", "folded"),
     ("CODE-EXECUTE-SCRIPT", "high", 18, r"\.executeScript\s*\(",
      "executeScript injects code into web pages", "masked"),
+    ("CODE-USER-SCRIPTS", "high", 18, r"\b(?:chrome|browser)\.userScripts\.register\s*\(",
+     "userScripts.register adds scripts that run in web pages", "masked"),
     ("CODE-IFRAME-INJECT", "medium", 8, r"createElement\s*\(\s*[\"']iframe[\"']",
      "creates an iframe inside the page", "folded"),
     ("CODE-SCRIPT-INJECT", "high", 18, r"createElement\s*\(\s*[\"']script[\"']",
-     "creates a <script> element (can load remote code)", "folded"),
-    ("CODE-COOKIE-READ", "medium", 8, r"chrome\.cookies\.get(?:All)?\s*\(|document\.cookie\b",
-     "reads cookies", "masked"),
-    ("CODE-NETWORK", "info", 0, r"\bfetch\s*\(|\bXMLHttpRequest\b|\bsendBeacon\s*\(",
-     "sends network requests", "masked"),
+     "creates a <script> element (can load or run downloaded code)", "folded"),
+    ("CODE-COOKIE-READ", "medium", 8,
+     r"\b(?:chrome|browser)\.cookies\.get(?:All)?\s*\(|\bdocument\s*(?:\.\s*cookie\b|\[\s*[\"']cookie[\"']\s*\])",
+     "reads cookies", "folded"),
+    ("CODE-NETWORK", "info", 0,
+     r"\bfetch\s*\(|\.open\s*\(\s*[\"'](?:GET|POST|PUT|PATCH|DELETE|HEAD)[\"']|\bsendBeacon\s*\("
+     r"|\bnew\s+(?:WebSocket|EventSource)\s*\(|\bimportScripts\s*\(",
+     "sends network requests", "folded"),
 ]
-_COMPILED = [(r, s, p, re.compile(rx), m, t) for r, s, p, rx, m, t in RULES]
-_URL = re.compile(r"https?://[^\s\"'`]+")
-_DYNAMIC = {"CODE-EVAL", "CODE-HIDDEN-EVAL", "CODE-FUNCTION", "CODE-STRING-TIMER"}
+_COMPILED = [(r, s, p, re.compile(rx, re.I if r == "CODE-NETWORK" else 0), m, t)
+             for r, s, p, rx, m, t in RULES]
+_URL = re.compile(r"(?:https?|wss?)://[^\s\"'`]+")
+# Ways to turn downloaded text into running code.
+_DYNAMIC = {"CODE-EVAL", "CODE-HIDDEN-EVAL", "CODE-FUNCTION", "CODE-STRING-TIMER",
+            "CODE-SCRIPT-INJECT"}
 
 
 def scan_source(src, name):
     """Findings and URL endpoints for one JavaScript file."""
     folded = fold_strings(strip_comments(src))
-    texts = {"folded": folded, "masked": mask_strings(folded)}
+    ranges = string_ranges(folded)
+    texts = {"folded": folded, "masked": mask_strings(folded, ranges)}
+    starts = [s for s, _ in ranges]
+    newlines = [i for i, ch in enumerate(folded) if ch == "\n"]
+
+    def in_string(pos):
+        k = bisect.bisect_right(starts, pos) - 1
+        return k >= 0 and ranges[k][0] <= pos < ranges[k][1]
+
     findings = []
     for rule, severity, points, regex, message, which in _COMPILED:
         for m in regex.finditer(texts[which]):
-            line = texts[which].count("\n", 0, m.start()) + 1
+            if which == "folded" and in_string(m.start()):
+                continue
+            line = bisect.bisect_right(newlines, m.start() - 1) + 1
             findings.append(Finding(rule, severity, points, message, name, line))
 
     # Correlations inside one file: the patterns are risky together.
@@ -120,14 +184,24 @@ def scan_source(src, name):
 
 
 def scan_scripts(folder):
-    """Scan every .js file under the extension folder."""
+    """Scan every script file under the extension folder."""
     folder = Path(folder)
     findings, endpoints = [], set()
-    for path in sorted(folder.rglob("*.js")):
-        if path.stat().st_size > MAX_FILE:
+    for path in sorted(folder.rglob("*")):
+        if path.suffix.lower() not in SCRIPT_SUFFIXES or not path.is_file():
             continue
         name = path.relative_to(folder).as_posix()
-        src = path.read_text(encoding="utf-8", errors="replace")
+        try:
+            if path.stat().st_size > MAX_FILE:
+                # Never let a skipped file look clean.
+                findings.append(Finding("SCAN-SKIPPED-LARGE", "medium", 8,
+                                        "file is over 2 MiB and was not scanned", name))
+                continue
+            src = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:            # removed or locked while scanning
+            findings.append(Finding("SCAN-UNREADABLE", "medium", 8,
+                                    f"file could not be read ({exc.__class__.__name__})", name))
+            continue
         file_findings, file_endpoints = scan_source(src, name)
         findings += file_findings
         endpoints.update(file_endpoints)

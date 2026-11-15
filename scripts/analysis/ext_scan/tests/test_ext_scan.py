@@ -165,3 +165,114 @@ def test_cli_json(lab, capsys):
     main(["scan", str(lab / "over-privileged"), "--json"])
     data = json.loads(capsys.readouterr().out)
     assert data["risk"]["grade"] == "medium"
+
+
+# --- review fixes (Sourcery findings on #207) ---------------------------------
+
+@pytest.mark.parametrize("src, rule", [
+    ("browser.cookies.getAll({})", "CODE-COOKIE-READ"),          # Firefox namespace
+    ("let c = document['cookie']", "CODE-COOKIE-READ"),          # bracket notation
+    ("const ws = new WebSocket(u)", "CODE-NETWORK"),
+    ("xhr.open('GET', u)", "CODE-NETWORK"),
+    ("chrome.userScripts.register([s])", "CODE-USER-SCRIPTS"),
+    ("const s = `${eval(x)}`", "CODE-EVAL"),                     # code inside a template runs
+])
+def test_review_rule_matches(src, rule):
+    assert rule in rules(src)
+
+
+@pytest.mark.parametrize("src", [
+    "const f = self['eval']",                    # read, not called
+    "log(\"example: self['eval'](x)\")",          # example inside a string
+    "const t = 'createElement(\"iframe\")'",
+    "const x = new XMLHttpRequest()",            # built but never opened
+    "const s = `text with eval( inside`",       # template text, not code
+])
+def test_review_no_false_alarm(src):
+    assert rules(src) - {"CODE-NETWORK"} == set()
+    if "XMLHttpRequest" in src:
+        assert "CODE-NETWORK" not in rules(src)
+
+
+def test_websocket_endpoint_is_collected():
+    _, endpoints = scan_source("new WebSocket('wss://127.0.0.1:9/x')", "t.js")
+    assert endpoints == ["wss://127.0.0.1:9/x"]
+
+
+def test_fetch_into_script_element_is_two_stage():
+    src = "fetch(u).then(r => r.text()).then(t => { const s = document.createElement('script'); s.textContent = t; })"
+    assert "CODE-TWO-STAGE" in rules(src)
+
+
+def test_line_numbers_in_a_long_file():
+    src = "x = 1;\n" * 5000 + "eval(a)\n"
+    findings, _ = scan_source(src, "t.js")
+    assert [f.line for f in findings if f.rule == "CODE-EVAL"] == [5001]
+
+
+def test_module_scripts_are_scanned(make_ext):
+    found = {f["rule"] for f in scan(make_ext({}, {"m.mjs": "eval(x)"}))["findings"]}
+    assert "CODE-EVAL" in found
+
+
+def test_large_file_is_reported_not_silently_skipped(make_ext, monkeypatch):
+    import ext_scan.patterns as patterns
+    monkeypatch.setattr(patterns, "MAX_FILE", 10)
+    result = scan(make_ext({}, {"big.js": "// " + "a" * 100}))
+    assert "SCAN-SKIPPED-LARGE" in {f["rule"] for f in result["findings"]}
+    assert result["risk"]["score"] > 0
+
+
+@pytest.mark.parametrize("manifest", [
+    [],                                          # root is not an object
+    {"permissions": "cookies"},                  # string instead of list
+    {"content_scripts": [{"matches": 7}]},
+    {"content_security_policy": 5},
+])
+def test_wrong_field_types_are_input_errors(tmp_path, manifest):
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    assert main(["scan", str(tmp_path)]) == 2
+
+
+def test_duplicate_permissions_count_once():
+    once = audit_manifest({"permissions": ["tabs"]})
+    twice = audit_manifest({"permissions": ["tabs", "tabs", "tabs"]})
+    assert [f.points for f in once] == [f.points for f in twice] == [5]
+
+
+def test_more_permissions_and_hosts_are_scored():
+    found = {f.rule for f in audit_manifest({
+        "permissions": ["userScripts", "webNavigation", "declarativeNetRequestWithHostAccess"],
+        "host_permissions": ["file:///*", "https://example.test/*"],
+        "optional_permissions": ["cookies"],
+        "optional_host_permissions": ["<all_urls>"],
+    })}
+    assert {"PERM-USERSCRIPTS", "PERM-WEBNAVIGATION", "PERM-DECLARATIVENETREQUESTWITHHOSTACCESS",
+            "PERM-FILE-ACCESS", "PERM-SITE-ACCESS", "PERM-OPTIONAL-COOKIES",
+            "PERM-OPTIONAL-ALL-SITES"} <= found
+
+
+def test_optional_counts_half_and_not_twice():
+    only_optional = audit_manifest({"optional_permissions": ["cookies"]})
+    assert [f.points for f in only_optional] == [5]
+    both = audit_manifest({"permissions": ["cookies"], "optional_permissions": ["cookies"]})
+    assert [f.rule for f in both] == ["PERM-COOKIES"]
+
+
+@pytest.mark.parametrize("csp, remote", [
+    ("script-src 'self'; connect-src https://api.test", False),   # not a script source
+    ("script-src 'self' https://cdn.test", True),
+    ("default-src 'self' https://cdn.test", True),                 # fallback for scripts
+    ({"extension_pages": "script-src 'self'; img-src https://img.test"}, False),
+])
+def test_csp_remote_only_counts_script_sources(csp, remote):
+    found = {f.rule for f in audit_manifest({"content_security_policy": csp})}
+    assert ("CSP-REMOTE-SCRIPT" in found) is remote
+
+
+def test_terminal_control_characters_are_escaped(make_ext, capsys):
+    folder = make_ext({"name": "evil\x1b[2J\x1b[31mname\u202e"})
+    main(["scan", str(folder)])
+    out = capsys.readouterr().out
+    assert "\x1b" not in out and "\u202e" not in out
+    assert "evil\\u001b[2J" in out
