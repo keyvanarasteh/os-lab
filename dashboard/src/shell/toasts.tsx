@@ -52,6 +52,20 @@ function routeHref(route: string | null): string | null {
   return path ? localePath(path, typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname)) : null;
 }
 
+/**
+ * Follow a cleanup action without reloading the page. The cleanup island
+ * navigates in place from the URL on popstate, so a full page load would drop
+ * the toast (and the page's scan session) instead of moving to the tab.
+ */
+function navigateAction(event: React.MouseEvent<HTMLAnchorElement>, href: string) {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const url = new URL(href, window.location.href);
+  if (!/\/cleanup(?:\/|$)/.test(url.pathname)) return;
+  event.preventDefault();
+  window.history.pushState({}, "", url.pathname + url.search + url.hash);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
 function Icon({ event }: { event: NotificationEvent }) {
   const size = 16;
   if (event.category === "job-failed" || event.category === "monitor-error") return <WarningCircleIcon size={size} />;
@@ -121,6 +135,9 @@ function Toast({ event, onDismiss }: { event: NotificationEvent; onDismiss: () =
       onPointerEnter={() => { paused.current = true; }}
       onPointerLeave={() => { paused.current = false; }}
       onPointerDown={(pointer) => {
+        // A press on an action or the close button is a click, not a swipe: capturing the
+        // pointer here would send the click to the toast instead of the link or button.
+        if ((pointer.target as HTMLElement).closest("a, button")) return;
         startX.current = pointer.clientX;
         setDragging(true);
         pointer.currentTarget.setPointerCapture(pointer.pointerId);
@@ -149,7 +166,7 @@ function Toast({ event, onDismiss }: { event: NotificationEvent; onDismiss: () =
               {event.actions.map((action) => {
                 const href = routeHref(action.route);
                 return href
-                  ? <a key={action.id} className="iux-btn h-7 px-2 text-xs" data-variant="outline" href={href}>{action.label}</a>
+                  ? <a key={action.id} className="iux-btn h-7 px-2 text-xs" data-variant="outline" href={href} onClick={(event) => navigateAction(event, href)}>{action.label}</a>
                   : <button key={action.id} type="button" className="iux-btn h-7 px-2 text-xs" data-variant="outline" onClick={onDismiss}>{action.label}</button>;
               })}
             </div>

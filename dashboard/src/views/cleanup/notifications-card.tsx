@@ -42,7 +42,8 @@ function RuntimeStatus({ runtime }: { runtime: CleanupNotificationsStatus["runti
 
 export function NotificationsCard() {
   const store = notificationsStore.use();
-  const status = store.data ?? null;
+  // An older console, or a reply of another shape, leaves the card empty instead of crashing the Cleanup page.
+  const status = store.data && typeof store.data.categories === "object" && store.data.categories ? store.data : null;
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -119,9 +120,9 @@ export function NotificationsCard() {
         </div>
         {status.configError && <div className="mt-3"><Status value={{ ok: false, text: status.configError }} /></div>}
         {error && <div className="mt-3"><Status value={{ ok: false, text: error }} /></div>}
-        {status.events.length > 0 && (
+        {(status.events?.length ?? 0) > 0 && (
           <details className="mt-4 text-sm">
-            <summary className="cursor-pointer">Recent notifications ({status.events.length})</summary>
+            <summary className="cursor-pointer">Recent notifications ({status.events?.length ?? 0})</summary>
             <ul className="mt-2 space-y-1">
               {[...status.events].reverse().slice(0, 8).map((event) => (
                 <li key={event.id} className="flex items-baseline gap-2 rounded-md border border-(--iux-border) p-2">
