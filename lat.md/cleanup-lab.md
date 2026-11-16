@@ -424,6 +424,14 @@ documented in [[docs/debug-widget-build.md]].
 
 ## Dashboard pages
 
+[[dashboard/src/views/cleanup/pages.tsx]] renders the compact default dashboard at
+`/cleanup/`: one read-only catalog scan, measured suggestions, plan review,
+confirmation, progress and a result summary.
+
+Its confirmation opens the shared native dialog (focus containment,
+Escape/backdrop close, focus return) that
+lists ready items with sizes and skipped items with their reasons.
+
 [[dashboard/src/views/cleanup/pages.tsx]] splits the dashboard at `/cleanup/`
 into a compact main view and a Settings tab.
 

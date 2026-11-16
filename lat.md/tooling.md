@@ -122,6 +122,19 @@ concatenated strings and masking string contents, so `eval` in a comment is igno
 reported as a two-stage payload. The score is capability (max 40) plus behaviour (max 60).
 Its tests run as their own stage of [[scripts/run-tests.sh]].
 
+## Native messaging audit
+
+[[scripts/analysis/ext_native_host.py]] audits owned unpacked extensions and
+explicitly supplied native host manifests offline (PENT-18).
+
+A declared lab root bounds all reads; the tool never executes a host or accesses
+a browser, registry or network. It reports lexical API clues, browser-specific caller
+allowlists and local binary metadata/mode risks. Computed calls, effective
+privileges, signatures and Windows ACLs remain unverified. See
+[[scripts/analysis/README.md]] for limits, exit codes and the inert fixture builder
+[[scripts/analysis/make_native_host_lab.py]]. Its regression tests live in
+[[android-lab/lab/tests/test_ext_native_host.py]] and run with the normal suite.
+
 ## Firewall rule renderer
 
 [[firewall-lab/vm/scripts/render-rules.py]] turns a company's abstract rules into UFW
@@ -228,6 +241,20 @@ its name, authorization, expiry and rule counts; [[android-lab/lab/web_ui.py]]
 serves it read-only. The command line checks one target and exits 0 in scope,
 1 refused and 2 for a usage or manifest error, with `--json` for agents and
 scripts. The tests are in [[android-lab/lab/tests/test_scope_guard.py]].
+
+## Session scribe
+
+PENT-20 runner and CLI in [[scripts/session_scribe/cli.py]].
+[[scripts/session_scribe/scope_guard.py#ScopeGuard]] enforces [[scripts/session_scribe/scope.json]] CIDRs/domains/ports/commands,
+[[scripts/session_scribe/prompt_guard.py#PromptInjectionGuard]] blocks jailbreaks/exfil payloads,
+[[scripts/session_scribe/circuit_breaker.py#SubagentCircuitBreaker]] locks offenders until human-token reset,
+[[scripts/session_scribe/redactor.py#SecretRedactor]] masks secrets pre-log, and
+[[scripts/session_scribe/mitre_mapper.py#MitreMapper]] adds MITRE ATT&CK tags and compliance scores.
+[[scripts/session_scribe/subagent.py#PentestSubagent]] enforces [[scripts/session_scribe/subagent.py#AIDisclosure]] via
+[[scripts/session_scribe/audit_logger.py#AuditLogger]] / [[scripts/session_scribe/audit_logger.py#verify_log_chain]];
+[[scripts/session_scribe/forensic_exporter.py#ForensicExporter]] writes Merkle roots, SARIF v2.1.0 and `EVIDENCE_MANIFEST.json`, while
+[[scripts/session_scribe/report_signer.py#sign_report]] and [[scripts/session_scribe/html_dashboard.py#HTMLDashboard]] export signed reports and 4-tab HTML dashboards.
+Tests: [[scripts/session_scribe/tests/test_session_scribe.py]] · Report: [[scripts/session_scribe/REPORT.md]] · Video: https://youtu.be/VFLu1myMy_o.
 
 ## Community and contribution
 

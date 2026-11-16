@@ -16,3 +16,11 @@ Tarayıcı eklentileri (Chrome/Chromium Manifest V2 ve V3) ile işletim sistemi 
 ## 3. Doğrulama ve Test Çıktıları
 - Çalıştırılan komut: `pytest source-lab/tests/test_native_messaging_analyzer.py -v`
 - Sonuç: 9 passed in 0.02s
+
+## Additional submission — Rauf Fatih Kaya (PR #130)
+
+The earlier reservation and implementation PR #130 was opened on 2026-11-13.
+Its separate [report](RFKaya/REPORT.md) and [reservation record](RFKaya/reservation.json)
+preserve the original submission alongside the already merged PR #189 above.
+The canonical reservation retains PR #189's completed record and notes the
+earlier PR #130 for maintainer review.

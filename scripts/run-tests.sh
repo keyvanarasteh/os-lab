@@ -72,8 +72,8 @@ bad()  { printf '%s[fail]%s %s\n'   "$RED"    "$RESET" "$*"; FAIL=$((FAIL+1)); }
 skip() { printf '%s[skip]%s %s\n'   "$YELLOW" "$RESET" "$*"; SKIP=$((SKIP+1)); }
 
 # --- Which stages run -----------------------------------------------------------
-ALL_STAGES="android pent07 source cleanup_ref cleanup_engine qrust linux ext_scan sample shell lat dashboard"
-QUICK_STAGES="android pent07 source cleanup_ref cleanup_engine qrust linux ext_scan"
+ALL_STAGES="android pent07 source cleanup_ref cleanup_engine qrust linux session_scribe sample shell lat dashboard"
+QUICK_STAGES="android pent07 source cleanup_ref cleanup_engine qrust linux session_scribe"
 STAGES=""
 CHANGED_FILES=""
 SHELL_FILES=""
@@ -100,6 +100,7 @@ else
       cleanup-lab/*) add cleanup_ref cleanup_engine ;;
       linux-lab/*) add linux ;;
       scripts/analysis/ext_scan/*) add ext_scan ;;
+      scripts/session_scribe/*) add session_scribe ;;
       lat.md/*) add lat ;;
       dashboard/*) add dashboard ;;
     esac
@@ -314,6 +315,22 @@ if want linux; then
     fi
   else
     bad "no python3 for linux-lab/tests (OS-30 hardening)"
+  fi
+  stage_end
+fi
+
+# PENT-20 session scribe tests (unittest)
+if want session_scribe; then
+  stage_start session_scribe
+  hdr "PENT-20 session scribe tests (unittest)"
+  if [ -n "$PY" ] || pick_python; then
+    if ( cd "$ROOT" && "$PY" -m unittest discover -s scripts/session_scribe/tests -q ); then
+      ok "scripts/session_scribe/tests (PENT-20)"
+    else
+      bad "scripts/session_scribe/tests (PENT-20)"
+    fi
+  else
+    bad "no python3 for scripts/session_scribe/tests (PENT-20)"
   fi
   stage_end
 fi

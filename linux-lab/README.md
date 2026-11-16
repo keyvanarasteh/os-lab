@@ -134,6 +134,34 @@ linux-lab/
 └── backups/                # archives (gitignored)
 ```
 
+## OS-16: server first-look report
+
+Inside an owned Linux lab/VM, from the repository root (Python 3.11+, no pip
+dependencies or sudo required):
+
+```bash
+python3 linux-lab/scripts/server_firstlook.py
+python3 linux-lab/scripts/server_firstlook.py --json
+```
+
+The read-only script collects kernel/architecture (`uname`), distribution
+(`lsb_release`), CPU (`inxi -C`), RAM (`free -b`), local filesystems (`df -P -k -l`)
+and loaded services (`systemctl list-units`). JSON contains byte counts, failed
+services and per-command status/exit code. The package architecture note explains
+`x86_64`/`amd64` and `aarch64`/`arm64`, including the kernel/userspace distinction.
+
+Missing tools, permission errors, unsupported output and timeouts produce a
+partial report, never a fabricated healthy result. Each command has a five-second
+timeout (`--timeout` changes it, up to 60 seconds). Exit 0 means a report was
+generated, not that the machine is healthy; invalid arguments/platform exit 2.
+The tool only prints to stdout: no automatic files, package installation, service
+changes or network requests. Mount paths, CPU details and service names may be
+host-specific; review output before sharing. `df` lists local mounts separately;
+service scope is loaded units, not every installed unit file. `inxi` is optional.
+
+See [VERIFY.md](docs/OS-16/VERIFY.md) for expected results and the video walkthrough,
+and [REPORT.md](docs/OS-16/REPORT.md) for the project report.
+
 ## Readiness model
 
 - Container `Up`: QEMU started. Not enough to use the guest.
