@@ -1,7 +1,9 @@
 """macOS Lab engine parity with QcU: config precedence, arm owner, capabilities, displays,
-element search, permissions, the live audit feed. A fake AX helper stands in for the Mac, so
-these run on Linux CI (OSLAB_AX_HELPER)."""
+element search, permissions, the live audit feed, the allowlist, preview stamps and the
+native REPL. A fake AX helper stands in for the Mac, so these run on Linux CI (OSLAB_AX_HELPER)."""
+import functools
 import http.client
+import io
 import os
 import sys
 import threading
@@ -238,3 +240,122 @@ def test_events_stream_delivers_rows_and_ends_on_panic_stop(events_server):
         if chunk == b"" and response.isclosed():
             break
     assert response.isclosed() or response.read() == b""
+
+def make_repl_host(root):
+    """A fake macOS host for oslab.plan: the mirror actions are available on this lab."""
+    return {"os": "macos", "arch": "arm64", "root": root,
+            "kvm": {"present": True, "usable": True},
+            "wsl": {"guest": False, "distributions": []},
+            "runtime": None,
+            "xcode": {"installed": True, "iosRuntime": True, "iosDevice": True},
+            "tools": [{"id": tool, "label": label, "found": tool in ("xcrun", "brew", "node"), "path": None}
+                      for tool, label in oslab.TOOLS]}
+
+
+def _repl(monkeypatch, input_lines=""):
+    """A REPL session over the fake helper; the plan executor is stubbed, so confirmed plans never run."""
+    import macos_repl
+    monkeypatch.setattr(oslab, "host_info", lambda root: make_repl_host(root))
+    repl = macos_repl.MacRepl(REPO_ROOT, input=io.StringIO(input_lines), output=io.StringIO())
+    repl.runs = []
+    repl._execute = lambda plan: (repl.runs.append(plan) or (0, "stubbed output"))
+    return repl
+
+
+def _stamp_of(out):
+    for line in out.splitlines():
+        if line.strip().startswith("stamp: "):
+            return line.strip().split()[1]
+    return None
+
+
+def _save_index(repl):
+    repl.handle("tree")
+    return next(i for i, entry in enumerate(repl.numbered, 1)
+                if entry["element"].get("label") == "Save")
+
+
+def test_repl_previews_then_confirms_once_and_refuses_replay(mac, monkeypatch):
+    repl = _repl(monkeypatch)
+    index = _save_index(repl)
+    repl.handle(f"click {index}")
+    assert repl.runs == []  # a preview never executes
+    stamp = _stamp_of(repl.output.getvalue())
+    assert stamp and stamp.startswith("v1.")
+    repl.handle("confirm not-the-stamp")
+    assert repl.runs == []
+    repl.handle(f"confirm {stamp}")
+    assert len(repl.runs) == 1 and repl.runs[0]["action"] == "macos-click"
+    kinds = [row["kind"] for row in oslab.macos_audit_rows()["rows"]]
+    assert "preview" in kinds and "preview-confirmed" in kinds
+    repl.handle(f"confirm {stamp}")  # replay: the first confirm consumed the stamp
+    assert len(repl.runs) == 1
+    assert "nothing to confirm" in repl.output.getvalue()
+
+
+def test_repl_expired_stamp_refused(mac, monkeypatch):
+    monkeypatch.setattr(oslab, "PlanSigner", functools.partial(oslab.PlanSigner, ttl=1))
+    repl = _repl(monkeypatch)
+    index = _save_index(repl)
+    repl.handle(f"click {index}")
+    stamp = _stamp_of(repl.output.getvalue())
+    time.sleep(1.1)
+    repl.handle(f"confirm {stamp}")
+    assert repl.runs == [] and "no longer valid" in repl.output.getvalue()
+
+
+def test_repl_arm_persists_across_commands_and_refuses_a_second_owner(mac, monkeypatch):
+    repl = _repl(monkeypatch)
+    index = _save_index(repl)  # tree reads before the _capture stub: the fake helper answers it
+    captured = []
+    monkeypatch.setattr(oslab, "_capture",
+                        lambda args, timeout=5.0, decode="utf-8": captured.append(args) or (0, "ok"))
+    repl.handle("arm")
+    assert oslab.macos_control_state()["owner"] == "repl"
+    repl.handle(f"click {index}")  # armed: runs now, no preview
+    assert "executed" in repl.output.getvalue() and repl.runs == []
+    repl.handle("apps")  # a read-only command between actions: the session keeps the arm
+    repl.handle(f"click {index}")
+    clicks = [args for args in captured if args[0] == "bash"]
+    assert len(clicks) == 2 and clicks[0][2] == "click"
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab.macos_control_arm(REPO_ROOT, True, "dashboard")
+    assert refused.value.code == "ARMED_BY_OTHER"
+    repl.handle("disarm")
+    assert oslab.macos_control_state()["armed"] is False
+
+
+def test_repl_paste_needs_explicit_confirm_even_while_armed(mac, monkeypatch):
+    repl = _repl(monkeypatch, input_lines="n\ny\n")
+    _save_index(repl)  # tree reads before the _capture stub: the fake helper answers it
+    captured = []
+    monkeypatch.setattr(oslab, "_capture",
+                        lambda args, timeout=5.0, decode="utf-8": captured.append(args) or (0, "ok"))
+    repl.handle("arm")
+    repl.handle("paste hello")
+    assert "cancelled" in repl.output.getvalue()
+    repl.handle("paste hello")
+    pastes = [args for args in captured if args[0] == "bash" and "paste" in args]
+    assert pastes and "hello" in pastes[-1]
+
+
+def test_repl_key_scroll_set_value_and_perform_preview_through_the_plan(mac, monkeypatch):
+    repl = _repl(monkeypatch)
+    index = _save_index(repl)
+    repl.handle("key enter")
+    assert "key enter" in repl.output.getvalue().replace('"', "")
+    repl.handle("scroll down 5")
+    assert "down:5" in repl.output.getvalue()
+    repl.handle(f"set-value {index} Ada Lovelace")
+    assert "axset" in repl.output.getvalue()
+    repl.handle(f"perform {index} AXPress")
+    assert "axperform" in repl.output.getvalue()
+    assert repl.runs == []  # everything stays a preview while disarmed
+
+
+def test_repl_stop_disarms_and_audits(mac, monkeypatch):
+    repl = _repl(monkeypatch)
+    oslab.macos_control_arm(REPO_ROOT, True, "repl")
+    repl.handle("stop")
+    assert oslab.macos_control_state()["armed"] is False
+    assert oslab.macos_audit_rows()["rows"][-1]["kind"] == "panic-stop"

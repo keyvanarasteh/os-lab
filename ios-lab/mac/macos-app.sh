@@ -216,19 +216,15 @@ PY
     say "macOS app smoke passed: mac2 session $SESSION_ID activated Finder"
     ;;
   repl)
-    # Interactive mac2 REPL (macos-repl.mjs): a local operator tool with its own terminal
-    # session. Never a console job — stdin does not survive the background job runner, and
-    # the web console keeps its preview → confirm model for everything it runs.
-    command -v node >/dev/null 2>&1 || die "node is required for the REPL (brew install node)"
-    APPIUM="$(appium_bin)"
-    [ -n "$APPIUM" ] || die "Appium is not installed; use Install Appium in the macOS Lab page"
-    if [ -x "$MANAGED_BIN" ]; then export APPIUM_HOME="$APPIUM_PREFIX/home"; fi
-    "$APPIUM" driver list --installed 2>/dev/null | grep -q mac2 \
-      || die "the Appium mac2 driver is not installed; run Install Appium again"
-    curl -fsS --max-time 2 "http://${APPIUM_HOST}:${APPIUM_PORT}/status" >/dev/null 2>&1 \
-      || die "Appium is not running on ${APPIUM_HOST}:${APPIUM_PORT}; start it first (make mac-appium)"
+    # Interactive macOS Lab REPL (console/macos_repl.py): a local operator tool with its own
+    # terminal session over the native AX helper — no Appium needed. Never a console job —
+    # stdin does not survive the background job runner, and the web console keeps its
+    # preview → confirm model for everything it runs.
+    command -v python3 >/dev/null 2>&1 || die "python3 is required for the REPL"
+    [ -x "$MAC_DIR/build/ax-helper" ] \
+      || warn "native AX helper: not built (Build AX helper in the macOS Lab page); reads fall back to osascript"
     mkdir -p "$LAB_DIR/artifacts"
-    exec node "$MAC_DIR/macos-repl.mjs" "http://${APPIUM_HOST}:${APPIUM_PORT}" "${MACOS_APP:-com.apple.finder}" "$LAB_DIR/artifacts"
+    exec python3 "$LAB_DIR/../console/macos_repl.py" --app "${MACOS_APP:-Finder}" --artifacts "$LAB_DIR/artifacts"
     ;;
   click)
     # One real click on this Mac: bring the owning app forward, then post the event at the

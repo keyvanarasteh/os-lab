@@ -2814,6 +2814,11 @@ class PlanSigner:
         for known in stale:
             del self._pending[known]
 
+    @property
+    def ttl(self) -> int:
+        """How many seconds a preview stays confirmable."""
+        return self._ttl
+
     def sign(self, request: dict) -> str:
         digest = self._digest(request)
         now = int(time.time())
