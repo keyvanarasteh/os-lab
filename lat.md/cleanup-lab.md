@@ -360,6 +360,65 @@ no request steers the walker. Console: `GET /api/cleanup/explorer/roots`
 and typed `explorer`/`explorer-subtree` jobs. The Space Explorer tab never
 deletes; it links cleaning back to the plan flow.
 
+## Local notifications (CLN-33)
+
+The lab's lifecycle hooks emit typed events; the desktop app delivers them
+as OS notifications on all three desktop platforms, and the dashboard
+shows the same events as an in-app toast stack.
+
+This closes the "OS notifications deferred to the desktop app" gap left
+open by CLNP-09…13.
+
+[[cleanup-lab/engine/cleanup_lab/notifications.py]] owns the typed outbox:
+`{id, at, category, title, body, route, actions}` records in an atomic JSON
+store in the private state folder (bounded, monotonic ids), gated by a
+validated config — `enabled` plus one flag per category, everything on by
+default. Routes are allowlisted to the dashboard's cleanup routes and
+records carry no paths beyond a volume's mount point — the widget snapshot
+rules apply here too. Titles are static English so the dashboard's DOM
+translator localizes them from the seven catalogs; bodies carry dynamic
+numbers and stay English everywhere.
+
+The console appends events where `publish_widget` already runs — the job
+wrapper's `finally` (cancelled runs stay quiet; the automated hook clean
+announces itself as `auto-clean`), the hook clean's own `finally`, the
+monitor loop's `newEvents` and the bookmark-size evaluator — always
+best-effort, so no failure reaches a request or the monitor thread.
+
+`GET /api/cleanup/notifications` returns config, events and the desktop
+runtime; `POST /api/cleanup/notifications/config` validates through the
+engine; `GET /api/cleanup/notifications/outbox?since=` feeds the desktop
+watcher with everything newer than its cursor; `POST
+/api/cleanup/notifications/open-settings` opens the platform's fixed
+notifications pane (macOS `open`, Windows the `ms-settings` URI, Linux
+answers `409` — there is no universal pane).
+
+The desktop app ([[app/src-tauri/src/notifications.rs]]) runs one watcher
+thread that polls the outbox over a plain loopback socket (the same
+no-HTTP-client idiom as the health probe) and delivers new events through
+`tauri-plugin-notification` from Rust — the dashboard page keeps zero IPC.
+Delivery is skipped while the main window is focused on the dashboard (the
+in-app toast owns that moment); a hidden page gets the OS banner instead.
+Clicking a notification (or its Open button) focuses the app and routes
+through the same allowlist as the `oslab://` deep links. The delivery
+report lands in `notifications-runtime.json` in the app files folder,
+handed to the console as `OSLAB_NOTIFICATIONS_RUNTIME` and merged into the
+status payload — "Desktop app not detected" when the console runs alone.
+Honest degradation: the plugin's desktop permission API reports a constant
+"granted", so the card reports recorded delivery results instead; the
+macOS system prompt appears on the first delivery. Windows reports clicks
+only while the toast is on screen; Linux needs a freedesktop notification
+daemon — when one is missing the failure is recorded, never faked.
+
+The dashboard ([[dashboard/src/shell/toasts.tsx]], mounted by the app
+shell; the Settings card is
+[[dashboard/src/views/cleanup/notifications-card.tsx]]) polls the shared
+store at 5 s, toasts only events newer than its localStorage cursor (a
+page load never replays the stored history), caps the stack at three
+visible toasts behind an overflow chip, offers swipe-to-dismiss,
+hover-paused auto-dismiss and per-event action links, and never mounts on
+Public Pages.
+
 ## Cleaner Widgets (CLW)
 
 The cleaner-widgets workstream (PR #226) ports the reference app's macOS
@@ -432,7 +491,10 @@ latest clean report, plus a compact read-only Monitor stats card
 ([[dashboard/src/views/cleanup/monitor-card.tsx]] exports `MonitorStatsCard`;
 thresholds and volumes are configured in Settings). The Settings tab at
 `/cleanup/settings/` hosts the Bookmarks section, the Permissions card, the
-full Background monitor card, the Desktop widgets card and the capability
+full Background monitor card, the Notifications card
+([[dashboard/src/views/cleanup/notifications-card.tsx]]; the same events
+surface as a dismissible toast stack on every local page), the Desktop
+widgets card and the capability
 card grid that links to the detail tools. The detail routes — Space Explorer,
 Advanced scan, Results, Leftovers, History, Relocation — keep their routes and
 behavior; the shared tab row renders on the Settings and detail pages, the
@@ -483,7 +545,10 @@ custom-entry endpoints (`custom-entries`, `custom-entries/remove`) and the
 explorer (`explorer/roots`, typed `explorer` and `explorer-subtree` jobs) —
 each typed and validated again by the engine. The cleaner-widgets layer
 adds `GET /api/cleanup/widget` (read-only fold, published into the App
-Group container as a side effect).
+Group container as a side effect). The notifications layer (CLN-33) adds
+`GET /api/cleanup/notifications`, `POST /api/cleanup/notifications/config`,
+`GET /api/cleanup/notifications/outbox?since=` (the desktop watcher's
+cursor) and `POST /api/cleanup/notifications/open-settings`.
 `POST /api/cleanup/scan`, `POST /api/cleanup/plan` and `POST /api/cleanup/clean
 {planId}` start jobs whose requests carry catalog ids, an optional worker count or
 mode, and a plan id only. `GET /api/cleanup/jobs/<id>` returns progress and result;
@@ -527,8 +592,9 @@ covers the probe, the catalog, the scan, plan → clean (guard, fingerprints,
 Trash by default, honest failures), the path rules, the CLI exit codes, the
 volume inventory, the privileged actions, the relocation executor, the
 permission probes and classification, the monitor triggers and store, the
-bookmarks, the custom overlay, the explorer walker and the widget snapshot
-fold; the desktop app's Rust bridge adds `cargo test widget::`.
+bookmarks, the custom overlay, the explorer walker, the widget snapshot
+fold and the notification outbox; the desktop app's Rust bridge adds
+`cargo test widget:: notifications::`.
 Tests live in [[cleanup-lab/engine/tests]]; the console's typed job contract is
 covered by [[android-lab/lab/tests/test_cleanup_console.py]]. [[scripts/run-tests.sh]]
 runs the same suites next to the reference code tests, the Android suite, `bash -n`,

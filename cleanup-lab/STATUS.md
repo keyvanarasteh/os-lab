@@ -58,6 +58,7 @@ the finding and the decision are in the session log.
 | CLN-27 | in review (this PR) | [#172](https://github.com/keyvanarasteh/os-lab/pull/172) | — | `/cleanup/relocation/` tab (dashboard layer) landed with `simulators.coresimulator-devices` | stacked on CLN-28 (uses its volume inventory); engine console layer already merged | none |
 | CLN-28 | merged | [#170](https://github.com/keyvanarasteh/os-lab/pull/170) | c10d5ad9 | `/cleanup/` volumes card (dashboard layer) | console + engine landed per the layer split | none |
 | CLN-29 | pending | — | — | — | — | none |
+| CLN-33 | in review (draft) | [#291](https://github.com/keyvanarasteh/os-lab/pull/291) | — | — | OS delivery bodies are English; Rust side compiled by CI first (local cargo run skipped at the maintainer's order) | none |
 | CLNP-01…05 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | OS notification plumbing (desktop app) | engine + dashboard landed together | none |
 | CLNP-06…08 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | — | island router instead of Astro ClientRouter (localized catch-all shares ~40 page kinds) | none |
 | CLNP-09…13 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | OS notifications; labctl activation | monitor runs while the console runs, documented honestly | none |
@@ -837,3 +838,33 @@ system-managed). 26 strings × 7 locales, `cleanup-relocation.spec.ts`; the
 engine suite's pre-existing Windows-seam failures on POSIX hosts (ntpath
 isabs/normpath vs a POSIX filesystem inside the `platform="windows"` test
 seams) are unchanged by this work and tracked for their own fix.
+
+**2026-11-16 — CLN-33.** Local notifications (closes the "OS notifications
+deferred to the desktop app" deliverable from CLNP-09…13). Added
+`cleanup_lab/notifications.py`: a typed, bounded notification outbox — atomic
+JSON in the private state folder, monotonic ids, a config gate (`enabled` plus
+one flag per category, everything on by default), allowlisted routes, and
+fixed notification-settings panes per platform — with 11 new engine tests.
+The console appends events at the existing lifecycle hooks (the job wrapper's
+`finally`, the automated hook clean's `finally`, the monitor loop's
+`newEvents`, the bookmark-size evaluator), best-effort like `publish_widget`,
+and answers four typed endpoints: `GET /api/cleanup/notifications`,
+`POST /api/cleanup/notifications/config`, `GET
+/api/cleanup/notifications/outbox?since=` (the desktop watcher's cursor) and
+`POST /api/cleanup/notifications/open-settings`. The desktop app
+(`app/src-tauri/src/notifications.rs`) polls the outbox over a plain loopback
+socket — the health-probe idiom, no HTTP client — and delivers OS
+notifications through `tauri-plugin-notification` from Rust, so the dashboard
+page keeps zero IPC; delivery is skipped while the window is focused on the
+dashboard (the in-app toast owns that moment), clicks deep-link through the
+`oslab://` route allowlist, and the delivery report lands in
+`notifications-runtime.json` (`OSLAB_NOTIFICATIONS_RUNTIME`) which the console
+serves back as the runtime status. The dashboard gains a global toast stack
+(three visible + overflow chip, swipe-to-dismiss, hover-paused auto-dismiss,
+per-event action links, localStorage seen-cursor so reloads never replay) and
+a Settings notifications card; 14 new strings × 7 locales;
+`e2e/notifications.spec.ts`. The engine suite's pre-existing Windows-seam
+`test_relocation` failures (see the CLN-27 entry) are unchanged; the 11
+notification tests and the rest of the suite pass. The Rust side was not
+compiled locally — a `cargo test` run was stopped at the maintainer's order
+and CI's release-mac PR build is the first compile.
