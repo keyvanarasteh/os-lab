@@ -36,9 +36,110 @@ expected, network containment is documented in
 [[linux-lab/knowledge/networking.md]] and worked workflows in
 [[linux-lab/knowledge/usecases.md]].
 
+## Permission and ownership audit
+
+[[linux-lab/scripts/permission_audit.py]] audits an owned lab tree's Unix modes
+and UID/GID against configurable limits. It reports world-write, excess bits,
+privileged regular files and ownership drift as text or JSON without applying fixes.
+
+Directory-relative stats and `fwalk` do not follow symlinks. Other filesystems
+and special files are counted as skipped; access errors and the entry budget
+make coverage incomplete. Exit codes are 0 clean, 1 findings, 2 incomplete/usage.
+
+The mode masks default to 0644/0755 and owner to the current UID; group is opt-in.
+Directory sticky/setgid semantics are preserved in suggestions. ACLs and file
+contents are outside scope; the audit is not an atomic filesystem snapshot.
+
+Offline cases in [[android-lab/lab/tests/test_permission_audit.py]] cover rules,
+root changes, links, limits, failure reporting and read-only behavior.
+[[linux-lab/docs/OS-26/VERIFY.md]] supplies the reproducible lab and video steps.
+
+OS-26 review hardening normalizes byte paths with `fsdecode`, rejects filesystem
+root aliases by device/inode, and compares opened child directories with their
+previously observed identities before inspecting contents. Changed directories
+make coverage incomplete. Findings include device/inode and stale-path warnings;
+commands are manual examples, never race-safe remediation. Ownership commands
+precede chmod; setgid directory mode restoration is suggested after chown.
+At most 1000 combined finding/error records are retained, including a terminal
+limit error; reaching that budget stops the audit with exit 2. `fwalk` directory
+name lists remain a limitation for very wide directories; use small owned labs.
+
+
 ## Why qemux/qemu
 
 The engine was chosen to match the Windows and macOS labs' compose+web-viewer UX.
 
 Rationale and the alternatives considered (privileged containers, libvirt,
 Firecracker, gVisor) are recorded in [[linux-lab/knowledge/draft.md]].
+
+## OS-30 Ubuntu baseline checker and explicit repairs
+
+[[linux-lab/scripts/harden_check.py]] is the standard-library Python entry point
+requested by the roadmap. It provides a read-only audit and selected,
+consent-gated repairs.
+
+Both entry points accept unquoted `ID=ubuntu` and double-quoted `ID="ubuntu"`
+in `/etc/os-release`, without sourcing that file.
+
+Its default audit delegates to [[linux-lab/scripts/hardening.sh]] for local SSH,
+user/sudo, cached-update and UFW checks; text or versioned JSON reports preserve
+WARN and FAIL evidence. A missing/empty collector or execution returning no
+findings is refused rather than treated as a clean audit.
+This runs inside an authorized Ubuntu guest (including ARM64 UTM), independently
+of the Docker VM host and its SSH forwarding port.
+
+Repair planning is read-only. Explicitly selected permission/timer/management-rule
+repairs require root and exact interactive consent immediately before application.
+Snapshots, metadata checks, no-follow file descriptors and a repair lock protect
+against drift and overlapping application. SSH authentication and ports are not
+changed; no package upgrades, UFW reset or automatic UFW activation occur. Failed
+permission/timer changes are rolled back. Failed or interrupted apply never
+automatically deletes UFW rules, including verified additions. Attempted
+additions retain the backup and manifest, with manual inspection required and
+the backup path reported.
+
+The allowlist and limitations are explained in [[linux-lab/knowledge/hardening.md]].
+[[linux-lab/tests/test_hardening.py]] and [[linux-lab/tests/test_harden_check.py]]
+use command fakes and temporary files.
+
+See [[linux-lab/os-30/VERIFY.md]] for test results and UTM verification.
+[[linux-lab/os-30/REPORT.md]] records the scope of the work.
+
+Completed schema-2 repair manifests record verified post-state for explicit
+`rollback ID`. The same lock and exact consent protect rollback; snapshot and
+post-state drift refuse permission/timer restoration. Only a uniquely tagged,
+proven run-owned UFW addition may be removed, with ambiguous firewall state
+reported as partial recovery. Legacy/incomplete evidence is not trusted.
+Rollback tests in [[linux-lab/tests/test_rollback.py]] use temporary files
+and fake commands.
+
+## OS-24 Local .deb Installer
+
+The OS-24 script installs local Debian packages on Ubuntu.
+
+Script: `linux-lab/scripts/os-24-deb-installer.sh`
+
+### Usage
+
+Install a local Debian package: the script validates it first, then hands
+it to apt.
+
+```bash
+./linux-lab/scripts/os-24-deb-installer.sh ./package.deb
+```
+
+### Behavior
+
+Validation and install steps, in order:
+
+- Requires exactly one package path.
+- Checks whether the file exists.
+- Requires a `.deb` file extension.
+- Validates the package using `dpkg-deb --info`.
+- Installs the package using `sudo apt install -y`.
+- Uses `realpath` to resolve the package's absolute path.
+
+### Safety
+
+Only install trusted `.deb` packages. Installation requires sudo
+permissions and may modify the operating system.

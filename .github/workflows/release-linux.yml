@@ -1,0 +1,179 @@
+name: release-linux
+
+on:
+  push:
+    tags: ['app-v*']
+  pull_request:
+    paths:
+      - '.github/workflows/release-linux.yml'
+      - 'app/**'
+      - 'dashboard/package.json'
+      - 'dashboard/package-lock.json'
+      - 'dashboard/astro.config.mjs'
+      - 'console/**'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload the packages to the matching app release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Plan item M: a newer push to the same PR cancels the older run. Pushes to master,
+# tags and manual runs are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: amd64
+          - runner: ubuntu-22.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          key: ${{ github.job }}
+      - name: Check release version
+        shell: bash
+        run: |
+          version="$(node -p "require('./app/src-tauri/tauri.conf.json').version")"
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "app-v$version" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match app version $version" >&2
+            exit 1
+          fi
+      - name: Install Tauri build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file pkg-config libssl-dev libxdo-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils xvfb xauth rpm
+      - name: Install signature verifier
+        run: bash app/scripts/install-minisign-linux.sh
+      - name: Build and verify Linux packages
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: ./app/scripts/release-deb.sh --all-formats
+      - name: Verify detached package signatures
+        shell: bash
+        run: |
+          for package in app/out/*/os-lab_*_linux_${{ matrix.arch }}.deb app/out/*/os-lab_*_linux_${{ matrix.arch }}.rpm app/out/*/os-lab_*_linux_${{ matrix.arch }}.AppImage; do
+            python3 app/scripts/verify-release-signature.py "$package" --version "$(node -p "require('./app/src-tauri/tauri.conf.json').version")"
+          done
+      - name: Install, launch and uninstall package
+        shell: bash
+        run: |
+          deb="$(find app/out -name "os-lab_*_linux_${{ matrix.arch }}.deb" -type f -print -quit)"
+          [[ -f "$deb" ]] || { echo 'Debian package missing' >&2; exit 1; }
+          sudo apt-get install -y "./$deb"
+          command -v os-lab-app
+          set +e
+          timeout 20s xvfb-run -a os-lab-app >/tmp/os-lab-smoke.log 2>&1
+          result=$?
+          set -e
+          if [[ "$result" != 124 ]]; then
+            cat /tmp/os-lab-smoke.log
+            echo "App exited during launch smoke test: $result" >&2
+            exit 1
+          fi
+          sudo apt-get remove -y os-lab
+          ! dpkg-query -W -f='${Status}' os-lab 2>/dev/null | grep -q 'install ok installed'
+      - name: Upload package for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: os-lab-linux-${{ matrix.arch }}
+          path: app/out/*/os-lab_*_linux_${{ matrix.arch }}.*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: os-lab-linux-*
+          path: ship
+          merge-multiple: true
+      - name: Publish packages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./app/src-tauri/tauri.conf.json').version")"
+          tag="app-v$version"
+          git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
+          [[ "$(git rev-list -n 1 "$tag")" == "$GITHUB_SHA" ]] || {
+            echo "The $tag tag does not point to this commit" >&2
+            exit 1
+          }
+          find ship -mindepth 1 -type f -exec mv -ft ship {} +
+          find ship -mindepth 1 -type d -empty -delete
+          (cd ship && sha256sum -c -- *.sha256)
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --title "os-lab app $version" \
+              --notes "os-lab desktop app $version. Verify each download with its .sha256 file." \
+              || gh release view "$tag" >/dev/null
+          fi
+          gh release upload "$tag" ship/* --clobber
+
+  notify:
+    # Optional Telegram report for real builds: define the TELEGRAM_BOT_TOKEN and
+    # TELEGRAM_CHAT_ID repository secrets to enable it. Without them the send step
+    # skips silently; pull-request dry runs never report.
+    if: ${{ always() && github.event_name != 'pull_request' }}
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Send the Telegram report
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NAMES: build publish
+          RESULTS: ${{ needs.build.result }} ${{ needs.publish.result }}
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        run: |
+          set -euo pipefail
+          read -ra names <<< "$NAMES"
+          read -ra results <<< "$RESULTS"
+          overall="✅"
+          lines=""
+          for index in "${!names[@]}"; do
+            result="${results[index]}"
+            if [ "$result" = skipped ]; then continue; fi
+            case "$result" in
+              success) icon="✅" ;;
+              *) icon="❌"; overall="❌" ;;
+            esac
+            lines="${lines}${icon} ${names[index]} (${result})
+          "
+          done
+          if [ -z "$lines" ]; then exit 0; fi
+          text="${overall} ${GITHUB_WORKFLOW} — ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}
+          ${lines}
+          ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          payload="$(jq -nc --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$text" \
+            '{chat_id:$chat_id, text:$text, disable_web_page_preview:true}')"
+          curl -fsS --max-time 20 -H 'Content-Type: application/json' \
+            -d "$payload" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" > /dev/null

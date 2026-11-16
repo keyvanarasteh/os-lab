@@ -1,0 +1,232 @@
+name: release-win
+
+# Builds the Windows installers on a GitHub-hosted runner (free for public repositories), optionally
+# signs them through SignPath Foundation, and uploads them to the release app-v<version>.
+# Tag builds always publish: they ship unsigned (SmartScreen warns) until SignPath credentials
+# are configured, and sign automatically once they exist. Manual builds keep the explicit
+# publish and allow_unsigned inputs.
+
+on:
+  push:
+    tags: ['app-v*']
+  pull_request:
+    paths:
+      - '.github/workflows/release-win.yml'
+      - 'app/**'
+      - 'dashboard/package.json'
+      - 'dashboard/package-lock.json'
+      - 'dashboard/astro.config.mjs'
+      - 'console/**'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload the installers to the GitHub release (requires SignPath unless allow_unsigned is checked)
+        type: boolean
+        default: false
+      allow_unsigned:
+        description: Explicitly allow unsigned manual publishing
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  attestations: write
+  contents: write
+  id-token: write
+
+# Plan item M: a newer push to the same PR cancels the older run. Pushes to master,
+# tags and manual runs are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      SIGN: ${{ github.event_name != 'pull_request' && vars.SIGNPATH_ORGANIZATION_ID != '' && secrets.SIGNPATH_API_TOKEN != '' }}
+      PUBLISH: ${{ github.event_name == 'push' || (inputs.publish && ((vars.SIGNPATH_ORGANIZATION_ID != '' && secrets.SIGNPATH_API_TOKEN != '') || inputs.allow_unsigned)) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          key: ${{ github.job }}
+
+      - name: Build the unsigned installers and check the per-user setup
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          npm ci --no-audit --no-fund --prefix dashboard
+          ./app/scripts/release-win.ps1 -NoSign -SmokeInstall
+
+      - name: Read the version
+        id: v
+        shell: pwsh
+        run: |
+          $v = (node -p "require('./app/src-tauri/tauri.conf.json').version").Trim()
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "app-v$v") {
+            throw "Tag $env:GITHUB_REF_NAME does not match app version $v"
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Stage the installers for signing
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force unsigned | Out-Null
+          Copy-Item "app/out/${{ steps.v.outputs.version }}/*.exe", "app/out/${{ steps.v.outputs.version }}/*.msi" unsigned/
+
+      - name: Upload the unsigned installers
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: os-lab-windows-unsigned
+          path: unsigned/*
+
+      - name: Sign with SignPath
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'os-lab' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          parameters: |
+            version: ${{ toJSON(steps.v.outputs.version) }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed
+
+      - name: Collect the files to ship
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          $dir = if ($env:SIGN -eq 'true') { 'signed' } else { 'unsigned' }
+          New-Item -ItemType Directory -Force ship | Out-Null
+          Copy-Item "$dir/*" ship/
+          $utf8 = New-Object Text.UTF8Encoding($false)
+          foreach ($f in Get-ChildItem ship -Include *.exe, *.msi -Recurse) {
+            $sig = Get-AuthenticodeSignature $f.FullName
+            if ($env:SIGN -eq 'true' -and $sig.Status -ne 'Valid') { throw "$($f.Name): signature is $($sig.Status), expected Valid" }
+            Write-Host "$($f.Name): $($sig.Status)"
+            $hash = (Get-FileHash -Algorithm SHA256 $f.FullName).Hash.ToLower()
+            [IO.File]::WriteAllText("$($f.FullName).sha256", "$hash  $($f.Name)`n", $utf8)
+            & ./app/node_modules/.bin/tauri.cmd signer sign --app-version '${{ steps.v.outputs.version }}' $f.FullName
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path "$($f.FullName).sig")) { throw "Could not sign updater artifact $($f.Name)" }
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: os-lab-windows
+          path: ship/*
+
+      # Build provenance for the shipped installers: verifiable without any code-signing
+      # certificate (gh attestation verify <file> -R keyvanarasteh/os-lab). Pull request runs
+      # have no OIDC token, so only tag and manual builds attest.
+      - name: Attest the shipped installers
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            ship/*.exe
+            ship/*.msi
+
+      - name: Install, launch and uninstall MSI
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem ship -Filter '*.msi' | Select-Object -First 1).FullName
+          if (-not $msi) { throw 'MSI missing for smoke test' }
+          $log = Join-Path $env:RUNNER_TEMP 'os-lab-msi-install.log'
+          $installed = $false
+          try {
+            $install = Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart', '/L*v', "`"$log`"") -Wait -PassThru
+            if ($install.ExitCode -notin @(0, 3010)) { throw "MSI install failed: $($install.ExitCode)" }
+            $installed = $true
+            $programDirs = @("$env:ProgramFiles\os-lab", "$env:LOCALAPPDATA\Programs\os-lab")
+            $binary = Get-ChildItem $programDirs -Filter 'os-lab-app.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $binary) { throw 'Installed os-lab-app.exe was not found' }
+            $app = Start-Process $binary.FullName -PassThru
+            Start-Sleep -Seconds 10
+            if ($app.HasExited) { throw "Installed app exited early: $($app.ExitCode)" }
+            Stop-Process -Id $app.Id -Force
+          } finally {
+            if ($installed) {
+              $remove = Start-Process msiexec.exe -ArgumentList @('/x', "`"$msi`"", '/qn', '/norestart') -Wait -PassThru
+              if ($remove.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed: $($remove.ExitCode)" }
+            }
+          }
+
+      - name: Publish to the release
+        if: env.PUBLISH == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "app-v${{ steps.v.outputs.version }}"
+          git fetch origin "refs/tags/${tag}:refs/tags/${tag}"
+          if ((git rev-list -n 1 $tag).Trim() -ne $env:GITHUB_SHA) {
+            throw "$tag does not point to this build commit"
+          }
+          gh release view $tag 2>$null | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target $env:GITHUB_SHA --title "os-lab app ${{ steps.v.outputs.version }}" --notes "os-lab desktop app ${{ steps.v.outputs.version }}. Verify each download with its .sha256 file. Code signing policy: https://github.com/keyvanarasteh/os-lab/blob/$env:GITHUB_SHA/CODE_SIGNING.md"
+          }
+          $policy = "Code signing policy: https://github.com/keyvanarasteh/os-lab/blob/$env:GITHUB_SHA/CODE_SIGNING.md"
+          $body = gh release view $tag --json body --jq '.body'
+          if ($LASTEXITCODE -ne 0) { throw "Could not read release $tag" }
+          if ($body -notlike '*Code signing policy:*') {
+            gh release edit $tag --notes "$body`n`n$policy"
+            if ($LASTEXITCODE -ne 0) { throw "Could not update release notes for $tag" }
+          }
+          gh release upload $tag (Get-ChildItem ship).FullName --clobber
+
+  notify:
+    # Optional Telegram report for real builds: define the TELEGRAM_BOT_TOKEN and
+    # TELEGRAM_CHAT_ID repository secrets to enable it. Without them the send step
+    # skips silently; pull-request dry runs never report.
+    if: ${{ always() && github.event_name != 'pull_request' }}
+    needs: [windows]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Send the Telegram report
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NAMES: windows
+          RESULTS: ${{ needs.windows.result }}
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        run: |
+          set -euo pipefail
+          read -ra names <<< "$NAMES"
+          read -ra results <<< "$RESULTS"
+          overall="✅"
+          lines=""
+          for index in "${!names[@]}"; do
+            result="${results[index]}"
+            if [ "$result" = skipped ]; then continue; fi
+            case "$result" in
+              success) icon="✅" ;;
+              *) icon="❌"; overall="❌" ;;
+            esac
+            lines="${lines}${icon} ${names[index]} (${result})
+          "
+          done
+          if [ -z "$lines" ]; then exit 0; fi
+          text="${overall} ${GITHUB_WORKFLOW} — ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}
+          ${lines}
+          ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          payload="$(jq -nc --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$text" \
+            '{chat_id:$chat_id, text:$text, disable_web_page_preview:true}')"
+          curl -fsS --max-time 20 -H 'Content-Type: application/json' \
+            -d "$payload" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" > /dev/null

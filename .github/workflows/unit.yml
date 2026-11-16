@@ -1,0 +1,51 @@
+name: unit
+
+# Plan item Q: the unit suites for what a pull request changes (scripts/run-tests.sh --changed).
+# Stages that need tools this job does not install (lat, dashboard node_modules) are skipped
+# here; dashboard-e2e covers the dashboard. Meant as a fast required check once master is green.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Plan item M: a newer push to the same PR cancels the older run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: android-lab/lab/requirements.txt
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest requests cryptography
+          python -m pip install -r android-lab/lab/requirements.txt || true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cleanup-lab/reference/qrust-scan -> target
+      - name: Run the changed suites
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then base="origin/${{ github.base_ref }}"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != 0000000000000000000000000000000000000000 ]; then base="${{ github.event.before }}"
+          else base="HEAD~1"; fi
+          scripts/run-tests.sh --changed="$base" --no-venv
+      - name: Timing summary
+        if: always()
+        run: |
+          [ -f test-results/timings.json ] || exit 0
+          { echo '### unit stage times'; echo '```json'; cat test-results/timings.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

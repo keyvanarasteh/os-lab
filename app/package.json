@@ -1,0 +1,18 @@
+{
+  "name": "os-lab-app",
+  "private": true,
+  "version": "0.4.5",
+  "type": "module",
+  "description": "os-lab desktop app (Tauri v2): the dashboard in a native window, backed by the os-lab console.",
+  "scripts": {
+    "stage": "node scripts/stage-runtime.mjs",
+    "test:stage": "node --test scripts/stage-runtime.test.mjs scripts/stage-python-helper.test.mjs",
+    "icons": "tauri icon icon.svg",
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "node scripts/stage-python-helper.mjs && tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4"
+  }
+}

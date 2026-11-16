@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>os-lab</title>
+  <link rel="stylesheet" href="launcher.css" />
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 256 256" width="56" height="56"><rect width="256" height="256" rx="56" fill="#171C24"/><g transform="translate(20 20) scale(.84)"><g fill="none" stroke="#E7ECF3" stroke-width="16" stroke-linecap="square" stroke-linejoin="miter"><path d="M196 116V72L128 32 60 72v96l68 40 40-24"/><path d="M153 150h55" stroke="#4EA8FF"/></g></g></svg>
+    </div>
+    <h1>os-lab</h1>
+    <p id="status" role="status">Starting the console…</p>
+    <div id="spinner" class="spinner" aria-hidden="true"></div>
+    <ol id="steps" class="steps" hidden>
+      <li data-step="prepare"></li>
+      <li data-step="console"></li>
+      <li data-step="open"></li>
+    </ol>
+    <div id="bar" class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" hidden><i></i></div>
+    <p id="progress" class="hint progress" hidden></p>
+    <p id="slow" class="slow" role="note" hidden></p>
+    <section id="problem" hidden>
+      <pre id="detail"></pre>
+      <div class="row">
+        <button id="retry" type="button">Retry</button>
+        <button id="python" type="button" hidden>Get Python</button>
+        <button id="container" type="button" hidden>Get container runtime</button>
+        <button id="recover" type="button" hidden>Start installed engine</button>
+        <button id="continue" type="button" class="secondary" hidden>Continue to dashboard</button>
+        <button id="choose" type="button" class="secondary">Use my os-lab checkout…</button>
+        <button id="reset" type="button" class="secondary" hidden>Use bundled copy</button>
+        <button id="files" type="button" class="secondary">Change files folder…</button>
+      </div>
+      <label id="dont-show-row" class="check" hidden>
+        <input id="dont-show" type="checkbox" />
+        <span id="dont-show-label"></span>
+      </label>
+      <p class="hint" id="where"></p>
+      <p class="hint" id="files-where"></p>
+    </section>
+    <section id="app-update" hidden>
+      <p id="app-update-detail" role="status"></p>
+      <div class="row">
+        <button id="app-update-check" type="button">Check again</button>
+        <button id="app-update-install" type="button" hidden>Install app update</button>
+        <button id="app-update-download" type="button" hidden>Open app release</button>
+        <button id="app-update-back" type="button" class="secondary">Return to dashboard</button>
+      </div>
+    </section>
+  </main>
+  <script src="launcher.js"></script>
+</body>
+</html>

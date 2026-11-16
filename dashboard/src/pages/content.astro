@@ -1,0 +1,12 @@
+---
+import Base from "../layouts/Base.astro";
+import { ContentInfoPage } from "../views/content-info-page";
+import { rewriteLinks } from "../lib/legal";
+
+// docs/CONTENT.md is the single source: the repository and the dashboard show the same text
+const files = import.meta.glob<{ compiledContent: () => Promise<string> }>("../../../docs/CONTENT.md", { eager: true });
+const entry = Object.values(files)[0];
+if (!entry) throw new Error("Missing docs/CONTENT.md");
+const html = rewriteLinks(await entry.compiledContent(), "docs");
+---
+<Base title="Content updates" description="Signed content updates: what updates, how to use it, why it is safe, and how to prove a contribution"><ContentInfoPage html={html} client:only="react" /></Base>

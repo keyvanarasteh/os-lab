@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# os-lab pre-push hook (plan item R). Installed by `scripts/worktree.sh new` or
+# `scripts/worktree.sh hook install`; skip once with OSLAB_SKIP_PREPUSH=1 git push.
+#
+# Runs the quick unit suites for what this branch changes, plus the dashboard typecheck when
+# dashboard/ changed. It does not run e2e: use scripts/e2e.sh for that.
+set -uo pipefail
+[ "${OSLAB_SKIP_PREPUSH:-0}" = 1 ] && exit 0
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 0
+base="origin/master"
+git rev-parse --verify --quiet "$base^{commit}" >/dev/null || exit 0
+
+echo "pre-push: scripts/run-tests.sh --changed --quick (skip with OSLAB_SKIP_PREPUSH=1)"
+scripts/run-tests.sh --changed --quick || { echo "pre-push: unit tests failed; push stopped" >&2; exit 1; }
+
+if scripts/lib/changed-files.sh "$base" | grep -q '^dashboard/'; then
+  if [ -e dashboard/node_modules ]; then
+    echo "pre-push: dashboard typecheck"
+    (cd dashboard && npm run --silent check) || { echo "pre-push: dashboard typecheck failed; push stopped" >&2; exit 1; }
+  else
+    echo "pre-push: dashboard/node_modules missing; typecheck skipped (scripts/worktree.sh doctor)"
+  fi
+fi

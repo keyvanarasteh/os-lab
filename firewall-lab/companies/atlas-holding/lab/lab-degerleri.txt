@@ -1,0 +1,11 @@
+# Yalnızca lab içinde kullanılan değerler. Tasarım kararı veya gerçek adres değildir.
+# 203.0.113.0/24 ve 198.51.100.0/24 belgeleme adresleridir (RFC 5737).
+# Gerçek WAN adresleri kurulum girdisidir, nesneler.json dosyasında "girdi-gerekli" olarak durur.
+wan-istanbul=203.0.113.1
+wan-izmir=203.0.113.2
+wan-amsterdam=203.0.113.3
+wan-ankara=203.0.113.4
+github.com=198.51.100.20
+gitlab.com=198.51.100.21
+archive.ubuntu.com=198.51.100.30
+security.ubuntu.com=198.51.100.31

@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-app-update-check"
+description = "Allows the local launcher to check the signed app update feed."
+commands.allow = ["app_update_check"]
+
+[[permission]]
+identifier = "allow-app-update-install"
+description = "Allows the local launcher to install a verified app update on request."
+commands.allow = ["app_update_install"]

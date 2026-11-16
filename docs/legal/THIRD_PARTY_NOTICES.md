@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-_Last updated: November 3, 2026_
+_Last updated: November 9, 2026_
 
 os-lab is licensed under the [Apache License 2.0](../../LICENSE). It
 orchestrates, downloads or bundles software from other projects, which remains
@@ -38,10 +38,13 @@ IP address through ipinfo.io. The image honours the opt-out variable
 
 | Component | Licence |
 |-----------|---------|
+| [Docker Desktop](https://docs.docker.com/desktop/) | Downloaded only when requested on macOS or Windows; subject to the [Docker Subscription Service Agreement](https://www.docker.com/legal/docker-subscription-service-agreement/) |
+| [uv](https://github.com/astral-sh/uv) and the CPython builds it downloads from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | Apache-2.0 or MIT for uv; CPython and included libraries retain their own licences |
 | [JADX](https://github.com/skylot/jadx) | Apache-2.0 |
 | [Apktool](https://github.com/iBotPeaches/Apktool) | Apache-2.0 |
 | [Frida](https://github.com/frida/frida) and frida-tools | wxWindows Library Licence 3.1 |
 | [Appium](https://github.com/appium/appium) (macOS path) | Apache-2.0 |
+| [rustup](https://rustup.rs) and the Rust toolchain it installs (Web Lab setup) | MIT or Apache-2.0 |
 | Android SDK Platform-Tools (adb, fastboot) and emulator images | [Android SDK Terms and Conditions](https://developer.android.com/studio/terms) (Google) |
 | Xcode and the iOS Simulator (macOS path) | Apple's Xcode and Apple SDKs licence agreement |
 | Python packages in `android-lab/lab/requirements.txt` (Flask, mitmproxy, requests, cryptography and others) | Their own licences, listed in each package's metadata (`pip show <package>`) |
@@ -49,6 +52,9 @@ IP address through ipinfo.io. The image honours the opt-out variable
 
 ## Bundled in this repository
 
+- Release installers include a pinned uv executable for their host architecture.
+  The app uses it only when the user chooses **Get Python**; CPython is downloaded
+  into the app's data folder rather than redistributed in the installer.
 - Nothing from Google: os-lab does **not** redistribute Android SDK
   Platform-Tools. When `adb` is missing, `android-lab/lab/scripts/get_platform_tools.py`
   (run by preflight or `make platform-tools`), or `lab.ps1 setup` on Windows,
@@ -58,6 +64,26 @@ IP address through ipinfo.io. The image honours the opt-out variable
   set `OSLAB_NO_DOWNLOAD=1` to stop the automatic download.
 - `dashboard/src/shell/` and `dashboard/src/apk-lab/`: user-interface code
   ported from the qLar project by the same maintainers.
+- Web Lab engine (`web-lab/browser/`): first-party Rust, built from source with
+  Cargo; no vendor binaries are committed. Its crate dependencies —
+  [wry](https://github.com/tauri-apps/wry),
+  [tao](https://github.com/tauri-apps/tao),
+  [tiny_http](https://github.com/tiny-http/tiny-http),
+  [serde](https://github.com/serde-rs/serde) and serde_json — are each
+  MIT or Apache-2.0, resolved into `web-lab/browser/Cargo.lock` at build time.
+
+## Source Lab code and excluded material
+
+`source-lab/engine/source_lab/`, its retained tests, and first-party manifest
+annotations/Pipeline architecture metadata in `console/source_*.json` were ported from the
+maintainer's iQ-SourceContol code with the owner's explicit authorization for
+publication in os-lab under Apache-2.0. This is a first-party contribution, not
+a claim that the private source repository declared an open-source license.
+The source revision, file hashes and exclusions are recorded in
+[Source Lab import policy](../../source-lab/IMPORT_POLICY.md) and its provenance
+manifest. No third-party archive, dataset, binary, browser or parser grammar is
+bundled with the port. The core engine uses Python's standard library; optional
+tools are installed separately by the operator under their own terms.
 
 ## Operating systems
 

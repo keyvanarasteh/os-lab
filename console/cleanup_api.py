@@ -1,0 +1,1268 @@
+"""Cleanup Lab HTTP contracts (``/api/cleanup/...``).
+
+The console accepts typed, validated calls only: never a command string and never
+a free-form path list from the page (``cleanup-lab/README.md``). Ready:
+readiness (CLN-01), the detector catalog (CLN-02), the scan job (CLN-03) and the
+plan → clean flow (CLN-13), audit history (CLN-15), the volume inventory
+(CLN-28), the typed privileged actions (CLN-20) and the cache-relocation plans
+(CLN-27); the remaining endpoints add
+their own actions here, each validated again by the engine's safety guard.
+
+The engine is imported from ``cleanup-lab/engine`` (``cleanup_lab``), which is a
+plain standard-library package: the console does not install it.
+
+Long work runs as an in-process console job: ``POST /api/cleanup/scan`` starts a
+scan, ``POST /api/cleanup/plan`` builds a plan (guard, measure, fingerprint),
+``POST /api/cleanup/clean {planId}`` runs a confirmed plan — each on a worker
+thread polled through ``GET /api/cleanup/jobs/<id>`` and cancelled through
+``POST /api/cleanup/jobs/<id>/cancel``. The job store keeps the most recent
+:data:`MAX_JOBS` jobs; the plan store keeps the most recent :data:`MAX_PLANS`
+plans with the fingerprints that expire them. Both live only in this console
+process, like the lab jobs: a restart loses them, and nothing is persisted.
+"""
+from __future__ import annotations
+
+import importlib
+import os
+import subprocess
+import sys
+import threading
+import time
+import uuid
+
+MAX_JOBS = 20
+MAX_PLANS = 20
+MAX_ENTRY_IDS = 200
+#: The only keys a scan request may carry. Paths are deliberately not among
+#: them: the scan walks the catalog, never a list the page sends.
+SCAN_KEYS = ("entryIds", "workers")
+DEEP_KEYS = ("rootIds", "minIdleDays")
+#: The only keys a plan request may carry; ``mode`` defaults to ``trash``.
+PLAN_KEYS = ("entryIds", "workers", "mode")
+#: The only key a clean request may carry: which confirmed plan to run.
+CLEAN_KEYS = ("planId",)
+CONTAINER_PREVIEW_KEYS = ("actionId",)
+CONTAINER_PRUNE_KEYS = ("previewId",)
+#: Engine ``PlanError.code`` → HTTP status on the plan → clean namespace.
+PLAN_STATUS = {
+    "plan-invalid": 400,
+    "unknown-plan": 404,
+    "expired": 410,
+    "stale": 409,
+    "used": 409,
+    "cancelled": 409,
+}
+BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clean": CLEAN_KEYS,
+             "macos-leftovers": (), "packages": (), "vm-scan": (),
+              "container-preview": CONTAINER_PREVIEW_KEYS, "container-prune": CONTAINER_PRUNE_KEYS,
+              "privileged-preview": CONTAINER_PREVIEW_KEYS, "privileged-run": CONTAINER_PRUNE_KEYS,
+              "relocation-plan": ("action", "entryId", "destination"), "relocation-run": ("previewId",),
+              "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "volumes"),
+              "monitor-evaluate": (),
+              "permissions-open": ("permissionId",),
+              "bookmarks-add": ("entryId",),
+              "bookmarks-update": ("entryId", "priority", "quickClean", "autoCleanHook", "sizeAlert"),
+              "bookmarks-remove": ("entryId",),
+              "bookmarks-quick-clean": (),
+              "custom-add": ("name", "path"),
+              "custom-remove": ("entryId",),
+              "explorer-scan": ("rootId",),
+              "explorer-subtree": ("rootId", "relative"),
+              "leftovers": ()}
+
+
+class CleanupError(ValueError):
+    """A request the Cleanup Lab refused, with the HTTP status to answer."""
+
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+
+
+def _module(root, name):
+    engine = os.path.join(root, "cleanup-lab", "engine")
+    if engine not in sys.path:
+        sys.path.insert(0, engine)
+    try:
+        return importlib.import_module("cleanup_lab." + name)
+    except ImportError as exc:  # a lone console copy without the engine
+        raise CleanupError(501, "The cleanup engine (cleanup-lab/engine) is not installed") from exc
+
+
+def _query(query):
+    """Reject duplicate or unexpected query parameters instead of guessing."""
+    if query:
+        raise CleanupError(400, "Unexpected query parameters")
+
+
+def _object_body(body, kind):
+    """Every POST body is a JSON object carrying that action's keys and no others."""
+    if not isinstance(body, dict):
+        raise CleanupError(400, "Expected a JSON object")
+    unknown = set(body) - set(BODY_KEYS[kind])
+    if unknown:
+        raise CleanupError(400, "Unexpected key(s): {0}".format(", ".join(sorted(unknown))))
+
+
+def _validate_entry_ids(root, catalog, entry_ids, *, required=False):
+    """Catalog ids only, unique, known, bounded — never paths, never commands."""
+    if entry_ids is None:
+        if required:
+            raise CleanupError(400, "entryIds is required")
+        return None
+    if (
+        not isinstance(entry_ids, list)
+        or not entry_ids
+        or any(not isinstance(item, str) or not item for item in entry_ids)
+    ):
+        raise CleanupError(400, "entryIds must be a list of detector ids")
+    if len(set(entry_ids)) != len(entry_ids):
+        raise CleanupError(400, "entryIds contains duplicates")
+    if len(entry_ids) > MAX_ENTRY_IDS:
+        raise CleanupError(400, "Too many detector ids")
+    try:
+        known = {entry["id"] for entry in catalog.load(root)}
+    except catalog.CatalogError as exc:
+        raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+    unknown = sorted(set(entry_ids) - known)
+    if unknown:
+        raise CleanupError(400, "Unknown detector id(s): {0}".format(", ".join(unknown)))
+    return entry_ids
+
+
+def _validate_workers(scan, workers):
+    if workers is None:
+        return None
+    if not isinstance(workers, int) or isinstance(workers, bool):
+        raise CleanupError(400, "workers must be a whole number")
+    if not 1 <= workers <= scan.MAX_WORKERS:
+        raise CleanupError(400, "workers must be between 1 and {0}".format(scan.MAX_WORKERS))
+    return workers
+
+
+class CleanupJob:
+    """One running (or finished) cleanup action: a scan, a plan or a clean."""
+
+    def __init__(self, kind, request):
+        self.id = uuid.uuid4().hex[:12]
+        self.kind = kind
+        self.state = "running"
+        self.request = request
+        if kind == "clean":
+            self.progress = {
+                "phase": "queued",
+                "itemsDone": 0,
+                "itemsTotal": 0,
+                "bytesRemoved": 0,
+                "currentPath": "",
+            }
+        else:
+            self.progress = {
+                "phase": "queued",
+                "pathsDone": 0,
+                "pathsTotal": 0,
+                "bytesSeen": 0,
+                "filesSeen": 0,
+                "currentPath": "",
+            }
+        self.result = None
+        self.error = None
+        self.startedAt = time.time()
+        self.finishedAt = None
+        self.cancel = threading.Event()
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "kind": self.kind,
+            "state": self.state,
+            "request": self.request,
+            "progress": self.progress,
+            "result": self.result,
+            "error": self.error,
+            "startedAt": self.startedAt,
+            "finishedAt": self.finishedAt,
+        }
+
+
+class PlanRecord:
+    """A built plan plus its single-use flag (the engine's Plan stays pure)."""
+
+    def __init__(self, plan):
+        self.plan = plan
+        self.used = False
+
+    @property
+    def id(self):
+        return self.plan.id
+
+    @property
+    def created_at(self):
+        return self.plan.created_at
+
+
+class CleanupJobStore:
+    """The console's cleanup jobs (scan, plan, clean). One store per process."""
+
+    def __init__(self):
+        self.jobs = {}
+        self.lock = threading.Lock()
+
+    def _register(self, job):
+        with self.lock:
+            self.jobs[job.id] = job
+            self._prune_locked()
+        return job
+
+    def _spawn(self, job, target, args):
+        def run_and_refresh():
+            try:
+                target(*args)
+            finally:
+                # CLW-04: every finished job changes what the widget shows.
+                # Workers with no root argument (the hook clean closes over
+                # it) skip the refresh here — their completion paths publish.
+                if args:
+                    publish_widget(args[0])
+        try:
+            threading.Thread(target=run_and_refresh, args=(), daemon=True).start()
+        except RuntimeError as exc:
+            job.state = "failed"
+            job.error = "Could not start the job worker: {0}".format(exc)
+            job.finishedAt = time.time()
+        return job
+
+    def start_scan(self, root, request):
+        """Validate the scan request, then run it on a worker thread.
+
+        ``request`` may name ``entryIds`` (catalog ids only) and ``workers``;
+        anything else — a path, a command, an unknown key — is refused before a
+        thread exists.
+        """
+        scan = _module(root, "scan")
+        catalog = _module(root, "catalog")
+        entry_ids = _validate_entry_ids(root, catalog, request.get("entryIds"))
+        workers = _validate_workers(scan, request.get("workers"))
+        job = CleanupJob("scan", {"entryIds": entry_ids, "workers": workers})
+        self._register(job)
+        return self._spawn(job, self._run_scan, (root, job, entry_ids, workers))
+
+    def start_packages(self, root):
+        job = CleanupJob("packages", {})
+        self._register(job)
+        return self._spawn(job, self._run_packages, (root, job))
+
+    def _run_packages(self, root, job):
+        try:
+            job.result = _module(root, "packages").inventory()
+            job.state = "done"
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def start_macos_leftovers(self, root):
+        job = CleanupJob("macos-leftovers", {})
+        self._register(job)
+        return self._spawn(job, self._run_macos_leftovers, (root, job))
+
+    def start_leftovers(self, root):
+        job = CleanupJob("leftovers", {})
+        self._register(job)
+        return self._spawn(job, self._run_leftovers, (root, job))
+
+    def _run_leftovers(self, root, job):
+        try:
+            platform = _module(root, "paths").platform_id()
+            module = "leftovers_macos" if platform == "macos" else "leftovers_cross"
+            result = _module(root, module).scan(root, platform=platform, cancel=job.cancel)
+            job.result = result
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def _run_macos_leftovers(self, root, job):
+        try:
+            result = _module(root, "leftovers_macos").scan(root, cancel=job.cancel)
+            job.result = result
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def start_vm_scan(self, root):
+        job = CleanupJob("vm-scan", {})
+        self._register(job)
+        return self._spawn(job, self._run_vm_scan, (root, job))
+
+    def _run_vm_scan(self, root, job):
+        try:
+            result = _module(root, "vms").inventory(root, cancel=job.cancel)
+            job.result = result
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def start_container_prune(self, root, preview_id):
+        try:
+            _module(root, "history").prepare()
+        except Exception as exc:
+            raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+        plan = CONTAINER_PREVIEWS.claim(preview_id)
+        job = CleanupJob("container-prune", {"previewId": preview_id, "actionId": plan.action_id})
+        self._register(job)
+        return self._spawn(job, self._run_container_prune, (root, job, plan))
+
+    def _run_container_prune(self, root, job, plan):
+        try:
+            result = _module(root, "containers").execute(root, plan)
+        except Exception as exc:
+            result = {"actionId": plan.action_id, "engine": plan.engine, "status": "failed",
+                      "error": "{0}: {1}".format(type(exc).__name__, exc), "bytesRemoved": None}
+        job.result = result
+        try:
+            _module(root, "history").append(result)
+            job.state = "done" if result["status"] == "completed" else "failed"
+            if job.state == "failed":
+                job.error = result.get("error")
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "Audit history could not record the result: {0}".format(exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def start_privileged_run(self, root, preview_id):
+        """Claim a single-use privileged preview and run its audited job."""
+        try:
+            _module(root, "history").prepare()
+        except Exception as exc:
+            raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+        plan = PRIVILEGED_PREVIEWS.claim(preview_id)
+        job = CleanupJob("privileged-run", {"previewId": preview_id, "actionId": plan.action_id})
+        self._register(job)
+        return self._spawn(job, self._run_privileged, (root, job, plan))
+
+    def _run_privileged(self, root, job, plan):
+        try:
+            result = _module(root, "privilege").execute(root, plan)
+        except Exception as exc:
+            result = {"actionId": plan.action_id, "platform": plan.platform, "status": "failed",
+                      "error": "{0}: {1}".format(type(exc).__name__, exc), "bytesRemoved": None}
+        job.result = result
+        try:
+            _module(root, "history").append(result)
+            job.state = "done" if result["status"] == "completed" else "failed"
+            if job.state == "failed":
+                job.error = result.get("error")
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "Audit history could not record the result: {0}".format(exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def start_relocation_plan(self, root, request):
+        """Validate the typed relocation request, then build its plan on a worker."""
+        action = request.get("action")
+        entry_id = request.get("entryId")
+        destination = request.get("destination")
+        if action not in ("move", "restore", "relink", "resume"):
+            raise CleanupError(400, "action must be move, restore, relink or resume")
+        if not isinstance(entry_id, str) or not entry_id:
+            raise CleanupError(400, "entryId must name a catalog entry")
+        if not isinstance(destination, str) or not destination:
+            raise CleanupError(400, "destination must be a volume mount point from GET /api/cleanup/relocation")
+        job = CleanupJob("relocation-plan", {"action": action, "entryId": entry_id, "destination": destination})
+        self._register(job)
+        return self._spawn(job, self._run_relocation_plan, (root, job, action, entry_id, destination))
+
+    def _run_relocation_plan(self, root, job, action, entry_id, destination):
+        try:
+            record = _module(root, "relocation").build_plan(root, entry_id, destination, action)
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+            job.finishedAt = time.time()
+            return
+        preview_id = RELOCATION_PREVIEWS.register(RelocationPreview(record))
+        job.result = dict(record, previewId=preview_id)
+        job.state = "done"
+        job.finishedAt = time.time()
+
+    def start_relocation_run(self, root, preview_id):
+        """Claim a single-use relocation preview and run its audited job."""
+        try:
+            _module(root, "history").prepare()
+        except Exception as exc:
+            raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+        record = RELOCATION_PREVIEWS.claim(preview_id).record
+        job = CleanupJob("relocation-run", {"previewId": preview_id, "entryId": record.get("entryId"),
+                                            "action": record.get("action")})
+        self._register(job)
+        return self._spawn(job, self._run_relocation_run, (root, job, record))
+
+    def _run_relocation_run(self, root, job, record):
+        def update(payload):
+            job.progress = dict(payload)
+
+        try:
+            result = _module(root, "relocation").execute(record, cancel=job.cancel,
+                                                          progress_callback=update)
+            job.result = result
+            _module(root, "history").append(result)
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+            try:
+                _module(root, "history").append({
+                    "entryId": record.get("entryId"), "action": record.get("action"),
+                    "status": "failed", "error": str(exc), "bytesRemoved": None,
+                })
+            except Exception:
+                pass
+        finally:
+            job.finishedAt = time.time()
+
+    def start_explorer(self, root, request, *, relative=None):
+        """CLNP-23: a read-only size-tree walk over a registered root id."""
+        explorer = _module(root, "explorer")
+        root_id = request.get("rootId")
+        if not isinstance(root_id, str) or not root_id:
+            raise CleanupError(400, "rootId must name a registered root")
+        try:
+            explorer.resolve_root(root, root_id)
+        except explorer.ExplorerError as exc:
+            raise CleanupError(400, str(exc)) from exc
+        request_payload = {"rootId": root_id}
+        if relative is not None:
+            if not isinstance(relative, str):
+                raise CleanupError(400, "relative must be a path relative to the root")
+            request_payload["relative"] = relative
+        job = CleanupJob("explorer", request_payload)
+        self._register(job)
+        return self._spawn(job, self._run_explorer, (root, job, root_id, relative))
+
+    def _run_explorer(self, root, job, root_id, relative):
+        def update(payload):
+            job.progress = {"phase": "walking", "currentPath": payload.get("currentPath", ""),
+                            "nodes": payload.get("nodes", 0)}
+
+        try:
+            result = _module(root, "explorer").explore(
+                root, root_id, cancel=job.cancel, progress_callback=update, relative=relative
+            )
+            job.result = result
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def start_deep_scan(self, root, request):
+        deep = _module(root, "deep")
+        root_ids = request.get("rootIds")
+        idle = request.get("minIdleDays", 0)
+        if not isinstance(root_ids, list) or not root_ids or any(not isinstance(x, str) for x in root_ids) or len(root_ids) != len(set(root_ids)):
+            raise CleanupError(400, "rootIds must be unique configured root ids")
+        if not isinstance(idle, int) or isinstance(idle, bool) or not 0 <= idle <= 3650:
+            raise CleanupError(400, "minIdleDays must be an integer from 0 to 3650")
+        available = {x["id"] for x in deep.roots(root) if x["available"]}
+        if any(x not in available for x in root_ids):
+            raise CleanupError(400, "Unknown or unavailable rootId")
+        job = CleanupJob("deep-scan", {"rootIds": root_ids, "minIdleDays": idle})
+        self._register(job)
+        return self._spawn(job, self._run_deep_scan, (root, job, root_ids, idle))
+
+    def _run_deep_scan(self, root, job, root_ids, idle):
+        try:
+            result = _module(root, "deep").sweep(root, root_ids, min_idle_days=idle, cancel=job.cancel)
+            job.result = result
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def start_plan(self, root, request):
+        """Validate the plan request, then build the plan on a worker thread.
+
+        The typed keys of a scan plus ``mode`` (``trash`` by default; ``delete``
+        must be explicit). ``entryIds`` is required — a plan always names what it
+        would clean. The request carries no path list and no command.
+        """
+        clean = _module(root, "clean")
+        scan = _module(root, "scan")
+        catalog = _module(root, "catalog")
+        entry_ids = _validate_entry_ids(root, catalog, request.get("entryIds"), required=True)
+        workers = _validate_workers(scan, request.get("workers"))
+        mode = request.get("mode", clean.DEFAULT_MODE)
+        if mode not in clean.MODES:
+            raise CleanupError(400, "mode must be one of {0}".format(", ".join(clean.MODES)))
+        job = CleanupJob("plan", {"entryIds": entry_ids, "workers": workers, "mode": mode})
+        self._register(job)
+        return self._spawn(job, self._run_plan, (root, job, entry_ids, workers, mode))
+
+    def start_clean(self, root, plan_id):
+        """Claim the plan (single-use, unexpired) and run it on a worker thread.
+
+        The cheap checks — unknown, already run, past its TTL — answer here; the
+        expensive one (an item changed since the plan was made) is re-checked
+        inside the job, which then fails honestly with nothing removed.
+        """
+        clean = _module(root, "clean")
+        try:
+            _module(root, "history").prepare()
+        except Exception as exc:
+            raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+        try:
+            record = PLANS.claim(plan_id)
+        except PlanStoreError as exc:
+            raise CleanupError(PLAN_STATUS.get(exc.code, 409), str(exc)) from exc
+        job = CleanupJob("clean", {"planId": plan_id})
+        self._register(job)
+        return self._spawn(job, self._run_clean, (root, job, record.plan, clean))
+
+    def _run_scan(self, root, job, entry_ids, workers):
+        def update(payload):
+            job.progress = dict(payload)
+
+        try:
+            result = _module(root, "scan").scan_catalog(
+                root, entry_ids, cancel=job.cancel, progress_callback=update, workers=workers
+            )
+            job.result = result
+            job.progress = result["progress"]
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except Exception as exc:  # the job must answer, never hang in "running"
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def _run_plan(self, root, job, entry_ids, workers, mode):
+        def update(payload):
+            job.progress = dict(payload)
+
+        try:
+            plan = _module(root, "clean").build_plan(
+                root,
+                entry_ids,
+                mode=mode,
+                workers=workers,
+                cancel=job.cancel,
+                progress_callback=update,
+            )
+            if plan.payload is None:  # cancelled before it finished: no plan exists
+                job.progress = plan.progress
+                job.state = "cancelled"
+            else:
+                PLANS.register(plan)
+                job.result = plan.to_dict()
+                job.progress = plan.progress
+                job.state = "done"
+        except Exception as exc:  # the job must answer, never hang in "running"
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def _run_clean(self, root, job, plan, clean):
+        def update(payload):
+            job.progress = dict(payload)
+
+        try:
+            measures = clean.verify_plan(plan, cancel=job.cancel)
+            result = clean.execute_plan(
+                plan, measures, cancel=job.cancel, progress_callback=update
+            )
+            job.result = result
+            job.progress = result["progress"]
+            _module(root, "history").append(result)
+            job.state = "cancelled" if result["cancelled"] else "done"
+        except clean.PlanError as exc:
+            # A stale or expired plan fails the job honestly: nothing was removed.
+            job.state = "failed"
+            job.error = str(exc)
+        except Exception as exc:  # the job must answer, never hang in "running"
+            job.state = "failed"
+            job.error = "{0}: {1}".format(type(exc).__name__, exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def get(self, job_id):
+        with self.lock:
+            return self.jobs.get(job_id)
+
+    def list(self):
+        with self.lock:
+            return [
+                job.to_dict()
+                for job in sorted(self.jobs.values(), key=lambda j: j.startedAt, reverse=True)
+            ]
+
+    def cancel(self, job_id):
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                return None
+            job.cancel.set()
+            return job
+
+    def _prune_locked(self):
+        finished = sorted(
+            (j for j in self.jobs.values() if j.state != "running"),
+            key=lambda j: j.startedAt,
+        )
+        for old in finished[:-MAX_JOBS]:
+            self.jobs.pop(old.id, None)
+
+
+class PlanStoreError(ValueError):
+    """A plan was refused by the store. ``code`` maps to an HTTP status."""
+
+    def __init__(self, message, code):
+        super().__init__(message)
+        self.code = code
+
+
+class PlanStore:
+    """The console's built plans, each single-use, with the fingerprints that expire them."""
+
+    def __init__(self):
+        self.plans = {}
+        self.lock = threading.Lock()
+
+    def register(self, plan):
+        with self.lock:
+            self.plans[plan.id] = PlanRecord(plan)
+            self._prune_locked()
+        return plan
+
+    def get(self, plan_id):
+        with self.lock:
+            return self.plans.get(plan_id)
+
+    def claim(self, plan_id, *, clock=time.time):
+        """Mark the plan as run — atomically, so one plan can never run twice."""
+        with self.lock:
+            record = self.plans.get(plan_id)
+            if record is None:
+                raise PlanStoreError("Unknown plan id.", "unknown-plan")
+            if record.used:
+                raise PlanStoreError("This plan was already run. Build a new plan.", "used")
+            if record.plan.expires_at < clock():
+                raise PlanStoreError("This plan expired; build a new one.", "expired")
+            record.used = True
+            return record
+
+    def _prune_locked(self):
+        ordered = sorted(self.plans.values(), key=lambda record: record.created_at, reverse=True)
+        for old in ordered[MAX_PLANS:]:
+            self.plans.pop(old.id, None)
+
+
+class PreviewStore:
+    """Single-use, short-lived preview records, kept in this console process."""
+
+    def __init__(self, label="Container preview"):
+        self.label = label
+        self.records = {}
+        self.lock = threading.Lock()
+
+    def register(self, plan):
+        preview_id = uuid.uuid4().hex[:12]
+        with self.lock:
+            self.records[preview_id] = {"plan": plan, "used": False}
+            if len(self.records) > MAX_PLANS:
+                oldest = min(self.records, key=lambda key: self.records[key]["plan"].created_at)
+                self.records.pop(oldest)
+        return preview_id
+
+    def claim(self, preview_id):
+        with self.lock:
+            record = self.records.get(preview_id)
+            if record is None:
+                raise CleanupError(404, "{0} not found".format(self.label))
+            if record["used"]:
+                raise CleanupError(409, "{0} was already used".format(self.label))
+            if time.time() - record["plan"].created_at > 600:
+                raise CleanupError(410, "{0} expired".format(self.label))
+            record["used"] = True
+            return record["plan"]
+
+
+#: One store per console process; the handler instances are per-request.
+JOBS = CleanupJobStore()
+PLANS = PlanStore()
+CONTAINER_PREVIEWS = PreviewStore()
+PRIVILEGED_PREVIEWS = PreviewStore("Privileged preview")
+RELOCATION_PREVIEWS = PreviewStore("Relocation preview")
+
+
+class RelocationPreview:
+    """A relocation record wrapped for the preview store's expiry contract."""
+
+    def __init__(self, record):
+        self.record = record
+        self.created_at = time.time()
+
+
+def _bookmark_book(root):
+    """CLNP-14/15: the engine bookmark module against this console's engine."""
+    return _module(root, "bookmarks")
+
+
+def _bookmark_catalog_ids(root):
+    """Today's catalog ids, or None when the catalog cannot be read (fail-open:
+    bookmark rows the catalog no longer lists are then kept, as before)."""
+    try:
+        return {entry["id"] for entry in _module(root, "catalog").load(root)}
+    except Exception:
+        return None
+
+
+def publish_widget(root):
+    """CLW-04: refresh the macOS widget snapshot after a state change.
+
+    Builds the snapshot from this process's job list and the engine stores and
+    writes it into the App Group container the widget extension reads. Always
+    best-effort: a machine without the widget (or without macOS) simply skips
+    the write, and no failure here may ever reach a request or the monitor
+    thread.
+    """
+    try:
+        widget = _module(root, "widget")
+        jobs = JOBS.list()
+        payload = widget.build(jobs, jobs)
+        payload["publish"] = widget.publish(payload)
+    except Exception:
+        pass  # the widget is an optional surface; it never breaks the API
+
+
+def _bookmark_entries(root, loaded):
+    """Join each bookmark with its catalog record for display."""
+    try:
+        entries = {entry["id"]: entry for entry in _module(root, "catalog").load(root)}
+    except Exception:
+        entries = {}
+    resolved = []
+    for item in loaded["bookmarks"]:
+        entry = entries.get(item["entryId"])
+        resolved.append(dict(item, entry=None if entry is None else {
+            "name": entry.get("name"), "risk": entry.get("risk"),
+            "category": entry.get("category"), "needsPrivilege": entry.get("needsPrivilege"),
+            "paths": entry.get("paths", []),
+        }))
+    return resolved
+
+
+def run_hook_clean(root):
+    """CLNP-16: the Trash-only automated clean the free-space hook triggers.
+
+    Runs in the monitor thread, never on a request path. Guards, in order:
+    the engine must be ready, hooked bookmarks must exist and pass the risk
+    refusal, and no plan/clean job may be running. The engine's own plan
+    fingerprinting, safety guard and owning-app check still apply; the run is
+    audited with ``automated: True`` and lands in the job list like any clean.
+    """
+    try:
+        bookmarks_mod = _bookmark_book(root)
+        loaded = bookmarks_mod.load()
+        if loaded["error"] or not loaded["bookmarks"]:
+            return None
+        if _module(root, "readiness").probe(root)["state"] != "ready":
+            return None
+        entries = _module(root, "catalog").load(root)
+        ids, _refusals = bookmarks_mod.plan_entry_ids(loaded["bookmarks"], entries, flag="autoCleanHook")
+        if not ids:
+            return None
+        if any(job.state == "running" and job.kind in ("plan", "clean")
+               for job in JOBS.list()):
+            return None
+        clean = _module(root, "clean")
+        job = CleanupJob("clean", {"automated": True, "trigger": "disk-free-space", "entryIds": ids})
+        JOBS._register(job)
+
+        def work():
+            try:
+                _module(root, "history").prepare()
+                plan = clean.build_plan(root, ids, mode="trash")
+                if plan.payload is None:
+                    job.state = "cancelled"
+                    return
+                job.request["planId"] = plan.id
+                measures = clean.verify_plan(plan)
+                result = clean.execute_plan(plan, measures)
+                result["automated"] = True
+                job.result = result
+                job.progress = result.get("progress", job.progress)
+                _module(root, "history").append(result)
+                loaded = bookmarks_mod.load()
+                now = time.time()
+                records = [
+                    dict(item, autoCleanHook=dict(item["autoCleanHook"], lastRunAt=now))
+                    if item["autoCleanHook"]["enabled"] else item
+                    for item in loaded["bookmarks"]
+                ]
+                bookmarks_mod.save(records)
+                job.state = "cancelled" if result["cancelled"] else "done"
+            except Exception as exc:
+                job.state = "failed"
+                job.error = "{0}: {1}".format(type(exc).__name__, exc)
+            finally:
+                job.finishedAt = time.time()
+                publish_widget(root)  # CLW-04: the hook run changed the widget's story
+
+        return JOBS._spawn(job, work, ())
+
+    except Exception:
+        return None
+
+
+def measure_bookmark_sizes(root, entry_ids):
+    """CLNP-17: read-only entry-scoped measurement for the size alerts."""
+    if not entry_ids:
+        return {}
+    try:
+        result = _module(root, "scan").scan_catalog(root, entry_ids)
+        return {item["id"]: item["sizeBytes"] for item in result["entries"]}
+    except Exception:
+        return {}
+
+
+class MonitorRunner:
+    """CLNP-10: the console's optional background monitor thread.
+
+    One daemon thread for the whole process, started with the first cleanup
+    API access. While the config is disabled it sleeps quietly and probes
+    nothing; while enabled it evaluates on the configured interval and
+    persists the state through the engine (CLNP-09). Reconfiguration needs no
+    restart: every tick re-reads the store, so a saved config applies on the
+    next wake-up. A single thread also means one evaluation at a time by
+    construction — a slow tick delays the next one instead of overlapping.
+    """
+
+    IDLE_WAIT = 30.0
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.thread = None
+        self.root = None
+        self.stop = threading.Event()
+
+    def ensure_started(self, root):
+        with self.lock:
+            self.root = root
+            if self.thread is not None and self.thread.is_alive():
+                return
+            self.stop = threading.Event()
+            try:
+                self.thread = threading.Thread(target=self._loop, name="cleanup-monitor", daemon=True)
+            except RuntimeError:
+                self.thread = None
+                return
+            self.thread.start()
+
+    def alive(self):
+        with self.lock:
+            return self.thread is not None and self.thread.is_alive()
+
+    def _loop(self):
+        while not self.stop.is_set():
+            try:
+                monitor = _module(self.root, "monitor")
+                config = monitor.load()["config"]
+                if config["enabled"]:
+                    result = monitor.run_evaluation()
+                    # CLNP-16: a fresh free-space crossing arms the bookmark hook.
+                    if any(event["kind"] == "warning" for event in result.get("newEvents", [])):
+                        run_hook_clean(self.root)
+                    self._evaluate_bookmark_sizes()
+                    publish_widget(self.root)  # CLW-04: monitor ticks refresh the widget
+                    self.stop.wait(config["intervalSeconds"])
+                else:
+                    self.stop.wait(self.IDLE_WAIT)
+            except Exception:
+                self.stop.wait(self.IDLE_WAIT)  # a tick may fail; the runner must not die
+
+    def _evaluate_bookmark_sizes(self):
+        """CLNP-17: measure alerted bookmarks read-only and record their events."""
+        try:
+            bookmarks_mod = _bookmark_book(self.root)
+            loaded = bookmarks_mod.load()
+            alerted = [item["entryId"] for item in loaded["bookmarks"] if item["sizeAlert"]["enabled"]]
+            if not alerted:
+                return
+            measurements = measure_bookmark_sizes(self.root, alerted)
+            updated, events = bookmarks_mod.evaluate_size_alerts(loaded["bookmarks"], measurements, time.time())
+            if events:
+                bookmarks_mod.save(updated)
+                _module(self.root, "monitor").append_events(events)
+        except Exception:
+            pass  # the size trigger is optional; a failure never kills the runner
+
+    def shutdown(self):
+        self.stop.set()
+
+
+#: One runner per console process.
+MONITOR = MonitorRunner()
+
+
+class CleanupAPI:
+    # @lat: [[cleanup-lab#Console API]]
+    def __init__(self, root):
+        self.root = os.path.realpath(root)
+        # CLNP-10: the monitor thread starts with the first API access and
+        # stays quiet (no probes) while its config is disabled.
+        MONITOR.ensure_started(self.root)
+
+    def get(self, path, query):
+        if path == "/api/cleanup/status":
+            _query(query)
+            return _module(self.root, "readiness").probe(self.root)
+        if path == "/api/cleanup/catalog":
+            _query(query)
+            catalog = _module(self.root, "catalog")
+            try:
+                return catalog.report(self.root)
+            except catalog.CatalogError as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+        if path == "/api/cleanup/containers":
+            _query(query)
+            return _module(self.root, "containers").capabilities(self.root)
+        if path == "/api/cleanup/deep-roots":
+            _query(query)
+            return {"roots": _module(self.root, "deep").roots(self.root)}
+        if path == "/api/cleanup/volumes":
+            _query(query)
+            return _module(self.root, "volumes").inventory()
+        if path == "/api/cleanup/monitor":
+            _query(query)
+            payload = _module(self.root, "monitor").status()
+            payload["running"] = bool(payload["enabled"] and MONITOR.alive())
+            return payload
+        if path == "/api/cleanup/permissions":
+            # CLNP-03: read-only probes plus the reactive classification of the
+            # latest scan's unreadable paths (deduplicated), when one exists.
+            _query(query)
+            permissions = _module(self.root, "permissions")
+            unreadable = []
+            for job in JOBS.list():
+                result = job.get("result")
+                if job["kind"] == "scan" and isinstance(result, dict):
+                    for entry in result.get("entries", []):
+                        for item in entry.get("unreadable", []):
+                            if item not in unreadable:
+                                unreadable.append(item)
+            return permissions.report(unreadable)
+        if path == "/api/cleanup/relocation":
+            _query(query)
+            return _module(self.root, "relocation").status(self.root)
+        if path == "/api/cleanup/privileged":
+            _query(query)
+            return _module(self.root, "privilege").capabilities(self.root)
+        if path == "/api/cleanup/simulators":
+            _query(query)
+            return _module(self.root, "deep").simulators(self.root)
+        if path == "/api/cleanup/history":
+            _query(query)
+            try:
+                return _module(self.root, "history").read()
+            except Exception as exc:
+                raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+        if path == "/api/cleanup/bookmarks":
+            _query(query)
+            loaded = _bookmark_book(self.root).load(catalog_ids=_bookmark_catalog_ids(self.root))
+            return {"bookmarks": _bookmark_entries(self.root, loaded), "error": loaded["error"]}
+        if path == "/api/cleanup/widget":
+            # CLW-02: the widget snapshot — one read-only fold of the lab's
+            # state, published into the App Group container as a side effect
+            # (the widget re-reads that file per timeline build).
+            _query(query)
+            widget = _module(self.root, "widget")
+            jobs = JOBS.list()
+            payload = widget.build(jobs, jobs)
+            payload["publish"] = widget.publish(payload)
+            return payload
+        if path == "/api/cleanup/jobs":
+            _query(query)
+            return {"jobs": JOBS.list()}
+        if path == "/api/cleanup/explorer/roots":
+            # CLNP-23: the read-only root list the Space Explorer opens with.
+            # The dashboard GETs this; it used to live in post(), which both
+            # 404'd the GET and NameError'd on _query's missing variable.
+            _query(query)
+            return {"roots": _module(self.root, "explorer").roots(self.root)}
+        if path.startswith("/api/cleanup/jobs/"):
+            _query(query)
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[:3] == ["api", "cleanup", "jobs"]:
+                job = JOBS.get(parts[3])
+                if job is None:
+                    raise CleanupError(404, "Job not found")
+                return job.to_dict()
+            raise CleanupError(404, "Cleanup Lab endpoint not found")
+        raise CleanupError(404, "Cleanup Lab endpoint not found")
+
+    def post(self, path, body):
+        """The typed POST surface: start a scan, plan or clean; cancel a job."""
+        if path == "/api/cleanup/scan":
+            _object_body(body, "scan")
+            return JOBS.start_scan(self.root, body)
+        if path == "/api/cleanup/vms/scan":
+            _object_body(body, "vm-scan")
+            return JOBS.start_vm_scan(self.root)
+        if path == "/api/cleanup/containers/preview":
+            _object_body(body, "container-preview")
+            action_id = body.get("actionId")
+            if not isinstance(action_id, str) or not action_id:
+                raise CleanupError(400, "actionId must name an available container action")
+            try:
+                plan, candidates = _module(self.root, "containers").preview(self.root, action_id)
+            except Exception as exc:
+                raise CleanupError(400, str(exc)) from exc
+            preview_id = CONTAINER_PREVIEWS.register(plan)
+            return {"previewId": preview_id, "actionId": plan.action_id, "engine": plan.engine,
+                    "risk": plan.risk, "candidateCount": plan.count, "candidates": candidates,
+                    "command": [plan.engine, *plan.prune_argv], "expiresAt": plan.created_at + 600}
+        if path == "/api/cleanup/containers/prune":
+            _object_body(body, "container-prune")
+            preview_id = body.get("previewId")
+            if not isinstance(preview_id, str) or not preview_id:
+                raise CleanupError(400, "previewId must name a confirmed preview")
+            return JOBS.start_container_prune(self.root, preview_id)
+        if path == "/api/cleanup/privileged/preview":
+            _object_body(body, "privileged-preview")
+            action_id = body.get("actionId")
+            if not isinstance(action_id, str) or not action_id:
+                raise CleanupError(400, "actionId must name an available privileged action")
+            try:
+                plan, candidates = _module(self.root, "privilege").preview(self.root, action_id)
+            except Exception as exc:
+                raise CleanupError(400, str(exc)) from exc
+            preview_id = PRIVILEGED_PREVIEWS.register(plan)
+            return {"previewId": preview_id, "actionId": plan.action_id, "elevation": plan.elevation,
+                    "risk": plan.risk, "candidateCount": plan.count, "candidates": candidates,
+                    "totalBytes": plan.total_bytes, "command": list(plan.elevation_argv),
+                    "expiresAt": plan.created_at + 600}
+        if path == "/api/cleanup/privileged/run":
+            _object_body(body, "privileged-run")
+            preview_id = body.get("previewId")
+            if not isinstance(preview_id, str) or not preview_id:
+                raise CleanupError(400, "previewId must name a confirmed privileged preview")
+            return JOBS.start_privileged_run(self.root, preview_id)
+        if path == "/api/cleanup/relocation/plan":
+            _object_body(body, "relocation-plan")
+            return JOBS.start_relocation_plan(self.root, body)
+        if path == "/api/cleanup/relocation/run":
+            _object_body(body, "relocation-run")
+            preview_id = body.get("previewId")
+            if not isinstance(preview_id, str) or not preview_id:
+                raise CleanupError(400, "previewId must name a confirmed relocation preview")
+            return JOBS.start_relocation_run(self.root, preview_id)
+        if path == "/api/cleanup/packages/scan":
+            _object_body(body, "packages")
+            return JOBS.start_packages(self.root)
+        if path == "/api/cleanup/leftovers/macos/scan":
+            _object_body(body, "macos-leftovers")
+            return JOBS.start_macos_leftovers(self.root)
+        if path == "/api/cleanup/leftovers/scan":
+            _object_body(body, "leftovers")
+            return JOBS.start_leftovers(self.root)
+        if path == "/api/cleanup/permissions/open-settings":
+            # The grant deep link: the page can only name a permission; the
+            # console opens the engine's fixed links (modern pane first, then
+            # the legacy pane) with ``open``. The in-app dashboard cannot open
+            # a custom scheme itself — the webview swallows the navigation —
+            # so the OS call lives here, exactly like app_update's ``open``.
+            _object_body(body, "permissions-open")
+            permission_id = body.get("permissionId")
+            if not isinstance(permission_id, str) or not permission_id:
+                raise CleanupError(400, "permissionId must name a permission record")
+            urls = _module(self.root, "permissions").settings_urls(permission_id)
+            if not urls:
+                raise CleanupError(409, "{0} has no settings pane to open on this platform".format(permission_id))
+            opened = None
+            for url in urls:
+                try:
+                    run = subprocess.run(["open", url], capture_output=True, timeout=10)
+                except (OSError, subprocess.SubprocessError):
+                    continue
+                if run.returncode == 0:
+                    opened = url
+                    break
+            if opened is None:
+                raise CleanupError(500, "Could not open System Settings; follow the guidance link instead")
+            return {"permissionId": permission_id, "opened": opened}
+        if path == "/api/cleanup/monitor/config":
+            _object_body(body, "monitor-config")
+            monitor = _module(self.root, "monitor")
+            try:
+                monitor.save_config(body)
+            except monitor.MonitorConfigError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            publish_widget(self.root)
+            payload = monitor.status()
+            payload["running"] = bool(payload["enabled"] and MONITOR.alive())
+            return payload
+        if path == "/api/cleanup/monitor/evaluate":
+            _object_body(body, "monitor-evaluate")
+            monitor = _module(self.root, "monitor")
+            monitor.run_evaluation()
+            publish_widget(self.root)
+            payload = monitor.status()
+            payload["running"] = bool(payload["enabled"] and MONITOR.alive())
+            return payload
+        if path == "/api/cleanup/bookmarks":
+            _object_body(body, "bookmarks-add")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a catalog entry")
+            bookmarks_mod = _bookmark_book(self.root)
+            try:
+                catalog_ids = {entry["id"] for entry in _module(self.root, "catalog").load(self.root)}
+            except Exception as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+            if entry_id not in catalog_ids:
+                raise CleanupError(400, "Unknown detector id: {0}".format(entry_id))
+            try:
+                loaded = bookmarks_mod.load(catalog_ids=catalog_ids)
+                result = bookmarks_mod.add(entry_id, loaded["bookmarks"], clock=time.time, catalog_ids=catalog_ids)
+            except bookmarks_mod.BookmarksError as exc:
+                raise CleanupError(409, str(exc)) from exc
+            publish_widget(self.root)
+            return {"bookmarks": _bookmark_entries(self.root, result), "error": result["error"]}
+        if path == "/api/cleanup/bookmarks/update":
+            _object_body(body, "bookmarks-update")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a bookmarked entry")
+            bookmarks_mod = _bookmark_book(self.root)
+            changes = {key: body[key] for key in ("priority", "quickClean", "autoCleanHook", "sizeAlert") if key in body}
+            if not changes:
+                raise CleanupError(400, "An update names at least one change")
+            try:
+                loaded = bookmarks_mod.load(catalog_ids=_bookmark_catalog_ids(self.root))
+                result = bookmarks_mod.update(entry_id, changes, loaded["bookmarks"])
+            except bookmarks_mod.BookmarksError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            publish_widget(self.root)
+            return {"bookmarks": _bookmark_entries(self.root, result), "error": result["error"]}
+        if path == "/api/cleanup/bookmarks/remove":
+            _object_body(body, "bookmarks-remove")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a bookmarked entry")
+            bookmarks_mod = _bookmark_book(self.root)
+            try:
+                loaded = bookmarks_mod.load(catalog_ids=_bookmark_catalog_ids(self.root))
+                result = bookmarks_mod.remove(entry_id, loaded["bookmarks"])
+            except bookmarks_mod.BookmarksError as exc:
+                raise CleanupError(404, str(exc)) from exc
+            publish_widget(self.root)
+            return {"bookmarks": _bookmark_entries(self.root, result), "error": result["error"]}
+        if path == "/api/cleanup/bookmarks/quick-clean":
+            _object_body(body, "bookmarks-quick-clean")
+            bookmarks_mod = _bookmark_book(self.root)
+            loaded = bookmarks_mod.load(catalog_ids=_bookmark_catalog_ids(self.root))
+            if loaded["error"]:
+                raise CleanupError(500, loaded["error"])
+            try:
+                entries = _module(self.root, "catalog").load(self.root)
+            except Exception as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+            ids, refusals = bookmarks_mod.plan_entry_ids(loaded["bookmarks"], entries, flag="quickClean")
+            if not ids:
+                if refusals:
+                    raise CleanupError(400, "; ".join(
+                        "{0}: {1}".format(item["entryId"], item["reason"]) for item in refusals
+                    ))
+                raise CleanupError(400, "No bookmark is marked for quick cleanup")
+            job = JOBS.start_plan(self.root, {"entryIds": ids, "mode": "trash"})
+            return {"job": job, "refusals": refusals}
+        if path == "/api/cleanup/custom-entries":
+            # CLNP-20: the raw path appears exactly once, here, validated by
+            # the engine before anything is stored. Afterwards only the
+            # custom.<slug> id travels through the API.
+            _object_body(body, "custom-add")
+            name = body.get("name")
+            raw_path = body.get("path")
+            if not isinstance(name, str) or not name.strip():
+                raise CleanupError(400, "A display name is required")
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise CleanupError(400, "path must be an absolute folder path")
+            overlay = _module(self.root, "custom_catalog")
+            platform = _module(self.root, "paths").platform_id()
+            try:
+                catalog_ids = {entry["id"] for entry in _module(self.root, "catalog").load(self.root)}
+            except Exception as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+            try:
+                result = overlay.add(name, raw_path, overlay.load()["entries"],
+                                     platform=platform, catalog_ids=catalog_ids)
+            except overlay.CustomCatalogError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            publish_widget(self.root)  # the new folder is bookmarkable material
+            return {"entries": result["entries"], "error": result["error"]}
+        if path == "/api/cleanup/custom-entries/remove":
+            _object_body(body, "custom-remove")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a custom entry")
+            if not entry_id.startswith("custom."):
+                raise CleanupError(400, "Only custom.<slug> entries can be removed here")
+            overlay = _module(self.root, "custom_catalog")
+            platform = _module(self.root, "paths").platform_id()
+            try:
+                result = overlay.remove(entry_id, overlay.load()["entries"], platform=platform)
+            except overlay.CustomCatalogError as exc:
+                raise CleanupError(404, str(exc)) from exc
+            # A removed entry cannot stay bookmarked: clear it and its flags.
+            bookmarks_mod = _bookmark_book(self.root)
+            loaded = bookmarks_mod.load()
+            if any(item["entryId"] == entry_id for item in loaded["bookmarks"]):
+                try:
+                    result["bookmarks"] = bookmarks_mod.remove(entry_id, loaded["bookmarks"])["bookmarks"]
+                except bookmarks_mod.BookmarksError:
+                    pass
+            publish_widget(self.root)
+            return result
+        if path == "/api/cleanup/explorer/scan":
+            _object_body(body, "explorer-scan")
+            return JOBS.start_explorer(self.root, body)
+        if path == "/api/cleanup/explorer/subtree":
+            _object_body(body, "explorer-subtree")
+            return JOBS.start_explorer(self.root, body, relative=body.get("relative"))
+        if path == "/api/cleanup/deep-scan":
+            _object_body(body, "deep-scan")
+            return JOBS.start_deep_scan(self.root, body)
+        if path == "/api/cleanup/plan":
+            _object_body(body, "plan")
+            return JOBS.start_plan(self.root, body)
+        if path == "/api/cleanup/clean":
+            _object_body(body, "clean")
+            plan_id = body.get("planId")
+            if not isinstance(plan_id, str) or not plan_id:
+                raise CleanupError(400, "planId must be the id of a built plan")
+            return JOBS.start_clean(self.root, plan_id)
+        parts = path.strip("/").split("/")
+        if len(parts) == 5 and parts[:3] == ["api", "cleanup", "jobs"] and parts[4] == "cancel":
+            if body:
+                raise CleanupError(400, "A cancel request carries no body")
+            job = JOBS.cancel(parts[3])
+            if job is None:
+                raise CleanupError(404, "Job not found")
+            return job.to_dict()
+        raise CleanupError(404, "Cleanup Lab endpoint not found")

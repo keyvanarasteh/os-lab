@@ -1,0 +1,81 @@
+name: Content pack — validate & publish
+
+# The app downloads signed content (Firewall Lab companies, guides, legal docs, Frida hooks)
+# from the `content-latest` release. This builds it from master after the firewall checks pass.
+# Needs the repository secret CONTENT_SIGNING_KEY: the Ed25519 private key (PEM) whose public
+# half is PUBLIC_KEY in console/content.py. See lat.md/content.md.
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'firewall-lab/**'
+      - 'ios-lab/knowledge/**'
+      - 'docs/legal/**'
+      - 'android-lab/lab/hooks/**'
+      - 'console/content.py'
+      - 'scripts/build-content.py'
+      - '.github/workflows/content.yml'
+  pull_request:
+    paths:
+      - 'firewall-lab/**'
+      - 'ios-lab/knowledge/**'
+      - 'docs/legal/**'
+      - 'android-lab/lab/hooks/**'
+      - 'console/content.py'
+      - 'scripts/build-content.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Plan item M: a newer push to the same PR cancels the older run. Pushes to master,
+# tags and manual runs are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate the pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Companies match the schema
+        run: python3 firewall-lab/scripts/validate.py
+      - name: The pack builds and the client accepts its manifest
+        run: python3 scripts/build-content.py --check
+      - name: Verification report (shown in the job summary)
+        run: python3 scripts/verify-content.py --base "origin/${{ github.base_ref || 'master' }}" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Sign and publish
+    needs: validate
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Build and sign
+        env:
+          OSLAB_CONTENT_SIGNING_KEY: ${{ secrets.CONTENT_SIGNING_KEY }}
+        run: python3 scripts/build-content.py --require-signature
+      - name: Publish content-latest (and an archived copy)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          seq="$(python3 -c "import json;print(json.load(open('dist-content/manifest.json'))['sequence'])")"
+          python3 scripts/content-release-notes.py --sequence "$seq" > dist-content/release-notes.md
+          for tag in "content-$seq" content-latest; do
+            gh release delete "$tag" --cleanup-tag --yes 2>/dev/null || true
+            gh release create "$tag" dist-content/manifest.json dist-content/manifest.json.sig dist-content/content-pack.tar.gz \
+              --title "os-lab content $seq" --notes-file dist-content/release-notes.md \
+              --target "$GITHUB_SHA" --latest=false
+          done

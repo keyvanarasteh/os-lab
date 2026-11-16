@@ -1,0 +1,18 @@
+---
+import Base from "../../../layouts/Base.astro";
+import { COMPANIES } from "../../../firewall/companies.generated";
+import { FirewallCompanyPage } from "../../../views/firewall-company-page";
+import { copy, FIREWALL_LOCALES, type FirewallLocale } from "../../../firewall/locale";
+import "../../../styles/firewall-company.css";
+
+export function getStaticPaths() {
+  return FIREWALL_LOCALES.filter((locale) => locale !== "en" && locale !== "tr")
+    .flatMap((locale) => COMPANIES.map((company) => ({ params: { locale, company: company.slug }, props: { company } })));
+}
+
+const locale = Astro.params.locale as FirewallLocale;
+const { company } = Astro.props;
+---
+<Base title={`${company.name} · ${copy[locale].lab}`} description={`${company.name}: ${copy[locale].companyDescription}`} lang={locale}>
+  <FirewallCompanyPage company={company} locale={locale} client:only="react" />
+</Base>

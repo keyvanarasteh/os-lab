@@ -1,0 +1,43 @@
+{
+  "aciklama": "Aynı VLAN içindeki sunucu trafiği çevre güvenlik duvarından geçmez. Bu dosya aynı VLAN içinde izin verilen akışları tanımlar; her sunucunun kendi güvenlik duvarı gelen trafikte varsayılan reddi ve aşağıdaki izinleri uygular. VLAN'lar arası akışlar çevre güvenlik duvarı kurallarındadır.",
+  "ayniVlanIzinleri": [
+    { "vlan": "ist-v60-sunucu", "kaynak": "ist-erp", "hedef": "ist-dns", "servis": "udp/53", "neden": "ERP iç adları çözer." },
+    { "vlan": "ist-v60-sunucu", "kaynak": "ist-git", "hedef": "ist-dns", "servis": "udp/53", "neden": "Git iç adları çözer." },
+    { "vlan": "ist-v60-sunucu", "kaynak": "ist-ad", "hedef": "ist-dns", "servis": "udp/53", "neden": "Dizin sunucusu ad çözer." },
+    { "vlan": "ist-v60-sunucu", "kaynak": "ist-erp", "hedef": "ist-ad", "servis": "tcp/636", "neden": "ERP kullanıcıları dizinden doğrular." },
+    { "vlan": "ist-v60-sunucu", "kaynak": "ist-git", "hedef": "ist-ad", "servis": "tcp/636", "neden": "Git kullanıcıları dizinden doğrular." },
+
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "bastion", "hedef": "wazuh", "servis": "tcp/22", "neden": "Wazuh sunucusu bastion'dan yönetilir." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "bastion", "hedef": "zabbix", "servis": "tcp/22", "neden": "Zabbix sunucusu bastion'dan yönetilir." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "bastion", "hedef": "glpi", "servis": "tcp/22", "neden": "GLPI sunucusu bastion'dan yönetilir." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "bastion", "hedef": "grafana", "servis": "tcp/22", "neden": "Grafana sunucusu bastion'dan yönetilir." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "bastion", "hedef": "fortimanager", "servis": "tcp/443", "neden": "FortiManager paneli bastion'dan kullanılır." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "bastion", "hedef": "wazuh", "servis": "tcp/6514", "neden": "Bastion oturum loglarını Wazuh'a gönderir." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "fortimanager", "hedef": "wazuh", "servis": "tcp/6514", "neden": "FortiManager değişiklik kayıtlarını Wazuh'a gönderir." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "zabbix", "hedef": "wazuh", "servis": "tcp/6514", "neden": "Wazuh, Zabbix'in loglarını izler; biri durursa diğeri alarm üretir." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "wazuh", "hedef": "zabbix", "servis": "tcp/10051", "neden": "Zabbix, Wazuh'un çalıştığını izler; biri durursa diğeri alarm üretir." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "grafana", "hedef": "zabbix", "servis": "tcp/443", "neden": "Grafana verisini Zabbix API'sinden alır." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "wazuh", "hedef": "glpi", "servis": "tcp/443", "neden": "Güvenlik alarmı GLPI kaydı açar." },
+    { "vlan": "ist-v61-yonetim-araclari", "kaynak": "zabbix", "hedef": "glpi", "servis": "tcp/443", "neden": "Altyapı alarmı GLPI kaydı açar." },
+
+    { "vlan": "ist-v70-dmz", "kaynak": "ist-waf-dugumleri", "hedef": "ist-web-uyg", "servis": "tcp/8080", "neden": "WAF temiz istekleri uygulamaya iletir." },
+    { "vlan": "ist-v70-dmz", "kaynak": "ist-waf-1", "hedef": "ist-waf-2", "servis": "vrrp", "neden": "Sanal adres için WAF düğümleri birbirini izler." },
+    { "vlan": "ist-v70-dmz", "kaynak": "ist-waf-2", "hedef": "ist-waf-1", "servis": "vrrp", "neden": "Sanal adres için WAF düğümleri birbirini izler." },
+
+    { "vlan": "izm-v60-sunucu", "kaynak": "izm-arge-veri", "hedef": "izm-dns", "servis": "udp/53", "neden": "Ar-Ge sunucusu iç adları çözer." },
+    { "vlan": "izm-v64-sinir", "kaynak": "izm-kamera-kayit", "hedef": "izm-proxy", "servis": "tcp/3128", "neden": "Kamera kayıt sunucusu güncellemeyi proxy'den alır." },
+
+    { "vlan": "ams-v60-sunucu", "kaynak": "ams-crm", "hedef": "ams-dns", "servis": "udp/53", "neden": "CRM iç adları çözer." },
+    { "vlan": "ams-v60-sunucu", "kaynak": "ams-crm", "hedef": "ams-log-toplayici", "servis": "tcp/6514", "neden": "CRM loglarını yerel toplayıcıya gönderir." },
+    { "vlan": "ams-v60-sunucu", "kaynak": "ams-dns", "hedef": "ams-log-toplayici", "servis": "tcp/6514", "neden": "DHCP ve DNS logları yerel toplayıcıya gider." },
+    { "vlan": "ams-v60-sunucu", "kaynak": "ams-log-toplayici", "hedef": "ams-dns", "servis": "udp/53", "neden": "Log toplayıcı iç adları çözer." },
+
+    { "vlan": "ank-v60-sunucu", "kaynak": "ank-obs", "hedef": "ank-dns", "servis": "udp/53", "neden": "Öğrenci bilgi sistemi iç adları çözer." },
+    { "vlan": "ank-v60-sunucu", "kaynak": "ank-dosya", "hedef": "ank-dns", "servis": "udp/53", "neden": "Dosya sunucusu iç adları çözer." },
+    { "vlan": "ank-v60-sunucu", "kaynak": "ank-radius", "hedef": "ank-dns", "servis": "udp/53", "neden": "RADIUS iç adları çözer." },
+    { "vlan": "ank-v64-sinir", "kaynak": "ank-kamera-kayit", "hedef": "ank-proxy", "servis": "tcp/3128", "neden": "Kamera kayıt sunucusu güncellemeyi proxy'den alır." },
+    { "vlan": "ank-v70-dmz", "kaynak": "ank-waf-dugumleri", "hedef": "ank-lms-uyg", "servis": "tcp/8080", "neden": "WAF temiz istekleri LMS'e iletir." },
+    { "vlan": "ank-v70-dmz", "kaynak": "ank-waf-1", "hedef": "ank-waf-2", "servis": "vrrp", "neden": "Sanal adres için WAF düğümleri birbirini izler." },
+    { "vlan": "ank-v70-dmz", "kaynak": "ank-waf-2", "hedef": "ank-waf-1", "servis": "vrrp", "neden": "Sanal adres için WAF düğümleri birbirini izler." }
+  ]
+}

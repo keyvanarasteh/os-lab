@@ -4,24 +4,32 @@
  * os-lab/lab-page.tsx (PR #174): every action is previewed (exact command, effects, setup
  * prerequisites, privileges) before it runs, and runs as a background job with retained output.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowClockwiseIcon,
   CheckCircleIcon,
+  CircleNotchIcon,
+  DeviceMobileIcon,
   GearSixIcon,
+  InfoIcon,
   PlayIcon,
   PulseIcon,
   ShieldWarningIcon,
   StopIcon,
+  TerminalIcon,
   WarningCircleIcon,
   WrenchIcon,
   XCircleIcon
 } from "@phosphor-icons/react";
 import { AppShell, LAB_ICON } from "../shell/app-shell";
 import { TopBar } from "../shell/top-bar";
-import { ProgressConsoleReport, ShellSnippet } from "../apk-lab/components";
-import type { ExecutionVersionStage } from "../apk-lab/components";
-import { Badge, Empty, EndpointList, Field, PageHead, Section, Skeleton, Status } from "../components/ui";
+import { ShellSnippet } from "../apk-lab/components";
+import { Badge, Empty, EndpointList, Field, IconButton, Modal, PageHead, Section, Skeleton, Status } from "../components/ui";
+import { SimulatorDrawer } from "./ios-simulator";
+import { IosDeviceCards } from "./ios-real-devices";
+import { MacAppMirrorTeaser, MacAppPanel } from "./macos-app-mirror";
+import { MacEnginePanel } from "./macos-engine-panel";
+import { WinAppsPanel } from "./winapps-app-mirror";
 import { stateBadge } from "./host-page";
 import {
   ago,
@@ -41,30 +49,62 @@ import {
 const REFERENCE: Record<LabId, { check: string; setup: string; where: string }> = {
   android: { check: "./labctl android doctor", setup: "./labctl android start --wait", where: "android-lab/lab" },
   windows: { check: "./labctl win status", setup: "./labctl win profile use development\n./labctl win start --wait", where: "win-lab" },
+  winapps: { check: "python console/winapps.py", setup: "Run this panel on a Windows host.", where: "winapps" },
   linux: { check: "./labctl linux status", setup: "./labctl linux profile use development\n./labctl linux start --wait", where: "linux-lab" },
   ios: { check: "./labctl ios status", setup: "./labctl ios profile use development\n./labctl ios start --wait", where: "ios-lab" },
-  macos: { check: "make -C ios-lab mac-doctor", setup: "make -C ios-lab mac-setup mac-sim mac-appium", where: "ios-lab/mac" }
+  source: { check: "./labctl source doctor", setup: "./labctl source setup", where: "source-lab" },
+  macos: { check: "make -C ios-lab mac-app-doctor", setup: "make -C ios-lab mac-appium mac-app-smoke", where: "ios-lab/mac" },
+  web: { check: "./labctl web status", setup: "./labctl web setup", where: "web-lab" }
 };
 
 const ACTION_GROUPS: { title: string; ids: string[] }[] = [
-  { title: "Lifecycle", ids: ["start", "stop", "restart", "appium-start", "appium-stop"] },
+  { title: "Automation", ids: ["appium-install", "idb-install", "xcuitest-smoke"] },
   { title: "Inspect", ids: ["status", "doctor", "urls", "logs", "monitor"] },
   { title: "Maintenance", ids: ["backup", "service-install", "service-uninstall"] }
 ];
 
-const STAGE: Record<LabJob["state"], ExecutionVersionStage["status"]> = {
-  running: "Running",
-  succeeded: "Deployed",
-  failed: "Failed",
-  cancelled: "Failed",
-  "timed-out": "Failed"
+/** Start/stop clusters render as one segmented icon control per tool, titled by what it drives. */
+const SEGMENT_GROUPS: { title: string; ids: string[] }[] = [
+  { title: "Stack", ids: ["start", "stop", "restart"] },
+  { title: "Appium", ids: ["appium-start", "appium-stop"] },
+  { title: "idb", ids: ["idb-start", "idb-stop"] }
+];
+
+/** One icon per segment; start segments keep the primary (orange) affordance. */
+const SEGMENT_ICON: Record<string, ReactNode> = {
+  start: <PlayIcon size={14} weight="fill" />,
+  stop: <StopIcon size={14} />,
+  restart: <ArrowClockwiseIcon size={14} />,
+  "appium-start": <PlayIcon size={14} weight="fill" />,
+  "appium-stop": <StopIcon size={14} />,
+  "idb-start": <PlayIcon size={14} weight="fill" />,
+  "idb-stop": <StopIcon size={14} />
 };
 
-function Requirements({ lab }: { lab: LabStatus }) {
-  if (!lab.requirements.length) return <Empty>No host prerequisites are tracked for this lab.</Empty>;
+/** Optional dependencies that have a one-click install action, keyed by requirement id. */
+const OPTIONAL_INSTALLS: Record<string, { action: string; label: string }> = {
+  appium: { action: "appium-install", label: "Install Appium" },
+  idb: { action: "idb-install", label: "Install idb" }
+};
+
+/** Scripts print `##PROGRESS n/total label` per step; the last one drives the bar and the lines stay out of the output. */
+const PROGRESS = /^##PROGRESS (\d+)\/(\d+) (.*)$/;
+export function readProgress(lines: string[]): { step: number; total: number; label: string } | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = PROGRESS.exec(lines[i].trim());
+    if (m && Number(m[2]) > 0) return { step: Math.min(Number(m[1]), Number(m[2])), total: Number(m[2]), label: m[3] };
+  }
+  return null;
+}
+
+function Requirements({ lab, onInstall }: { lab: LabStatus; onInstall?: (action: string) => void }) {
+  // Requirements that are already found stay out of the list — the header badge reports them,
+  // the card itself lists only what is still missing so install actions are visible at once.
+  const missing = lab.requirements.filter((r) => !r.found);
+  if (!missing.length) return <Empty>No host prerequisites are tracked for this lab.</Empty>;
   return (
     <ul className="divide-y divide-(--iux-border)">
-      {lab.requirements.map((r) => (
+      {missing.map((r) => (
         <li key={r.id} className="flex flex-wrap items-center gap-2.5 py-2.5 text-sm">
           {r.found ? (
             <CheckCircleIcon size={16} weight="fill" className="shrink-0 text-(--iux-success)" />
@@ -73,8 +113,15 @@ function Requirements({ lab }: { lab: LabStatus }) {
           ) : (
             <WarningCircleIcon size={16} className="shrink-0 text-(--iux-muted-foreground)" />
           )}
-          <span className="min-w-0 flex-1">{r.label}</span>
-          {!r.found && r.hint ? <span className="text-xs text-(--iux-muted-foreground)">{r.hint}</span> : null}
+          <span className="min-w-0 flex-1 basis-40">
+            {r.label}
+            {!r.found && r.hint ? <span className="block text-xs text-(--iux-muted-foreground)">{r.hint}</span> : null}
+          </span>
+          {!r.found && OPTIONAL_INSTALLS[r.id] && onInstall && lab.actions.some((a) => a.id === OPTIONAL_INSTALLS[r.id]!.action) ? (
+            <button type="button" className="iux-btn" onClick={() => onInstall(OPTIONAL_INSTALLS[r.id]!.action)}>
+              {OPTIONAL_INSTALLS[r.id]!.label}
+            </button>
+          ) : null}
           <Badge tone={r.found ? "success" : r.required ? "danger" : undefined}>
             {r.found ? "found" : r.required ? "missing" : "optional"}
           </Badge>
@@ -99,6 +146,9 @@ function PlanPanel({
   onRun: () => void;
   onCancel: () => void;
 }) {
+  // The command and its effects stay one click away instead of dominating the
+  // card; the confirm sentence and the buttons always stay visible.
+  const [debug, setDebug] = useState(false);
   return (
     <section id="plan" className="iux-card gap-4 border-[#f36c21]/50 py-5">
       <div className="flex flex-wrap items-start gap-3 px-5">
@@ -115,6 +165,9 @@ function PlanPanel({
           <div className="flex gap-2">
             {plan.privileged ? <Badge tone="warning">Administrator</Badge> : null}
             <Badge>{plan.provider}</Badge>
+            <IconButton label={debug ? "Hide details" : "Show details"} onClick={() => setDebug((d) => !d)}>
+              <TerminalIcon size={14} />
+            </IconButton>
           </div>
         ) : null}
       </div>
@@ -122,13 +175,17 @@ function PlanPanel({
         {error ? <Status value={{ ok: false, text: error }} /> : null}
         {plan ? (
           <>
-            <pre className="overflow-x-auto rounded-lg border border-(--iux-border) bg-(--iux-muted) px-4 py-3 font-mono text-xs">{plan.display || "(run manually)"}</pre>
-            <ul className="list-disc space-y-1 pl-5 text-sm">
-              {plan.effects.map((e) => (
-                <li key={e}>{e}</li>
-              ))}
-              <li>Timeout: {Math.round(plan.timeoutSec / 60) || 1} min</li>
-            </ul>
+            {debug ? (
+              <>
+                <pre className="overflow-x-auto rounded-lg border border-(--iux-border) bg-(--iux-muted) px-4 py-3 font-mono text-xs">{plan.display || "(run manually)"}</pre>
+                <ul className="list-disc space-y-1 pl-5 text-sm">
+                  {plan.effects.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                  <li>Timeout: {Math.round(plan.timeoutSec / 60) || 1} min</li>
+                </ul>
+              </>
+            ) : null}
             {plan.setup ? (
               <div className="rounded-xl border border-dashed border-(--iux-border) p-4 text-sm">
                 <h3 className="mb-2 font-semibold">Dependencies this installs or checks</h3>
@@ -182,54 +239,94 @@ function JobPanel({ jobs, selected, onSelect }: { jobs: LabJob[]; selected: stri
   const current = jobs.find((j) => j.id === id);
   const detail = usePoll(() => (id ? api.job(id) : Promise.resolve(null)), current?.state === "running" ? 1500 : 0, [id, current?.state]);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  // Compact by default: a running job shows only progress, a finished one just
+  // its status; the output opens on failure or through the details toggle.
+  const [debug, setDebug] = useState(false);
+  const failed = current?.state === "failed" || current?.state === "cancelled";
   if (!jobs.length) return <Empty>No jobs for this lab yet. Preview an action above to start one.</Empty>;
-  const logs = detail.data?.logs ?? [];
+  const rawLogs = detail.data?.id === id ? detail.data.logs ?? [] : [];
+  const progress = readProgress(rawLogs);
+  const logs = rawLogs.filter((line) => !PROGRESS.test(line.trim()));
+  const showOutput = debug || failed;
   return (
-    <ProgressConsoleReport
-      title={current?.label ?? "Job"}
-      description={current ? `${current.command} · started ${ago(current.startedAt)}${current.exitCode != null ? ` · exit ${current.exitCode}` : ""}${current.error ? ` · ${current.error}` : ""}` : ""}
-      stages={jobs.slice(0, 6).map((j) => ({
-        id: j.id,
-        version: j.action,
-        updatedAt: ago(j.startedAt),
-        status: STAGE[j.state],
-        active: j.id === id
-      }))}
-      logs={logs.length ? logs : [current?.state === "running" ? "Waiting for output…" : "No output."]}
-      streaming={current?.state === "running"}
-      footer={
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {jobs.slice(0, 6).map((j) => (
-            <button
-              key={j.id}
-              type="button"
-              onClick={() => onSelect(j.id)}
-              className={`rounded-md px-2.5 py-1 font-mono text-xs ${j.id === id ? "bg-[#f36c21]/20 text-[#f36c21]" : "text-zinc-400 hover:text-white"}`}
-            >
-              {j.action}
-            </button>
-          ))}
-          {current?.state === "running" ? (
-            <button
-              type="button"
-              disabled={cancelling}
-              onClick={async () => {
-                setCancelling(true);
-                try {
-                  await api.cancel(current.id);
-                  await jobsStore.refresh();
-                } finally {
-                  setCancelling(false);
-                }
-              }}
-              className="flex items-center gap-1.5 rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/20"
-            >
-              <StopIcon size={12} weight="fill" /> Cancel job
-            </button>
-          ) : null}
+    <div className="iux-card gap-4 p-5" aria-busy={current?.state === "running"}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">{current?.label ?? "Job"}</h3>
+          <p className="mt-1 text-xs text-(--iux-muted-foreground)">
+            Started {ago(current?.startedAt)}{current?.exitCode != null ? ` · exit ${current.exitCode}` : ""}
+          </p>
         </div>
-      }
-    />
+        <div className="flex items-center gap-2">
+          <IconButton label={debug ? "Hide details" : "Show details"} onClick={() => setDebug((d) => !d)}>
+            <TerminalIcon size={14} />
+          </IconButton>
+          <Badge tone={current?.state === "succeeded" ? "success" : current?.state === "running" ? "warning" : "danger"}>
+            {current?.state === "running" ? <CircleNotchIcon size={13} className="mr-1 inline animate-spin" /> : null}
+            {current?.state ?? "unknown"}
+          </Badge>
+        </div>
+      </div>
+      {current?.state === "running" ? (
+        <div role="status" className="space-y-1.5 text-xs text-(--iux-muted-foreground)">
+          <p>
+            {progress
+              ? `Step ${progress.step} of ${progress.total}: ${progress.label}`
+              : current.action === "setup" ? "Installing and checking dependencies…" : "Running action…"}{" "}
+            Output appears below as each step completes.
+          </p>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-(--iux-muted)"
+            role={progress ? "progressbar" : undefined}
+            aria-valuemin={progress ? 0 : undefined}
+            aria-valuemax={progress?.total}
+            aria-valuenow={progress ? progress.step : undefined}
+          >
+            {progress ? (
+              <div className="h-full rounded-full bg-[#f36c21] transition-[width] duration-500" style={{ width: `${(progress.step / progress.total) * 100}%` }} />
+            ) : (
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-[#f36c21]" />
+            )}
+          </div>
+        </div>
+      ) : null}
+      {current?.error ? <Status value={{ ok: false, text: current.error }} /> : null}
+      {detail.error ? <Status value={{ ok: false, text: `Could not load job output: ${detail.error}` }} /> : null}
+      {cancelError ? <Status value={{ ok: false, text: `Could not cancel job: ${cancelError}` }} /> : null}
+      <div className="flex flex-wrap gap-2">
+        {jobs.slice(0, 6).map((job) => (
+          <button key={job.id} type="button" onClick={() => { setCancelError(null); onSelect(job.id); }}
+            className="iux-btn" data-variant={job.id === id ? "primary" : "outline"}>
+            {job.action} · {job.state}
+          </button>
+        ))}
+        {current?.state === "running" ? (
+          <button type="button" className="iux-btn" data-variant="outline" disabled={cancelling}
+            onClick={async () => {
+              setCancelling(true);
+              setCancelError(null);
+              try {
+                await api.cancel(current.id);
+                await jobsStore.refresh();
+              } catch (e) {
+                setCancelError(message(e));
+              } finally {
+                setCancelling(false);
+              }
+            }}>
+            <StopIcon size={14} /> {cancelling ? "Cancelling…" : "Cancel job"}
+          </button>
+        ) : null}
+      </div>
+      {showOutput ? (
+        <div>
+          <p className="mb-2 text-xs font-medium text-(--iux-muted-foreground)">Output · {current?.lines ?? 0} lines</p>
+          <pre className="max-h-80 overflow-auto rounded-lg border border-(--iux-border) bg-(--iux-muted) p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">{logs.length ? logs.join("\n") : current?.state === "running" ? "Waiting for output…" : "No output."}</pre>
+          {current?.truncated ? <p className="mt-1 text-xs text-(--iux-muted-foreground)">Earlier output was trimmed.</p> : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -285,56 +382,72 @@ function Monitor({ lab }: { lab: LabId }) {
   );
 }
 
-function Configuration({ lab, onProfile }: { lab: LabId; onProfile: (profile: string) => void }) {
+/** Endpoints and the masked configuration file, opened from the header's Advanced settings icon. */
+function ConfigurationModal({ lab, ready, onProfile, onClose }: { lab: LabId; ready: boolean; onProfile: (profile: string) => void; onClose: () => void }) {
   const { data, error } = usePoll(() => api.config(lab), 0, [lab]);
-  if (error) return <Section title="Configuration"><Status value={{ ok: false, text: error }} /></Section>;
-  if (!data) return <Section title="Configuration"><Skeleton rows={2} /></Section>;
   return (
-    <>
-      {data.endpoints.length ? (
-        <Section icon={<PlayIcon size={16} />} title="Endpoints" description="Addresses from the lab's configuration; they answer once the lab is running.">
-          <EndpointList items={data.endpoints} />
-        </Section>
-      ) : null}
-      <Section
-        icon={<GearSixIcon size={16} />}
-        title="Configuration"
-        description={
-          <>
-            <code>{data.path}</code> {data.exists ? "" : "(not created yet — defaults from the example file)"}. Secrets are masked.
-          </>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          {data.profiles.length ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium">Profiles</span>
-              {data.profiles.map((p) => (
-                <button key={p} type="button" className="iux-btn" data-variant="outline" onClick={() => onProfile(p)} title={`Preview applying ${p}`}>
-                  {p}
-                </button>
-              ))}
+    <Modal title="Advanced settings" icon={<GearSixIcon size={16} />} onClose={onClose}>
+      <div className="flex flex-col gap-4">
+        {error ? <Status value={{ ok: false, text: error }} /> : null}
+        {!data && !error ? <Skeleton rows={2} /> : null}
+        {data && ready && data.endpoints.length ? (
+          <Section icon={<PlayIcon size={16} />} title="Endpoints" description="Addresses from the lab's configuration; they answer once the lab is running.">
+            <EndpointList items={data.endpoints} />
+          </Section>
+        ) : null}
+        {data ? (
+          <Section
+            icon={<GearSixIcon size={16} />}
+            title="Configuration"
+            description={
+              <>
+                <code>{data.path}</code> {data.exists ? "" : "(not created yet — defaults from the example file)"}. Secrets are masked.
+              </>
+            }
+          >
+            <div className="flex flex-col gap-4">
+              {data.profiles.length ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium">Profiles</span>
+                  {data.profiles.map((p) => (
+                    <button key={p} type="button" className="iux-btn" data-variant="outline" onClick={() => onProfile(p)} title={`Preview applying ${p}`}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <details>
+                <summary className="cursor-pointer text-sm">{data.fields.length} settings</summary>
+                <ul className="mt-3 max-h-80 overflow-y-auto text-xs">
+                  {data.fields.map((f) => (
+                    <li key={f.key} className="flex gap-3 border-b border-(--iux-border) py-1.5">
+                      <span className="w-48 shrink-0 truncate font-mono">{f.key}</span>
+                      <span className="min-w-0 flex-1 truncate font-mono text-(--iux-muted-foreground)">{f.value || "—"}</span>
+                      {f.local ? <Badge>.env</Badge> : null}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
-          ) : null}
-          <details>
-            <summary className="cursor-pointer text-sm">{data.fields.length} settings</summary>
-            <ul className="mt-3 max-h-80 overflow-y-auto text-xs">
-              {data.fields.map((f) => (
-                <li key={f.key} className="flex gap-3 border-b border-(--iux-border) py-1.5">
-                  <span className="w-48 shrink-0 truncate font-mono">{f.key}</span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-(--iux-muted-foreground)">{f.value || "—"}</span>
-                  {f.local ? <Badge>.env</Badge> : null}
-                </li>
-              ))}
-            </ul>
-          </details>
-        </div>
-      </Section>
-    </>
+          </Section>
+        ) : null}
+      </div>
+    </Modal>
   );
 }
 
 export default function LabPage({ lab: labId }: { lab: LabId }) {
+  if (import.meta.env.PUBLIC_SITE_MODE === "pages" && labId === "source") {
+    return <AppShell activeId="lab-source"><TopBar title="Source Lab" icon={LAB_ICON.source(20)} />
+      <main className="mx-auto max-w-4xl p-8"><PageHead toolbarOnly icon={LAB_ICON.source(22)} title="Source Lab"
+        description="Runs locally with Python 3.11+. Open the installed console to check readiness and run analyses." />
+        <a className="iux-btn mt-6" href="https://github.com/keyvanarasteh/os-lab/tree/master/source-lab">Repository</a>
+      </main></AppShell>;
+  }
+  return <LiveLabPage lab={labId} />;
+}
+
+function LiveLabPage({ lab: labId }: { lab: LabId }) {
   const { data: hostData, error: hostError, refresh: refreshHost } = hostStore.use();
   const { data: allJobs } = jobsStore.use();
   const lab = hostData?.labs.find((l) => l.id === labId);
@@ -347,6 +460,11 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [distro, setDistro] = useState("");
   const [resize, setResize] = useState({ cpus: "", ram: "", disk: "", device: "" });
+  const [mirrorHidden, setMirrorHidden] = useState(false);
+  // On-demand panels: the iOS simulator mirror and every lab's endpoints/configuration.
+  const [simOpen, setSimOpen] = useState(false);
+  const [simTarget, setSimTarget] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const preview = async (action: string, extra: Partial<LabRequest> = {}) => {
     const req: LabRequest = { lab: labId, action, ...extra };
@@ -398,27 +516,40 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
   const label = lab?.label ?? labId;
   const actions = new Map((lab?.actions ?? []).map((a) => [a.id, a]));
   const ref = REFERENCE[labId];
+  // The ready iOS Simulator gets a device frame panel instead of plain start/stop buttons.
+  const simulator = labId === "ios" && lab?.provider === "native-macos" && lab.state === "ready";
+  // The ready macOS Lab gets the floating app mirror for the windows on this Mac.
+  const appMirror = labId === "macos" && lab?.provider === "native-macos" && lab.state === "ready";
+  // The Windows Apps Lab panel reads the desktop directly; it is mounted only locally on Windows hosts.
+  const showWinAppsPanel =
+    import.meta.env.PUBLIC_SITE_MODE !== "pages" && labId === "winapps";
+  // Every tracked prerequisite is found: the card would only repeat success badges, so it yields
+  // its half of the row to the actions. Anything missing keeps the full status list visible.
+  const requirements = lab?.requirements ?? [];
+  const depsInstalled = requirements.every((r) => r.found);
 
   return (
     <AppShell activeId={`lab-${labId}`}>
       <div className="iux min-h-screen">
         <TopBar title={labId === "android" ? "Android Lab · Runtime & Setup" : label} back={{ href: labId === "android" ? "/android/" : "/", label: labId === "android" ? "Android Lab" : "This computer" }} icon={LAB_ICON[labId](20)} />
-        <main className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6">
+        <div className={simulator && simOpen ? "lg:flex lg:w-full lg:items-start" : undefined}>
+        <main className={`mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 ${simulator && simOpen ? "lg:mx-0 lg:min-w-0 lg:flex-1 lg:max-w-none" : ""}`}>
           {!lab ? (
             hostError ? <Empty>Could not reach the lab engine: {hostError}</Empty> : <Skeleton rows={5} />
           ) : (
             <>
-              <PageHead
-                icon={LAB_ICON[labId](22)}
-                title={label}
-                description={lab.summary}
-                actions={
-                  <>
+              <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Lab status and tools">
                     {stateBadge(lab.state)}
                     {lab.provider ? <Badge>{lab.provider}</Badge> : null}
-                  </>
-                }
-              />
+                    {simulator ? (
+                      <IconButton label="Simulator" onClick={() => setSimOpen((open) => !open)}>
+                        <DeviceMobileIcon size={14} />
+                      </IconButton>
+                    ) : null}
+                    <IconButton label="Advanced settings" onClick={() => setAdvancedOpen(true)}>
+                      <GearSixIcon size={14} />
+                    </IconButton>
+              </div>
 
               {(lab.reasons.length > 0 || lab.notes.length > 0) && (
                 <div className="space-y-1.5 rounded-xl border border-dashed border-(--iux-border) p-4 text-sm">
@@ -429,11 +560,13 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
                   ))}
                   {lab.notes.map((n) => (
                     <p key={n} className="flex gap-2 text-(--iux-muted-foreground)">
-                      <CheckCircleIcon size={16} className="mt-0.5 shrink-0" /> {n}
+                      <InfoIcon size={16} className="mt-0.5 shrink-0" /> {n}
                     </p>
                   ))}
                 </div>
               )}
+
+              {showWinAppsPanel ? <WinAppsPanel /> : null}
 
               {request ? (
                 <PlanPanel
@@ -450,6 +583,15 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
                 />
               ) : null}
 
+              {advancedOpen && lab ? (
+                <ConfigurationModal lab={labId} ready={lab.state === "ready"} onProfile={(p) => void preview("profile", { profile: p })} onClose={() => setAdvancedOpen(false)} />
+              ) : null}
+              {appMirror && !mirrorHidden ? (
+                <MacAppPanel onPreview={(action, extra) => void preview(action, extra)} onHide={() => setMirrorHidden(true)} />
+              ) : null}
+              {appMirror && mirrorHidden ? <MacAppMirrorTeaser onOpen={() => setMirrorHidden(false)} /> : null}
+              {appMirror ? <MacEnginePanel /> : null}
+
               {lab.state === "unavailable" ? (
                 <Section title="Run it elsewhere" description={`On a supported host, these commands run from the os-lab checkout (${ref.where}).`}>
                   <div className="flex flex-col gap-3">
@@ -459,28 +601,46 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
               ) : (
                 <>
                   <div className="grid gap-6 lg:grid-cols-2">
-                    <Section
-                      icon={<WrenchIcon size={16} />}
-                      title="Dependencies"
-                      description="What this lab needs on this computer."
-                      action={
-                        actions.has("setup") ? (
-                          <button
-                            type="button"
-                            className={lab.state === "needs-setup" ? "iux-btn bg-[#f36c21] text-white hover:bg-[#fa7b32]" : "iux-btn"}
-                            data-variant={lab.state === "needs-setup" ? undefined : "outline"}
-                            onClick={() => void preview("setup")}
-                          >
-                            Install dependencies
-                          </button>
-                        ) : null
-                      }
-                    >
-                      <Requirements lab={lab} />
-                    </Section>
+                    {depsInstalled ? null : (
+                      <Section
+                        icon={<WrenchIcon size={16} />}
+                        title="Dependencies"
+                        description="What this lab needs on this computer."
+                        action={
+                          <>
+                            {requirements.length ? (
+                              <Badge tone="success">{`${requirements.filter((r) => r.found).length} of ${requirements.length} found`}</Badge>
+                            ) : null}
+                            {lab.requirements.some((r) => r.required && !r.found) && actions.has("setup") ? (
+                              <button
+                                type="button"
+                                className={lab.state === "needs-setup" ? "iux-btn bg-[#f36c21] text-white hover:bg-[#fa7b32]" : "iux-btn"}
+                                data-variant={lab.state === "needs-setup" ? undefined : "outline"}
+                                onClick={() => void preview("setup")}
+                              >
+                                Install dependencies
+                              </button>
+                            ) : null}
+                          </>
+                        }
+                      >
+                        <Requirements lab={lab} onInstall={(action) => void preview(action)} />
+                      </Section>
+                    )}
 
-                    <Section icon={<PlayIcon size={16} />} title="Actions" description="Each action is previewed before it runs.">
-                      <div className="flex flex-col gap-4">
+                    <Section
+                      className={depsInstalled ? "lg:col-span-2" : undefined}
+                      compact={simulator}
+                      icon={<PlayIcon size={16} />}
+                      title="Actions"
+                      description="Each action is previewed before it runs."
+                    >
+                      <div className={`flex flex-col ${simulator ? "gap-3" : "gap-4"}`}>
+                        {lab.state === "needs-setup" ? (
+                          <p className="text-xs text-(--iux-muted-foreground)">
+                            Start, stop and the other actions appear once the missing dependencies are installed.
+                          </p>
+                        ) : null}
                         {lab.provider === "wsl2" ? (
                           <Field label="WSL2 distribution">
                             <select className="iux-input" value={distro} onChange={(e) => setDistro(e.target.value)}>
@@ -490,19 +650,61 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
                             </select>
                           </Field>
                         ) : null}
+                        <div className={simulator ? "grid gap-3 sm:grid-cols-2" : "flex flex-col gap-4"}>
+                        {SEGMENT_GROUPS.map((group) => {
+                          const items = group.ids
+                            .filter((id) => !(simulator && (id === "start" || id === "stop")))
+                            .map((id) => actions.get(id))
+                            .filter(Boolean);
+                          if (!items.length) return null;
+                          return (
+                            <div key={group.title} className={simulator ? "min-w-0 rounded-lg border border-(--iux-border) bg-(--iux-muted)/20 p-3" : undefined}>
+                              <p className={`${simulator ? "mb-1" : "mb-2"} text-xs font-medium text-(--iux-muted-foreground)`}>{group.title}</p>
+                              {items.length === 1 ? (
+                                // A lone segment (e.g. restart while the simulator panel owns start/stop) keeps a labelled button.
+                                <button
+                                  type="button"
+                                  className="iux-btn"
+                                  data-variant="outline"
+                                  title={items[0]!.description}
+                                  onClick={() => void preview(items[0]!.id)}
+                                >
+                                  {SEGMENT_ICON[items[0]!.id] ?? null} {items[0]!.label}
+                                </button>
+                              ) : (
+                                <div role="group" aria-label={group.title} className="iux-seg">
+                                  {items.map((a) => (
+                                    <button
+                                      key={a!.id}
+                                      type="button"
+                                      title={a!.description}
+                                      aria-label={a!.label}
+                                      data-primary={a!.id.endsWith("start") ? "true" : undefined}
+                                      onClick={() => void preview(a!.id)}
+                                    >
+                                      {SEGMENT_ICON[a!.id] ?? <PlayIcon size={14} weight="fill" />}
+                                      {simulator ? (a!.id.endsWith("start") ? "Start" : a!.id.endsWith("stop") ? "Stop" : a!.label) : null}
+                                      {a!.privileged ? <ShieldWarningIcon size={13} className="text-(--iux-warning)" /> : null}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                         {ACTION_GROUPS.map((group) => {
                           const items = group.ids.map((id) => actions.get(id)).filter(Boolean);
                           if (!items.length) return null;
                           return (
-                            <div key={group.title}>
-                              <p className="mb-2 text-xs font-medium text-(--iux-muted-foreground)">{group.title}</p>
+                            <div key={group.title} className={simulator ? "min-w-0 rounded-lg border border-(--iux-border) bg-(--iux-muted)/20 p-3" : undefined}>
+                              <p className={`${simulator ? "mb-1" : "mb-2"} text-xs font-medium text-(--iux-muted-foreground)`}>{group.title}</p>
                               <div className="flex flex-wrap gap-2">
                                 {items.map((a) => (
                                   <button
                                     key={a!.id}
                                     type="button"
-                                    className={a!.id === "start" ? "iux-btn bg-[#f36c21] text-white hover:bg-[#fa7b32]" : "iux-btn"}
-                                    data-variant={a!.id === "start" ? undefined : "outline"}
+                                    className="iux-btn"
+                                    data-variant="outline"
                                     title={a!.description}
                                     onClick={() => void preview(a!.id)}
                                   >
@@ -514,6 +716,7 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
                             </div>
                           );
                         })}
+                        </div>
                         {actions.has("resize") ? (
                           <form
                             className="flex flex-wrap items-end gap-2"
@@ -552,6 +755,7 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
                             </button>
                           </form>
                         ) : null}
+                        {simulator ? <IosDeviceCards selectedTarget={simTarget} onSelect={(target) => { setSimTarget(target); setSimOpen(true); }} /> : null}
                       </div>
                     </Section>
                   </div>
@@ -561,13 +765,14 @@ export default function LabPage({ lab: labId }: { lab: LabId }) {
                     <JobPanel jobs={jobs} selected={selectedJob} onSelect={setSelectedJob} />
                   </section>
 
-                  <Monitor lab={labId} />
-                  <Configuration lab={labId} onProfile={(p) => void preview("profile", { profile: p })} />
+                  {lab.state === "ready" ? <Monitor lab={labId} /> : null}
                 </>
               )}
             </>
           )}
         </main>
+        {simulator ? <SimulatorDrawer open={simOpen} target={simTarget} onTargetChange={setSimTarget} onClose={() => setSimOpen(false)} onPreview={(action, extra) => void preview(action, extra)} /> : null}
+        </div>
       </div>
     </AppShell>
   );

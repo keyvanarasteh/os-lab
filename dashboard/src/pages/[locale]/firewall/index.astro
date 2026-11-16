@@ -1,0 +1,12 @@
+---
+import Base from "../../../layouts/Base.astro";
+import { FirewallPage } from "../../../views/firewall-page";
+import { copy, FIREWALL_LOCALES, type FirewallLocale } from "../../../firewall/locale";
+
+export function getStaticPaths() {
+  return FIREWALL_LOCALES.filter((locale) => locale !== "en" && locale !== "tr").map((locale) => ({ params: { locale } }));
+}
+
+const locale = Astro.params.locale as FirewallLocale;
+---
+<Base title={copy[locale].lab} description={copy[locale].description} lang={locale}><FirewallPage locale={locale} client:only="react" /></Base>

@@ -1,0 +1,17 @@
+# macOS yerel dosyalari
+.DS_Store
+
+# Yerel ortam degiskenleri; ornek dosyayi koru
+.env
+.env.*
+!.env.example
+
+# Ozel anahtar dosyalari
+*.pem
+*.key
+
+# Python sanal ortamlari ve onbellekleri
+.venv/
+venv/
+__pycache__/
+*.py[cod]

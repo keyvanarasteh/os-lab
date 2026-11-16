@@ -1,0 +1,5 @@
+---
+import Base from "../layouts/Base.astro";
+import HealthPage from "../views/health-page";
+---
+<Base title="Health check" description="Is the lab engine running, what needs attention on this computer, and what os-lab supports on Windows, macOS and Linux"><HealthPage client:only="react" /></Base>

@@ -1,0 +1,7 @@
+# Lab dosyaları Linux'ta çalışır, Windows'ta da LF satır sonuyla kalmalıdır.
+lab/*.sh text eol=lf
+lab/*.py text eol=lf
+lab/*.txt text eol=lf
+lab/sonuclar/* text eol=lf
+waf/*.sh text eol=lf
+waf/*.conf text eol=lf

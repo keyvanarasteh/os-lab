@@ -1,0 +1,255 @@
+# no|kaynak|hedef|proto|port|beklenen|gercek|karar_veren_kural|durum|aciklama
+G1-01|10.4.128.100|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Öğrenci (Yurt 1) LMS'e ulaşır
+G1-02|10.4.144.100|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Öğrenci (Yurt 2) LMS'e ulaşır
+G1-03|10.4.160.100|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Öğrenci (Kütüphane) LMS'e ulaşır
+G1-04|10.4.176.100|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Öğrenci (Mühendislik) LMS'e ulaşır
+G1-05|10.4.192.100|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Öğrenci (Fen-Edebiyat) LMS'e ulaşır
+G1-06|10.4.208.100|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Öğrenci (İİBF) LMS'e ulaşır
+G1-07|10.4.224.100|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Öğrenci (Yemekhane) LMS'e ulaşır
+G1-08|10.4.240.100|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Öğrenci (Açık alan) LMS'e ulaşır
+G1-09|10.4.128.100|198.51.100.10|tcp|443|izin|izin|ank:5|Geçti|Öğrenci (Yurt 1) HTTPS ile internete çıkar
+G1-10|10.4.128.100|198.51.100.10|tcp|80|izin|izin|ank:5|Geçti|Öğrenci (Yurt 1) HTTP ile internete çıkar
+G1-11|10.4.176.100|198.51.100.10|tcp|443|izin|izin|ank:5|Geçti|Öğrenci (Mühendislik) HTTPS ile internete çıkar
+G1-12|10.4.240.100|198.51.100.10|tcp|80|izin|izin|ank:5|Geçti|Öğrenci (Açık alan) HTTP ile internete çıkar
+G1-13|10.4.128.100|10.1.60.31|tcp|443|red|red|ank:4|Geçti|Öğrenci ERP'ye ulaşamaz
+G1-14|10.4.128.100|10.4.10.1|tcp|443|red|red|ank:O3|Geçti|Öğrenci kampüs ağ cihazı yönetimine ulaşamaz
+G1-15|10.4.128.100|10.1.10.1|tcp|22|red|red|ank:O3|Geçti|Öğrenci merkez ağ cihazı yönetimine ulaşamaz
+G1-16|10.4.128.100|10.2.60.20|tcp|443|red|red|ank:4|Geçti|Öğrenci İzmir'in özel ağına ulaşamaz
+G1-17|10.4.128.100|10.3.60.20|tcp|443|red|red|ank:4|Geçti|Öğrenci Amsterdam'ın özel ağına ulaşamaz
+G1-18|10.4.128.100|10.4.60.31|tcp|443|red|red|ank:4|Geçti|Öğrenci öğrenci bilgi sistemine ulaşamaz
+G1-19|10.4.128.100|10.4.63.30|tcp|5432|red|red|ank:4|Geçti|Öğrenci LMS veritabanına ulaşamaz
+G1-20|10.4.128.100|10.4.70.11|tcp|8080|red|red|ank:4|Geçti|Öğrenci WAF'ı atlayıp LMS uygulamasına ulaşamaz
+G1-21|10.4.128.100|10.4.80.20|tcp|631|red|red|ank:4|Geçti|Öğrenci yazıcıya ulaşamaz
+G1-22|10.4.128.100|10.4.192.100|tcp|445|red|red|ank:4|Geçti|Öğrenci başka binadaki öğrenciye ulaşamaz
+G1-23|10.4.128.100|198.51.100.10|tcp|6881|red|red|ank:O7|Geçti|Öğrenci internete yalnızca web portlarıyla çıkar (TCP 6881)
+G1-24|10.4.128.100|198.51.100.10|udp|6881|red|red|ank:O7|Geçti|Öğrenci internete yalnızca web portlarıyla çıkar (UDP 6881)
+G1-25|10.4.128.100|198.51.100.10|udp|443|red|red|ank:O7|Geçti|Öğrenci QUIC kullanamaz, tarayıcı TCP 443'e döner
+G1-26|10.4.128.100|198.51.100.10|tcp|22|red|red|ank:O7|Geçti|Öğrenci internete SSH yapamaz
+G1-27|10.4.128.100|198.51.100.10|udp|53|red|red|ank:O7|Geçti|Öğrenci dış DNS kullanamaz, şube DNS'ini kullanır
+G2-01|10.1.85.10|198.51.100.10|tcp|443|izin|izin|ist:14|Geçti|İstanbul misafiri internete çıkar
+G2-02|10.2.85.10|198.51.100.10|tcp|443|izin|izin|izm:11|Geçti|İzmir misafiri internete çıkar
+G2-03|10.3.85.10|198.51.100.10|tcp|80|izin|izin|ams:10|Geçti|Amsterdam misafiri internete çıkar
+G2-04|10.4.85.10|198.51.100.10|tcp|443|izin|izin|ank:18|Geçti|Ankara misafiri internete çıkar
+G2-05|10.4.85.10|198.51.100.10|udp|53|izin|izin|ank:18|Geçti|Misafir dış DNS kullanır
+G2-06|10.1.85.10|10.1.60.31|tcp|443|red|red|ist:O7|Geçti|İstanbul misafiri ERP'ye ulaşamaz
+G2-07|10.1.85.10|10.1.20.10|tcp|445|red|red|ist:O7|Geçti|İstanbul misafiri personel ağına ulaşamaz
+G2-08|10.2.85.10|10.2.60.20|tcp|443|red|red|izm:O7|Geçti|İzmir misafiri Ar-Ge verisine ulaşamaz
+G2-09|10.3.85.10|10.3.20.1|tcp|443|red|red|ams:O7|Geçti|Amsterdam misafiri personel ağına ulaşamaz
+G2-10|10.3.85.10|10.3.60.20|tcp|443|red|red|ams:O7|Geçti|Amsterdam misafiri müşteri verisine ulaşamaz
+G2-11|10.4.85.10|10.4.60.31|tcp|443|red|red|ank:4|Geçti|Ankara misafiri öğrenci bilgi sistemine ulaşamaz
+G2-12|10.4.85.10|10.1.60.31|tcp|443|red|red|ank:4|Geçti|Ankara misafiri tünelden ERP'ye ulaşamaz
+G2-13|10.4.85.10|10.4.70.10|tcp|443|red|red|ank:4|Geçti|Misafir LMS'i iç adresten kullanamaz
+G2-14|10.1.85.10|10.1.10.1|tcp|443|red|red|ist:O3|Geçti|Misafir ağ cihazı yönetimine ulaşamaz
+G3-01|10.1.40.10|10.1.64.40|tcp|3128|izin|izin|ist:8|Geçti|İstanbul Ar-Ge proxy'ye ulaşır
+G3-02|10.2.40.10|10.2.64.10|tcp|3128|izin|izin|izm:2|Geçti|İzmir Ar-Ge proxy'ye ulaşır
+G3-03|10.4.40.10|10.4.64.10|tcp|3128|izin|izin|ank:11|Geçti|Ankara Ar-Ge proxy'ye ulaşır
+G3-04|10.1.40.10|198.51.100.10|tcp|443|reject|reject|ist:10|Geçti|İstanbul Ar-Ge doğrudan internete çıkamaz, hemen hata alır
+G3-05|10.2.40.10|198.51.100.10|tcp|443|reject|reject|izm:4|Geçti|İzmir Ar-Ge doğrudan internete çıkamaz, hemen hata alır
+G3-06|10.4.40.10|198.51.100.10|tcp|443|reject|reject|ank:13|Geçti|Ankara Ar-Ge doğrudan internete çıkamaz, hemen hata alır
+G3-07|10.2.40.10|198.51.100.10|tcp|22|reject|reject|izm:4|Geçti|Ar-Ge başka portla da doğrudan çıkamaz
+G3-08|10.1.64.40|198.51.100.10|tcp|443|izin|izin|ist:9|Geçti|İstanbul proxy'si internete çıkar
+G3-09|10.2.64.10|198.51.100.10|tcp|80|izin|izin|izm:3|Geçti|İzmir proxy'si internete çıkar
+G3-10|10.4.64.10|198.51.100.10|tcp|443|izin|izin|ank:12|Geçti|Ankara proxy'si internete çıkar
+G3-11|10.2.40.10|10.2.60.20|tcp|443|izin|izin|izm:1|Geçti|Ar-Ge kendi verisine ulaşır
+G3-12|10.2.20.10|10.2.60.20|tcp|443|red|red|izm:O7|Geçti|Personel Ar-Ge verisine ulaşamaz
+G4-01|10.1.200.10|10.1.60.31|tcp|443|izin|izin|ist:20|Geçti|Personel VPN'i ERP'ye ulaşır
+G4-02|10.1.200.10|10.1.60.32|tcp|443|red|red|ist:O7|Geçti|Personel VPN'i Git'e ulaşamaz
+G4-03|10.1.200.10|10.1.61.5|tcp|22|red|red|ist:O7|Geçti|Personel VPN'i bastion'a ulaşamaz
+G4-04|10.1.200.10|10.4.60.31|tcp|443|red|red|ist:O7|Geçti|Personel VPN'i öğrenci bilgi sistemine ulaşamaz
+G4-05|10.1.204.10|10.1.60.32|tcp|22|izin|izin|ist:21|Geçti|Geliştirici VPN'i Git'e SSH ile ulaşır
+G4-06|10.1.204.10|10.1.60.32|tcp|443|izin|izin|ist:21|Geçti|Geliştirici VPN'i Git'e HTTPS ile ulaşır
+G4-07|10.1.204.10|10.1.60.31|tcp|443|red|red|ist:O7|Geçti|Geliştirici VPN'i ERP'ye ulaşamaz
+G4-08|10.1.204.10|10.1.63.31|tcp|5432|red|red|ist:O7|Geçti|Geliştirici VPN'i veritabanına ulaşamaz
+G4-09|10.1.208.10|10.4.60.31|tcp|443|izin|izin|ank:23 ist:22|Geçti|Hoca VPN'i öğrenci bilgi sistemine iki güvenlik duvarından geçerek ulaşır
+G4-10|10.1.208.10|10.1.60.31|tcp|443|red|red|ist:O7|Geçti|Hoca VPN'i ERP'ye ulaşamaz
+G4-11|10.1.208.10|10.4.63.30|tcp|5432|red|red|ist:O7|Geçti|Hoca VPN'i LMS veritabanına ulaşamaz
+G4-12|10.1.205.10|10.1.61.5|tcp|22|izin|izin|ist:23|Geçti|Yönetici VPN'i bastion'a ulaşır
+G4-13|10.1.205.10|10.1.60.31|tcp|443|red|red|ist:O7|Geçti|Yönetici VPN'i ERP'ye doğrudan ulaşamaz
+G4-14|198.51.100.10|203.0.113.1|udp|4500|izin|izin|ist:19|Geçti|Çalışan internetten VPN'e bağlanır
+G5-01|10.1.205.10|10.1.10.1|tcp|443|red|red|ist:O3|Geçti|Yönetici VPN'i cihaza doğrudan bağlanamaz
+G5-02|10.1.61.5|10.1.10.1|tcp|443|izin|izin|ist:O1|Geçti|Bastion İstanbul cihazına ulaşır
+G5-03|10.1.61.5|10.2.10.1|tcp|22|izin|izin|ist:O1 izm:O1|Geçti|Bastion İzmir cihazına tünelden ulaşır
+G5-04|10.1.61.5|10.3.10.1|tcp|443|izin|izin|ams:O1 ist:O1|Geçti|Bastion Amsterdam cihazına tünelden ulaşır
+G5-05|10.1.61.5|10.4.10.1|tcp|22|izin|izin|ank:O1 ist:O1|Geçti|Bastion Ankara cihazına tünelden ulaşır
+G5-06|10.1.61.20|10.1.10.1|udp|161|izin|izin|ist:O2|Geçti|Zabbix İstanbul cihazını okur
+G5-07|10.1.61.20|10.2.10.1|udp|161|izin|izin|ist:O2 izm:O2|Geçti|Zabbix İzmir cihazını okur
+G5-08|10.1.61.20|10.3.10.1|udp|161|izin|izin|ams:O2 ist:O2|Geçti|Zabbix Amsterdam cihazını okur
+G5-09|10.1.61.20|10.4.10.1|udp|161|izin|izin|ank:O2 ist:O2|Geçti|Zabbix Ankara cihazını okur
+G5-10|10.1.20.10|10.1.10.1|tcp|443|red|red|ist:O3|Geçti|Personel cihaz yönetimine ulaşamaz
+G5-11|10.1.50.10|10.1.10.1|tcp|22|red|red|ist:O3|Geçti|Teknik ekip cihaza da doğrudan bağlanamaz, bastion kullanır
+G5-12|10.1.50.10|10.1.61.5|tcp|22|izin|izin|ist:28|Geçti|Teknik ekip bastion'a ulaşır
+G5-13|10.1.20.10|10.4.10.1|tcp|443|red|red|ist:O3|Geçti|Personel başka şubenin cihazına ulaşamaz
+G5-14|10.2.20.10|10.2.10.1|tcp|443|red|red|izm:O3|Geçti|İzmir personeli cihaz yönetimine ulaşamaz
+G5-15|10.3.85.10|10.3.10.1|tcp|443|red|red|ams:O3|Geçti|Amsterdam misafiri cihaz yönetimine ulaşamaz
+G5-16|198.51.100.10|203.0.113.1|tcp|22|red|red|ist:O7|Geçti|İnternetten WAN adresine SSH kapalı
+G5-17|198.51.100.10|203.0.113.4|tcp|3389|red|red|ank:O7|Geçti|İnternetten WAN adresine RDP kapalı
+G5-18|10.2.10.1|10.1.61.6|tcp|541|red|red|izm:O7|Geçti|Yönetim ağındaki sıradan cihaz FortiManager'a bağlanamaz, yalnızca güvenlik duvarı bağlanır
+G5-19|172.31.2.2|10.1.61.6|tcp|541|izin|izin|ist:30|Geçti|İzmir güvenlik duvarı FortiManager'a tünelden bağlanır
+G5-20|172.31.3.2|10.1.61.6|tcp|541|izin|izin|ist:30|Geçti|Amsterdam güvenlik duvarı FortiManager'a tünelden bağlanır
+G5-21|172.31.4.2|10.1.61.6|tcp|541|izin|izin|ist:30|Geçti|Ankara güvenlik duvarı FortiManager'a tünelden bağlanır
+G5-22|10.1.20.10|10.1.61.6|tcp|443|red|red|ist:O7|Geçti|Personel FortiManager panelini göremez
+G5-23|10.1.50.10|10.1.61.10|tcp|443|izin|izin|ist:29|Geçti|Teknik ekip ve SOC Wazuh paneline ulaşır
+G5-24|10.1.50.10|10.1.61.21|tcp|443|izin|izin|ist:29|Geçti|Teknik ekip ve SOC GLPI'a ulaşır
+G5-25|10.1.50.10|10.1.61.10|tcp|22|red|red|ist:O7|Geçti|Teknik ekip Wazuh'a doğrudan SSH yapamaz, bastion kullanır
+G5-26|10.1.20.10|10.1.61.10|tcp|443|red|red|ist:O7|Geçti|Personel Wazuh paneline ulaşamaz
+G6-01|198.51.100.10|203.0.113.1|tcp|443|izin|izin|ist:1|Geçti|İnternet kurumsal siteye WAF üzerinden ulaşır
+G6-02|198.51.100.10|203.0.113.4|tcp|443|izin|izin|ank:1|Geçti|İnternet LMS'e WAF üzerinden ulaşır
+G6-03|198.51.100.10|10.1.70.11|tcp|8080|red|red|ist:O7|Geçti|İnternet web uygulamasına doğrudan ulaşamaz
+G6-04|198.51.100.10|10.4.70.11|tcp|8080|red|red|ank:O7|Geçti|İnternet LMS uygulamasına doğrudan ulaşamaz
+G6-05|198.51.100.10|10.1.63.30|tcp|5432|red|red|ist:O7|Geçti|İnternet web veritabanına ulaşamaz
+G6-06|198.51.100.10|10.4.63.30|tcp|5432|red|red|ank:O7|Geçti|İnternet LMS veritabanına ulaşamaz
+G6-07|198.51.100.10|10.1.60.31|tcp|443|red|red|ist:O7|Geçti|İnternet ERP'ye ulaşamaz
+G6-08|198.51.100.10|10.2.60.20|tcp|443|red|red|izm:O7|Geçti|İnternet Ar-Ge verisine ulaşamaz
+G6-09|198.51.100.10|203.0.113.2|tcp|443|red|red|izm:O7|Geçti|İzmir'in internete açık servisi yoktur
+G6-10|198.51.100.10|203.0.113.3|tcp|443|red|red|ams:O7|Geçti|Amsterdam'ın internete açık servisi yoktur
+G6-11|10.1.70.11|10.1.63.30|tcp|5432|izin|izin|ist:2|Geçti|Web uygulaması kendi veritabanına ulaşır
+G6-12|10.4.70.11|10.4.63.30|tcp|5432|izin|izin|ank:2|Geçti|LMS kendi veritabanına ulaşır
+G6-13|10.1.70.11|10.1.63.31|tcp|5432|red|red|ist:O7|Geçti|Web uygulaması ERP veritabanına ulaşamaz
+G6-14|10.1.70.11|10.1.60.31|tcp|443|red|red|ist:O7|Geçti|DMZ ERP'ye ulaşamaz
+G6-15|10.4.70.11|10.4.60.31|tcp|443|red|red|ank:O7|Geçti|DMZ öğrenci bilgi sistemine ulaşamaz
+G6-16|10.1.70.12|198.51.100.10|tcp|443|red|red|ist:O7|Geçti|WAF internete doğrudan çıkamaz
+G6-17|10.1.70.11|10.1.64.40|tcp|3128|izin|izin|ist:16|Geçti|DMZ güncellemeyi proxy'den alır
+G6-18|10.4.70.12|10.4.64.10|tcp|3128|izin|izin|ank:20|Geçti|Ankara DMZ güncellemeyi proxy'den alır
+G7-01|10.2.20.10|10.1.60.31|tcp|443|izin|izin|ist:4 izm:5|Geçti|İzmir personeli ERP'ye ulaşır
+G7-02|10.3.20.10|10.1.60.31|tcp|443|izin|izin|ams:5 ist:4|Geçti|Amsterdam personeli ERP'ye ulaşır
+G7-03|10.4.20.10|10.1.60.31|tcp|443|izin|izin|ank:8 ist:4|Geçti|Ankara personeli ERP'ye ulaşır
+G7-04|10.2.30.10|10.1.60.32|tcp|443|izin|izin|ist:6 izm:6|Geçti|İzmir yazılımcısı Git'e ulaşır
+G7-05|10.3.30.10|10.1.60.32|tcp|22|izin|izin|ams:6 ist:6|Geçti|Amsterdam yazılımcısı Git'e ulaşır
+G7-06|10.4.30.10|10.1.60.32|tcp|443|izin|izin|ank:14 ist:6|Geçti|Ankara yazılımcısı Git'e ulaşır
+G7-07|10.2.20.10|10.1.60.32|tcp|443|red|red|izm:O7|Geçti|Şube personeli Git'e ulaşamaz
+G7-08|10.2.30.10|10.1.60.31|tcp|443|red|red|izm:O7|Geçti|Şube yazılımcısı ERP'ye ulaşamaz
+G7-09|10.4.20.10|10.2.20.10|tcp|443|red|red|ank:O7|Geçti|Şubeden şubeye doğrudan geçilemez
+G7-10|10.2.30.10|10.3.30.10|tcp|22|red|red|izm:O7|Geçti|Şubeden şubeye doğrudan geçilemez
+G7-11|10.1.60.31|10.4.20.10|tcp|443|red|red|ist:O7|Geçti|ERP şubedeki personele bağlantı başlatamaz, yalnızca yanıt verir
+G7-12|10.2.60.20|10.1.61.20|tcp|10051|izin|izin|ist:17 izm:13|Geçti|İzmir sunucusu izleme verisini gönderir
+G7-13|10.2.64.10|10.1.61.20|tcp|10051|izin|izin|ist:17 izm:13|Geçti|İzmir proxy'si izleme verisini gönderir
+G7-14|10.4.60.2|10.1.61.20|tcp|10051|izin|izin|ank:21 ist:17|Geçti|Ankara sunucusu izleme verisini gönderir
+G7-15|10.4.70.11|10.1.61.20|tcp|10051|izin|izin|ank:21 ist:17|Geçti|LMS izleme verisini gönderir
+G7-16|10.4.63.30|10.1.61.20|tcp|10051|izin|izin|ank:21 ist:17|Geçti|LMS veritabanı izleme verisini gönderir
+G7-17|10.2.20.10|10.1.61.20|tcp|10051|red|red|izm:O7|Geçti|Şube kullanıcısı izleme portuna ulaşamaz
+G7-18|203.0.113.2|203.0.113.1|udp|500|izin|izin|ist:18|Geçti|İzmir merkeze tünel kurar
+G7-19|203.0.113.3|203.0.113.1|udp|4500|izin|izin|ist:18|Geçti|Amsterdam merkeze tünel kurar
+G7-20|203.0.113.4|203.0.113.1|udp|500|izin|izin|ist:18|Geçti|Ankara merkeze tünel kurar
+G7-21|203.0.113.1|203.0.113.2|udp|500|izin|izin|izm:14|Geçti|Merkez İzmir'e tünel kurar
+G7-22|203.0.113.1|203.0.113.3|udp|4500|izin|izin|ams:13|Geçti|Merkez Amsterdam'a tünel kurar
+G7-23|203.0.113.1|203.0.113.4|udp|500|izin|izin|ank:22|Geçti|Merkez Ankara'ya tünel kurar
+G7-24|198.51.100.10|203.0.113.2|udp|500|red|red|izm:O7|Geçti|Yabancı adres İzmir'e tünel kuramaz
+G7-25|198.51.100.10|203.0.113.4|udp|4500|red|red|ank:O7|Geçti|Yabancı adres Ankara'ya tünel kuramaz
+G7-26|10.4.10.1|10.4.60.3|udp|1812|izin|izin|ank:25|Geçti|Kampüs erişim noktası 802.1X için RADIUS'a ulaşır
+G7-27|10.4.60.3|10.1.60.3|tcp|636|izin|izin|ank:26 ist:32|Geçti|Kampüs RADIUS'u merkez dizine ulaşır
+G7-28|10.4.128.100|10.4.60.3|udp|1812|red|red|ank:4|Geçti|Öğrenci RADIUS sunucusuna ulaşamaz
+G8-01|10.1.20.10|10.1.60.2|udp|67|izin|izin|ist:O4|Geçti|İstanbul personeli DHCP alır
+G8-02|10.1.20.10|10.1.60.2|udp|53|izin|izin|ist:O4|Geçti|İstanbul personeli DNS kullanır
+G8-03|10.1.20.10|10.1.60.2|tcp|53|izin|izin|ist:O4|Geçti|İstanbul personeli büyük DNS yanıtlarını alır
+G8-04|10.1.20.10|10.1.60.2|udp|123|izin|izin|ist:O4|Geçti|İstanbul personeli NTP kullanır
+G8-05|10.2.40.10|10.2.60.2|udp|67|izin|izin|izm:O4|Geçti|Ar-Ge DHCP alır
+G8-06|10.2.40.10|10.2.60.2|udp|53|izin|izin|izm:O4|Geçti|Ar-Ge şube DNS'ini kullanır
+G8-07|10.3.80.10|10.3.60.2|udp|67|izin|izin|ams:O4|Geçti|Kamera DHCP alır
+G8-08|10.3.20.10|10.3.60.2|udp|123|izin|izin|ams:O4|Geçti|Amsterdam personeli NTP kullanır
+G8-09|10.4.128.100|10.4.60.2|udp|67|izin|izin|ank:O4|Geçti|Öğrenci (Yurt 1) DHCP alır, öğrenci reddine takılmaz
+G8-10|10.4.240.100|10.4.60.2|udp|67|izin|izin|ank:O4|Geçti|Öğrenci (Açık alan) DHCP alır, öğrenci reddine takılmaz
+G8-11|10.4.128.100|10.4.60.2|udp|53|izin|izin|ank:O4|Geçti|Öğrenci şube DNS'ini kullanır
+G8-12|10.4.128.100|10.4.60.2|udp|123|izin|izin|ank:O4|Geçti|Öğrenci NTP kullanır
+G8-13|10.1.85.10|10.1.60.2|udp|67|izin|izin|ist:O4|Geçti|İstanbul misafiri DHCP alır
+G8-14|10.2.85.10|10.2.60.2|udp|67|izin|izin|izm:O4|Geçti|İzmir misafiri DHCP alır
+G8-15|10.4.85.10|10.4.60.2|udp|67|izin|izin|ank:O4|Geçti|Ankara misafiri DHCP alır
+G8-16|10.1.85.10|10.1.60.2|udp|53|red|red|ist:O4|Geçti|İstanbul misafiri iç DNS'i kullanamaz
+G8-17|10.4.85.10|10.4.60.2|udp|53|red|red|ank:O4|Geçti|Ankara misafiri iç DNS'i kullanamaz
+G8-18|10.1.200.10|10.1.60.2|udp|53|izin|izin|ist:O4|Geçti|VPN kullanıcısı iç adları çözer
+G8-19|10.1.60.2|198.51.100.10|tcp|53|izin|izin|ist:O6|Geçti|Şube DNS sunucusu dış adres çözer
+G8-20|10.2.60.2|198.51.100.10|udp|123|izin|izin|izm:O6|Geçti|Şube NTP sunucusu dışarıdan saat alır
+G8-21|10.3.60.2|198.51.100.10|udp|53|izin|izin|ams:O6|Geçti|Amsterdam DNS sunucusu dış adres çözer
+G8-22|10.4.60.2|198.51.100.10|udp|123|izin|izin|ank:O6|Geçti|Ankara NTP sunucusu dışarıdan saat alır
+G9-01|10.1.80.10|198.51.100.10|tcp|443|red|red|ist:O7|Geçti|İstanbul IoT internete çıkamaz
+G9-02|10.2.80.10|198.51.100.10|tcp|443|red|red|izm:O7|Geçti|İzmir IoT internete çıkamaz
+G9-03|10.3.80.10|198.51.100.10|tcp|80|red|red|ams:O7|Geçti|Amsterdam IoT internete çıkamaz
+G9-04|10.4.80.10|198.51.100.10|tcp|443|red|red|ank:O7|Geçti|Ankara IoT internete çıkamaz
+G9-05|10.1.80.10|10.1.60.31|tcp|443|red|red|ist:O7|Geçti|Kamera ERP'ye ulaşamaz
+G9-06|10.1.20.10|198.51.100.10|tcp|25|red|red|ist:O7|Geçti|Personel doğrudan SMTP yapamaz
+G9-07|10.1.20.10|10.1.60.31|tcp|3389|red|red|ist:O7|Geçti|Personel sunucuya RDP yapamaz
+G9-08|10.2.20.10|198.51.100.10|tcp|22|red|red|izm:O7|Geçti|İzmir personeli internete SSH yapamaz
+G9-09|10.3.20.10|198.51.100.10|tcp|22|red|red|ams:O7|Geçti|Amsterdam personeli internete SSH yapamaz
+G9-10|10.4.88.10|198.51.100.10|tcp|22|red|red|ank:O7|Geçti|Hoca internete SSH yapamaz
+G9-11|10.1.30.10|198.51.100.10|tcp|22|red|red|ist:O7|Geçti|Yazılımcı onaysız adrese SSH yapamaz
+G9-12|10.1.30.10|198.51.100.20|tcp|22|izin|izin|ist:12|Geçti|Yazılımcı onaylı Git adresine SSH yapar
+G9-13|10.2.30.10|198.51.100.21|tcp|22|izin|izin|izm:9|Geçti|İzmir yazılımcısı onaylı Git adresine SSH yapar
+G9-14|10.1.30.10|198.51.100.20|tcp|8080|red|red|ist:O7|Geçti|Onaylı adrese başka port kapalı
+G9-15|10.1.20.10|10.1.80.20|tcp|631|izin|izin|ist:15|Geçti|Personel yazıcıya baskı gönderir
+G9-16|10.1.20.10|198.51.100.10|tcp|443|izin|izin|ist:11|Geçti|Personel internete çıkar
+G9-17|10.4.88.10|10.1.60.31|tcp|443|red|red|ank:O7|Geçti|Hoca ERP'ye ulaşamaz
+G9-18|10.4.110.10|10.4.60.31|tcp|443|red|red|ank:O7|Geçti|Laboratuvar öğrenci bilgi sistemine ulaşamaz
+G9-19|10.4.110.10|10.4.60.40|tcp|445|izin|izin|ank:9|Geçti|Laboratuvar dosya sunucusuna ulaşır
+G9-20|10.4.110.10|198.51.100.10|tcp|443|izin|izin|ank:10|Geçti|Laboratuvar internete çıkar
+G9-21|10.4.88.10|10.4.60.31|tcp|443|izin|izin|ank:6|Geçti|Hoca not girer
+G9-22|10.4.20.10|10.4.60.31|tcp|443|izin|izin|ank:7|Geçti|Personel öğrenci işlemi yapar
+G9-23|10.4.88.10|10.4.80.20|tcp|9100|izin|izin|ank:19|Geçti|Hoca yazıcıya baskı gönderir
+G10-01|10.3.60.20|10.1.60.31|tcp|443|red|red|ams:3|Geçti|CRM İstanbul'a veri gönderemez
+G10-02|10.3.60.20|10.1.61.20|tcp|10051|red|red|ams:3|Geçti|Amsterdam sunucuları merkezî izleme akışına girmez
+G10-03|10.3.60.10|10.1.61.10|tcp|6514|red|red|ams:3|Geçti|Amsterdam logu Türkiye'ye gitmez
+G10-04|10.3.10.1|10.1.61.10|tcp|6514|red|red|ams:O7|Geçti|Amsterdam cihaz logu da Türkiye'ye gitmez
+G10-05|10.3.10.1|10.3.60.10|tcp|6514|izin|izin|ams:O5|Geçti|Amsterdam cihaz logu yerel toplayıcıya gider
+G10-06|172.31.3.1|10.3.60.20|tcp|443|red|red|ams:4|Geçti|Merkez tünelden CRM'e ulaşamaz
+G10-07|10.1.50.10|10.3.60.20|tcp|443|red|red|ist:O7|Geçti|İstanbul teknik ekibi müşteri verisine ulaşamaz
+G10-08|10.3.20.10|10.3.60.20|tcp|443|izin|izin|ams:1|Geçti|Amsterdam personeli CRM'e ulaşır
+G10-09|10.3.50.10|10.3.60.20|tcp|22|izin|izin|ams:2|Geçti|Yerel teknik ekip sunucuyu yönetir
+G10-10|10.3.60.20|198.51.100.10|tcp|443|red|red|ams:O7|Geçti|CRM onaysız siteye çıkamaz
+G10-11|10.3.60.20|198.51.100.30|tcp|443|izin|izin|ams:12|Geçti|Sunucu onaylı adresten güncelleme alır
+G10-12|10.3.60.20|198.51.100.30|tcp|22|red|red|ams:O7|Geçti|Onaylı adrese başka port kapalı
+G11-01|10.1.64.40|10.1.60.31|tcp|443|red|red|ist:O7|Geçti|Proxy ERP'ye ulaşamaz
+G11-02|10.1.64.40|10.1.61.5|tcp|22|red|red|ist:O7|Geçti|Proxy bastion'a ulaşamaz
+G11-03|10.1.64.50|10.1.63.31|tcp|5432|red|red|ist:O7|Geçti|Kamera kayıt sunucusu veritabanına ulaşamaz
+G11-04|10.1.60.31|10.1.63.31|tcp|5432|izin|izin|ist:24|Geçti|ERP kendi veritabanına ulaşır
+G11-05|10.1.60.31|10.1.63.30|tcp|5432|red|red|ist:O7|Geçti|ERP web veritabanına ulaşamaz
+G11-06|10.1.60.32|10.1.63.31|tcp|5432|red|red|ist:O7|Geçti|Git ERP veritabanına ulaşamaz
+G11-07|10.1.60.31|10.1.61.5|tcp|22|red|red|ist:O7|Geçti|ERP bastion'a ulaşamaz
+G11-08|10.1.60.31|10.1.61.10|tcp|443|red|red|ist:O7|Geçti|ERP Wazuh paneline ulaşamaz
+G11-09|10.1.63.31|198.51.100.10|tcp|443|red|red|ist:O7|Geçti|Veritabanı internete çıkamaz
+G11-10|10.1.63.31|10.1.60.31|tcp|22|red|red|ist:O7|Geçti|Veritabanı ERP'ye bağlantı başlatamaz
+G11-11|10.1.60.31|10.1.64.40|tcp|3128|izin|izin|ist:25|Geçti|ERP güncellemeyi proxy'den alır
+G11-12|10.1.63.31|10.1.64.40|tcp|3128|izin|izin|ist:25|Geçti|Veritabanı güncellemeyi proxy'den alır
+G11-13|10.1.61.10|10.1.64.40|tcp|3128|izin|izin|ist:25|Geçti|Wazuh bildirimlerini proxy'den gönderir
+G11-14|10.1.61.5|10.1.60.31|tcp|22|izin|izin|ist:26|Geçti|Bastion ERP sunucusunu yönetir
+G11-15|10.1.61.5|10.1.70.11|tcp|22|izin|izin|ist:26|Geçti|Bastion DMZ sunucusunu yönetir
+G11-16|10.1.61.5|10.1.63.31|tcp|22|izin|izin|ist:27|Geçti|Bastion veritabanı sunucusunu yönetir
+G11-17|10.1.61.5|10.1.63.31|tcp|5432|red|red|ist:O7|Geçti|Bastion veritabanı portuna doğrudan bağlanamaz
+G11-18|10.1.50.10|10.1.63.31|tcp|22|red|red|ist:O7|Geçti|Teknik ekip veritabanına bastion'sız bağlanamaz
+G11-19|10.1.50.10|10.1.60.31|tcp|3389|izin|izin|ist:7|Geçti|Teknik ekip sunucuya RDP yapar
+G11-20|10.1.80.10|10.1.64.50|tcp|554|izin|izin|ist:13|Geçti|Kamera kayıt sunucusuna ulaşır
+G11-21|10.1.80.10|10.1.64.40|tcp|3128|red|red|ist:O7|Geçti|Kamera proxy'ye ulaşamaz
+G11-22|10.4.63.30|10.4.60.31|tcp|443|red|red|ank:O7|Geçti|LMS veritabanı öğrenci bilgi sistemine ulaşamaz
+G11-23|10.4.60.31|10.4.63.30|tcp|5432|red|red|ank:O7|Geçti|Öğrenci bilgi sistemi LMS veritabanına ulaşamaz
+G11-24|10.4.64.10|10.4.60.31|tcp|443|red|red|ank:O7|Geçti|Ankara proxy'si öğrenci bilgi sistemine ulaşamaz
+G11-25|10.4.60.31|10.4.64.10|tcp|3128|izin|izin|ank:24|Geçti|Öğrenci bilgi sistemi güncellemeyi proxy'den alır
+G11-26|10.4.50.10|10.4.63.30|tcp|22|izin|izin|ank:27|Geçti|Kampüs teknik ekibi veritabanı sunucusunu yönetir
+G11-27|10.4.50.10|10.4.63.30|tcp|5432|red|red|ank:O7|Geçti|Teknik ekip veritabanı portuna doğrudan bağlanamaz
+G11-28|10.2.64.10|10.2.60.20|tcp|443|red|red|izm:O7|Geçti|İzmir proxy'si Ar-Ge verisine ulaşamaz
+G11-29|10.2.60.20|10.2.64.10|tcp|3128|izin|izin|izm:15|Geçti|Ar-Ge sunucusu güncellemeyi proxy'den alır
+G11-30|10.3.64.50|10.3.60.20|tcp|443|red|red|ams:O7|Geçti|Amsterdam kamera kayıt sunucusu CRM'e ulaşamaz
+G11-31|10.3.64.50|10.3.60.10|tcp|6514|izin|izin|ams:O5|Geçti|Amsterdam kamera kayıt logu yerel toplayıcıya gider
+G12-01|10.1.70.12|10.1.61.10|tcp|6514|izin|izin|ist:O5|Geçti|İstanbul WAF logu Wazuh'a ulaşır
+G12-02|10.4.70.12|10.1.61.10|tcp|6514|izin|izin|ank:O5 ist:O5|Geçti|Ankara WAF logu Wazuh'a ulaşır
+G12-03|10.2.60.2|10.1.61.10|tcp|6514|izin|izin|ist:O5 izm:O5|Geçti|İzmir DHCP logu İstanbul'a ulaşır
+G12-04|10.4.60.2|10.1.61.10|tcp|6514|izin|izin|ank:O5 ist:O5|Geçti|Ankara DHCP logu İstanbul'a ulaşır
+G12-05|10.1.60.2|10.1.61.10|tcp|6514|izin|izin|ist:O5|Geçti|İstanbul DHCP logu Wazuh'a ulaşır
+G12-06|10.4.10.1|10.1.61.10|tcp|6514|izin|izin|ank:O5 ist:O5|Geçti|Ankara cihaz logu Wazuh'a ulaşır
+G12-07|10.2.10.1|10.1.61.10|tcp|6514|izin|izin|ist:O5 izm:O5|Geçti|İzmir cihaz logu Wazuh'a ulaşır
+G12-08|10.1.10.1|10.1.61.10|tcp|6514|izin|izin|ist:O5|Geçti|İstanbul cihaz logu Wazuh'a ulaşır
+G12-09|10.1.20.10|10.1.61.10|tcp|6514|red|red|ist:O7|Geçti|Kullanıcı ağları log toplayıcıya yazamaz
+G12-10|10.4.128.100|10.1.61.10|tcp|6514|red|red|ank:4|Geçti|Öğrenci log toplayıcıya yazamaz
+G13-01|10.1.20.10|10.1.60.31|tcp|443|izin|izin|ist:3|Geçti|İstanbul personeli ERP'ye ulaşır
+G13-02|10.1.30.10|10.1.60.32|tcp|22|izin|izin|ist:5|Geçti|İstanbul yazılımcısı Git'e ulaşır
+G13-03|10.1.61.5|10.1.60.3|tcp|636|izin|izin|ist:31|Geçti|Bastion kullanıcıyı dizinden doğrular
+G13-04|10.2.50.10|10.2.60.20|tcp|3389|izin|izin|izm:7|Geçti|İzmir teknik ekibi sunucuyu yönetir
+G13-05|10.2.20.10|198.51.100.10|tcp|443|izin|izin|izm:8|Geçti|İzmir personeli internete çıkar
+G13-06|10.2.80.10|10.2.64.50|tcp|554|izin|izin|izm:10|Geçti|İzmir kamerası kayıt sunucusuna ulaşır
+G13-07|10.2.40.10|10.2.80.20|tcp|9100|izin|izin|izm:12|Geçti|İzmir Ar-Ge yazıcıya baskı gönderir
+G13-08|10.3.20.10|198.51.100.10|tcp|443|izin|izin|ams:7|Geçti|Amsterdam personeli internete çıkar
+G13-09|10.3.30.10|198.51.100.20|tcp|22|izin|izin|ams:8|Geçti|Amsterdam yazılımcısı onaylı Git adresine SSH yapar
+G13-10|10.3.80.10|10.3.64.50|tcp|554|izin|izin|ams:9|Geçti|Amsterdam kamerası kayıt sunucusuna ulaşır
+G13-11|10.3.50.10|10.3.80.20|tcp|631|izin|izin|ams:11|Geçti|Amsterdam teknik ekibi yazıcıya baskı gönderir
+G13-12|10.4.50.10|10.4.70.11|tcp|22|izin|izin|ank:15|Geçti|Kampüs teknik ekibi DMZ sunucusunu yönetir
+G13-13|10.4.88.10|198.51.100.10|tcp|443|izin|izin|ank:16|Geçti|Hoca internete çıkar
+G13-14|10.4.80.10|10.4.64.50|tcp|554|izin|izin|ank:17|Geçti|Kampüs kamerası kayıt sunucusuna ulaşır
+G13-15|10.4.20.10|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Kampüs personeli LMS'e ulaşır
+G13-16|10.4.110.10|10.4.70.10|tcp|443|izin|izin|ank:3|Geçti|Laboratuvar LMS'e ulaşır
+G13-17|10.4.30.10|10.4.70.10|tcp|443|red|red|ank:O7|Geçti|LMS kullanmayan ağlar kampüs içinden WAF'a ulaşamaz

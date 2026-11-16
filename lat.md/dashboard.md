@@ -1,7 +1,8 @@
 # Dashboard
 
-The browser console: the host overview, every lab, and the Android Lab
-workbench, built from the qLar app shell (qLar PR #174).
+The browser console for the host, labs, and Android workbench.
+
+It is built from the qLar app shell (qLar PR #174).
 
 ## Architecture
 
@@ -9,13 +10,89 @@ A static Astro app in [[dashboard]] served by the Python console; there is no
 Node server at runtime.
 
 [[dashboard/src/shell/app-shell.tsx]] carries the sidebar (labs with their
-availability pills), Spotlight and theme ported from qLar. Pages are React
+availability pills), Spotlight and theme ported from qLar.
+[[dashboard/src/shell/lab-switcher.tsx]] is the ⌘L / Ctrl+L modal that sets the
+focused lab: a compact card per lab with its live availability, remembered in
+[[dashboard/src/shell/active-lab.ts]]. With a focus, the sidebar's OS Lab group
+keeps only that lab's entry (plus the firewall section); "All labs" in the
+switcher restores the full list, and Spotlight keeps every lab listed.
+Pages are React
 islands: [[dashboard/src/views/host-page.tsx]],
 [[dashboard/src/views/lab-page.tsx]], [[dashboard/src/views/jobs-page.tsx]],
 [[dashboard/src/views/contribute-page.tsx]] and
 the Android workbench in [[dashboard/src/views/android/pages.tsx]].
 [[dashboard/src/lib/api.ts]] is the typed client; it mirrors qLar's
 `shared/os-lab.ts` contract.
+
+## iOS Simulator panel
+
+When the iOS Lab is ready through the native-macos provider,
+[[dashboard/src/views/ios-simulator.tsx]] replaces the plain start/stop
+buttons with a device frame: a device picker, previewed attach/detach, a
+toggleable bezel and a live screen.
+
+The screen comes from the read-only `/api/labs/ios/simulator` and
+`/api/labs/ios/screenshot` endpoints. The panel still routes every state
+change through the previewed plan flow; the console validates the device
+against `xcrun simctl` (see [[ios-lab]]).
+
+## macOS app mirror
+
+When the macOS Lab is ready, [[dashboard/src/views/macos-app-mirror.tsx]]
+floats a draggable, resizable mirror of one real window on this Mac, fed by
+read-only endpoints under `/api/labs/macos/apps` (list, screenshot, stream,
+elements) and `/api/labs/macos/audit`.
+
+Mirror and hotspot clicks preview a `macos-click` action like any other;
+only while control mode is armed (an explicit toggle that disarms itself
+after ten minutes) do clicks land immediately through
+`/api/labs/macos/click`, which stays localhost-only like every other POST.
+The stream is multipart MJPEG with a poll fallback; the elements endpoint
+takes a `revision` query and powers a diff overlay. Right-click or
+long-press a hotspot for the input family (double, right, type, key —
+previewed `macos-input`, typing never sends Return), Deep inspect opens one
+armed-only mac2 session per app through `/api/labs/macos/session*` and
+routes hotspot actions through stable element ids, and the toolbar
+downloads the local audit log from `/api/labs/macos/audit.json`.
+
+The agent surface adds the native AX helper's values, focus and advertised
+actions to every hotspot (a priority trim, with the serving engine shown),
+a hotspot menu with set-value, advertised AX actions, scroll and paste,
+submit-class confirms for Enter and pastes even while armed, a persistent
+panic Stop, single-owner arming, and read-only windows/menu-bar/focused
+endpoints. `console/mcp_server.py` exposes the same guarded surface as a
+stdio MCP server — the model acts, the console guards, every step is
+audited. See [[ios-lab]] for permissions.
+
+
+## macOS engine panel
+
+[[dashboard/src/views/macos-engine-panel.tsx]] sits under the mirror and shows
+engine state, permissions, displays, element search and a live audit feed.
+
+It reads `/api/labs/macos/{capabilities,permissions,displays}` and searches
+one window through `…/apps/<id>/search`. The only write is Request access
+(`POST …/permission/request`), which fires the Accessibility dialog or opens
+a Privacy pane. The feed is an opt-in `EventSource` on `…/events` that closes
+when switched off, hidden or unmounted.
+
+## Windows Apps Lab panel
+
+On Windows hosts, `winapps` serves a read-only desktop mirror through
+`/api/labs/winapps/apps` and `/api/labs/winapps/apps/<hwnd>/screenshot`.
+
+The backend uses ctypes to enumerate visible, captioned top-level windows and
+captures one window with `PrintWindow(PW_RENDERFULLCONTENT)`. The panel shows
+the selected window at its own aspect ratio, its dimensions and an `Elevated`
+badge when the owning process is elevated; only the newest capture updates the
+view. It is mounted only locally, is separate from the WSL2-backed VM lifecycle,
+and does not offer input control.
+
+## UX readiness
+
+[[ux-readiness]] records the dashboard's action, endpoint, and navigation
+rules. The detailed implementation checklist is [[docs/UX_READINESS.md]].
+The feedback route is in [[dashboard/src/views/feedback-page.tsx]].
 
 ## Host engine
 
@@ -30,6 +107,24 @@ cancellation, and reports container state. Privileged setup runs through
 pkexec when a graphical agent exists; otherwise the plan returns a `sudo`
 command to run in a terminal.
 
+The Source Lab evidence/report readers in
+[[console/source_artifacts.py]] reuse the console's localhost Host guard without
+starting analyses or changing state. Additional [[console/source_api.py]] handlers
+use the shared preview and jobs service for explicit actions. Source readiness
+runs natively through Python, and public Source routes show information without
+polling a local engine. See [[source-lab#Console operations]].
+
+## Web Lab console
+
+[[console/web_api.py]] reports Web Lab readiness, starts and stops the engine
+process, and proxies the engine's `/api/web/*` JSON under the same Host guard.
+`console/oslab.py` registers the lab with the `native-rust` provider.
+
+The local workbench route (`/web-lab/`,
+[[dashboard/src/views/web-lab/pages.tsx]]) opens windows, manages injections,
+runs eval and tails the engine's event log; it is console-only and never
+appears on public Pages.
+
 ## Serving and builds
 
 [[android-lab/lab/web_ui.py]] serves the newest of `dashboard/build` (local)
@@ -40,3 +135,97 @@ without Node use the committed `dashboard/dist`. Every POST must carry
 `X-OSLab: 1` and every request a localhost `Host`, so other sites cannot drive
 the lab. Lab starts require the token returned by the plan preview. See
 [[tooling#Local test runner]] for the build freshness check.
+
+## Source navigation
+
+Cleanup Lab navigation splits into the compact Dashboard (Quick clean, Clean
+and monitor stats) and a Settings tab, with the detail tabs keeping their
+routes ([[dashboard/src/views/cleanup/pages.tsx]]).
+
+Settings hosts bookmarks, permissions, the monitor configuration, widgets and
+the tools hub. The public route explains that the engine is local, while the
+local app uses typed cleanup jobs and a confirm step.
+
+[[dashboard/src/views/source/pages.tsx]] provides localized Source Lab routes and
+uses the existing shell for mobile navigation and themes. The sidebar and
+Spotlight include Source destinations; record search reads private file-backed
+results only while the local palette is open.
+
+Public Source pages are informational, make no engine requests, and preserve
+locale/base/query links. Missing private artifacts/providers say so explicitly.
+
+[[dashboard/src/views/source/overview.tsx]] renders file-backed Overview matrices,
+inspector notes, filters, CSV/JSON links and operator source catalogs.
+[[console/source_overview.py]] adapts raw and flattened crawler manifests and
+per-package dependency sections without importing private datasets.
+
+[[dashboard/src/views/source/crawler.tsx]] validates selected source lists or
+repository slugs, workers/depth and crawler options. Live Source readiness and
+Git gate actions; previews invalidate on edits. Runs use the existing jobs API
+for output, cancellation and conflicts. No progress percentage is invented.
+
+[[dashboard/src/views/source/evidence.tsx]] exposes findings, coverage, H1-H5
+scorecards, sessions/events and report links. Detection uses the shared
+[[dashboard/src/views/source/action.tsx]] preview/job component. Evidence states,
+partial coverage and browsing-without-verification remain explicit.
+
+[[dashboard/src/views/source/runtime.tsx]] manages key status and previewed
+generation/rotation, configured canary URL and explicit session verification.
+Environment-owned keys are read-only; rotation needs acknowledgement and command
+confirmation. Evidence collection modes distinguish static, canary and selected
+sessions; optional browser tooling never blocks static analysis.
+
+[[dashboard/src/views/source/deep.tsx]] browses bundles, source and indexed AST
+artifacts through repo/file deep links. Its structural map dialog filters files
+by role/language and shows stats, targets, coverage, symbols and imports.
+
+Map navigation is distinct from evidence. Available private targets have a
+bound crawler action; missing maps/workspaces are explicit unavailable states.
+
+## Brain providers
+
+[[source-lab/BRAIN.md]] records embedding/provider decisions for every retained
+Brain subview. The prototype runs in the existing React island without new
+packages or a live Laravel service.
+
+[[dashboard/src/views/source/brain-model.ts]] validates bounded graph windows and
+[[dashboard/src/views/source/brain-data.ts]] reads only validated private JSON
+provider paths. Duplicate nodes, oversized graphs and unsafe paths fail clearly.
+
+[[dashboard/src/views/source/brain.tsx]] provides paged SVG/keyboard graph
+navigation, filters/legend, usages, source/history/diff, flow/sequence, static
+AI-rule review, recorded-metric rankings and full snapshot JSON export.
+
+Absent providers, including live application stress testing, stay explicitly
+unavailable. Snapshot relationships never claim to be runtime traces.
+
+## Source workflow documentation
+
+[[dashboard/src/views/source/docs.tsx]] renders trusted first-party guides from
+[[dashboard/src/lib/source-docs.ts]] in local and public localized routes.
+
+The English technical prose is labeled; navigation and internal guide/legal
+links preserve locale/base paths. No private artifact or OpenAPI reference is
+rendered. [[source-lab/RUNBOOK.md]] records operation/recovery and native bonus checks.
+
+[[dashboard/src/views/source-bonus-tasks.tsx]] adds six open, reservable Source
+verification/patch tasks to Contribute. They preserve explicit native/live limits.
+
+## Task prompt builder
+
+[[dashboard/src/views/how-to-use-page.tsx]] adds How to use under Workspace in
+both navigation modes, with localized `/how-to-use/` routes.
+
+[[dashboard/src/lib/how-to-use.ts]] combines the user task with the shipped
+[[console/capabilities.json]] catalog, platform limits, workflow guidance and
+repository/legal references. It never reads a live host report or calls an LLM.
+Submit generates and copies the prompt; clipboard failures retain a selectable
+preview with retry. Tasks remain in browser memory, without URL/storage persistence.
+[[scripts/deploy-page.sh]] retains these routes in every public locale.
+
+The prompt embeds the complete [[docs/HOW_TO_USE_CHEATSHEET.md]] and
+[[docs/HOW_TO_USE_COMMANDS.md]], including requirements, operations and recovery
+for every lab. [[scripts/build-how-to-use-reference.py]] extracts exact parser,
+Make target, PowerShell parameter and configuration-name references from an
+explicit source allowlist without executing code or reading private state.
+Regenerate it after those sources change; `--check` detects stale output.

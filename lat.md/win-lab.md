@@ -1,8 +1,9 @@
 # win-lab
 
-A reproducible Windows VM on Ubuntu Server, built on `dockur/windows`: one
-compose service running QEMU+KVM with a noVNC web viewer and RDP, backed by a
-persistent disk in `storage/`.
+A reproducible Windows VM on Ubuntu Server, built on `dockur/windows`.
+
+One compose service runs QEMU+KVM with a noVNC web viewer and RDP.
+The persistent disk lives in `storage/`.
 
 See [[win-lab]], the service in [[win-lab/docker-compose.yml]] and the runbook
 [[win-lab/README.md]].
@@ -34,6 +35,22 @@ All guest state is in `storage/`; configuration is `.env` plus compose.
 `--live`); [[win-lab/scripts/restore.sh]] moves the current `storage/` aside
 before extracting, so restores are reversible. `make reset CONFIRM=yes` destroys
 the disk and reinstalls on next boot.
+
+## Windows Apps Lab
+
+On a real Windows host, the dashboard can open the separate `winapps` lab.
+
+It serves a read-only desktop mirror through [[console/winapps.py]] with ctypes
+window enumeration and a `PrintWindow` capture; no process control is offered.
+This is separate from the Windows VM lifecycle and public Pages never mounts it.
+
+A window is listed only when it is actually on screen: visible, captioned,
+not minimized, not a tool or shell window and not DWM-cloaked (suspended UWP
+frames stay "visible" to Win32 but cannot be seen). Each entry carries
+`elevated` (true, false, or null when Windows will not say) so an elevated
+window a standard-user console cannot capture is marked rather than hidden.
+`GET /api/labs/winapps/doctor` and `python console/winapps.py --doctor` report
+the desktop session, this console's own elevation and one live capture probe.
 
 ## Research
 

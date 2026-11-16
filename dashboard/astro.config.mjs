@@ -10,11 +10,15 @@ const base = process.env.SITE_BASE || undefined;
 
 export default defineConfig({
   output: "static",
+  // Per-worktree caches (plan item I): node_modules may be a link into a cache shared by every
+  // worktree, so Astro and Vite must not write their caches inside it.
+  cacheDir: "./.vite-cache/astro",
   base,
   integrations: [react()],
   build: { format: "directory" },
   devToolbar: { enabled: false },
   vite: {
+    cacheDir: "./.vite-cache/vite",
     plugins: [tailwindcss()],
     // `npm run dev` talks to a running console (python3 android-lab/lab/web_ui.py)
     server: {

@@ -39,7 +39,8 @@ Guests are treated as untrusted.
 The labs never expose their viewers or remote-access ports publicly by default,
 and each lab's `knowledge/` directory documents network containment for
 detonation-style work. This is a defensive, authorization-only project — see
-[[tooling#Security and licensing]].
+[[tooling#Security and licensing]]. Lab tools enforce that rule through the
+[[tooling#Scope guard]], which refuses targets outside the declared lab scope.
 
 ## Why a monorepo
 
@@ -47,3 +48,11 @@ The labs are siblings with a shared operating model and one CLI ([[labctl]]).
 
 Keeping them together lets `./labctl all status` report every Linux-host lab at
 once and lets the common script/Makefile pattern evolve in lockstep.
+
+## Portable Source Lab
+
+[[source-lab]] adds native Python source/package analysis beside the OS guests.
+Static detection and structural maps need no VM, Node or container runtime.
+
+The local dashboard provides guarded jobs and file-backed artifact views; public
+Pages provides information and first-party workflow docs, without engine polling.

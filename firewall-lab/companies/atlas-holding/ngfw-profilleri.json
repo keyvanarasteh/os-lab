@@ -1,0 +1,53 @@
+{
+  "aciklama": "NGFW uygulama profilleri. Bunlar L3/L4 kuralı değildir: company.json kuralları adres, protokol ve porta bakar; uygulama denetimi izin verilen trafiğin içine bakar. company.json şeması bu alanı taşımadığı için profiller burada tutulur ve kurala bu dosyadaki addan bağlanır.",
+  "durum": "Tasarım. Hiçbir profil FortiGate üzerinde çalıştırılmadı veya ölçülmedi. Kategori adları FortiGuard uygulama kategorileridir, kuruluşta cihazdaki sürümle doğrulanır.",
+  "profiller": [
+    {
+      "ad": "up-ogrenci",
+      "uygulandigiKurallar": ["ankara-akademik:5"],
+      "tlsDerinDenetim": false,
+      "tlsGerekce": "Öğrenci gizliliği (KVKK) ve kapasite nedeniyle kapalı. Cihaz yalnızca TLS el sıkışması ve trafik örüntüsünü görür.",
+      "kategoriler": [
+        { "kategori": "P2P", "eylem": "engelle", "neden": "Hattı dolduran trafik ve telif riski." },
+        { "kategori": "Proxy", "eylem": "engelle", "neden": "Denetimi atlatan anonimleştirme uygulamaları." },
+        { "kategori": "Remote.Access", "eylem": "izle", "neden": "Öğrenci işi olabilir; önce görünürlük, gerekirse engel." },
+        { "kategori": "Video/Audio", "eylem": "izle", "neden": "Ders videosu da burada; kapasite cihaz başına hız sınırıyla korunur." },
+        { "kategori": "Diğer", "eylem": "izin", "neden": "Web erişimi öğrencinin ana ihtiyacıdır." }
+      ],
+      "bilinenSinirlar": [
+        "TLS derin denetimi kapalıyken şifreli veya gizlenmiş torrent trafiği tanınmayabilir. Bu risk kapatılmış sayılmaz.",
+        "443 portunu kullanan bir P2P istemcisi L3/L4 kuralına takılmaz, yalnızca uygulama imzası yakalarsa engellenir.",
+        "Uygulama imzası sonuç vermezse etki, cihaz başına 10 Mbps sınırı ve Wazuh üzerindeki oturum sayısı alarmıyla sınırlanır."
+      ],
+      "l4Destek": "Öğrenci internet kuralı yalnızca TCP 80 ve 443'e izin verir. Klasik BitTorrent, uTP ve DHT'nin çoğu UDP ve yüksek port kullandığı için bu trafik son ret kuralına düşer. Bu bir yan etkidir, torrent engeli değildir."
+    },
+    {
+      "ad": "up-kurumsal",
+      "uygulandigiKurallar": ["istanbul:11", "izmir:8", "amsterdam:7", "ankara-akademik:10", "ankara-akademik:16"],
+      "tlsDerinDenetim": true,
+      "tlsGerekce": "Kurum cihazlarında sertifika dağıtılır. Amsterdam'da ve Ankara laboratuvarında kapalıdır; Amsterdam'da açılması hukuk birimi onayına bağlıdır.",
+      "kategoriler": [
+        { "kategori": "P2P", "eylem": "engelle", "neden": "İş ihtiyacı yok, veri sızıntısı riski." },
+        { "kategori": "Proxy", "eylem": "engelle", "neden": "Denetimi atlatan uygulamalar." },
+        { "kategori": "Remote.Access", "eylem": "izle", "neden": "Yetkisiz uzaktan erişim veri sızıntısı işareti olabilir." },
+        { "kategori": "Diğer", "eylem": "izin", "neden": "SaaS ve web iş için gereklidir." }
+      ],
+      "bilinenSinirlar": [
+        "TLS derin denetimi dışında bırakılan adreslerde uygulama tanıma sınırlıdır."
+      ]
+    },
+    {
+      "ad": "up-misafir",
+      "uygulandigiKurallar": ["istanbul:14", "izmir:11", "amsterdam:10", "ankara-akademik:18"],
+      "tlsDerinDenetim": false,
+      "tlsGerekce": "Misafir cihazına sertifika dağıtılamaz.",
+      "kategoriler": [
+        { "kategori": "P2P", "eylem": "engelle", "neden": "Şirket hattından telif riski doğar." },
+        { "kategori": "Diğer", "eylem": "izin", "neden": "Misafir yalnızca internete çıkar." }
+      ],
+      "bilinenSinirlar": [
+        "TLS derin denetimi kapalı olduğu için şifreli P2P tanınmayabilir; VLAN bant sınırı etkiyi sınırlar."
+      ]
+    }
+  ]
+}

@@ -1,11 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
+import { NotFoundPage } from "../views/not-found-page";
+import "../styles/firewall-company.css";
+import "../styles/firewall-contribute.css";
 ---
-<Base title="Not found">
-  <main style="display:grid;place-items:center;height:100dvh;text-align:center;padding:1rem">
-    <div>
-      <h1 style="font-size:20px;font-weight:600">Page not found</h1>
-      <p style="margin-top:8px;opacity:.7"><a href="/" style="text-decoration:underline">Back to this computer</a></p>
-    </div>
-  </main>
-</Base>
+<Base title="Not found"><NotFoundPage client:only="react" /></Base>

@@ -22,9 +22,11 @@ import "../styles/firewall-contribute.css";
 import { AppShell } from "../shell/app-shell";
 import { TopBar } from "../shell/top-bar";
 import { Badge, Section, type Tone } from "../components/ui";
-import { COMPANIES } from "../firewall/companies.generated";
+import { useLiveCompanies } from "../firewall/live";
 import type { Branch, Company, Firewall, Rule } from "../firewall/types";
 import { branchRole, copy, cveStatus, firewallPath, ruleAction, ruleDirection, type FirewallLocale } from "../firewall/locale";
+import { FirewallLanguageSwitch } from "../firewall/language-switch";
+import { numberLocale } from "../firewall/locale";
 
 const ACCENT = "#f36c21";
 const REPO = "https://github.com/keyvanarasteh/os-lab";
@@ -53,7 +55,7 @@ function companyStats(c: Company) {
   return { branches: c.branches.length, people, segments, rules };
 }
 
-const fmt = (n: number, locale: FirewallLocale) => n.toLocaleString(locale === "tr" ? "tr-TR" : "en-US");
+const fmt = (n: number, locale: FirewallLocale) => n.toLocaleString(numberLocale(locale));
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
@@ -103,7 +105,7 @@ function FirewallCard({ fw, locale }: { fw: Firewall; locale: FirewallLocale }) 
       <button
         type="button"
         onClick={() => setShowAlts((v) => !v)}
-        className="mt-2 text-xs font-semibold text-[#f36c21] hover:underline"
+        className="iux-touch-target mt-2 inline-flex items-center text-xs font-semibold text-[#f36c21] hover:underline"
       >
         {showAlts ? t.hide : t.show} {fw.alternatives.length} {t.alternatives}
       </button>
@@ -293,7 +295,7 @@ function CompanyPanel({ company, locale }: { company: Company; locale: FirewallL
 
 export function FirewallPage({ locale = "en" }: { locale?: FirewallLocale }) {
   const t = copy[locale];
-  const companies = COMPANIES;
+  const companies = useLiveCompanies();
   const [showContribute, setShowContribute] = useState(false);
   const [activeSlug, setActiveSlug] = useState(companies[0]?.slug ?? "");
   const active = useMemo(() => companies.find((c) => c.slug === activeSlug) ?? companies[0], [companies, activeSlug]);
@@ -310,11 +312,7 @@ export function FirewallPage({ locale = "en" }: { locale?: FirewallLocale }) {
             <p className="mt-1.5 max-w-3xl text-sm text-(--iux-muted-foreground)">
               {t.intro}
             </p>
-            <nav aria-label="Language" className="mt-3 flex gap-2 text-xs font-semibold">
-              <a href={firewallPath("en")} lang="en" aria-current={locale === "en" ? "page" : undefined} className={locale === "en" ? "text-[#f36c21]" : "text-(--iux-muted-foreground) hover:underline"}>EN</a>
-              <span aria-hidden="true">/</span>
-              <a href={firewallPath("tr")} lang="tr" aria-current={locale === "tr" ? "page" : undefined} className={locale === "tr" ? "text-[#f36c21]" : "text-(--iux-muted-foreground) hover:underline"}>TR</a>
-            </nav>
+            <div className="mt-3"><FirewallLanguageSwitch locale={locale} /></div>
           </header>
 
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[#f36c21]/50 bg-[#f36c21]/5 p-4">

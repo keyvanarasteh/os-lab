@@ -113,9 +113,76 @@ def test_artifacts_cannot_escape_folder(web_server):
 def test_host_reports_every_lab(web_server):
     data = json.loads(urllib.request.urlopen(f"{web_server}/api/host").read().decode("utf-8"))
     assert data["host"]["os"]
-    assert [lab["id"] for lab in data["labs"]] == ["android", "windows", "linux", "ios", "macos"]
+    assert [lab["id"] for lab in data["labs"]] == ["android", "windows", "winapps", "linux", "ios", "macos", "source", "web"]
     for lab in data["labs"]:
         assert lab["state"] in ("ready", "needs-setup", "unavailable")
+
+
+def test_health_capabilities_are_served_by_console(web_server):
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/capabilities").read().decode("utf-8"))
+    assert len(data["platforms"]) == 3
+    assert any(item.get("lab") == "ios" for group in data["groups"] for item in group["items"])
+
+
+def test_winapps_endpoint_serves_the_read_only_inventory(web_server, monkeypatch):
+    import web_ui
+
+    fixture = {"available": True, "windows": [], "reason": None}
+    monkeypatch.setattr(web_ui.winapps, "winapps_windows", lambda: fixture)
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps").read().decode("utf-8"))
+    assert data == fixture
+
+    monkeypatch.setattr(web_ui, "winapps", None)
+    try:
+        status = urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps").status
+    except urllib.error.HTTPError as e:
+        status = e.code
+    assert status == 501
+
+
+def test_winapps_screenshot_serves_a_png_and_reports_stale_windows(web_server, monkeypatch):
+    import web_ui
+
+    png = b"\x89PNG\r\n\x1a\n"
+    monkeypatch.setattr(web_ui.winapps, "winapps_window_screenshot", lambda window_id: png)
+    reply = urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps/7/screenshot")
+    assert reply.status == 200 and reply.headers["Content-Type"] == "image/png"
+    assert reply.headers["Cache-Control"] == "no-store" and reply.read() == png
+
+    def stale(_window_id):
+        raise web_ui.winapps.WinAppError("That window is not on screen anymore; refresh the mirror")
+
+    monkeypatch.setattr(web_ui.winapps, "winapps_window_screenshot", stale)
+    with pytest.raises(urllib.error.HTTPError) as caught:
+        urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps/7/screenshot")
+    assert caught.value.code == 400
+    assert "not on screen" in json.loads(caught.value.read().decode("utf-8"))["error"]
+
+
+def test_winapps_doctor_endpoint_serves_the_probe_and_is_501_without_the_module(web_server, monkeypatch):
+    import web_ui
+
+    probe = {"available": True, "desktop": True, "elevated": False, "capture": True, "windows": 1}
+    monkeypatch.setattr(web_ui.winapps, "doctor", lambda: probe)
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/labs/winapps/doctor").read().decode("utf-8"))
+    assert data == probe
+
+    monkeypatch.setattr(web_ui, "winapps", None)
+    with pytest.raises(urllib.error.HTTPError) as caught:
+        urllib.request.urlopen(f"{web_server}/api/labs/winapps/doctor")
+    assert caught.value.code == 501
+
+
+def test_scope_endpoint_reports_the_declared_scope(web_server, tmp_path, monkeypatch):
+    path = tmp_path / "scope.json"
+    monkeypatch.setenv("OSLAB_SCOPE_FILE", str(path))
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/scope").read().decode("utf-8"))
+    assert data["valid"] is False and data["declared"] is False and "No lab scope is declared" in data["error"]
+    path.write_text(json.dumps({"version": 1, "name": "web test lab", "authorization": "Owned fixtures",
+                                "hosts": ["127.0.0.1"], "devices": ["emulator-*"]}), encoding="utf-8")
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/scope").read().decode("utf-8"))
+    assert data["valid"] is True and data["name"] == "web test lab"
+    assert data["counts"] == {"hosts": 1, "packages": 0, "devices": 1, "paths": 0}
 
 
 def test_lab_start_requires_a_previewed_plan(web_server):
@@ -130,3 +197,43 @@ def test_lab_plan_rejects_injection(web_server):
                          {"request": {"lab": "android", "action": "start", "profile": "../../etc"}},
                          {"X-OSLab": "1"})
     assert status == 400
+
+
+def _content_post(url, body=b"{}", headers=None):
+    req = urllib.request.Request(url, data=body, method="POST", headers=headers or {})
+    try:
+        return urllib.request.urlopen(req)
+    except urllib.error.HTTPError as e:
+        return e
+
+
+def test_content_status_and_bundled_companies(web_server):
+    status = json.load(urllib.request.urlopen(f"{web_server}/api/content/status"))
+    assert status["installed"] is False and status["offline"] is True
+    data = json.load(urllib.request.urlopen(f"{web_server}/api/content/companies"))
+    assert data["source"] == "bundled" and len(data["companies"]) >= 1
+    assert all(c["slug"] and isinstance(c["branches"], list) for c in data["companies"])
+
+
+def test_content_file_is_limited_to_content_paths(web_server):
+    ok = urllib.request.urlopen(f"{web_server}/api/content/file?path=docs/legal/PRIVACY.md")
+    assert ok.status == 200 and b"Privacy" in ok.read()
+    for bad in ("labctl", "../../etc/passwd", "android-lab/lab/web_ui.py", "docs/legal/../../labctl"):
+        try:
+            urllib.request.urlopen(f"{web_server}/api/content/file?path={bad}")
+            raise AssertionError(f"{bad} was served")
+        except urllib.error.HTTPError as e:
+            assert e.code == 404
+
+
+def test_content_posts_need_the_oslab_header_and_respect_the_offline_switch(web_server):
+    assert _content_post(f"{web_server}/api/content/update").code == 403
+    resp = _content_post(f"{web_server}/api/content/check", headers={"X-OSLab": "1"})
+    assert resp.code == 400 and b"switched off" in resp.read()
+
+
+def test_app_update_status_is_reported_without_network(web_server):
+    data = json.load(urllib.request.urlopen(f"{web_server}/api/app/update"))
+    assert "supported" in data and "updateAvailable" in data
+    assert data["install"] is None
+

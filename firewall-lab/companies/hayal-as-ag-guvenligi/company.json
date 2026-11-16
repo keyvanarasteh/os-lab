@@ -7,7 +7,7 @@
     "course": "BGT207",
     "github": "yusufiyilmaz"
   },
-  "summary": "Hayal A.Ş. builds education software and runs its own academic campus. Six sites (Ankara HQ, Istanbul, London, a 10,000-student academic branch, a software team and a separate R&D building) each have their own line and firewall (FortiGate, Check Point in R&D for brand diversity), common VLANs (IT, staff, IoT, management), an encrypted VPN to Ankara and a Wazuh SIEM watched by a hybrid SOC.",
+  "summary": "Hayal A.Ş. builds education software and runs its own academic campus. Six sites (Ankara HQ, Istanbul, London, a 10,000-student academic branch, a software team and a separate R&D building) each have their own line and firewall (FortiGate, Check Point in R&D for brand diversity), common VLANs (IT, staff, IoT, management), an encrypted VPN to Ankara and a Wazuh SIEM watched by a hybrid SOC. Public web: only the company web site, in the Ankara DMZ behind Cloudflare WAF, which also gives DDoS protection. The grade and e-learning web application runs on the campus server VLAN and is not published to the internet; staff reach it from outside over VPN. The company has no mobile app and no public API.",
   "branches": [
     {
       "id": "ankara-hq",
@@ -76,31 +76,36 @@
             "product": "FortiGate 200F",
             "vendor": "Fortinet",
             "throughputGbps": 3.0,
-            "reason": "Chosen. Diğer şubelerdeki FortiGate'lerle aynı ekrandan yönetilir. Bütün şubelerin bağlandığı merkez olmaya uygun. 1 Gbps hattın 3 katı hız, büyüme payı var"
+            "priceUsd": 5544,
+            "reason": "Chosen. Diğer şubelerdeki FortiGate'lerle aynı ekrandan yönetilir. Bütün şubelerin bağlandığı merkez olmaya uygun. 1 Gbps hattın 3 katı hız, büyüme payı var. 2 adet, HA (aktif-pasif): biri bozulursa diğeri birkaç saniyede devralır"
           },
           "alternatives": [
             {
               "product": "Palo Alto PA-1420",
               "vendor": "Palo Alto Networks",
               "throughputGbps": 4.8,
+              "priceUsd": 20778,
               "reason": "Hangi uygulamanın kullanıldığını çok iyi tanır. Daha pahalı"
             },
             {
               "product": "Check Point Quantum Force 9100",
               "vendor": "Check Point",
               "throughputGbps": 4.95,
+              "priceUsd": 56030,
               "reason": "Kurumsal yönetim paneli çok gelişmiş. Lisans maliyeti yüksek"
             },
             {
               "product": "Cisco Secure Firewall 3105",
               "vendor": "Cisco",
               "throughputGbps": 10.0,
+              "priceUsd": 31155,
               "reason": "Çok güçlü, ağda Cisco switch varsa uyumlu. Bu şube için fazla büyük ve pahalı"
             },
             {
               "product": "Sophos XGS 2300",
               "vendor": "Sophos",
               "throughputGbps": 1.4,
+              "priceUsd": 3495,
               "reason": "Uygun fiyatlı, kullanımı kolay. 1 Gbps hatta yetiyor ama büyüme payı az"
             }
           ],
@@ -128,9 +133,9 @@
               "direction": "in",
               "proto": "tcp",
               "port": 443,
-              "from": "any",
+              "from": "cloudflare-waf",
               "to": "vlan40-dmz",
-              "note": "Only the company web site is reachable from the internet, and it sits in the DMZ."
+              "note": "The company web site sits in the DMZ behind Cloudflare WAF. Only Cloudflare addresses reach it, so nobody can go around the WAF."
             },
             {
               "action": "deny",
@@ -150,12 +155,73 @@
               "note": "Home workers connect by VPN with mandatory two-step verification; branches terminate their VPN here."
             },
             {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "firewall,vlan10-it,vlan20-employees",
+              "to": "internet",
+              "note": "IT and staff get web access; without this rule the default deny would cut them off. IoT and servers are not in this rule. The firewall itself downloads security updates here as soon as they are released."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "443,445,587,993",
+              "from": "vlan10-it,vlan20-employees",
+              "to": "vlan30-servers",
+              "note": "Staff reach the web, file (445) and e-mail (587, 993) services on the Ankara servers; without this rule the default deny would cut them off."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "443,445,514,587,993",
+              "from": "firewall,vpn-peers",
+              "to": "vlan30-servers",
+              "note": "Branches and home workers reach the same shared servers through the VPN, and every firewall's logs reach the SIEM on 514."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": 443,
+              "from": "vlan30-servers,vlan40-dmz",
+              "to": "internet",
+              "note": "Servers and the DMZ web server download security updates as soon as they are released."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "vlan99-management",
+              "to": "branch-firewalls-over-vpn,vlan40-dmz",
+              "note": "From the management VLAN, Ankara IT reaches the admin screens of the branch firewalls over the VPN and manages the DMZ web server."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "home-vpn-users",
+              "to": "academic-vlan60-over-vpn",
+              "note": "Academic staff working from home pass through the Ankara VPN to reach the grade and e-learning system."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 161,
+              "from": "vlan30-servers",
+              "to": "firewall,branch-firewalls-over-vpn",
+              "note": "Zabbix reads line and device health from this firewall and, over the VPN, from the branch firewalls."
+            },
+            {
               "action": "deny",
               "direction": "in",
               "proto": "any",
-              "from": "any",
-              "to": "any",
-              "note": "Default deny: anything not allowed above is blocked and logged to the central SIEM."
+              "note": "Catch-all default deny, always the last rule: whatever no rule above allowed is blocked and logged to the central SIEM."
             }
           ]
         }
@@ -221,6 +287,7 @@
             "product": "FortiGate 100F",
             "vendor": "Fortinet",
             "throughputGbps": 1.0,
+            "priceUsd": 3240,
             "reason": "Chosen. Ankara'daki FortiGate ile aynı panelden yönetilir. Misafir Wi-Fi'ı ayrı ağa almak kolay"
           },
           "alternatives": [
@@ -228,24 +295,28 @@
               "product": "Sophos XGS 2100",
               "vendor": "Sophos",
               "throughputGbps": 1.25,
+              "priceUsd": 2293,
               "reason": "Uygun fiyatlı, arayüzü kolay. Ama Ankara'dan ayrı bir panelle yönetilmesi gerekir"
             },
             {
               "product": "Check Point Quantum Spark 1600",
               "vendor": "Check Point",
               "throughputGbps": 1.5,
+              "priceUsd": 5049,
               "reason": "Küçük ofisler için iyi. Lisans maliyeti yüksek"
             },
             {
               "product": "Palo Alto PA-440",
               "vendor": "Palo Alto Networks",
               "throughputGbps": 1.0,
-              "reason": "Güvenlik çok iyi ama bu büyüklükte bir ofis için pahalı"
+              "priceUsd": 1804,
+              "reason": "Güvenlik çok iyi. Ama Ankara'dan ayrı bir panelle yönetilmesi gerekir ve lisansları ayrı alınır"
             },
             {
               "product": "pfSense (Netgate 6100)",
               "vendor": "Netgate",
               "throughputGbps": 1.0,
+              "priceUsd": 949,
               "reason": "Ücretsiz yazılım, ucuz donanım. Ama üretici desteği sınırlı ve BT ekibinin bilgisi önemli"
             }
           ],
@@ -264,9 +335,18 @@
               "direction": "in",
               "proto": "tcp",
               "port": "443,22",
-              "from": "vlan99-management",
+              "from": "vlan99-management,ankara-vlan99-over-vpn",
               "to": "firewall",
-              "note": "Admin screens of the firewall open only from the management VLAN 99, with two-step verification."
+              "note": "Admin screens of the firewall open only from the management VLAN 99 here or in Ankara over the VPN, with two-step verification."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 161,
+              "from": "ankara-zabbix-over-vpn",
+              "to": "firewall",
+              "note": "Zabbix in Ankara reads line and device health over the VPN."
             },
             {
               "action": "deny",
@@ -285,12 +365,46 @@
               "note": "IoT devices (VLAN 80) cannot reach the internet or staff PCs."
             },
             {
+              "action": "limit",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "vlan50-guest",
+              "to": "internet",
+              "note": "Guests get web access only, 50 Mbps in total, so they cannot fill the office line."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "firewall,vlan10-it,vlan20-employees",
+              "to": "internet",
+              "note": "IT and staff get web access; without this rule the default deny would cut them off. The firewall itself downloads security updates here as soon as they are released."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "firewall",
+              "to": "ankara-hq",
+              "note": "The encrypted VPN tunnel to Ankara: without it the branch cannot reach shared servers and its logs cannot reach the SIEM."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "443,445,514,587,993",
+              "from": "firewall,vlan10-it,vlan20-employees",
+              "to": "ankara-servers",
+              "note": "Through the VPN, staff reach the shared Ankara servers (web 443, files 445, e-mail 587 and 993) and the firewall sends its logs to the SIEM (514)."
+            },
+            {
               "action": "deny",
               "direction": "in",
               "proto": "any",
-              "from": "any",
-              "to": "any",
-              "note": "Default deny: anything not allowed above is blocked and logged to the central SIEM."
+              "note": "Catch-all default deny, always the last rule: whatever no rule above allowed is blocked and logged to the central SIEM."
             }
           ]
         }
@@ -355,6 +469,7 @@
             "product": "FortiGate 60F",
             "vendor": "Fortinet",
             "throughputGbps": 0.7,
+            "priceUsd": 765,
             "reason": "Chosen. Ankara'dan uzaktan yönetilir. Küçük ve ucuz. Ana hat koparsa 4G/5G yedek hatta otomatik geçer"
           },
           "alternatives": [
@@ -362,24 +477,28 @@
               "product": "Check Point Quantum Spark 1600",
               "vendor": "Check Point",
               "throughputGbps": 1.5,
+              "priceUsd": 5049,
               "reason": "Küçük ofislerde yaygın. Ama ayrı panel ve pahalı lisans"
             },
             {
               "product": "Palo Alto PA-440",
               "vendor": "Palo Alto Networks",
               "throughputGbps": 1.0,
+              "priceUsd": 1804,
               "reason": "Çok güvenli ama 38 kişilik ofis için pahalı"
             },
             {
               "product": "Sophos XGS 2100",
               "vendor": "Sophos",
               "throughputGbps": 1.25,
+              "priceUsd": 2293,
               "reason": "Bu ofis için fazla büyük. Sophos'un daha küçük modelleri de kullanılabilir"
             },
             {
               "product": "pfSense (Netgate 6100)",
               "vendor": "Netgate",
               "throughputGbps": 1.0,
+              "priceUsd": 949,
               "reason": "Ucuz. Ama uzaktan yönetimi ve desteği diğerleri kadar kolay değil"
             }
           ],
@@ -398,16 +517,25 @@
               "direction": "in",
               "proto": "tcp",
               "port": "443,22",
-              "from": "vlan99-management",
+              "from": "vlan99-management,ankara-vlan99-over-vpn",
               "to": "firewall",
-              "note": "Admin screens of the firewall open only from the management VLAN 99, with two-step verification."
+              "note": "Admin screens of the firewall open only from the management VLAN 99 here or in Ankara over the VPN, with two-step verification."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 161,
+              "from": "ankara-zabbix-over-vpn",
+              "to": "firewall",
+              "note": "Zabbix in Ankara reads line and device health over the VPN."
             },
             {
               "action": "allow",
               "direction": "out",
               "proto": "udp",
               "port": "500,4500",
-              "from": "vlan20-employees",
+              "from": "firewall",
               "to": "ankara-hq",
               "note": "Personal data of European customers travels to Ankara only through the encrypted VPN (UK GDPR)."
             },
@@ -428,12 +556,37 @@
               "note": "IoT devices cannot reach the internet or staff PCs."
             },
             {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "vlan50-guest",
+              "to": "internet",
+              "note": "Guests get web access only; the deny rule above keeps them away from the company network."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "firewall,vlan10-it,vlan20-employees",
+              "to": "internet",
+              "note": "IT and staff get web access; without this rule the default deny would cut them off. The firewall itself downloads security updates here as soon as they are released."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "443,445,514,587,993",
+              "from": "firewall,vlan10-it,vlan20-employees",
+              "to": "ankara-servers",
+              "note": "Through the VPN, staff reach the shared Ankara servers (web 443, files 445, e-mail 587 and 993) and the firewall sends its logs to the SIEM (514)."
+            },
+            {
               "action": "deny",
               "direction": "in",
               "proto": "any",
-              "from": "any",
-              "to": "any",
-              "note": "Default deny: anything not allowed above is blocked and logged to the central SIEM."
+              "note": "Catch-all default deny, always the last rule: whatever no rule above allowed is blocked and logged to the central SIEM."
             }
           ]
         }
@@ -445,7 +598,7 @@
       "role": "campus",
       "location": "Istanbul, Turkey",
       "population": {
-        "staff": 215,
+        "staff": 615,
         "students": 10000
       },
       "network": {
@@ -518,31 +671,36 @@
             "product": "FortiGate 600F",
             "vendor": "Fortinet",
             "throughputGbps": 10.5,
-            "reason": "Chosen. 10 Gbps hattı karşılıyor. Captive portal, kullanıcı başı hız sınırı ve kayıt tutma hazır geliyor. Diğer şubelerle aynı panel"
+            "priceUsd": 22108,
+            "reason": "Chosen. 10 Gbps hattı karşılıyor. Captive portal, kullanıcı başı hız sınırı ve kayıt tutma hazır geliyor. Diğer şubelerle aynı panel. 2 adet, HA (aktif-pasif): biri bozulursa diğeri birkaç saniyede devralır"
           },
           "alternatives": [
             {
               "product": "Palo Alto PA-3440",
               "vendor": "Palo Alto Networks",
               "throughputGbps": 12.8,
+              "priceUsd": 29776,
               "reason": "Daha hızlı ve uygulama tanıması çok iyi. Ama 2 cihaz alındığında maliyet çok artıyor"
             },
             {
               "product": "Sophos XGS 5500",
               "vendor": "Sophos",
               "throughputGbps": 12.4,
+              "priceUsd": 23586,
               "reason": "Hızlı ve görece ucuz. Eğitim kurumlarında yaygın"
             },
             {
               "product": "Cisco Secure Firewall 3120",
               "vendor": "Cisco",
               "throughputGbps": 21.0,
+              "priceUsd": 59978,
               "reason": "Çok güçlü, büyüme payı fazla. Yönetimi daha karmaşık ve pahalı"
             },
             {
               "product": "Check Point Quantum Force 19100",
               "vendor": "Check Point",
               "throughputGbps": 28.8,
+              "priceUsd": 116229,
               "reason": "En güçlü aday ama bu şube için fazla büyük ve en pahalısı"
             }
           ],
@@ -561,9 +719,18 @@
               "direction": "in",
               "proto": "tcp",
               "port": "443,22",
-              "from": "vlan99-management",
+              "from": "vlan99-management,ankara-vlan99-over-vpn",
               "to": "firewall",
-              "note": "Admin screens of the firewall open only from the management VLAN 99, with two-step verification."
+              "note": "Admin screens of the firewall open only from the management VLAN 99 here or in Ankara over the VPN, with two-step verification."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 161,
+              "from": "ankara-zabbix-over-vpn",
+              "to": "firewall",
+              "note": "Zabbix in Ankara reads line and device health over the VPN."
             },
             {
               "action": "allow",
@@ -583,20 +750,20 @@
               "note": "Students can never reach the database directly."
             },
             {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "from": "vlan70-student-wifi",
+              "to": "p2p",
+              "note": "Torrent traffic is blocked on the student network. It sits above the limit rule because the first matching rule wins."
+            },
+            {
               "action": "limit",
               "direction": "out",
               "proto": "any",
               "from": "vlan70-student-wifi",
               "to": "internet",
               "note": "Every student is limited to 5 Mbps so a few big downloads cannot fill the campus line."
-            },
-            {
-              "action": "deny",
-              "direction": "out",
-              "proto": "any",
-              "from": "vlan70-student-wifi",
-              "to": "p2p",
-              "note": "Torrent traffic is blocked on the student network."
             },
             {
               "action": "deny",
@@ -615,12 +782,64 @@
               "note": "IoT devices (cameras, turnstiles, printers) have no internet access."
             },
             {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "firewall,vlan10-it,vlan20-staff,vlan30-faculty,vlan50-labs",
+              "to": "internet",
+              "note": "IT, staff, faculty and labs get web access; without this rule the default deny would cut them off. The firewall itself downloads security updates here as soon as they are released."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "firewall",
+              "to": "ankara-hq",
+              "note": "The encrypted VPN tunnel to Ankara: without it the branch cannot reach shared servers and its logs cannot reach the SIEM."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "443,445,514,587,993",
+              "from": "firewall,vlan10-it,vlan20-staff,vlan30-faculty",
+              "to": "ankara-servers",
+              "note": "Through the VPN, staff reach the shared Ankara servers (web 443, files 445, e-mail 587 and 993) and the firewall sends its logs to the SIEM (514)."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "vlan10-it,vlan20-staff,vlan30-faculty,vlan50-labs",
+              "to": "vlan60-servers",
+              "note": "Staff, faculty and labs reach the grade and e-learning system; the rule above covers students only."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "ankara-vpn",
+              "to": "vlan60-servers",
+              "note": "Staff working from outside reach the grade and e-learning system only through the VPN."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": 443,
+              "from": "vlan60-servers",
+              "to": "internet",
+              "note": "Servers download security updates as soon as they are released."
+            },
+            {
               "action": "deny",
               "direction": "in",
               "proto": "any",
-              "from": "any",
-              "to": "any",
-              "note": "Default deny: anything not allowed above is blocked and logged to the central SIEM."
+              "note": "Catch-all default deny, always the last rule: whatever no rule above allowed is blocked and logged to the central SIEM."
             }
           ]
         }
@@ -686,6 +905,7 @@
             "product": "FortiGate 90G",
             "vendor": "Fortinet",
             "throughputGbps": 2.2,
+            "priceUsd": 2150,
             "reason": "Chosen. Hattın 2 katı hız. Diğer şubelerle aynı panel. Kaynak kodun dışarı gönderilmesini engelleyebiliyor (DLP)"
           },
           "alternatives": [
@@ -693,24 +913,28 @@
               "product": "Palo Alto PA-460",
               "vendor": "Palo Alto Networks",
               "throughputGbps": 2.1,
+              "priceUsd": 4500,
               "reason": "Uygulama tanıması çok iyi. Örneğin GitHub'da \"okumaya izin ver, başka hesaba yüklemeyi engelle\" denebilir. Pahalı"
             },
             {
               "product": "Check Point Quantum Spark 1800",
               "vendor": "Check Point",
               "throughputGbps": 2.0,
+              "priceUsd": 6731,
               "reason": "Güvenli, hızı yeterli. Ayrı panel ve pahalı lisans"
             },
             {
               "product": "Sophos XGS 2300",
               "vendor": "Sophos",
               "throughputGbps": 1.4,
+              "priceUsd": 3495,
               "reason": "Uygun fiyatlı ama 1 Gbps hatta büyüme payı az"
             },
             {
               "product": "OPNsense (kendi sunucumuzda)",
               "vendor": "Deciso",
               "throughputGbps": 1.0,
+              "priceUsd": 0,
               "reason": "Ücretsiz. DevOps ekibi yönetebilir. Ama üretici desteği yok ve hız sınırda"
             }
           ],
@@ -729,9 +953,18 @@
               "direction": "in",
               "proto": "tcp",
               "port": "443,22",
-              "from": "vlan99-management",
+              "from": "vlan99-management,ankara-vlan99-over-vpn",
               "to": "firewall",
-              "note": "Admin screens of the firewall open only from the management VLAN 99, with two-step verification."
+              "note": "Admin screens of the firewall open only from the management VLAN 99 here or in Ankara over the VPN, with two-step verification."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 161,
+              "from": "ankara-zabbix-over-vpn",
+              "to": "firewall",
+              "note": "Zabbix in Ankara reads line and device health over the VPN."
             },
             {
               "action": "allow",
@@ -751,12 +984,46 @@
               "note": "Test servers and real production servers live in separate VLANs; tests cannot reach real systems."
             },
             {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "firewall,vlan10-it,vlan20-developers,vlan30-test-servers",
+              "to": "internet",
+              "note": "Web and package downloads for developers. The DLP profile on this rule stops source code being uploaded anywhere except the company GitHub account. The firewall itself downloads security updates here as soon as they are released."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "firewall",
+              "to": "ankara-hq",
+              "note": "The encrypted VPN tunnel to Ankara: without it the branch cannot reach shared servers and its logs cannot reach the SIEM."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "443,445,514,587,993",
+              "from": "firewall,vlan10-it,vlan20-developers",
+              "to": "ankara-servers",
+              "note": "Through the VPN, staff reach the shared Ankara servers (web 443, files 445, e-mail 587 and 993) and the firewall sends its logs to the SIEM (514)."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "vlan10-it,vlan20-developers",
+              "to": "vlan30-test-servers",
+              "note": "Developers and IT reach the test servers; without this rule the default deny would cut them off."
+            },
+            {
               "action": "deny",
               "direction": "in",
               "proto": "any",
-              "from": "any",
-              "to": "any",
-              "note": "Default deny: anything not allowed above is blocked and logged to the central SIEM."
+              "note": "Catch-all default deny, always the last rule: whatever no rule above allowed is blocked and logged to the central SIEM."
             }
           ]
         }
@@ -822,6 +1089,7 @@
             "product": "Check Point Quantum Spark 1800",
             "vendor": "Check Point",
             "throughputGbps": 2.0,
+            "priceUsd": 6731,
             "reason": "Chosen. Diğer şubelerden farklı üretici. SandBlast kum havuzu şüpheli dosyaları açılmadan önce test ediyor"
           },
           "alternatives": [
@@ -829,24 +1097,28 @@
               "product": "Palo Alto PA-440",
               "vendor": "Palo Alto Networks",
               "throughputGbps": 1.0,
+              "priceUsd": 1804,
               "reason": "WildFire kum havuzu çok iyi. O da farklı bir üretici olur"
             },
             {
               "product": "FortiGate 70F",
               "vendor": "Fortinet",
               "throughputGbps": 0.8,
+              "priceUsd": 955,
               "reason": "Hızı yeterli ama diğer şubelerle aynı üretici olduğu için katmanlı güvenlik zayıflar"
             },
             {
               "product": "Sophos XGS 2100",
               "vendor": "Sophos",
               "throughputGbps": 1.25,
+              "priceUsd": 2293,
               "reason": "İyi ama kum havuzu ve DLP özellikleri ilk ikisi kadar güçlü değil"
             },
             {
               "product": "pfSense (Netgate 6100)",
               "vendor": "Netgate",
               "throughputGbps": 1.0,
+              "priceUsd": 949,
               "reason": "Ucuz ama kum havuzu ve DLP hazır gelmiyor. En gizli şube için uygun değil"
             }
           ],
@@ -865,9 +1137,18 @@
               "direction": "in",
               "proto": "tcp",
               "port": "443,22",
-              "from": "vlan99-management",
+              "from": "vlan99-management,ankara-vlan99-over-vpn",
               "to": "firewall",
-              "note": "Admin screens of the firewall open only from the management VLAN 99, with two-step verification."
+              "note": "Admin screens of the firewall open only from the management VLAN 99 here or in Ankara over the VPN, with two-step verification."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": 161,
+              "from": "ankara-zabbix-over-vpn",
+              "to": "firewall",
+              "note": "Zabbix in Ankara reads line and device health over the VPN."
             },
             {
               "action": "deny",
@@ -880,20 +1161,45 @@
             },
             {
               "action": "allow",
-              "direction": "in",
+              "direction": "out",
               "proto": "tcp",
-              "port": "80,443",
-              "from": "internet",
-              "to": "sandbox",
-              "note": "Every downloaded file is tried in a sandbox before it reaches R&D PCs."
+              "port": 443,
+              "from": "firewall,vlan10-it,vlan20-researchers,vlan30-rnd-servers",
+              "to": "work-sites-allowlist",
+              "note": "R&D reaches only work-related sites on an allow list, through the web proxy. Every downloaded file is tried in the SandBlast sandbox before it reaches a PC. The firewall and the R&D servers download security updates from this list as soon as they are released."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "firewall",
+              "to": "ankara-hq",
+              "note": "The encrypted VPN tunnel to Ankara: without it the branch cannot reach shared servers and its logs cannot reach the SIEM."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "tcp",
+              "port": "443,445,514,587,993",
+              "from": "firewall,vlan10-it,vlan20-researchers,vlan30-rnd-servers",
+              "to": "ankara-servers",
+              "note": "Through the VPN, staff reach the shared Ankara servers (web 443, files 445, e-mail 587 and 993) and the firewall sends its logs to the SIEM (514). R&D servers back up project files to Ankara on 445."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "443,445",
+              "from": "vlan10-it,vlan20-researchers",
+              "to": "vlan30-rnd-servers",
+              "note": "Researchers and IT reach project files on the R&D servers; without this rule the default deny would cut them off."
             },
             {
               "action": "deny",
               "direction": "in",
               "proto": "any",
-              "from": "any",
-              "to": "any",
-              "note": "Default deny: anything not allowed above is blocked and logged to the central SIEM."
+              "note": "Catch-all default deny, always the last rule: whatever no rule above allowed is blocked and logged to the central SIEM."
             }
           ]
         }
@@ -905,10 +1211,24 @@
     "note": "Branches connect to the Ankara hub by encrypted VPN; home workers use VPN with two-step verification; firewall admin screens are reachable only from the management VLAN."
   },
   "monitoring": {
-    "siem": "Wazuh SIEM in Ankara (any vendor's logs, including the R&D Check Point), Zabbix for line and device health, GLPI ticketing so no incident is forgotten.",
-    "owner": "The NOC job belongs to the Ankara IT team; the SOC (4 L1, 2 L2, 1 L3 and a SOC manager) owns security alerts.",
+    "siem": "Wazuh SIEM in Ankara (any vendor's logs, including the R&D Check Point), Zabbix for line and device health, GLPI ticketing so no incident is forgotten. Log retention: firewall and security logs are kept for 1 year, the last 90 days online; academic and Istanbul guest Wi-Fi internet access logs are kept at least 2 years with a timestamp (Law 5651); London logs hold as little personal data as possible (UK GDPR). Turkish sites follow KVKK: camera recordings and personal data are kept only as long as needed.",
+    "owner": "The NOC job belongs to the Ankara IT team; the SOC (4 L1, 2 L2, 1 L3 and a SOC manager) owns security alerts. The Ankara IT team owns patching and backups: Fortinet and Check Point update notices are followed automatically and a security update is installed as soon as it is released; on top of that, the firmware of every device is checked every 30 days; every firewall config is exported to the Ankara backup server each night and after every change, and a restore is tested every 3 months.",
     "alertSink": "SIEM alerts to the SOC by phone, e-mail and message; weekday 08:00-24:00 in-house SOC, nights and weekends an outsourced security firm, on-call person phoned for critical alerts.",
     "appVsSecurity": "NOC watches whether the network works; SOC watches attacks; handling follows the NIST four-phase incident process."
   },
-  "slug": "hayal-as-ag-guvenligi"
+  "slug": "hayal-as-ag-guvenligi",
+  "cveWatch": [
+    {
+      "id": "CVE-2026-24858",
+      "product": "FortiOS (all FortiGate branches)",
+      "status": "patched",
+      "note": "Temporary: admin login through FortiCloud SSO stays off, and admin screens open only from VLAN 99. Permanent: FortiOS is upgraded to a fixed version (7.6.6, 7.4.11, 7.2.13, 7.0.19 or above, Fortinet advisory FG-IR-26-060)."
+    },
+    {
+      "id": "CVE-2024-24919",
+      "product": "Check Point Quantum Spark 1800 (R&D)",
+      "status": "patched",
+      "note": "Temporary: Remote Access VPN and Mobile Access stay off on this gateway, because the flaw needs one of them. Permanent: the Check Point security fix for Quantum Spark is installed."
+    }
+  ]
 }

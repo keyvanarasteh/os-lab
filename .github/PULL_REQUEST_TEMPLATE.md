@@ -28,6 +28,13 @@ Keep PRs focused — one logical change per PR is easier to review and merge.
 
 <!-- Commands run, OS/arch, and results. e.g. `./scripts/run-tests.sh` -->
 
+## Proof (optional)
+
+<!-- For content changes (Firewall Lab companies, guides, legal docs, Frida hooks); see docs/CONTENT.md.
+     Paste the output of `python3 scripts/verify-content.py`.
+     Optionally drag in a short video/GIF of the change working. Attach it here; do not commit media.
+     No secrets, personal data or unauthorized targets in recordings. -->
+
 ## Checklist
 
 - [ ] My changes concern only apps/targets that are owned or authorized for testing.

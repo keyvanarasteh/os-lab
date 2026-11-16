@@ -1,0 +1,1638 @@
+{
+  "aciklama": "Atlas Holding adres ve servis nesneleri. Kural tablolarındaki bütün adlar burada tanımlıdır. Adresler hayali şirket içindir, gerçek altyapı bilgisi değildir.",
+  "turler": {
+    "ag": "Tek CIDR.",
+    "host": "Tek IP.",
+    "ozet": "Rezerv ve kural özeti; VLAN değildir.",
+    "grup": "Başka nesnelerin listesi.",
+    "fqdn": "Alan adı listesi; cihazda FQDN nesnesi olarak uygulanır.",
+    "girdi": "Değeri kurulumda verilecek. Uydurulmaz.",
+    "ozel": "Adres listesi olmayan özel ad."
+  },
+  "nesneler": [
+    {
+      "ad": "ams-tum",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.0.0/16"
+      ],
+      "aciklama": "Amsterdam adres bloğu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-v10-yonetim",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.10.0/26"
+      ],
+      "aciklama": "VLAN 10: ağ cihazı yönetimi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-v20-personel",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.20.0/24"
+      ],
+      "aciklama": "VLAN 20: personel.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-v30-yazilim",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.30.0/26"
+      ],
+      "aciklama": "VLAN 30: yazılım.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-v50-teknik",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.50.0/27"
+      ],
+      "aciklama": "VLAN 50: teknik ekip.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-v60-sunucu",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.60.0/26"
+      ],
+      "aciklama": "VLAN 60: altyapı, log toplayıcı ve müşteri verisi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-v64-sinir",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.64.0/26"
+      ],
+      "aciklama": "VLAN 64: kamera kayıt.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-v80-iot",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.80.0/26"
+      ],
+      "aciklama": "VLAN 80: kamera, yazıcı, kartlı geçiş.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-v85-misafir",
+      "tur": "ag",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.85.0/24"
+      ],
+      "aciklama": "VLAN 85: misafir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "onayli-guncelleme",
+      "tur": "fqdn",
+      "sube": "amsterdam",
+      "uyeler": [
+        "archive.ubuntu.com",
+        "security.ubuntu.com"
+      ],
+      "aciklama": "Amsterdam sunucu güncelleme adresleri. Sunucuların Ubuntu olduğu varsayılmıştır; işletim sistemi kesinleşince güncellenir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "wan-amsterdam",
+      "tur": "girdi",
+      "sube": "amsterdam",
+      "uyeler": [],
+      "aciklama": "Amsterdam güvenlik duvarı WAN adresi. Operatörden alınacak gerçek adres burada tanımlanmaz, kurulum girdisidir.",
+      "durum": "girdi-gerekli"
+    },
+    {
+      "ad": "ams-kurumsal",
+      "tur": "grup",
+      "sube": "amsterdam",
+      "uyeler": [
+        "ams-v20-personel",
+        "ams-v30-yazilim",
+        "ams-v50-teknik"
+      ],
+      "aciklama": "İnternete denetimli çıkan kurum ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-log-hedefi",
+      "tur": "grup",
+      "sube": "amsterdam",
+      "uyeler": [
+        "ams-log-toplayici"
+      ],
+      "aciklama": "Amsterdam'ın log hedefi. Veri Hollanda'da kalır.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-log-kaynaklari",
+      "tur": "grup",
+      "sube": "amsterdam",
+      "uyeler": [
+        "ams-v10-yonetim",
+        "ams-v64-sinir"
+      ],
+      "aciklama": "Logları yerel toplayıcıya giden, başka VLAN'daki kaynaklar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-sunucular",
+      "tur": "grup",
+      "sube": "amsterdam",
+      "uyeler": [
+        "ams-v60-sunucu",
+        "ams-v64-sinir"
+      ],
+      "aciklama": "Amsterdam sunucu ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-uzak-ozel",
+      "tur": "grup",
+      "sube": "amsterdam",
+      "uyeler": [
+        "ist-tum",
+        "izm-tum",
+        "ank-tum",
+        "tunel-ist-ams"
+      ],
+      "aciklama": "Tünelin karşısındaki bütün adresler.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-yazici-istemcileri",
+      "tur": "grup",
+      "sube": "amsterdam",
+      "uyeler": [
+        "ams-v20-personel",
+        "ams-v30-yazilim",
+        "ams-v50-teknik"
+      ],
+      "aciklama": "Yazıcı kullanan ağlar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-yonetim-erisimi",
+      "tur": "grup",
+      "sube": "amsterdam",
+      "uyeler": [
+        "ams-v10-yonetim"
+      ],
+      "aciklama": "Bu güvenlik duvarının arkasındaki yönetim ağı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-crm",
+      "tur": "host",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.60.20"
+      ],
+      "aciklama": "Müşteri (CRM) sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-dns",
+      "tur": "host",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.60.2"
+      ],
+      "aciklama": "DNS, DHCP ve NTP.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-kamera-kayit",
+      "tur": "host",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.64.50"
+      ],
+      "aciklama": "Kamera kayıt sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-log-toplayici",
+      "tur": "host",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.60.10"
+      ],
+      "aciklama": "Yerel log toplayıcı (GDPR).",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ams-yazici",
+      "tur": "host",
+      "sube": "amsterdam",
+      "uyeler": [
+        "10.3.80.20"
+      ],
+      "aciklama": "Yazıcı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "tunel-amsterdam",
+      "tur": "host",
+      "sube": "amsterdam",
+      "uyeler": [
+        "172.31.3.2"
+      ],
+      "aciklama": "Amsterdam tünel arayüzü adresi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-tum",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.0.0/16"
+      ],
+      "aciklama": "Ankara adres bloğu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v10-yonetim",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.10.0/26"
+      ],
+      "aciklama": "VLAN 10: ağ cihazı ve erişim noktası yönetimi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v100-ogrenci-yurt-1",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.128.0/20"
+      ],
+      "aciklama": "VLAN 100: öğrenci Wi-Fi, Yurt 1.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v101-ogrenci-yurt-2",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.144.0/20"
+      ],
+      "aciklama": "VLAN 101: öğrenci Wi-Fi, Yurt 2.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v102-ogrenci-kutuphane",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.160.0/20"
+      ],
+      "aciklama": "VLAN 102: öğrenci Wi-Fi, Kütüphane.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v103-ogrenci-muhendislik",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.176.0/20"
+      ],
+      "aciklama": "VLAN 103: öğrenci Wi-Fi, Mühendislik.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v104-ogrenci-fen-edebiyat",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.192.0/20"
+      ],
+      "aciklama": "VLAN 104: öğrenci Wi-Fi, Fen-Edebiyat.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v105-ogrenci-iibf",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.208.0/20"
+      ],
+      "aciklama": "VLAN 105: öğrenci Wi-Fi, İİBF.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v106-ogrenci-sosyal",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.224.0/20"
+      ],
+      "aciklama": "VLAN 106: öğrenci Wi-Fi, Yemekhane ve sosyal alan.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v107-ogrenci-acik-alan",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.240.0/20"
+      ],
+      "aciklama": "VLAN 107: öğrenci Wi-Fi, Spor ve açık alan.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v110-lab",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.110.0/23"
+      ],
+      "aciklama": "VLAN 110: laboratuvar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v20-personel",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.20.0/22"
+      ],
+      "aciklama": "VLAN 20: personel.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v30-yazilim",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.30.0/27"
+      ],
+      "aciklama": "VLAN 30: yazılım.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v40-arge",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.40.0/26"
+      ],
+      "aciklama": "VLAN 40: Ar-Ge.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v50-teknik",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.50.0/25"
+      ],
+      "aciklama": "VLAN 50: teknik ekip.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v60-sunucu",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.60.0/24"
+      ],
+      "aciklama": "VLAN 60: altyapı ve uygulama sunucuları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v63-veri",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.63.0/26"
+      ],
+      "aciklama": "VLAN 63: LMS veritabanı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v64-sinir",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.64.0/26"
+      ],
+      "aciklama": "VLAN 64: proxy ve kamera kayıt.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v70-dmz",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.70.0/26"
+      ],
+      "aciklama": "VLAN 70: WAF ve LMS uygulaması.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v80-iot",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.80.0/24"
+      ],
+      "aciklama": "VLAN 80: kamera, yazıcı, kartlı geçiş.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v85-misafir",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.85.0/24"
+      ],
+      "aciklama": "VLAN 85: misafir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-v90-hoca",
+      "tur": "ag",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.88.0/21"
+      ],
+      "aciklama": "VLAN 90: hoca.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "wan-ankara",
+      "tur": "girdi",
+      "sube": "ankara-akademik",
+      "uyeler": [],
+      "aciklama": "Ankara güvenlik duvarı WAN adresi. Operatörden alınacak gerçek adres burada tanımlanmaz, kurulum girdisidir.",
+      "durum": "girdi-gerekli"
+    },
+    {
+      "ad": "ank-guncelleme-kaynaklari",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-v60-sunucu",
+        "ank-v63-veri"
+      ],
+      "aciklama": "Güncellemeyi proxy'den alan sunucu ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-izleme-kaynaklari",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-v60-sunucu",
+        "ank-v63-veri",
+        "ank-v64-sinir",
+        "ank-waf-dugumleri",
+        "ank-lms-uyg"
+      ],
+      "aciklama": "Zabbix aracısı veri gönderen sunucular.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-kurumsal",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-v20-personel",
+        "ank-v30-yazilim",
+        "ank-v50-teknik",
+        "ank-v90-hoca"
+      ],
+      "aciklama": "İnternete denetimli çıkan kurum ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-lms-istemcileri",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-v20-personel",
+        "ank-v90-hoca",
+        "ank-ogrenci",
+        "ank-v110-lab"
+      ],
+      "aciklama": "Kampüsten LMS kullanan ağlar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-log-hedefi",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "wazuh"
+      ],
+      "aciklama": "Ankara'nın log hedefi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-log-kaynaklari",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-v10-yonetim",
+        "ank-v60-sunucu",
+        "ank-v63-veri",
+        "ank-v64-sinir",
+        "ank-waf-dugumleri",
+        "ank-lms-uyg"
+      ],
+      "aciklama": "Logları Wazuh'a giden cihaz ve sunucular.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-ogrenci-ve-misafir",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-ogrenci",
+        "ank-v85-misafir"
+      ],
+      "aciklama": "İç ağa geçemeyen ağlar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-waf-dugumleri",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-waf-1",
+        "ank-waf-2"
+      ],
+      "aciklama": "Logları ve izleme verisini gönderen gerçek WAF adresleri.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-yazici-istemcileri",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-v20-personel",
+        "ank-v30-yazilim",
+        "ank-v40-arge",
+        "ank-v50-teknik",
+        "ank-v90-hoca",
+        "ank-v110-lab"
+      ],
+      "aciklama": "Yazıcı kullanan ağlar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-yonetilen-sunucular",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-v60-sunucu",
+        "ank-v64-sinir",
+        "ank-v70-dmz"
+      ],
+      "aciklama": "Teknik ekibin yönettiği sunucu ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-yonetim-erisimi",
+      "tur": "grup",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "ank-v10-yonetim"
+      ],
+      "aciklama": "Bu güvenlik duvarının arkasındaki yönetim ağı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-dns",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.60.2"
+      ],
+      "aciklama": "DNS, DHCP ve NTP.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-dosya",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.60.40"
+      ],
+      "aciklama": "Laboratuvar dosya sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-kamera-kayit",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.64.50"
+      ],
+      "aciklama": "Kamera kayıt sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-lms-db",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.63.30"
+      ],
+      "aciklama": "LMS veritabanı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-lms-uyg",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.70.11"
+      ],
+      "aciklama": "LMS uygulaması.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-obs",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.60.31"
+      ],
+      "aciklama": "Öğrenci bilgi sistemi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-proxy",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.64.10"
+      ],
+      "aciklama": "İnternet çıkış proxy'si.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-radius",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.60.3"
+      ],
+      "aciklama": "Yerel RADIUS. Tünel kopsa da kampüs 802.1X çalışır.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-waf-1",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.70.12"
+      ],
+      "aciklama": "WAF düğümü 1.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-waf-2",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.70.13"
+      ],
+      "aciklama": "WAF düğümü 2.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-waf-vip",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.70.10"
+      ],
+      "aciklama": "WAF sanal adresi (VRRP).",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-yazici",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.80.20"
+      ],
+      "aciklama": "Yazıcı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "tunel-ankara",
+      "tur": "host",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "172.31.4.2"
+      ],
+      "aciklama": "Ankara tünel arayüzü adresi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ank-ogrenci",
+      "tur": "ozet",
+      "sube": "ankara-akademik",
+      "uyeler": [
+        "10.4.128.0/17"
+      ],
+      "aciklama": "Öğrenci adres rezervi ve kural özeti. VLAN değildir, arayüze atanmaz. Gerçek ağlar VLAN 100-107'dir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-tum",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.0.0/16"
+      ],
+      "aciklama": "İstanbul adres bloğu, VPN havuzları dahil.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v10-yonetim",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.10.0/26"
+      ],
+      "aciklama": "VLAN 10: ağ cihazı yönetimi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v20-personel",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.20.0/22"
+      ],
+      "aciklama": "VLAN 20: personel.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v30-yazilim",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.30.0/24"
+      ],
+      "aciklama": "VLAN 30: yazılım.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v40-arge",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.40.0/26"
+      ],
+      "aciklama": "VLAN 40: Ar-Ge.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v50-teknik",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.50.0/25"
+      ],
+      "aciklama": "VLAN 50: teknik ekip ve SOC.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v60-sunucu",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.60.0/24"
+      ],
+      "aciklama": "VLAN 60: altyapı ve uygulama sunucuları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v61-yonetim-araclari",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.61.0/27"
+      ],
+      "aciklama": "VLAN 61: bastion, izleme ve merkezi yönetim.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v63-veri",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.63.0/26"
+      ],
+      "aciklama": "VLAN 63: veritabanları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v64-sinir",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.64.0/26"
+      ],
+      "aciklama": "VLAN 64: proxy ve kamera kayıt.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v70-dmz",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.70.0/27"
+      ],
+      "aciklama": "VLAN 70: WAF ve web uygulaması.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v80-iot",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.80.0/25"
+      ],
+      "aciklama": "VLAN 80: kamera, yazıcı, kartlı geçiş.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-v85-misafir",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.85.0/24"
+      ],
+      "aciklama": "VLAN 85: misafir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "vpn-gelistirici",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.204.0/24"
+      ],
+      "aciklama": "Geliştirici VPN havuzu. 115 × 1,3 = 150 adres gerekir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "vpn-hoca",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.208.0/22"
+      ],
+      "aciklama": "Hoca VPN havuzu. 400 × 1,3 = 520 adres gerekir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "vpn-personel",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.200.0/22"
+      ],
+      "aciklama": "Personel VPN havuzu. 650 × 1,3 = 845 adres gerekir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "vpn-yonetici",
+      "tur": "ag",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.205.0/25"
+      ],
+      "aciklama": "Yönetici VPN havuzu. 75 × 1,3 = 98 adres gerekir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "wan-istanbul",
+      "tur": "girdi",
+      "sube": "istanbul",
+      "uyeler": [],
+      "aciklama": "İstanbul güvenlik duvarı WAN adresi. Operatörden alınacak gerçek adres burada tanımlanmaz, kurulum girdisidir.",
+      "durum": "girdi-gerekli"
+    },
+    {
+      "ad": "ist-guncelleme-kaynaklari",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "ist-v60-sunucu",
+        "ist-v61-yonetim-araclari",
+        "ist-v63-veri"
+      ],
+      "aciklama": "Güncellemeyi proxy'den alan sunucu ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-izleme-kaynaklari",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "ist-v60-sunucu",
+        "ist-v63-veri",
+        "ist-v64-sinir",
+        "ist-waf-dugumleri",
+        "ist-web-uyg",
+        "izm-izleme-kaynaklari",
+        "ank-izleme-kaynaklari"
+      ],
+      "aciklama": "Zabbix aracısı veri gönderen sunucular. Amsterdam GDPR nedeniyle dahil değildir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-kurumsal",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "ist-v20-personel",
+        "ist-v30-yazilim",
+        "ist-v50-teknik"
+      ],
+      "aciklama": "İnternete denetimli çıkan kurum ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-log-hedefi",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "wazuh"
+      ],
+      "aciklama": "İstanbul'un log hedefi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-log-kaynaklari",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "ist-v10-yonetim",
+        "ist-v60-sunucu",
+        "ist-v63-veri",
+        "ist-v64-sinir",
+        "ist-waf-dugumleri",
+        "ist-web-uyg",
+        "izm-log-kaynaklari",
+        "ank-log-kaynaklari"
+      ],
+      "aciklama": "Logları Wazuh'a giden cihaz ve sunucular. Amsterdam GDPR nedeniyle dahil değildir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-panel-sunuculari",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "wazuh",
+        "zabbix",
+        "grafana",
+        "glpi",
+        "fortimanager"
+      ],
+      "aciklama": "Teknik ekibin HTTPS ile kullandığı paneller.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-waf-dugumleri",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "ist-waf-1",
+        "ist-waf-2"
+      ],
+      "aciklama": "Logları ve izleme verisini gönderen gerçek WAF adresleri.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-yazici-istemcileri",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "ist-v20-personel",
+        "ist-v30-yazilim",
+        "ist-v40-arge",
+        "ist-v50-teknik"
+      ],
+      "aciklama": "Yazıcı kullanan ağlar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-yonetilen-sunucular",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "ist-v60-sunucu",
+        "ist-v64-sinir",
+        "ist-v70-dmz"
+      ],
+      "aciklama": "Teknik ekip ve bastion'un yönettiği sunucu ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-yonetim-erisimi",
+      "tur": "grup",
+      "sube": "istanbul",
+      "uyeler": [
+        "ist-v10-yonetim",
+        "izm-v10-yonetim",
+        "ams-v10-yonetim",
+        "ank-v10-yonetim"
+      ],
+      "aciklama": "İstanbul'dan geçerek yönetilen ağlar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "bastion",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.61.5"
+      ],
+      "aciklama": "Oturum kaydeden yönetim sıçrama sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "fortimanager",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.61.6"
+      ],
+      "aciklama": "FortiManager.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "glpi",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.61.21"
+      ],
+      "aciklama": "Olay kayıt sistemi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "grafana",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.61.22"
+      ],
+      "aciklama": "İzleme panelleri.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-ad",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.60.3"
+      ],
+      "aciklama": "Active Directory ve RADIUS.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-dns",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.60.2"
+      ],
+      "aciklama": "DNS, DHCP ve NTP.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-erp",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.60.31"
+      ],
+      "aciklama": "ERP uygulaması.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-erp-db",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.63.31"
+      ],
+      "aciklama": "ERP veritabanı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-git",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.60.32"
+      ],
+      "aciklama": "Git ve CI.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-kamera-kayit",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.64.50"
+      ],
+      "aciklama": "Kamera kayıt sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-proxy",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.64.40"
+      ],
+      "aciklama": "İnternet çıkış proxy'si.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-waf-1",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.70.12"
+      ],
+      "aciklama": "WAF düğümü 1.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-waf-2",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.70.13"
+      ],
+      "aciklama": "WAF düğümü 2.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-waf-vip",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.70.10"
+      ],
+      "aciklama": "WAF sanal adresi (VRRP).",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-web-db",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.63.30"
+      ],
+      "aciklama": "Kurumsal web sitesi veritabanı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-web-uyg",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.70.11"
+      ],
+      "aciklama": "Kurumsal web uygulaması.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ist-yazici",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.80.20"
+      ],
+      "aciklama": "Yazıcı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "tunel-ist-ams",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "172.31.3.1"
+      ],
+      "aciklama": "İstanbul'un Amsterdam tüneli adresi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "tunel-ist-ank",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "172.31.4.1"
+      ],
+      "aciklama": "İstanbul'un Ankara tüneli adresi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "tunel-ist-izm",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "172.31.2.1"
+      ],
+      "aciklama": "İstanbul'un İzmir tüneli adresi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "wazuh",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.61.10"
+      ],
+      "aciklama": "SIEM ve log toplayıcı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "zabbix",
+      "tur": "host",
+      "sube": "istanbul",
+      "uyeler": [
+        "10.1.61.20"
+      ],
+      "aciklama": "Zabbix sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-tum",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.0.0/16"
+      ],
+      "aciklama": "İzmir adres bloğu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v10-yonetim",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.10.0/26"
+      ],
+      "aciklama": "VLAN 10: ağ cihazı yönetimi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v20-personel",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.20.0/23"
+      ],
+      "aciklama": "VLAN 20: personel.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v30-yazilim",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.30.0/25"
+      ],
+      "aciklama": "VLAN 30: yazılım.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v40-arge",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.40.0/25"
+      ],
+      "aciklama": "VLAN 40: Ar-Ge.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v50-teknik",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.50.0/26"
+      ],
+      "aciklama": "VLAN 50: teknik ekip.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v60-sunucu",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.60.0/25"
+      ],
+      "aciklama": "VLAN 60: altyapı ve Ar-Ge verisi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v64-sinir",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.64.0/26"
+      ],
+      "aciklama": "VLAN 64: proxy ve kamera kayıt.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v80-iot",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.80.0/25"
+      ],
+      "aciklama": "VLAN 80: kamera, yazıcı, kartlı geçiş.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-v85-misafir",
+      "tur": "ag",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.85.0/24"
+      ],
+      "aciklama": "VLAN 85: misafir.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "wan-izmir",
+      "tur": "girdi",
+      "sube": "izmir",
+      "uyeler": [],
+      "aciklama": "İzmir güvenlik duvarı WAN adresi. Operatörden alınacak gerçek adres burada tanımlanmaz, kurulum girdisidir.",
+      "durum": "girdi-gerekli"
+    },
+    {
+      "ad": "izm-izleme-kaynaklari",
+      "tur": "grup",
+      "sube": "izmir",
+      "uyeler": [
+        "izm-v60-sunucu",
+        "izm-v64-sinir"
+      ],
+      "aciklama": "Zabbix aracısı veri gönderen sunucular.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-kurumsal",
+      "tur": "grup",
+      "sube": "izmir",
+      "uyeler": [
+        "izm-v20-personel",
+        "izm-v30-yazilim",
+        "izm-v50-teknik"
+      ],
+      "aciklama": "İnternete denetimli çıkan kurum ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-log-hedefi",
+      "tur": "grup",
+      "sube": "izmir",
+      "uyeler": [
+        "wazuh"
+      ],
+      "aciklama": "İzmir'in log hedefi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-log-kaynaklari",
+      "tur": "grup",
+      "sube": "izmir",
+      "uyeler": [
+        "izm-v10-yonetim",
+        "izm-v60-sunucu",
+        "izm-v64-sinir"
+      ],
+      "aciklama": "Logları Wazuh'a giden cihaz ve sunucular.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-yazici-istemcileri",
+      "tur": "grup",
+      "sube": "izmir",
+      "uyeler": [
+        "izm-v20-personel",
+        "izm-v30-yazilim",
+        "izm-v40-arge",
+        "izm-v50-teknik"
+      ],
+      "aciklama": "Yazıcı kullanan ağlar.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-yonetilen-sunucular",
+      "tur": "grup",
+      "sube": "izmir",
+      "uyeler": [
+        "izm-v60-sunucu",
+        "izm-v64-sinir"
+      ],
+      "aciklama": "Teknik ekibin yönettiği sunucu ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-yonetim-erisimi",
+      "tur": "grup",
+      "sube": "izmir",
+      "uyeler": [
+        "izm-v10-yonetim"
+      ],
+      "aciklama": "Bu güvenlik duvarının arkasındaki yönetim ağı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-arge-veri",
+      "tur": "host",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.60.20"
+      ],
+      "aciklama": "Ar-Ge veri sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-dns",
+      "tur": "host",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.60.2"
+      ],
+      "aciklama": "DNS, DHCP ve NTP.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-kamera-kayit",
+      "tur": "host",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.64.50"
+      ],
+      "aciklama": "Kamera kayıt sunucusu.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-proxy",
+      "tur": "host",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.64.10"
+      ],
+      "aciklama": "İnternet çıkış proxy'si.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "izm-yazici",
+      "tur": "host",
+      "sube": "izmir",
+      "uyeler": [
+        "10.2.80.20"
+      ],
+      "aciklama": "Yazıcı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "tunel-izmir",
+      "tur": "host",
+      "sube": "izmir",
+      "uyeler": [
+        "172.31.2.2"
+      ],
+      "aciklama": "İzmir tünel arayüzü adresi.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "ozel-10-8",
+      "tur": "ag",
+      "sube": "ortak",
+      "uyeler": [
+        "10.0.0.0/8"
+      ],
+      "aciklama": "Şirketin bütün özel adres alanı.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "onayli-git",
+      "tur": "fqdn",
+      "sube": "ortak",
+      "uyeler": [
+        "github.com",
+        "gitlab.com"
+      ],
+      "aciklama": "Dış Git depoları. Listeyi yazılım ekibinin talebi ve SOC onayıyla BT Operasyon Sorumlusu günceller.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "sube-fw-tunel",
+      "tur": "grup",
+      "sube": "ortak",
+      "uyeler": [
+        "tunel-izmir",
+        "tunel-amsterdam",
+        "tunel-ankara"
+      ],
+      "aciklama": "FortiManager'a bağlanan şube güvenlik duvarları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "sube-personel",
+      "tur": "grup",
+      "sube": "ortak",
+      "uyeler": [
+        "izm-v20-personel",
+        "ams-v20-personel",
+        "ank-v20-personel"
+      ],
+      "aciklama": "Tünelden ERP'ye gelen şube personeli.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "sube-yazilim",
+      "tur": "grup",
+      "sube": "ortak",
+      "uyeler": [
+        "izm-v30-yazilim",
+        "ams-v30-yazilim",
+        "ank-v30-yazilim"
+      ],
+      "aciklama": "Tünelden Git'e gelen şube yazılımcıları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "wan-subeler",
+      "tur": "grup",
+      "sube": "ortak",
+      "uyeler": [
+        "wan-izmir",
+        "wan-amsterdam",
+        "wan-ankara"
+      ],
+      "aciklama": "IPsec başlatabilen şube WAN adresleri.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "yonetim-tum",
+      "tur": "grup",
+      "sube": "ortak",
+      "uyeler": [
+        "ist-v10-yonetim",
+        "izm-v10-yonetim",
+        "ams-v10-yonetim",
+        "ank-v10-yonetim"
+      ],
+      "aciklama": "Bütün şubelerin yönetim ağları.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "any",
+      "tur": "ozel",
+      "sube": "ortak",
+      "uyeler": [],
+      "aciklama": "Bütün adresler. Yalnızca kural kaynağı ve son ret kuralında kullanılır.",
+      "durum": "tanimli"
+    },
+    {
+      "ad": "internet",
+      "tur": "ozel",
+      "sube": "ortak",
+      "uyeler": [],
+      "aciklama": "WAN arayüzünden gelen veya çıkan trafik. Cihazda bölge (zone) olarak uygulanır, adres listesi değildir.",
+      "durum": "tanimli"
+    }
+  ]
+}

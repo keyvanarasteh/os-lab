@@ -1,0 +1,989 @@
+{
+  "schemaVersion": 1,
+  "slug": "aegisai-global",
+  "name": "AegisAI & CyberSystems Global",
+  "sector": "Technology / Education",
+  "author": {
+    "name": "S***",
+    "course": "BGT207",
+    "github": "Winslowe"
+  },
+  "summary": "Yapay zeka altyapısı, SaaS yazılım ve siber güvenlik akademisi sunan bir grup: İstanbul HQ (veri merkezi, DMZ'de WAF arkasında web sitesi, mobil uygulama API'si, VPN hub, SOC), New York, Amsterdam (GDPR) ve 12.500 öğrencili Antalya kampüsü, toplam 14.280 kişi. Her şubede HA FortiGate, VLAN segmentasyonu, rol tabanlı VPN, NOC/SOC ayrımı ve en sonda varsayılan deny kuralı vardır.",
+  "branches": [
+    {
+      "id": "istanbul-hq",
+      "name": "Istanbul Office (HQ)",
+      "role": "headquarters",
+      "location": "İstanbul, TR",
+      "population": {
+        "staff": 335,
+        "software": 85,
+        "rnd": 30
+      },
+      "network": {
+        "cidr": "10.10.0.0/16",
+        "dmz": true,
+        "vlans": [
+          {
+            "id": 10,
+            "name": "management",
+            "cidr": "10.10.10.0/24",
+            "note": "Ağ cihazı yönetimi (mgmt), yalnızca VPN + bastion"
+          },
+          {
+            "id": 20,
+            "name": "staff",
+            "cidr": "10.10.20.0/23",
+            "note": "Admin staff + technical"
+          },
+          {
+            "id": 30,
+            "name": "software",
+            "cidr": "10.10.30.0/24",
+            "note": "Yazılım geliştirme, Git ve CI/CD"
+          },
+          {
+            "id": 40,
+            "name": "rnd",
+            "cidr": "10.10.40.0/24",
+            "note": "Yapay zeka Ar-Ge (R&D)"
+          },
+          {
+            "id": 50,
+            "name": "security",
+            "cidr": "10.10.50.0/24",
+            "note": "SOC ve siber güvenlik ekibi"
+          },
+          {
+            "id": 60,
+            "name": "servers",
+            "cidr": "10.10.60.0/24",
+            "note": "ERP, Active Directory, Git, SIEM; DHCP/DNS/NTP"
+          },
+          {
+            "id": 70,
+            "name": "dmz",
+            "cidr": "10.10.70.0/24",
+            "note": "Web, API ve mail gateway; iç ağdan izole"
+          },
+          {
+            "id": 99,
+            "name": "guest",
+            "cidr": "10.10.99.0/24",
+            "note": "Misafir: yalnızca internet"
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 5000,
+        "upMbps": 5000,
+        "drivers": [
+          "ERP",
+          "Git, CI/CD",
+          "AI veri setleri",
+          "Zoom ve IP telefon",
+          "veri merkezi ve VPN hub",
+          "web ve API (DMZ)"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 600F (HA)",
+            "vendor": "Fortinet",
+            "throughputGbps": 10.5,
+            "priceUsd": 38000,
+            "reason": "5+5 Gbps hat ve merkez VPN hub rolü için en iyi fiyat/performans; IPS açıkken 10.5 Gbps. HA çifti fiyatı."
+          },
+          "alternatives": [
+            {
+              "product": "PA-3430 (HA)",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 9.5,
+              "priceUsd": 62000,
+              "reason": "Güçlü App-ID ama maliyet çok yüksek."
+            },
+            {
+              "product": "Quantum 6900 (HA)",
+              "vendor": "Check Point",
+              "throughputGbps": 9.2,
+              "priceUsd": 54000,
+              "reason": "İyi merkezi yönetim, daha pahalı ve daha düşük throughput."
+            },
+            {
+              "product": "Secure Firewall 3130 (HA)",
+              "vendor": "Cisco",
+              "throughputGbps": 10.2,
+              "priceUsd": 58000,
+              "reason": "Omurga uyumu iyi, fiyatı yüksek ve ayrı FMC gerekir."
+            },
+            {
+              "product": "FortiGate 400F (HA)",
+              "vendor": "Fortinet",
+              "throughputGbps": 9.0,
+              "priceUsd": 26000,
+              "reason": "5 Gbps sınırında çalışır, büyüme payı yok."
+            }
+          ],
+          "rules": [
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "private-source-from-internet",
+              "to": "any-site",
+              "note": "Spoof koruması: internetten gelen özel (RFC1918) kaynak adresler sahtedir."
+            },
+            {
+              "action": "limit",
+              "direction": "in",
+              "proto": "tcp",
+              "port": 443,
+              "from": "Internet",
+              "to": "dmz-web",
+              "note": "DDoS / brute-force: yeni TLS bağlantılarına hız sınırı uygulanır (rate-limit)."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "tcp",
+              "port": 443,
+              "from": "Internet",
+              "to": "dmz-web",
+              "note": "Genel HTTPS: DMZ'deki WAF arkasındaki web sitesi ve mobil uygulama API'si; tek giriş yolu."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "tcp",
+              "port": 80,
+              "from": "Internet",
+              "to": "dmz-web",
+              "note": "HTTP yalnızca 443'e yönlendirme içindir; DMZ reverse proxy yönlendirir."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "tcp",
+              "port": 25,
+              "from": "Internet",
+              "to": "dmz-mail",
+              "note": "SMTP: DMZ'deki mail gateway dış e-posta alır."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 8443,
+              "from": "dmz",
+              "to": "servers",
+              "note": "Reverse proxy yalnızca tek arka uç portuna (8443) erişir; DMZ'den iç ağa başka yol yok."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "dmz",
+              "to": "internal-lan",
+              "note": "DMZ ele geçirilirse iç ağa sızma engellenir; kalan tüm DMZ→iç trafik reddedilir."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "67:68",
+              "from": "staff",
+              "to": "dhcp-server",
+              "note": "DHCP: istemciler IP alabilsin; kapatılırsa şube ağı çöker."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": 53,
+              "from": "internal",
+              "to": "dns-forwarder",
+              "note": "DNS: yalnızca iç çözümleyiciye izin verilir, dışarıya doğrudan DNS yok."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": 123,
+              "from": "internal",
+              "to": "ntp-pool",
+              "note": "NTP: saat senkronu; sertifika ve log zamanları için gerekli."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "management",
+              "to": "network-devices",
+              "note": "Yalnızca yönetim VLAN'ı ağ cihazlarına SSH ve HTTPS ile erişir; admin erişimi VPN + bastion üzerindendir."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "8443,636,993",
+              "from": "staff",
+              "to": "servers",
+              "note": "İdari personel yalnızca ERP, LDAPS ve IMAPS sunucularına erişir."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "software",
+              "to": "servers",
+              "note": "Yazılım ekibi Git ve CI/CD sunucularına erişir; idari VLAN'a erişemez."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "3128",
+              "from": "rnd",
+              "to": "proxy",
+              "note": "Ar-Ge yalnızca proxy üzerinden internete çıkar (proxy filtresi, doğrudan internet yok)."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "443,6514",
+              "from": "security",
+              "to": "all-firewalls",
+              "note": "SOC ekibi tüm şube güvenlik duvarlarını ve SIEM'i izler (syslog TLS)."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "branch-vpn-peers",
+              "to": "firewall",
+              "note": "Şubelerden gelen IPsec tünelleri (UDP 500/4500) kabul edilir; hub-and-spoke yapısı."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "Internet",
+              "to": "vpn-gateway",
+              "note": "Rol tabanlı uzaktan erişim VPN'i (IKEv2 + MFA) için istemci girişi."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "staff",
+              "to": "Internet",
+              "note": "İç VLAN'lar ve misafir ağı web filtresi arkasında internete çıkar."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "guest",
+              "to": "internal-lan",
+              "note": "Misafir ağı iç ağlara erişemez; yalnızca internet çıkışı vardır."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "guest",
+              "to": "Internet",
+              "note": "Misafir yalnızca web çıkışı alır, 5/2 Mbps sınırı ve captive portal ile."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "note": "Varsayılan kural: izin verilmeyen her şey engellenir ve loglanır (implicit deny)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "new-york",
+      "name": "New York Office",
+      "role": "branch",
+      "location": "New York, US",
+      "population": {
+        "staff": 195,
+        "software": 40,
+        "rnd": 15,
+        "students": 0
+      },
+      "network": {
+        "cidr": "10.20.0.0/16",
+        "vlans": [
+          {
+            "id": 10,
+            "name": "management",
+            "cidr": "10.20.10.0/24",
+            "note": "Şube cihaz yönetimi (mgmt)"
+          },
+          {
+            "id": 20,
+            "name": "staff",
+            "cidr": "10.20.20.0/24",
+            "note": "Admin staff + technical"
+          },
+          {
+            "id": 30,
+            "name": "software",
+            "cidr": "10.20.30.0/24",
+            "note": "Yazılım geliştirme"
+          },
+          {
+            "id": 40,
+            "name": "rnd",
+            "cidr": "10.20.40.0/24",
+            "note": "Ar-Ge (R&D)"
+          },
+          {
+            "id": 50,
+            "name": "security",
+            "cidr": "10.20.50.0/24",
+            "note": "ABD gece vardiyası SOC"
+          },
+          {
+            "id": 99,
+            "name": "guest",
+            "cidr": "10.20.99.0/24",
+            "note": "Misafir: yalnızca internet"
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 2000,
+        "upMbps": 2000,
+        "drivers": [
+          "Zoom ve IP telefon",
+          "Git, CI/CD",
+          "ERP",
+          "e-posta",
+          "VPN (SOC)"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 200F (HA)",
+            "vendor": "Fortinet",
+            "throughputGbps": 3.0,
+            "priceUsd": 14500,
+            "reason": "2+1 Gbps hat için yeterli threat protection, SD-WAN ve İstanbul ile tam uyum. HA çifti."
+          },
+          "alternatives": [
+            {
+              "product": "PA-1410 (HA)",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 3.2,
+              "priceUsd": 24000,
+              "reason": "Güçlü ama lisans maliyeti yüksek."
+            },
+            {
+              "product": "Quantum 3800 (HA)",
+              "vendor": "Check Point",
+              "throughputGbps": 3.0,
+              "priceUsd": 21000,
+              "reason": "Güvenilir, daha pahalı."
+            },
+            {
+              "product": "XGS 3300 (HA)",
+              "vendor": "Sophos",
+              "throughputGbps": 3.1,
+              "priceUsd": 13000,
+              "reason": "Kolay yönetim, merkezi çok şubeli yönetimi zayıf."
+            },
+            {
+              "product": "Secure Firewall 1220 (HA)",
+              "vendor": "Cisco",
+              "throughputGbps": 3.3,
+              "priceUsd": 19500,
+              "reason": "Kurumsal alternatif, maliyet yüksek."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "67:68",
+              "from": "staff",
+              "to": "dhcp-server",
+              "note": "DHCP: istemciler IP alabilsin; kapatılırsa şube ağı çöker."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": 53,
+              "from": "internal",
+              "to": "dns-forwarder",
+              "note": "DNS: yalnızca iç çözümleyiciye izin verilir, dışarıya doğrudan DNS yok."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": 123,
+              "from": "internal",
+              "to": "ntp-pool",
+              "note": "NTP: saat senkronu; sertifika ve log zamanları için gerekli."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "8443,443,22",
+              "from": "staff",
+              "to": "hq-servers",
+              "note": "Şube personeli ve yazılım/Ar-Ge İstanbul sunucularına IPsec VPN üzerinden ERP ve Git için erişir."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "security",
+              "to": "hq-siem",
+              "note": "SOC ekibi İstanbul SIEM ve güvenlik duvarlarını izler."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "hq-vpn",
+              "to": "firewall",
+              "note": "Şube–merkez IPsec tüneli (IKEv2, NAT-T) kurulumu."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "3128",
+              "from": "rnd",
+              "to": "proxy",
+              "note": "Ar-Ge yalnızca proxy üzerinden internete çıkar; doğrudan internet yoktur."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "staff",
+              "to": "Internet",
+              "note": "İç VLAN'lar web filtresi ve QoS arkasında internete çıkar."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "guest",
+              "to": "internal-lan",
+              "note": "Misafir ağı kurumsal ağa erişemez."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "guest",
+              "to": "Internet",
+              "note": "Misafir yalnızca web çıkışı alır; hız sınırı ve captive portal uygulanır."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "note": "Varsayılan kural: izin verilmeyen her şey engellenir ve loglanır (implicit deny)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "amsterdam",
+      "name": "Amsterdam Office",
+      "role": "branch",
+      "location": "Amsterdam, NL",
+      "population": {
+        "staff": 155,
+        "software": 35,
+        "rnd": 20,
+        "students": 0
+      },
+      "network": {
+        "cidr": "10.30.0.0/16",
+        "vlans": [
+          {
+            "id": 10,
+            "name": "management",
+            "cidr": "10.30.10.0/24",
+            "note": "Şube cihaz yönetimi (mgmt)"
+          },
+          {
+            "id": 20,
+            "name": "staff",
+            "cidr": "10.30.20.0/24",
+            "note": "Admin staff + technical (GDPR korumalı)"
+          },
+          {
+            "id": 30,
+            "name": "software",
+            "cidr": "10.30.30.0/24",
+            "note": "Yazılım geliştirme"
+          },
+          {
+            "id": 40,
+            "name": "rnd",
+            "cidr": "10.30.40.0/24",
+            "note": "Ar-Ge (R&D), GDPR izole veri"
+          },
+          {
+            "id": 99,
+            "name": "guest",
+            "cidr": "10.30.99.0/24",
+            "note": "Misafir: yalnızca internet"
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 2000,
+        "upMbps": 2000,
+        "drivers": [
+          "Zoom",
+          "e-posta",
+          "Git",
+          "ERP",
+          "bulut yedekleme"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 200F (HA)",
+            "vendor": "Fortinet",
+            "throughputGbps": 3.0,
+            "priceUsd": 14500,
+            "reason": "2+1 Gbps hat için ideal, DLP ve GDPR raporlama desteği. HA çifti."
+          },
+          "alternatives": [
+            {
+              "product": "PA-1410 (HA)",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 3.2,
+              "priceUsd": 24000,
+              "reason": "Güçlü uygulama kontrolü, pahalı."
+            },
+            {
+              "product": "Quantum 3600 (HA)",
+              "vendor": "Check Point",
+              "throughputGbps": 2.6,
+              "priceUsd": 18500,
+              "reason": "AB uyumluluk raporu iyi, throughput düşük."
+            },
+            {
+              "product": "XGS 3300 (HA)",
+              "vendor": "Sophos",
+              "throughputGbps": 3.1,
+              "priceUsd": 13000,
+              "reason": "EDR senkronu iyi, merkezi yönetimi zayıf."
+            },
+            {
+              "product": "Firebox M590 (HA)",
+              "vendor": "WatchGuard",
+              "throughputGbps": 2.9,
+              "priceUsd": 12500,
+              "reason": "Ekonomik, büyüme payı az."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "67:68",
+              "from": "staff",
+              "to": "dhcp-server",
+              "note": "DHCP: istemciler IP alabilsin; kapatılırsa şube ağı çöker."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": 53,
+              "from": "internal",
+              "to": "dns-forwarder",
+              "note": "DNS: yalnızca iç çözümleyiciye izin verilir, dışarıya doğrudan DNS yok."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": 123,
+              "from": "internal",
+              "to": "ntp-pool",
+              "note": "NTP: saat senkronu; sertifika ve log zamanları için gerekli."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "8443,443,22",
+              "from": "staff",
+              "to": "hq-servers",
+              "note": "Şube personeli ve yazılım/Ar-Ge İstanbul sunucularına IPsec VPN üzerinden ERP ve Git için erişir."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "22,443",
+              "from": "security",
+              "to": "hq-siem",
+              "note": "SOC ekibi İstanbul SIEM ve güvenlik duvarlarını izler."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "hq-vpn",
+              "to": "firewall",
+              "note": "Şube–merkez IPsec tüneli (IKEv2, NAT-T) kurulumu."
+            },
+            {
+              "action": "deny",
+              "direction": "in",
+              "proto": "any",
+              "from": "Internet",
+              "to": "internal-lan",
+              "note": "GDPR: internet ve diğer şubelerden Amsterdam iç ağına doğrudan erişim yasaktır."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "3128",
+              "from": "rnd",
+              "to": "proxy",
+              "note": "Ar-Ge yalnızca proxy üzerinden internete çıkar; doğrudan internet yoktur."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "staff",
+              "to": "Internet",
+              "note": "İç VLAN'lar web filtresi ve QoS arkasında internete çıkar."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "guest",
+              "to": "internal-lan",
+              "note": "Misafir ağı kurumsal ağa erişemez."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "guest",
+              "to": "Internet",
+              "note": "Misafir yalnızca web çıkışı alır; hız sınırı ve captive portal uygulanır."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "note": "Varsayılan kural: izin verilmeyen her şey engellenir ve loglanır (implicit deny)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "academic-antalya",
+      "name": "Academic Branch (Antalya Campus)",
+      "role": "campus",
+      "location": "Antalya, TR",
+      "population": {
+        "staff": 785,
+        "students": 12500,
+        "software": 40,
+        "rnd": 45
+      },
+      "network": {
+        "cidr": "10.40.0.0/16",
+        "vlans": [
+          {
+            "id": 100,
+            "name": "students-wifi",
+            "cidr": "10.40.0.0/17",
+            "note": "12.500 öğrenci × ~2 cihaz için /17 (student)"
+          },
+          {
+            "id": 110,
+            "name": "faculty",
+            "cidr": "10.40.128.0/22",
+            "note": "450 akademisyen"
+          },
+          {
+            "id": 120,
+            "name": "staff",
+            "cidr": "10.40.132.0/23",
+            "note": "Admin + technical + security"
+          },
+          {
+            "id": 130,
+            "name": "rnd-lab",
+            "cidr": "10.40.136.0/22",
+            "note": "Software + R&D + siber lab (research lab)"
+          },
+          {
+            "id": 140,
+            "name": "lms-exam",
+            "cidr": "10.40.140.0/24",
+            "note": "LMS ve online sınav sunucuları"
+          },
+          {
+            "id": 10,
+            "name": "management",
+            "cidr": "10.40.141.0/24",
+            "note": "Kampüs ağ yönetimi (mgmt)"
+          },
+          {
+            "id": 99,
+            "name": "guest",
+            "cidr": "10.40.142.0/24",
+            "note": "Misafir: yalnızca internet"
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 40000,
+        "upMbps": 40000,
+        "drivers": [
+          "LMS video",
+          "online sınav",
+          "Zoom",
+          "bulut",
+          "yazılım güncellemeleri",
+          "araştırma veri setleri"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 3500F (HA)",
+            "vendor": "Fortinet",
+            "throughputGbps": 63.0,
+            "priceUsd": 165000,
+            "reason": "40+10 Gbps kampüs hattını IPS + SSL inceleme açıkken bile taşır; HA çifti fiyatı."
+          },
+          "alternatives": [
+            {
+              "product": "PA-5440 (HA)",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 54.0,
+              "priceUsd": 240000,
+              "reason": "Çok güçlü ama maliyet çok yüksek."
+            },
+            {
+              "product": "Quantum 16600 (HA)",
+              "vendor": "Check Point",
+              "throughputGbps": 52.0,
+              "priceUsd": 195000,
+              "reason": "Büyük kampüs alternatifi, daha pahalı."
+            },
+            {
+              "product": "Secure Firewall 4245 (HA)",
+              "vendor": "Cisco",
+              "throughputGbps": 60.0,
+              "priceUsd": 210000,
+              "reason": "Yüksek port yoğunluğu, fiyat yüksek."
+            },
+            {
+              "product": "SRX5400 (HA)",
+              "vendor": "Juniper",
+              "throughputGbps": 50.0,
+              "priceUsd": 180000,
+              "reason": "İyi yönlendirme, güvenlik profilleri daha zayıf."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "67:68",
+              "from": "students-wifi",
+              "to": "dhcp-server",
+              "note": "DHCP: istemciler IP alabilsin; kapatılırsa şube ağı çöker."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": 53,
+              "from": "internal",
+              "to": "dns-forwarder",
+              "note": "DNS: yalnızca iç çözümleyiciye izin verilir, dışarıya doğrudan DNS yok."
+            },
+            {
+              "action": "allow",
+              "direction": "out",
+              "proto": "udp",
+              "port": 123,
+              "from": "internal",
+              "to": "ntp-pool",
+              "note": "NTP: saat senkronu; sertifika ve log zamanları için gerekli."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "students",
+              "to": "lms-exam",
+              "note": "Sınav günü öğrenci ve lab ağı LMS'e HTTPS ile erişir; QoS sınav saatlerinde %50 garanti verir."
+            },
+            {
+              "action": "limit",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "students",
+              "to": "Internet",
+              "note": "Öğrenci internet çıkışı kişi başı 15/5 Mbps ile sınırlandırılır, P2P/Torrent engelli."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "students",
+              "to": "internal-lan",
+              "note": "Öğrenciler akademisyen, idari ve VPN ağlarına erişemez (tam izolasyon)."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "443",
+              "from": "faculty",
+              "to": "lms-exam",
+              "note": "Akademisyenler LMS ve İstanbul sunucularına not girişi için erişir."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 445,
+              "from": "faculty",
+              "to": "hq-servers",
+              "note": "Akademik veri paylaşımı İstanbul dosya sunucusuna VPN ile SMB; yalnızca akademisyen VLAN'ından."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "8443,443",
+              "from": "staff",
+              "to": "hq-servers",
+              "note": "Kampüs idari ve teknik personel İstanbul ERP'ye erişir."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "3128",
+              "from": "rnd",
+              "to": "proxy",
+              "note": "Ar-Ge ve siber lab yalnızca proxy üzerinden internete çıkar; sınav saatinde kapatılır."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "udp",
+              "port": "500,4500",
+              "from": "hq-vpn",
+              "to": "firewall",
+              "note": "Kampüs–merkez IPsec tüneli kurulumu."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "faculty",
+              "to": "Internet",
+              "note": "Akademisyen ve idari personel web filtresi arkasında internete çıkar."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "guest",
+              "to": "internal-lan",
+              "note": "Misafir ağı kurumsal ağlara erişemez."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "guest",
+              "to": "Internet",
+              "note": "Misafir yalnızca web çıkışı alır, 5/2 Mbps ve captive portal."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "note": "Varsayılan kural: izin verilmeyen her şey engellenir ve loglanır (implicit deny)."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "remoteAccess": {
+    "type": "role-based-vpn",
+    "note": "IKEv2 VPN + MFA ve Active Directory grupları: yöneticiler yönetim VLAN'ına bastion ile, geliştiriciler Git/CI'ya, personel ERP'ye erişir. İnternete açık SSH yoktur. Şubeler ayrıca IPsec ile İstanbul hub'ına bağlanır; hat kopunca yedek ISP / SD-WAN failover devreye girer."
+  },
+  "monitoring": {
+    "siem": "FortiAnalyzer + Wazuh SIEM ile log ve korelasyon, Zabbix + Grafana ile sağlık ve bant genişliği. Loglar 90 gün sıcak, 2 yıl arşivde (5651/KVKK, Amsterdam için GDPR); config backup: firewall yapılandırmaları FortiManager ile haftalık yedeklenir ve restore testi yapılır; DR planı İstanbul–Antalya arasında.",
+    "owner": "NOC ekibi (hat, HA, VPN) ve SOC ekibi (İstanbul + New York, 7/24 vardiya); SOC Tier-1/Tier-2 güvenlik alarmlarından, ağ mühendisleri kural değişikliklerinden sorumludur. FortiOS ve sunucular aylık patch penceresinde (firmware update), aktif sömürülen açıklarda 72 saat içinde güncellenir.",
+    "alertSink": "SIEM panosu + SOC ticket sistemi; kritik engelleme alarmları Telegram kanalına, uptime alarmları ayrı ops kanalına gider.",
+    "appVsSecurity": "Uygulama sağlığı (ERP, LMS, web up/down) NOC/ops kanalına; güvenlik olayları (engeller, kimlik doğrulama hataları, IPS ve WAF) SOC'a gider. İkisi karışmaz."
+  },
+  "cveWatch": [
+    {
+      "id": "CVE-2024-4577",
+      "product": "PHP-CGI (Windows)",
+      "status": "not-affected",
+      "note": "Web portal Linux üzerinde PHP-FPM ile çalışır, CGI yolu kullanılmaz. Geçici önlem: ModSecurity + Cloudflare WAF kuralı; kalıcı çözüm: PHP sürümü yamalı ve aylık güncelleme."
+    }
+  ]
+}

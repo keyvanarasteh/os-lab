@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "task_id": "PENT-07",
+  "policy_id": "03_onenter_arg_tamper",
+  "target": {
+    "source": "android-lab/lab/tests/targets/hedef.c",
+    "function": "parola_kontrol",
+    "scope_verified": true
+  },
+  "schedule": {
+    "iterations": 3,
+    "interval_ms": 2000
+  },
+  "inputs": {
+    "parola": "deneme123",
+    "yetki_seviyesi": 1
+  },
+  "summary": {
+    "total_calls": 3,
+    "approved_calls": 3,
+    "rejected_calls": 0,
+    "arg_tampers_applied": 3,
+    "retval_replacements_applied": 0,
+    "final_status": "ONAYLANDI"
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "total_iterations": 3,
+      "elapsed_ms": 0,
+      "caller_inputs": {
+        "parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "onEnter": {
+        "hooked": true,
+        "observed_args": {
+          "girilen_parola": "deneme123",
+          "yetki_seviyesi": 1
+        },
+        "tampered_args": [
+          {
+            "index": 0,
+            "name": "girilen_parola",
+            "type": "utf8",
+            "before": "deneme123",
+            "after": "gizli123"
+          }
+        ]
+      },
+      "effective_args": {
+        "girilen_parola": "gizli123",
+        "yetki_seviyesi": 1
+      },
+      "native_retval": 1,
+      "onLeave": {
+        "hooked": true,
+        "observed_retval": 1,
+        "retval_replaced": false,
+        "final_retval": 1
+      },
+      "durum": "ONAYLANDI"
+    },
+    {
+      "iteration": 2,
+      "total_iterations": 3,
+      "elapsed_ms": 2000,
+      "caller_inputs": {
+        "parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "onEnter": {
+        "hooked": true,
+        "observed_args": {
+          "girilen_parola": "deneme123",
+          "yetki_seviyesi": 1
+        },
+        "tampered_args": [
+          {
+            "index": 0,
+            "name": "girilen_parola",
+            "type": "utf8",
+            "before": "deneme123",
+            "after": "gizli123"
+          }
+        ]
+      },
+      "effective_args": {
+        "girilen_parola": "gizli123",
+        "yetki_seviyesi": 1
+      },
+      "native_retval": 1,
+      "onLeave": {
+        "hooked": true,
+        "observed_retval": 1,
+        "retval_replaced": false,
+        "final_retval": 1
+      },
+      "durum": "ONAYLANDI"
+    },
+    {
+      "iteration": 3,
+      "total_iterations": 3,
+      "elapsed_ms": 4000,
+      "caller_inputs": {
+        "parola": "deneme123",
+        "yetki_seviyesi": 1
+      },
+      "onEnter": {
+        "hooked": true,
+        "observed_args": {
+          "girilen_parola": "deneme123",
+          "yetki_seviyesi": 1
+        },
+        "tampered_args": [
+          {
+            "index": 0,
+            "name": "girilen_parola",
+            "type": "utf8",
+            "before": "deneme123",
+            "after": "gizli123"
+          }
+        ]
+      },
+      "effective_args": {
+        "girilen_parola": "gizli123",
+        "yetki_seviyesi": 1
+      },
+      "native_retval": 1,
+      "onLeave": {
+        "hooked": true,
+        "observed_retval": 1,
+        "retval_replaced": false,
+        "final_retval": 1
+      },
+      "durum": "ONAYLANDI"
+    }
+  ]
+}

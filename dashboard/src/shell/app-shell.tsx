@@ -1,7 +1,8 @@
 /**
  * The page frame for every dashboard page, ported from qLar's shell/app-shell.tsx (PR #174):
  * a collapsible sidebar with nested nav on desktop, the same nav in a left drawer on small screens,
- * and Spotlight (⌘K / Ctrl+K) over the pages, labs, lab actions and recent jobs.
+ * Spotlight (⌘K / Ctrl+K) over the pages, labs, lab actions and recent jobs, and the lab switcher
+ * (⌘L / Ctrl+L) that focuses the sidebar on one lab.
  *
  * The sidebar is built from the live host report: each lab carries its availability on this
  * computer (Ready / Setup / N/A) and a dot while one of its jobs runs.
@@ -11,11 +12,14 @@ import {
   AndroidLogoIcon,
   AppleLogoIcon,
   BookOpenIcon,
+  BroomIcon,
   CircleIcon,
   CpuIcon,
   DesktopTowerIcon,
   FireIcon,
+  ChatCircleTextIcon,
   GitPullRequestIcon,
+  GlobeIcon,
   HeartbeatIcon,
   ScalesIcon,
   LaptopIcon,
@@ -26,42 +30,62 @@ import {
   ArrowClockwiseIcon,
   ShieldCheckIcon,
   SidebarSimpleIcon,
+  SquaresFourIcon,
   SunIcon,
   TerminalWindowIcon,
   WindowsLogoIcon,
   XIcon
 } from "@phosphor-icons/react";
-import { AppSidebar, SidebarBadge, useSidebarCollapsed, type SidebarGroup } from "./sidebar";
+import { AppSidebar, SidebarBadge, useSidebarCollapsed, type SidebarGroup, type SidebarItem } from "./sidebar";
 import { Spotlight, type SpotlightCommand, type SpotlightMeta, type SpotlightRecord } from "./spotlight";
+import { LabSwitcher, type LabSwitcherLab } from "./lab-switcher";
+import { labOfSection, useActiveLab, type ActiveLabId } from "./active-lab";
 import { toggleMode, useThemeMode } from "./theme";
+import { UpdateModal } from "../views/update-modal";
 import { androidLogsStore, healthStore, hostStore, jobsStore, type LabId, type LabStatus } from "../lib/api";
+import { copy, firewallPath, type FirewallLocale } from "../firewall/locale";
+import { localeFromPath, localePath } from "../i18n/paths";
 
 export const REPO_URL = "https://github.com/keyvanarasteh/os-lab";
+const PUBLIC_PAGES = import.meta.env.PUBLIC_SITE_MODE === "pages";
 
 export const LAB_ICON: Record<LabId, (size?: number) => ReactNode> = {
   android: (s = 16) => <AndroidLogoIcon size={s} />,
   windows: (s = 16) => <WindowsLogoIcon size={s} />,
+  winapps: (s = 16) => <TerminalWindowIcon size={s} />,
   linux: (s = 16) => <TerminalWindowIcon size={s} />,
   ios: (s = 16) => <AppleLogoIcon size={s} />,
-  macos: (s = 16) => <LaptopIcon size={s} />
+  source: (s = 16) => <TerminalWindowIcon size={s} />,
+  macos: (s = 16) => <LaptopIcon size={s} />,
+  web: (s = 16) => <GlobeIcon size={s} />
 };
 
 /** Where a section id leads. Pages are static files, so every section is a plain href. */
 export function sectionHref(id: string): string {
-  if (id === "host") return "/";
-  if (id === "jobs") return "/jobs/";
+  const localized = (path: string) => localePath(path, typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname));
+  if (id === "host") return PUBLIC_PAGES ? `${import.meta.env.BASE_URL.replace(/\/$/, "")}/` : localized("/");
+  if (id === "jobs") return localized("/jobs/");
   if (id === "repo") return REPO_URL;
-  if (id === "health") return "/api/health";
-  if (id === "legal") return "/legal/";
-  if (id === "contribute") return "/contribute/";
-  if (id === "firewall") return "/firewall/";
-  if (id.startsWith("legal-")) return `/legal/${id.slice(6)}/`;
-  if (id === "android-overview") return "/android/";
-  if (id.startsWith("android-")) return `/android/${id.slice(8)}/`;
-  if (id.startsWith("lab-")) return `/labs/${id.slice(4)}/`;
-  return "/";
+  if (id === "health") return localized("/health/");
+  if (id === "legal") return localized("/legal/");
+  if (id === "contribute") return localized("/contribute/");
+  if (id.startsWith("how-to-use")) return localized("/how-to-use/");
+  if (id === "feedback") return localized("/feedback/");
+  if (id === "content") return localized("/content/");
+  if (id.startsWith("cleanup-")) return localized(`/cleanup/${id === "cleanup-scan" ? "" : id.slice(8) + "/"}`);
+  if (id === "web-lab") return localized("/web-lab/");
+  if (id === "firewall") {
+    const locale = typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname);
+    return firewallPath(locale);
+  }
+  if (id.startsWith("legal-")) return localized(`/legal/${id.slice(6)}/`);
+  if (id === "android-overview") return localized("/android/");
+  if (id.startsWith("android-")) return localized(`/android/${id.slice(8)}/`);
+  if (id.startsWith("source-")) return localized(`/source/${id === "source-overview" ? "" : id.slice(7) + "/"}`);
+  if (id.startsWith("lab-")) return localized(`/labs/${id.slice(4)}/`);
+  return localized("/");
 }
-export const labHref = (lab: LabId) => `/labs/${lab}/`;
+export const labHref = (lab: LabId) => localePath(`/labs/${lab}/`, typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname));
 
 function StatePill({ lab }: { lab?: LabStatus }) {
   if (!lab) return null;
@@ -78,7 +102,35 @@ function RunningDot() {
   return <span className="ml-auto size-2 animate-pulse rounded-full bg-[#00d084]" aria-label="running" />;
 }
 
-function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androidRunning: boolean): SidebarGroup[] {
+/** Labs this computer cannot run are left out of navigation; the page of one you are on stays. */
+function labShown(labs: LabStatus[] | undefined, id: LabId, activeId: string): boolean {
+  const lab = labs?.find((l) => l.id === id);
+  return !lab || lab.state !== "unavailable" || activeId === `lab-${id}`;
+}
+
+/** "How to use" sits at the bottom of Help as a collapsible guide; the child opens the prompt builder. */
+const HOW_TO_USE_ITEM: SidebarItem = {
+  id: "how-to-use-guide",
+  label: "How to use",
+  icon: <BookOpenIcon size={16} />,
+  children: [{ id: "how-to-use", label: "Task prompt" }]
+};
+
+function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androidRunning: boolean, locale: FirewallLocale, activeId: string, activeLab: ActiveLabId | null): SidebarGroup[] {
+  if (PUBLIC_PAGES) return [
+    {
+      label: "os-lab",
+      items: [
+        { id: "host", label: "Home", icon: <DesktopTowerIcon size={16} /> },
+        { id: "firewall", label: copy[locale].lab, icon: <FireIcon size={16} /> },
+        { id: "source-overview", label: "Source Lab", icon: LAB_ICON.source() },
+        { id: "cleanup-scan", label: "Cleanup Lab", icon: <BroomIcon size={16} /> },
+        { id: "feedback", label: "Feedback", icon: <ChatCircleTextIcon size={16} /> },
+        { id: "repo", label: "Repository", icon: <BookOpenIcon size={16} /> },
+        HOW_TO_USE_ITEM
+      ]
+    }
+  ];
   const lab = (id: LabId) => labs?.find((l) => l.id === id);
   const labItem = (id: LabId, label: string) => ({
     id: `lab-${id}`,
@@ -86,6 +138,75 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
     icon: LAB_ICON[id](),
     badge: running.has(id) ? <RunningDot /> : <StatePill lab={lab(id)} />
   });
+  // Every lab as a sidebar item. With a focused lab the OS Lab group keeps only its entry;
+  // the other labs stay reachable through the switcher (⌘L), Spotlight and direct links.
+  const labNav: Record<ActiveLabId, SidebarItem> = {
+    android: {
+      id: "android",
+      label: "Android Lab",
+      icon: <ShieldCheckIcon size={16} />,
+      badge: androidRunning || running.has("android") ? <RunningDot /> : <StatePill lab={lab("android")} />,
+      children: [
+        { id: "android-overview", label: "Overview" },
+        { id: "lab-android", label: "Runtime & setup" },
+        { id: "android-providers", label: "Code & Providers" },
+        { id: "android-workflows", label: "Workflows & DAG" },
+        { id: "android-console", label: "Execution & Logs" },
+        { id: "android-analytics", label: "Analytics" },
+        { id: "android-sitemap", label: "Routes & Sitemap" }
+      ]
+    },
+    source: {
+      id: "source",
+      label: "Source Lab",
+      icon: LAB_ICON.source(),
+      badge: running.has("source") ? <RunningDot /> : <StatePill lab={lab("source")} />,
+      children: [
+        { id: "source-overview", label: "Overview" }, { id: "lab-source", label: "Readiness & setup" },
+        { id: "source-analyzer", label: "Crawler" }, { id: "source-evidence", label: "Evidence" },
+        { id: "source-deep-analysis", label: "Deep analysis" }, { id: "source-pipeline", label: "Pipeline" },
+        { id: "source-brain", label: "Brain" }, { id: "source-sources", label: "Sources" },
+        { id: "source-settings/runtime", label: "Runtime settings" }, { id: "source-docs", label: "Documentation" }
+      ]
+    },
+    cleanup: {
+      id: "cleanup",
+      label: "Cleanup Lab",
+      icon: <BroomIcon size={16} />,
+      children: [
+        { id: "cleanup-scan", label: "Dashboard" },
+        { id: "cleanup-settings", label: "Settings" }
+      ]
+    },
+    web: {
+      id: "web",
+      label: "Web Lab",
+      icon: LAB_ICON.web(),
+      badge: running.has("web") ? <RunningDot /> : <StatePill lab={lab("web")} />,
+      children: [
+        { id: "web-lab", label: "Workbench" },
+        { id: "lab-web", label: "Readiness & setup" }
+      ]
+    },
+    ios: labItem("ios", "iOS Lab"),
+    windows: labItem("windows", "Windows Lab"),
+    winapps: labItem("winapps", "Windows Apps Lab"),
+    macos: labItem("macos", "macOS Lab"),
+    linux: labItem("linux", "Linux Lab")
+  };
+  const osLabItems = activeLab
+    ? [labNav[activeLab]]
+    : [
+        labNav.android,
+        labNav.source,
+        labNav.cleanup,
+        labNav.web,
+        ...(labShown(labs, "ios", activeId) ? [labNav.ios] : []),
+        ...(labShown(labs, "windows", activeId) ? [labNav.windows] : []),
+        ...(labShown(labs, "winapps", activeId) ? [labNav.winapps] : []),
+        ...(labShown(labs, "macos", activeId) ? [labNav.macos] : []),
+        ...(labShown(labs, "linux", activeId) ? [labNav.linux] : [])
+      ];
   return [
     {
       label: "Workspace",
@@ -101,28 +222,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
     },
     {
       label: "OS Lab",
-      items: [
-        {
-          id: "android",
-          label: "Android Lab",
-          icon: <ShieldCheckIcon size={16} />,
-          badge: androidRunning || running.has("android") ? <RunningDot /> : <StatePill lab={lab("android")} />,
-          children: [
-            { id: "android-overview", label: "Overview" },
-            { id: "lab-android", label: "Runtime & setup" },
-            { id: "android-providers", label: "Code & Providers" },
-            { id: "android-workflows", label: "Workflows & DAG" },
-            { id: "android-console", label: "Execution & Logs" },
-            { id: "android-analytics", label: "Analytics" },
-            { id: "android-sitemap", label: "Routes & Sitemap" }
-          ]
-        },
-        labItem("ios", "iOS Lab"),
-        labItem("windows", "Windows Lab"),
-        labItem("macos", "macOS Lab"),
-        labItem("linux", "Linux Lab"),
-        { id: "firewall", label: "Firewall Lab", icon: <FireIcon size={16} /> }
-      ]
+      items: [...osLabItems, { id: "firewall", label: copy[locale].lab, icon: <FireIcon size={16} /> }]
     },
     {
       label: "Help",
@@ -140,13 +240,16 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
           ]
         },
         { id: "contribute", label: "Contribute", icon: <GitPullRequestIcon size={16} /> },
-        { id: "repo", label: "Repository", icon: <BookOpenIcon size={16} /> }
+        { id: "feedback", label: "Feedback", icon: <ChatCircleTextIcon size={16} /> },
+        { id: "repo", label: "Repository", icon: <BookOpenIcon size={16} /> },
+        HOW_TO_USE_ITEM
       ]
     }
   ];
 }
 
 function buildMeta(): Record<string, SpotlightMeta> {
+  const howToUse = { description: "Create a task prompt with os-lab capabilities for any LLM", aliases: ["how to", "guide", "prompt", "llm", "help", "task"] };
   return {
     host: { description: "OS, hardware, KVM, tools and which labs run here", aliases: ["host", "computer", "dependencies", "kvm", "wsl"] },
     jobs: { description: "Every lab job with its output", aliases: ["jobs", "runs", "history", "logs"] },
@@ -159,11 +262,17 @@ function buildMeta(): Record<string, SpotlightMeta> {
     "android-sitemap": { description: "Every page, endpoint and lab route", aliases: ["routes", "topology", "sitemap"] },
     "lab-ios": { description: "iOS Simulator via the macOS VM, or native Xcode", aliases: ["ios", "simulator", "xcode"] },
     "lab-windows": { description: "Windows VM with web desktop and RDP", aliases: ["windows", "rdp", "vm"] },
+    "lab-winapps": { description: "Read-only mirror of visible desktop applications on this Windows host", aliases: ["winapps", "windows apps", "window mirror", "capture"] },
     "lab-macos": { description: "Native Xcode Simulator and Appium on a Mac", aliases: ["mac", "appium", "xcuitest"] },
     "lab-linux": { description: "Linux VM with web console and SSH", aliases: ["linux", "ssh", "vm"] },
+    "web-lab": { description: "Embedded in-app browser: open windows, inject JavaScript, read captured page activity", aliases: ["web", "browser", "webview", "injection", "javascript"] },
+    "lab-web": { description: "Web Lab engine readiness: cargo, make and the built engine", aliases: ["web", "engine", "setup"] },
     firewall: { description: "BGT207 dream-company firewall designs — branches, segmentation, products and rule sets", aliases: ["firewall", "bgt207", "ufw", "rules", "vlan", "dmz", "company"] },
     health: { description: "GET /api/health", aliases: ["status", "api"] },
     contribute: { description: "How to set up, test, rebuild, open a pull request and view roadmap TODOs", aliases: ["contribute", "contributing", "pull request", "pr", "development", "tests", "todos", "roadmap", "pentesting", "firewall", "tasks"] },
+    "how-to-use": howToUse,
+    "how-to-use-guide": howToUse,
+    feedback: { description: "Report issues, suggest features, and share feedback", aliases: ["feedback", "bug", "issue", "request", "suggestion", "help"] },
     "legal-terms": { description: "Licence, authorized use, OS licences, no warranty", aliases: ["legal", "terms", "license", "warranty", "liability"] },
     "legal-acceptable-use": { description: "Supported and unsupported use, responsible disclosure", aliases: ["legal", "aup", "policy", "disclosure"] },
     "legal-privacy": { description: "Local-only console, browser storage, network connections, analytics", aliases: ["legal", "privacy", "gdpr", "kvkk", "telemetry", "cookies"] },
@@ -214,7 +323,7 @@ function Brand({ compact = false, action }: { compact?: boolean; action?: ReactN
           : "flex h-14 shrink-0 items-center gap-2.5 border-b border-(--iux-border) pr-2 pl-4"
       }
     >
-      <img src="/favicon.svg" alt="os-lab" width={28} height={28} className="iux-logo" />
+      <img src={localePath("/favicon.svg", "en")} alt="os-lab" width={28} height={28} className="iux-logo" />
       {!compact && (
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm leading-5 font-semibold tracking-tight">os-lab</div>
@@ -246,14 +355,20 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useSidebarCollapsed("oslab.sidebar.collapsed");
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [sourceRecords, setSourceRecords] = useState<SpotlightRecord[]>([]);
+  const [sourceSearchError, setSourceSearchError] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [spotlightOpen, setSpotlightOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [activeLab, chooseActiveLab] = useActiveLab(activeId);
   const drawerRef = useRef<HTMLDialogElement>(null);
   const mode = useThemeMode();
   const { data: host } = hostStore.use();
   const { data: jobs } = jobsStore.use();
   const { data: health, error: healthError } = healthStore.use();
   const { data: androidLogs } = androidLogsStore.use();
+  const locale: FirewallLocale = typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname);
 
   useEffect(() => {
     const drawer = drawerRef.current;
@@ -262,14 +377,119 @@ export function AppShell({
     if (!navOpen && drawer.open) drawer.close();
   }, [navOpen]);
 
+  // ⌘L / Ctrl+L toggles the lab switcher from anywhere (local console only)
+  useEffect(() => {
+    if (PUBLIC_PAGES) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        setSwitcherOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (PUBLIC_PAGES || !spotlightOpen) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      const query = sourceQuery.replace(/^source:\s*/i, "").slice(0, 200);
+      void fetch(`/api/source/spotlight?section=evidence&limit=25&q=${encodeURIComponent(query)}`, { signal: controller.signal })
+        .then(async response => { if (!response.ok) throw new Error(); return response.json(); })
+        .then(result => {
+          setSourceSearchError(false);
+          setSourceRecords((result.data ?? []).filter((r: { href?: string }) => r.href?.startsWith("/source/")).map((r: { title: string; href: string }) => ({
+            id: r.href, section: "source-evidence", title: r.title, href: r.href
+          })));
+        }).catch(() => { if (!controller.signal.aborted) { setSourceRecords([]); setSourceSearchError(true); } });
+    }, 200);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [spotlightOpen, sourceQuery]);
+
   const running = useMemo(() => new Set((jobs ?? []).filter((j) => j.state === "running").map((j) => j.lab)), [jobs]);
-  const groups = useMemo(
-    () => buildGroups(host?.labs, running, Boolean(androidLogs?.running)),
-    [host?.labs, running, androidLogs?.running]
+  const androidRunning = Boolean(androidLogs?.running);
+  // The sidebar focuses on the active lab; Spotlight keeps every lab listed.
+  const navGroups = useMemo(
+    () => buildGroups(host?.labs, running, androidRunning, locale, activeId, activeLab),
+    [host?.labs, running, androidRunning, locale, activeId, activeLab]
   );
+  const spotlightGroups = useMemo(
+    () => buildGroups(host?.labs, running, androidRunning, locale, activeId, null),
+    [host?.labs, running, androidRunning, locale, activeId]
+  );
+  const switcherLabs = useMemo<LabSwitcherLab[]>(() => {
+    if (PUBLIC_PAGES) return [];
+    const status = (id: LabId) => host?.labs?.find((l) => l.id === id);
+    return [
+      {
+        id: "android",
+        label: status("android")?.label ?? "Android Lab",
+        icon: <ShieldCheckIcon size={18} />,
+        summary: status("android")?.summary,
+        badge: androidRunning || running.has("android") ? <RunningDot /> : <StatePill lab={status("android")} />
+      },
+      {
+        id: "source",
+        label: status("source")?.label ?? "Source Lab",
+        icon: LAB_ICON.source(18),
+        summary: status("source")?.summary,
+        badge: running.has("source") ? <RunningDot /> : <StatePill lab={status("source")} />
+      },
+      {
+        id: "cleanup",
+        label: "Cleanup Lab",
+        icon: <BroomIcon size={18} />,
+        summary: "Measure reclaimable space, review a plan, then confirm each clean."
+      },
+      {
+        id: "web",
+        label: status("web")?.label ?? "Web Lab",
+        icon: LAB_ICON.web(18),
+        summary: status("web")?.summary,
+        badge: running.has("web") ? <RunningDot /> : <StatePill lab={status("web")} />
+      },
+      {
+        id: "ios",
+        label: status("ios")?.label ?? "iOS Lab",
+        icon: LAB_ICON.ios(18),
+        summary: status("ios")?.summary,
+        badge: running.has("ios") ? <RunningDot /> : <StatePill lab={status("ios")} />
+      },
+      {
+        id: "windows",
+        label: status("windows")?.label ?? "Windows Lab",
+        icon: LAB_ICON.windows(18),
+        summary: status("windows")?.summary,
+        badge: running.has("windows") ? <RunningDot /> : <StatePill lab={status("windows")} />
+      },
+      {
+        id: "winapps",
+        label: status("winapps")?.label ?? "Windows Apps Lab",
+        icon: LAB_ICON.winapps(18),
+        summary: status("winapps")?.summary,
+        badge: running.has("winapps") ? <RunningDot /> : <StatePill lab={status("winapps")} />
+      },
+      {
+        id: "macos",
+        label: status("macos")?.label ?? "macOS Lab",
+        icon: LAB_ICON.macos(18),
+        summary: status("macos")?.summary,
+        badge: running.has("macos") ? <RunningDot /> : <StatePill lab={status("macos")} />
+      },
+      {
+        id: "linux",
+        label: status("linux")?.label ?? "Linux Lab",
+        icon: LAB_ICON.linux(18),
+        summary: status("linux")?.summary,
+        badge: running.has("linux") ? <RunningDot /> : <StatePill lab={status("linux")} />
+      }
+    ];
+  }, [host?.labs, running, androidRunning]);
   const meta = useMemo(buildMeta, []);
   const records = useMemo<SpotlightRecord[]>(
     () => [
+      ...sourceRecords,
       ...(host?.labs ?? []).flatMap((lab) =>
         lab.actions.map((action) => ({
           id: `${lab.id}:${action.id}`,
@@ -287,19 +507,26 @@ export function AppShell({
         badge: job.state
       }))
     ],
-    [host?.labs, jobs]
+    [host?.labs, jobs, sourceRecords]
   );
   const allCommands = useMemo<SpotlightCommand[]>(
     () => [
       ...commands,
-      {
+      ...(!PUBLIC_PAGES ? [{
         id: "refresh",
         label: "Re-detect this computer",
         description: "Refresh OS, tools and lab availability",
         aliases: ["refresh", "detect", "rescan"],
         icon: <ArrowClockwiseIcon size={16} />,
         run: () => void hostStore.refresh()
-      },
+      }, {
+        id: "switch-lab",
+        label: "Switch lab",
+        description: "Focus the sidebar on one lab",
+        aliases: ["switch lab", "labs", "focus", "active lab"],
+        icon: <SquaresFourIcon size={16} />,
+        run: () => setSwitcherOpen(true)
+      }] : []),
       {
         id: "theme",
         label: "Toggle theme",
@@ -320,13 +547,30 @@ export function AppShell({
   );
 
   const connected = health?.status === "ok" && !healthError;
+  const activeLabLabel = activeLab ? (switcherLabs.find((lab) => lab.id === activeLab)?.label ?? "All labs") : "All labs";
   const footer = () => (
-    <div className="flex items-center justify-between border-t border-(--iux-border) px-4 py-3 text-[10px] text-(--iux-muted-foreground)/70">
-      <span className="inline-flex items-center gap-1.5">
-        <CircleIcon size={7} weight="fill" className={connected ? "text-(--iux-success)" : "text-(--iux-danger)"} />
-        {connected ? "Lab engine connected" : healthError ? "Lab engine offline" : "Connecting…"}
-      </span>
-      <span>{host ? `${host.host.os} · ${host.host.arch}` : "os-lab"}</span>
+    <div className="flex flex-col border-t border-(--iux-border)">
+      {!PUBLIC_PAGES && (
+        <div className="p-2">
+          <button type="button" className="iux-lab-card" aria-label="Switch lab" onClick={() => setSwitcherOpen(true)}>
+            <span className="iux-lab-card-icon">
+              <SquaresFourIcon size={15} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col text-left">
+              <span className="truncate text-sm leading-5 font-medium">Switch lab</span>
+              <span className="truncate text-xs leading-4 text-(--iux-muted-foreground)">{activeLabLabel}</span>
+            </span>
+            <kbd className="shrink-0 rounded border border-(--iux-border) px-1 text-[10px] text-(--iux-muted-foreground)">⌘L</kbd>
+          </button>
+        </div>
+      )}
+      <div className="flex items-center justify-between px-4 py-3 text-[10px] text-(--iux-muted-foreground)/70">
+        {!PUBLIC_PAGES && <span className="inline-flex items-center gap-1.5">
+          <CircleIcon size={7} weight="fill" className={connected ? "text-(--iux-success)" : "text-(--iux-danger)"} />
+          {connected ? "Lab engine connected" : healthError ? "Lab engine offline" : "Connecting…"}
+        </span>}
+        <span>{host ? `${host.host.os} · ${host.host.arch}` : "os-lab"}</span>
+      </div>
     </div>
   );
   const shell = useMemo(() => ({ openNav: () => setNavOpen(true), openSpotlight: () => setSpotlightOpen(true) }), []);
@@ -334,12 +578,21 @@ export function AppShell({
     setNavOpen(false);
     go(sectionHref(id));
   };
+  const pickLab = (id: ActiveLabId) => {
+    setSwitcherOpen(false);
+    chooseActiveLab(id);
+    go(id === "cleanup" ? sectionHref("cleanup-scan") : labHref(id));
+  };
+  const showAllLabs = () => {
+    setSwitcherOpen(false);
+    chooseActiveLab(null);
+  };
 
   return (
     <ShellContext.Provider value={shell}>
       <div className="flex h-dvh overflow-hidden">
         <AppSidebar
-          groups={groups}
+          groups={navGroups}
           activeId={activeId}
           onSelect={select}
           collapsed={collapsed}
@@ -352,21 +605,35 @@ export function AppShell({
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
         </div>
       </div>
+      {PUBLIC_PAGES ? null : <UpdateModal />}
+      {PUBLIC_PAGES ? null : (
+        <LabSwitcher
+          open={switcherOpen}
+          onOpenChange={setSwitcherOpen}
+          labs={switcherLabs}
+          activeLab={activeLab}
+          onPick={pickLab}
+          onShowAll={showAllLabs}
+        />
+      )}
       <Spotlight
+        onQueryChange={setSourceQuery}
+        searchError={sourceSearchError && !PUBLIC_PAGES ? "Source search unavailable" : undefined}
         open={spotlightOpen}
         onOpenChange={setSpotlightOpen}
-        groups={groups}
+        groups={spotlightGroups}
         meta={meta}
         commands={allCommands}
-        records={records}
-        tips={[
+        records={PUBLIC_PAGES ? [] : records}
+        tips={PUBLIC_PAGES ? [] : [
           { scope: "jobs", description: "Search recent jobs", icon: <ListChecksIcon size={16} /> },
-          { scope: "windows", description: "Windows Lab actions", icon: <WindowsLogoIcon size={16} /> },
+          ...(labShown(host?.labs, "windows", activeId) ? [{ scope: "windows", description: "Windows Lab actions", icon: <WindowsLogoIcon size={16} /> }] : []),
           { scope: "android", description: "Android Lab pages and actions", icon: <AndroidLogoIcon size={16} /> },
-          { scope: "linux", description: "Linux Lab actions", icon: <CpuIcon size={16} /> }
+          ...(labShown(host?.labs, "linux", activeId) ? [{ scope: "linux", description: "Linux Lab actions", icon: <CpuIcon size={16} /> }] : [])
         ]}
         onNavigate={(section, record) => {
-          if (record && section === "jobs") return go(`/jobs/#${record.id}`);
+          if (record?.href?.startsWith("/source/")) return go(localePath(record.href, locale));
+          if (record && section === "jobs") return go(`${sectionHref("jobs")}#${record.id}`);
           if (record && section.startsWith("lab-")) return go(`${sectionHref(section)}#action=${record.id.split(":")[1]}`);
           go(sectionHref(section));
         }}
@@ -390,7 +657,7 @@ export function AppShell({
         />
         <AppSidebar
           variant="drawer"
-          groups={groups}
+          groups={navGroups}
           activeId={activeId}
           onSelect={select}
           onSearch={() => {

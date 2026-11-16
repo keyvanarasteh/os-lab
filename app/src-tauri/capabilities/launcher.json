@@ -1,0 +1,26 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "launcher",
+  "description": "The local launcher page (ui/) only: it starts the console and hands the window to the dashboard. The dashboard itself is served from 127.0.0.1 and is granted nothing, so a page there cannot call a command.",
+  "windows": ["main"],
+  "local": true,
+  "permissions": [
+    "core:event:default",
+    "allow-console-start",
+    "allow-console-status",
+    "allow-console-restart",
+    "allow-console-choose-root",
+    "allow-console-reset-root",
+    "allow-console-logs",
+    "allow-console-files-dir",
+    "allow-console-choose-files-dir",
+    "allow-python-install",
+    "allow-container-status",
+    "allow-container-warning-hidden",
+    "allow-container-warning-set-hidden",
+    "allow-container-recover",
+    "allow-container-get",
+    "allow-app-update-check",
+    "allow-app-update-install"
+  ]
+}

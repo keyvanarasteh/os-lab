@@ -65,16 +65,13 @@ esac
 
 [[ "$ARCH" == "x86_64" ]] || warn "arch=$ARCH — docker-android images are x86/x86_64"
 
-# --- docker -------------------------------------------------------------
-if command -v docker >/dev/null 2>&1; then
-  ok "docker: $(docker --version 2>/dev/null || echo present)"
-  if docker compose version >/dev/null 2>&1; then
-    ok "docker compose plugin present"
-  else
-    bad "docker compose not found (install the compose plugin)"
-  fi
+# --- container runtime --------------------------------------------------
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  ok "docker: $(docker --version 2>/dev/null || echo present) with Compose"
+elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1 && podman compose version >/dev/null 2>&1; then
+  ok "podman: $(podman --version 2>/dev/null || echo present) with Compose"
 else
-  bad "docker not found (run: sudo make setup)"
+  bad "no working Docker or Podman engine with Compose (run: sudo make setup)"
 fi
 
 if [[ "$STATIC" -eq 1 ]]; then

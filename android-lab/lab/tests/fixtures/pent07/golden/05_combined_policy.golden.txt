@@ -1,0 +1,15 @@
+[PENT-07] policy=05_combined_policy | target=android-lab/lab/tests/targets/hedef.c | fn=parola_kontrol | scope=VERIFIED
+[PENT-07] schedule=3x2000ms | inputs=parola:"yanlis_parola",yetki_seviyesi:0 | hook_active=true
+[t=0ms] [INTERCEPTOR] onEnter parola_kontrol | observed={"girilen_parola": "yanlis_parola", "yetki_seviyesi": 0} | tampered=[{"after": 5, "before": 0, "index": 1, "name": "yetki_seviyesi", "type": "int32"}]
+[t=0ms] [HEDEF] native parola_kontrol("yanlis_parola", 5) -> 0
+[t=0ms] [INTERCEPTOR] onLeave parola_kontrol | observed_retval=0 | final_retval=1 | retval_replaced=true
+[t=0ms] [HEDEF] iter=1/3 | girilen="yanlis_parola" | seviye=0 | sonuc=1 | durum=ONAYLANDI
+[t=2000ms] [INTERCEPTOR] onEnter parola_kontrol | observed={"girilen_parola": "yanlis_parola", "yetki_seviyesi": 0} | tampered=[{"after": 5, "before": 0, "index": 1, "name": "yetki_seviyesi", "type": "int32"}]
+[t=2000ms] [HEDEF] native parola_kontrol("yanlis_parola", 5) -> 0
+[t=2000ms] [INTERCEPTOR] onLeave parola_kontrol | observed_retval=0 | final_retval=1 | retval_replaced=true
+[t=2000ms] [HEDEF] iter=2/3 | girilen="yanlis_parola" | seviye=0 | sonuc=1 | durum=ONAYLANDI
+[t=4000ms] [INTERCEPTOR] onEnter parola_kontrol | observed={"girilen_parola": "yanlis_parola", "yetki_seviyesi": 0} | tampered=[{"after": 5, "before": 0, "index": 1, "name": "yetki_seviyesi", "type": "int32"}]
+[t=4000ms] [HEDEF] native parola_kontrol("yanlis_parola", 5) -> 0
+[t=4000ms] [INTERCEPTOR] onLeave parola_kontrol | observed_retval=0 | final_retval=1 | retval_replaced=true
+[t=4000ms] [HEDEF] iter=3/3 | girilen="yanlis_parola" | seviye=0 | sonuc=1 | durum=ONAYLANDI
+[SUMMARY] calls=3 | approved=3 | rejected=0 | arg_tampers=3 | retval_replacements=3 | final=ONAYLANDI
