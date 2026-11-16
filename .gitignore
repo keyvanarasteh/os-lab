@@ -89,3 +89,9 @@ web-lab/browser/target/
 
 # Written by scripts/worktree.sh: cache settings and the .venv-test link (plan item I)
 .oslab-env
+
+# Linked worktrees kept inside the checkout
+.worktrees/
+
+# Local scratch files
+.temp/
