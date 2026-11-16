@@ -37,6 +37,7 @@ const BUNDLE_FILES: &[&str] = &[
     "console/source_manifest_specs.json",
     "console/source_pipeline.json",
     "console/content.py",
+    "console/winapps.py",
     "dashboard/dist/index.html",
     "docs/legal/PRIVACY.md",
     "android-lab/lab/scripts/setup-ubuntu.sh",
@@ -109,6 +110,31 @@ fn kept(name: &str) -> bool {
 /// Copy `src` over `dst`, file by file. Existing kept paths are left alone; nothing in `dst` is
 /// deleted, so a lab's own files survive an update. Symlinks are skipped.
 pub fn sync_tree(src: &Path, dst: &Path) -> io::Result<usize> {
+    sync_tree_reporting(src, dst, &mut || {})
+}
+
+/// How many files `sync_tree` will visit, so the launcher can show "N of M". Symlinks and
+/// existing private paths are skipped, just as they are during the copy.
+fn count_files(src: &Path, dst: &Path) -> usize {
+    let Ok(entries) = fs::read_dir(src) else { return 0 };
+    entries
+        .flatten()
+        .map(|entry| {
+            let target = dst.join(entry.file_name());
+            if kept(&entry.file_name().to_string_lossy()) && target.exists() {
+                return 0;
+            }
+            match entry.file_type() {
+                Ok(kind) if kind.is_dir() => count_files(&entry.path(), &target),
+                Ok(kind) if kind.is_file() => 1,
+                _ => 0,
+            }
+        })
+        .sum()
+}
+
+/// `sync_tree`, calling `visited` once per file it looks at (copied or already identical).
+pub fn sync_tree_reporting(src: &Path, dst: &Path, visited: &mut dyn FnMut()) -> io::Result<usize> {
     let mut copied = 0;
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
@@ -124,7 +150,7 @@ pub fn sync_tree(src: &Path, dst: &Path) -> io::Result<usize> {
             continue;
         }
         if kind.is_dir() {
-            copied += sync_tree(&entry.path(), &target)?;
+            copied += sync_tree_reporting(&entry.path(), &target, visited)?;
         } else if kind.is_file() {
             let same = match (fs::metadata(entry.path()), fs::metadata(&target)) {
                 (Ok(a), Ok(b)) => a.len() == b.len() && fs::read(entry.path())? == fs::read(&target)?,
@@ -144,30 +170,95 @@ pub fn sync_tree(src: &Path, dst: &Path) -> io::Result<usize> {
                 }
                 copied += 1;
             }
+            visited();
         }
     }
     Ok(copied)
 }
 
+/// What `sync_bundle_reporting` is doing, for the launcher's progress display.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SyncPhase {
+    /// Comparing the installed files with the bundled ones.
+    Check,
+    /// Copying bundled files; `done` of `total` files visited.
+    Copy,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SyncProgress {
+    pub phase: SyncPhase,
+    pub done: usize,
+    pub total: usize,
+}
+
 /// The dashboard build is replaced wholesale on an update: hashed assets from an older build
 /// would otherwise pile up in the data folder.
 pub fn sync_bundle(bundle: &Path, data_root: &Path, app_version: &str) -> Result<usize, String> {
+    sync_bundle_reporting(bundle, data_root, app_version, &mut |_| {})
+}
+
+/// Move a folder out of the way and delete it on a background thread. Deleting thousands of
+/// files can take minutes on a busy disk, and nothing needs them once they are renamed.
+fn discard_in_background(old: PathBuf) {
+    std::thread::spawn(move || {
+        let _ = fs::remove_dir_all(&old);
+    });
+}
+
+fn replace_dashboard(dist: &Path) -> Result<(), String> {
+    if !dist.exists() {
+        return Ok(());
+    }
+    let parent = dist.parent().unwrap_or(dist);
+    // Leftovers from an earlier start that was stopped before its background delete finished.
+    if let Ok(entries) = fs::read_dir(parent) {
+        for entry in entries.flatten() {
+            if entry.file_name().to_string_lossy().starts_with("dist.old-") {
+                discard_in_background(entry.path());
+            }
+        }
+    }
+    let aside = parent.join(format!("dist.old-{}", std::process::id()));
+    match fs::rename(dist, &aside) {
+        Ok(()) => {
+            discard_in_background(aside);
+            Ok(())
+        }
+        // Renaming should never fail on one volume; if it does, fall back to deleting in place.
+        Err(_) => fs::remove_dir_all(dist).map_err(|e| format!("Could not replace the old dashboard build: {e}")),
+    }
+}
+
+/// `sync_bundle` that reports progress: once when it starts comparing, then roughly per file while
+/// copying. A start with nothing to do reports `Check` only.
+pub fn sync_bundle_reporting(
+    bundle: &Path,
+    data_root: &Path,
+    app_version: &str,
+    report: &mut dyn FnMut(SyncProgress),
+) -> Result<usize, String> {
     if !is_complete_bundle(bundle) {
         return Err(format!(
             "The bundled os-lab files are missing or incomplete ({}). Rebuild the app with `npm run stage`.",
             bundle.display()
         ));
     }
+    report(SyncProgress { phase: SyncPhase::Check, done: 0, total: 0 });
     let stamp = data_root.join(".app-version");
     let current = fs::read_to_string(&stamp).unwrap_or_default();
     if current.trim() == app_version && is_complete_bundle(data_root) {
         return Ok(0);
     }
-    let dist = data_root.join("dashboard").join("dist");
-    if dist.exists() {
-        fs::remove_dir_all(&dist).map_err(|e| format!("Could not replace the old dashboard build: {e}"))?;
-    }
-    let copied = sync_tree(bundle, data_root).map_err(|e| format!("Could not prepare {}: {e}", data_root.display()))?;
+    replace_dashboard(&data_root.join("dashboard").join("dist"))?;
+    let total = count_files(bundle, data_root);
+    let mut done = 0;
+    report(SyncProgress { phase: SyncPhase::Copy, done, total });
+    let copied = sync_tree_reporting(bundle, data_root, &mut || {
+        done += 1;
+        report(SyncProgress { phase: SyncPhase::Copy, done, total });
+    })
+    .map_err(|e| format!("Could not prepare {}: {e}", data_root.display()))?;
     fs::write(&stamp, app_version).map_err(|e| format!("Could not write {}: {e}", stamp.display()))?;
     Ok(copied)
 }
@@ -238,6 +329,50 @@ mod tests {
         assert!(!data.join("dashboard/dist/old-hash.js").exists());
         assert_eq!(fs::read_to_string(data.join("android-lab/lab/.env")).unwrap(), "SECRET=1");
         assert_eq!(fs::read_to_string(data.join("android-lab/lab/storage/disk.img")).unwrap(), "mine");
+    }
+
+    #[test]
+    fn sync_reports_progress_and_never_exceeds_the_total() {
+        let bundle = tmp("progress-bundle");
+        let data = tmp("progress-data");
+        fake_root(&bundle, "v1");
+        let mut seen = Vec::new();
+        sync_bundle_reporting(&bundle, &data, "1", &mut |p| seen.push(p)).unwrap();
+        assert_eq!(seen.first().unwrap().phase, SyncPhase::Check);
+        let last = seen.last().unwrap();
+        assert_eq!(last.phase, SyncPhase::Copy);
+        assert!(last.done > 0 && last.done == last.total, "{last:?}");
+        assert!(seen.windows(2).all(|w| w[0].done <= w[1].done));
+        fs::write(bundle.join("android-lab/lab/.env"), "bundled").unwrap();
+        fs::write(data.join("android-lab/lab/.env"), "personal").unwrap();
+        let mut updated = Vec::new();
+        sync_bundle_reporting(&bundle, &data, "2", &mut |p| updated.push(p)).unwrap();
+        let last = updated.last().unwrap();
+        assert_eq!(last.done, last.total, "{last:?}");
+        assert_eq!(fs::read_to_string(data.join("android-lab/lab/.env")).unwrap(), "personal");
+        // An up-to-date start has nothing to copy, so it never reports a copy.
+        let mut again = Vec::new();
+        sync_bundle_reporting(&bundle, &data, "2", &mut |p| again.push(p)).unwrap();
+        assert!(again.iter().all(|p| p.phase == SyncPhase::Check));
+    }
+
+    #[test]
+    fn the_old_dashboard_is_moved_aside_and_discarded() {
+        let bundle = tmp("aside-bundle");
+        let data = tmp("aside-data");
+        fake_root(&bundle, "v1");
+        sync_bundle(&bundle, &data, "1").unwrap();
+        fs::write(data.join("dashboard/dist/old-hash.js"), "old").unwrap();
+        sync_bundle(&bundle, &data, "2").unwrap();
+        assert!(!data.join("dashboard/dist/old-hash.js").exists());
+        // The background delete finishes on its own; nothing is left beside dist.
+        let leftover = || fs::read_dir(data.join("dashboard")).unwrap().flatten()
+            .any(|e| e.file_name().to_string_lossy().starts_with("dist.old-"));
+        for _ in 0..50 {
+            if !leftover() { break; }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        assert!(!leftover());
     }
 
     #[test]

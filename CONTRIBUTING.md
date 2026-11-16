@@ -299,30 +299,44 @@ Tests run offline: mock network calls and never download from the internet.
 
 ## Step 5: Run the checks
 
-GitHub Actions is disabled for this repository; the local runner replaces CI.
-Run it before every pull request:
+Run the checks for what your branch changes before every pull request:
 
 ```bash
-./scripts/run-tests.sh          # everything
-./scripts/run-tests.sh --quick  # unit tests only
+./scripts/run-tests.sh --changed   # only the suites and test files your change touches
+./scripts/run-tests.sh             # everything
+./scripts/run-tests.sh --quick     # unit tests only (combines with --changed)
+./scripts/run-tests.sh --changed --dry-run   # what would run
 ```
 
-It runs the pytest suite, a sample-analysis smoke test, `bash -n` on every
-shell script, `lat check` when `lat` is installed, and, when
-`dashboard/node_modules` exists, the dashboard typecheck plus a check that the
-committed build is current.
+It runs the pytest and unittest suites, a sample-analysis smoke test, `bash -n`
+on shell scripts, `lat check` when `lat` is installed, and, when
+`dashboard/node_modules` exists, the dashboard typecheck, translation check and
+e2e change-map tests. Stage times go to `test-results/timings.json`.
 
-## Step 6: Rebuild the dashboard if you changed it
+For the dashboard's browser tests use `scripts/e2e.sh` (see `--help`). It runs
+the specs that cover your change on a free port, with two browsers, and waits
+if another e2e run is going on the same machine. Run `--full` once, right
+before the pull request.
 
-`dashboard/dist/` is committed so hosts without Node.js still get the
-dashboard. After changing anything in `dashboard/src/` or `docs/legal/`:
+Working on several branches at once? Create each worktree with
+`scripts/worktree.sh new <branch>` so they share one copy of the dependencies.
+
+## Step 6: Do not commit the dashboard build
+
+`dashboard/dist/` stays committed so hosts without Node.js still get the
+dashboard, but pull requests no longer change it: CI fails a pull request that
+does, and the `dashboard-dist` workflow rebuilds `dist` on master after your
+change is merged. Check your change with:
 
 ```bash
 cd dashboard
-npm ci
+npm ci             # or: scripts/worktree.sh doctor
 npm run check
-npm run build      # refreshes dashboard/dist; commit it with your change
+npm run test:i18n
 ```
+
+If a rebase leaves `dashboard/dist` changes in your branch, drop them with
+`git checkout origin/master -- dashboard/dist`.
 
 ## Step 7: Update the docs and the knowledge graph
 
@@ -342,6 +356,33 @@ npm run build      # refreshes dashboard/dist; commit it with your change
    including how you tested the change.
 4. Respond to review comments; maintainers merge once the checks pass and the
    review is done.
+
+### Landing a branch
+
+When several people or agents work at the same time, land one branch at a time:
+
+1. Commit the source changes, without `dashboard/dist`.
+2. `git fetch origin && git rebase origin/master`, using the conflict rules below.
+3. In `dashboard/`: `npm run check` and `npm run test:i18n`; at the repo root:
+   `lat check` and `scripts/run-tests.sh --changed`. Compare every failure with
+   a clean `origin/master` worktree and list the ones that already happen there.
+4. `scripts/e2e.sh --changed`; the CI run on the pull request is the full-suite check.
+5. `git fetch origin`. If `origin/master` moved since step 2, go back to step 2.
+6. Push and open the pull request with the test results and the failures that
+   already exist on master. Wait for CI.
+7. After the merge, check that it is on `origin/master`, then remove the worktree
+   with `scripts/worktree.sh rm <branch>`.
+
+Conflict rules:
+
+- `dashboard/dist`: never resolve it by hand. Run
+  `git checkout origin/master -- dashboard/dist` and continue the rebase.
+- `dashboard/src/i18n/generated/*.json`: the locale merge driver keeps both
+  sides' keys (`scripts/worktree.sh doctor` sets it up). If it still stops, two
+  branches gave the same key different texts: pick one, keep the file valid
+  JSON, and run `npm run test:i18n`.
+- Shared code (`app-shell.tsx`, nav lists, `api.ts`): keep master's new features
+  working alongside yours. Never drop master's changes to make yours fit.
 
 ## Reporting bugs and requesting features
 

@@ -1,0 +1,77 @@
+name: dashboard-dist
+
+# Plan item D: feature branches no longer commit dashboard/dist. After a dashboard change lands
+# on master, this rebuilds dist and, when it differs, lands a `build: regenerate dashboard
+# dist` PR. dist stays committed because `./labctl ui` serves it on hosts without Node.
+#
+# Master requires a PR (enforced for admins), so the workflow cannot push to master. It opens a
+# build/dist-<sha> PR and merges it. That needs one of:
+# - a DIST_PR_TOKEN secret (a fine-grained token with contents and pull-requests write), or
+# - Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests"
+#   plus read and write workflow permissions, so the default token can open the PR.
+# A PR opened with the default token does not start other workflows, so this cannot loop.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'dashboard/**'
+      - 'docs/legal/**'
+      - '!dashboard/dist/**'
+      - '.github/workflows/dashboard-dist.yml'
+  workflow_dispatch:
+
+# Never cancelled: when two PRs merge close together, the second run rebuilds from the
+# latest master and supersedes the first PR.
+concurrency:
+  group: dashboard-dist
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          token: ${{ secrets.DIST_PR_TOKEN || github.token }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: dashboard
+      - run: npm run build
+        working-directory: dashboard
+      - name: Open and merge the dist PR when dist changed
+        env:
+          GH_TOKEN: ${{ secrets.DIST_PR_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- dashboard/dist && [ -z "$(git ls-files --others --exclude-standard -- dashboard/dist)" ]; then
+            echo "dashboard/dist already matches master's sources" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          sha="$(git rev-parse --short HEAD)"
+          branch="build/dist-$sha"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A dashboard/dist
+          git commit -q -m "build: regenerate dashboard dist" -m "Built from master $sha by the dashboard-dist workflow."
+          git push -q origin "$branch"
+          # Older dist PRs are superseded by this one.
+          for old in $(gh pr list --state open --search "head:build/dist-" --json number,headRefName --jq '.[] | select(.headRefName != "'"$branch"'") | .number'); do
+            gh pr close "$old" --delete-branch --comment "Superseded by the rebuild from $sha." || true
+          done
+          url="$(gh pr create --base master --head "$branch" --title "build: regenerate dashboard dist ($sha)" \
+            --body "Rebuilt \`dashboard/dist\` from master at $sha (plan item D, dashboard-dist workflow).")"
+          echo "PR: $url" | tee -a "$GITHUB_STEP_SUMMARY"
+          # Master has no required checks or reviews, so the PR can merge right away. If master
+          # moved meanwhile, the next run of this workflow rebuilds again.
+          gh pr merge "$url" --merge --delete-branch

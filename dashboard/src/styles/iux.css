@@ -290,6 +290,22 @@
     border-radius: calc(var(--iux-radius) + 4px);
     overflow: hidden;
   }
+  /* Lab switcher (⌘L): a compact centred card list that focuses the sidebar on one lab.
+     Flex only while open — a closed dialog must keep the UA's display: none. */
+  .iux-lab-switcher {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    height: fit-content;
+    width: min(24rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 4rem);
+    border-radius: calc(var(--iux-radius) + 4px);
+    overflow: hidden;
+  }
+  .iux-lab-switcher[open] {
+    display: flex;
+    flex-direction: column;
+  }
   /* Indeterminate bar for a panel whose chunk is still loading */
   .iux-progress {
     overflow: hidden;
@@ -423,6 +439,38 @@ dialog.iux-modal::backdrop {
     width: 44px;
     height: 44px;
   }
+}
+
+/* The "Switch lab" card at the foot of the sidebar; opens the ⌘L lab switcher. */
+.iux-lab-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--iux-border);
+  border-radius: 0.625rem;
+  background: var(--iux-card);
+  transition: border-color 0.15s, background 0.15s;
+}
+.iux-lab-card:hover {
+  border-color: color-mix(in oklch, var(--iux-primary) 45%, var(--iux-border));
+  background: color-mix(in oklch, var(--iux-accent) 55%, var(--iux-card));
+}
+.iux-lab-card:focus-visible {
+  outline: 2px solid var(--iux-ring);
+  outline-offset: 1px;
+}
+.iux-lab-card-icon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  border: 1px solid var(--iux-border);
+  border-radius: 0.5rem;
+  background: var(--iux-muted);
+  color: var(--iux-foreground);
 }
 
 /* The simulator overlays small viewports and docks beside the lab on desktop. */

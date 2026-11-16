@@ -984,8 +984,25 @@ def test_the_hook_clean_is_a_guarded_trash_only_automated_run(monkeypatch, tmp_p
     (Path(target) / "junk.bin").write_bytes(b"x" * 128)
     api.post("/api/cleanup/bookmarks", {"entryId": "system.user-caches"})
     api.post("/api/cleanup/bookmarks/update", {"entryId": "system.user-caches", "autoCleanHook": {"enabled": True}})
+    import cleanup_lab.bookmarks as bookmarks_module
+    original_save = bookmarks_module.save
+    saving = threading.Event()
+    finish_save = threading.Event()
+
+    def held_save(records):
+        if any(item["autoCleanHook"]["lastRunAt"] is not None for item in records):
+            saving.set()
+            assert finish_save.wait(10)
+        return original_save(records)
+
+    monkeypatch.setattr(bookmarks_module, "save", held_save)
     job = cleanup_api.run_hook_clean(REPO_ROOT)
     assert job is not None
+    try:
+        assert saving.wait(10)
+        assert job.state == "running"
+    finally:
+        finish_save.set()
     wait_for(job, "done")
     assert job.error is None
     assert job.result["automated"] is True
@@ -993,7 +1010,6 @@ def test_the_hook_clean_is_a_guarded_trash_only_automated_run(monkeypatch, tmp_p
     assert job.result["totals"]["trashed"] >= 1
     assert not (Path(target) / "junk.bin").exists()
     # The bookmark records the automated run.
-    import cleanup_lab.bookmarks as bookmarks_module
     loaded = bookmarks_module.load()
     assert loaded["bookmarks"][0]["autoCleanHook"]["lastRunAt"] is not None
     # The history store holds the automated record.

@@ -808,7 +808,6 @@ def run_hook_clean(root):
                 job.result = result
                 job.progress = result.get("progress", job.progress)
                 _module(root, "history").append(result)
-                job.state = "cancelled" if result["cancelled"] else "done"
                 loaded = bookmarks_mod.load()
                 now = time.time()
                 records = [
@@ -817,6 +816,7 @@ def run_hook_clean(root):
                     for item in loaded["bookmarks"]
                 ]
                 bookmarks_mod.save(records)
+                job.state = "cancelled" if result["cancelled"] else "done"
             except Exception as exc:
                 job.state = "failed"
                 job.error = "{0}: {1}".format(type(exc).__name__, exc)

@@ -54,17 +54,17 @@ test("the widgets card renders the snapshot preview and republishes", async ({ p
   });
   await page.goto("/cleanup/settings/");
   await expect(page.getByRole("heading", { name: "Desktop widgets" }).first()).toBeVisible();
-  // The preview mirrors the widget's content.
+  // Publishing is automatic: opening the page already built and published the snapshot.
+  await expect(page.getByText("Kept up to date automatically.")).toBeVisible();
+  expect(publishes.length).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "Publish now" })).toHaveCount(0);
+  // The preview mirrors the widget's content, collapsed until asked for.
+  await page.getByText("What the widget shows", { exact: true }).click();
   await expect(page.getByText("Ready to clean")).toBeVisible();
   await expect(page.getByText("18 items")).toBeVisible();
   await expect(page.getByText("3.9 GB")).toBeVisible();
   await expect(page.getByText("30 GB")).toBeVisible();
   await expect(page.getByText("FDA granted")).toBeVisible();
-  await expect(page.getByText(/^published ·/)).toBeVisible();
-  // Publish now refetches the snapshot endpoint.
-  const before = publishes.length;
-  await page.getByRole("button", { name: "Publish now" }).click();
-  await expect(publishes.length).toBeGreaterThan(before);
 });
 
 test("a not-capable machine states the honest reason", async ({ page }) => {
@@ -72,7 +72,6 @@ test("a not-capable machine states the honest reason", async ({ page }) => {
   await page.goto("/cleanup/settings/");
   await expect(page.getByRole("heading", { name: "Desktop widgets" }).first()).toBeVisible();
   await expect(page.getByText("Publishing is idle until the installed os-lab app creates its widget container.")).toBeVisible();
-  await expect(page.getByText("not published")).toBeVisible();
   // The absent-container case explains itself once; the engine's publish
   // refusal is redundant here and must not contradict the idle note.
   await expect(page.getByText("The widget container is not available here.")).toHaveCount(0);

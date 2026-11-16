@@ -375,6 +375,26 @@
           }
         },
         {
+          "id": "lab-winapps",
+          "lab": "winapps",
+          "title": "Windows Apps Lab",
+          "summary": "Read-only mirror of visible desktop applications on this Windows host.",
+          "support": {
+            "windows": {
+              "level": "full",
+              "note": "Uses the current Windows desktop; no input control"
+            },
+            "macos": {
+              "level": "none",
+              "note": "Needs a Windows host"
+            },
+            "linux": {
+              "level": "none",
+              "note": "Needs a Windows host"
+            }
+          }
+        },
+        {
           "id": "lab-linux",
           "lab": "linux",
           "title": "Linux Lab",

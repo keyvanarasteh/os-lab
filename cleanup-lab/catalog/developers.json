@@ -1155,6 +1155,54 @@
         "slack",
         "Slack.exe"
       ]
+    },
+    {
+      "id": "developers.xcode-derived-data",
+      "name": "Xcode DerivedData",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "Xcode rebuilds the project indexes and build products on the next build, so the first build is slower.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "paths": {
+        "macos": [
+          "~/Library/Developer/Xcode/DerivedData"
+        ]
+      }
+    },
+    {
+      "id": "developers.xcode-device-support",
+      "name": "Xcode iOS DeviceSupport",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "Xcode copies the device symbols again the next time that device is connected.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "paths": {
+        "macos": [
+          "~/Library/Developer/Xcode/iOS DeviceSupport"
+        ]
+      }
+    },
+    {
+      "id": "developers.coresimulator-caches",
+      "name": "CoreSimulator caches",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "The simulator rebuilds its caches on the next boot; simulator devices are not touched.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "paths": {
+        "macos": [
+          "~/Library/Developer/CoreSimulator/Caches"
+        ]
+      }
     }
   ]
 }

@@ -28,6 +28,8 @@ import { Badge, Empty, EndpointList, Field, IconButton, Modal, PageHead, Section
 import { SimulatorDrawer } from "./ios-simulator";
 import { IosDeviceCards } from "./ios-real-devices";
 import { MacAppMirrorTeaser, MacAppPanel } from "./macos-app-mirror";
+import { MacEnginePanel } from "./macos-engine-panel";
+import { WinAppsPanel } from "./winapps-app-mirror";
 import { stateBadge } from "./host-page";
 import {
   ago,
@@ -47,6 +49,7 @@ import {
 const REFERENCE: Record<LabId, { check: string; setup: string; where: string }> = {
   android: { check: "./labctl android doctor", setup: "./labctl android start --wait", where: "android-lab/lab" },
   windows: { check: "./labctl win status", setup: "./labctl win profile use development\n./labctl win start --wait", where: "win-lab" },
+  winapps: { check: "python console/winapps.py", setup: "Run this panel on a Windows host.", where: "winapps" },
   linux: { check: "./labctl linux status", setup: "./labctl linux profile use development\n./labctl linux start --wait", where: "linux-lab" },
   ios: { check: "./labctl ios status", setup: "./labctl ios profile use development\n./labctl ios start --wait", where: "ios-lab" },
   source: { check: "./labctl source doctor", setup: "./labctl source setup", where: "source-lab" },
@@ -517,6 +520,9 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
   const simulator = labId === "ios" && lab?.provider === "native-macos" && lab.state === "ready";
   // The ready macOS Lab gets the floating app mirror for the windows on this Mac.
   const appMirror = labId === "macos" && lab?.provider === "native-macos" && lab.state === "ready";
+  // The Windows Apps Lab panel reads the desktop directly; it is mounted only locally on Windows hosts.
+  const showWinAppsPanel =
+    import.meta.env.PUBLIC_SITE_MODE !== "pages" && labId === "winapps";
   // Every tracked prerequisite is found: the card would only repeat success badges, so it yields
   // its half of the row to the actions. Anything missing keeps the full status list visible.
   const requirements = lab?.requirements ?? [];
@@ -560,6 +566,8 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
                 </div>
               )}
 
+              {showWinAppsPanel ? <WinAppsPanel /> : null}
+
               {request ? (
                 <PlanPanel
                   title={`${actions.get(request.action)?.label ?? request.action} · ${label}`}
@@ -582,6 +590,7 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
                 <MacAppPanel onPreview={(action, extra) => void preview(action, extra)} onHide={() => setMirrorHidden(true)} />
               ) : null}
               {appMirror && mirrorHidden ? <MacAppMirrorTeaser onOpen={() => setMirrorHidden(false)} /> : null}
+              {appMirror ? <MacEnginePanel /> : null}
 
               {lab.state === "unavailable" ? (
                 <Section title="Run it elsewhere" description={`On a supported host, these commands run from the os-lab checkout (${ref.where}).`}>

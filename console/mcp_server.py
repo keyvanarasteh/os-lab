@@ -193,6 +193,31 @@ TOOLS = [
         },
     },
     {
+        "name": "macos_search",
+        "description": "Find elements of one window by label, value or placeholder substring (max 50 hits), with the same paths and revision as macos_get_app_state, so an element can be acted on without reading the whole tree (read-only).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"windowId": {"type": "integer"}, "query": {"type": "string"}},
+            "required": ["windowId", "query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "macos_displays",
+        "description": "Active displays with origin, size and backing scale, so window coordinates can be reasoned about (read-only).",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "macos_capabilities",
+        "description": "What this console can observe and do right now: engine, input kinds, keys, safety limits and control state in one read-only answer.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "macos_permissions",
+        "description": "Accessibility and Screen Recording state and the app each grant belongs to (read-only). Requesting a grant is a human step in the dashboard.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
         "name": "macos_control_state",
         "description": "Whether armed control mode is active, its owner and remaining seconds (read-only). Input tools refuse while it is off; there is no arm tool — the human arms from the dashboard.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
@@ -292,6 +317,15 @@ def tool_call(name: str, args: dict) -> dict:
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_ax_windows(REPO_ROOT, args))}]}
     if name == "macos_menubar":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_ax_menubar(REPO_ROOT, args))}]}
+    if name == "macos_search":
+        return {"content": [{"type": "text", "text": json.dumps(
+            oslab.macos_search_elements(REPO_ROOT, args.get("windowId"), args.get("query")))}]}
+    if name == "macos_displays":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_displays())}]}
+    if name == "macos_capabilities":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_capabilities(REPO_ROOT))}]}
+    if name == "macos_permissions":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_permissions(REPO_ROOT))}]}
     if name == "macos_control_state":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_control_state())}]}
     if name == "macos_stop":

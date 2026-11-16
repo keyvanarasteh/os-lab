@@ -56,6 +56,11 @@ or `OSLAB_DASHBOARD_BUILD=0`, the committed `dashboard/dist` is used.
 Lab engine/catalog, and the Web Lab engine manifest and binary. It refuses private resource/storage/archive inputs. Desktop
 updates preserve private state.
 
+On first launch and after an app update, the native launcher prepares bundled files on a blocking
+worker and reports file progress before starting the console. It shows a slow or stalled disk hint
+when needed. The old dashboard build is renamed aside and deleted in the background; an
+interrupted deletion is retried on the next update. Private state remains untouched.
+
 Minimal installers skip pip package upgrades and report Source readiness through
 Python. Static Source detection needs no Node, VM or optional parser/browser
 installation. Native installer acceptance is tracked in [[source-lab/VALIDATION.md]].

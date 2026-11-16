@@ -7,7 +7,9 @@ on:
     paths:
       - '.github/workflows/release-linux.yml'
       - 'app/**'
-      - 'dashboard/**'
+      - 'dashboard/package.json'
+      - 'dashboard/package-lock.json'
+      - 'dashboard/astro.config.mjs'
       - 'console/**'
   workflow_dispatch:
     inputs:
@@ -18,6 +20,12 @@ on:
 
 permissions:
   contents: read
+
+# Plan item M: a newer push to the same PR cancels the older run. Pushes to master,
+# tags and manual runs are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -36,6 +44,10 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          key: ${{ github.job }}
       - name: Check release version
         shell: bash
         run: |

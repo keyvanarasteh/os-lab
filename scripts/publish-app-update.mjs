@@ -64,7 +64,7 @@ for (let i = 0; i < args.length; i += 1) {
 }
 
 function run(command, list, options = {}) {
-  return execFileSync(command, list, { cwd: repo, encoding: "utf8", stdio: options.quiet ? "pipe" : "inherit", ...options });
+  return execFileSync(command, list, { cwd: repo, encoding: "utf8", stdio: options.quiet ? "pipe" : "inherit", maxBuffer: 256 * 1024 * 1024, ...options });
 }
 
 function gh(list, options = {}) {

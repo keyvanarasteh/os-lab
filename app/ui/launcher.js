@@ -68,11 +68,154 @@
   continueBtn.textContent = ct[1];
   $("dont-show-label").textContent = ct[5];
 
+
+  // Startup steps, progress and "why is this slow" hints. The native side reports the file sync as
+  // "console-progress" events; everything else (elapsed time, rate, hints) is worked out here.
+  function L(en, tr, de, fr, es, it, fa, ar) { return { en: en, tr: tr, de: de, fr: fr, es: es, it: it, fa: fa, ar: ar }[language] || en; }
+  var pg = {
+    steps: [L("Prepare files", "Dosyaları hazırla", "Dateien vorbereiten", "Préparer les fichiers", "Preparar archivos", "Prepara i file", "آماده‌سازی فایل‌ها", "تجهيز الملفات"),
+            L("Start console", "Konsolu başlat", "Konsole starten", "Démarrer la console", "Iniciar la consola", "Avvia la console", "راه‌اندازی کنسول", "تشغيل وحدة التحكم"),
+            L("Open dashboard", "Panoyu aç", "Dashboard öffnen", "Ouvrir le tableau de bord", "Abrir el panel", "Apri la dashboard", "باز کردن داشبورد", "فتح لوحة المعلومات")],
+    copying: L("Updating files", "Dosyalar güncelleniyor", "Dateien werden aktualisiert", "Mise à jour des fichiers", "Actualizando archivos", "Aggiornamento dei file", "به‌روزرسانی فایل‌ها", "تحديث الملفات"),
+    waiting: L("Starting", "Başlatılıyor", "Wird gestartet", "Démarrage", "Iniciando", "Avvio", "در حال راه‌اندازی", "جارٍ التشغيل"),
+    slowDisk: L("The disk is busy, so updating files is slower than usual ({rate} files/s){eta}. This happens once after an app update.",
+                "Disk meşgul, bu yüzden dosya güncellemesi her zamankinden yavaş ({rate} dosya/sn){eta}. Uygulama güncellemesinden sonra bir kez olur.",
+                "Die Festplatte ist ausgelastet, daher dauert das Aktualisieren länger als üblich ({rate} Dateien/s){eta}. Das passiert einmal nach einem App-Update.",
+                "Le disque est occupé : la mise à jour des fichiers est plus lente que d’habitude ({rate} fichiers/s){eta}. Cela n’arrive qu’une fois après une mise à jour.",
+                "El disco está ocupado, por eso la actualización de archivos va más lenta de lo normal ({rate} archivos/s){eta}. Solo ocurre una vez tras actualizar la app.",
+                "Il disco è occupato, quindi l’aggiornamento dei file è più lento del solito ({rate} file/s){eta}. Succede una sola volta dopo un aggiornamento dell’app.",
+                "دیسک مشغول است و به‌روزرسانی فایل‌ها کندتر از معمول انجام می‌شود ({rate} فایل در ثانیه){eta}. این فقط یک بار پس از به‌روزرسانی برنامه رخ می‌دهد.",
+                "القرص مشغول، لذا تحديث الملفات أبطأ من المعتاد ({rate} ملف/ث){eta}. يحدث مرة واحدة بعد تحديث التطبيق."),
+    eta: L(", about {n} min left", ", yaklaşık {n} dk kaldı", ", noch etwa {n} Min.", ", environ {n} min restantes", ", unos {n} min restantes", ", circa {n} min rimanenti", "، حدود {n} دقیقه مانده", "، متبقٍ نحو {n} دقيقة"),
+    stalled: L("Waiting for the disk to respond. This happens when it is busy; nothing is wrong.",
+               "Disk yanıt vermeyi bekliyor. Disk meşgulken olur; bir sorun yok.",
+               "Warten auf die Festplatte. Das passiert bei hoher Auslastung; es ist nichts kaputt.",
+               "En attente du disque. Cela arrive quand il est occupé ; rien d’anormal.",
+               "Esperando respuesta del disco. Ocurre cuando está ocupado; no pasa nada malo.",
+               "In attesa del disco. Succede quando è occupato; non c’è nessun problema.",
+               "در انتظار پاسخ دیسک. وقتی دیسک مشغول است رخ می‌دهد؛ مشکلی نیست.",
+               "بانتظار استجابة القرص. يحدث عندما يكون مشغولًا؛ لا توجد مشكلة."),
+    slowConsole: L("The console is taking longer than usual to start. A busy disk or security software can delay it; details appear here if it fails.",
+                   "Konsolun başlaması her zamankinden uzun sürüyor. Meşgul disk veya güvenlik yazılımı geciktirebilir; başarısız olursa ayrıntılar burada görünür.",
+                   "Die Konsole startet langsamer als üblich. Eine ausgelastete Festplatte oder Sicherheitssoftware kann das verzögern; bei einem Fehler erscheinen hier die Details.",
+                   "La console met plus de temps que d’habitude à démarrer. Un disque occupé ou un logiciel de sécurité peut la retarder ; les détails s’afficheront ici en cas d’échec.",
+                   "La consola tarda más de lo normal en iniciar. Un disco ocupado o un software de seguridad pueden retrasarla; si falla, los detalles aparecerán aquí.",
+                   "La console impiega più del solito ad avviarsi. Un disco occupato o un software di sicurezza possono rallentarla; se fallisce, i dettagli compaiono qui.",
+                   "راه‌اندازی کنسول بیشتر از حد معمول طول می‌کشد. دیسک مشغول یا نرم‌افزار امنیتی می‌تواند آن را کند کند؛ در صورت خطا جزئیات اینجا نمایش داده می‌شود.",
+                   "يستغرق تشغيل وحدة التحكم وقتًا أطول من المعتاد. قد يؤخرها قرص مشغول أو برنامج أمان؛ ستظهر التفاصيل هنا إن فشلت.")
+  };
+  var stepsEl = $("steps"), barEl = $("bar"), progressEl = $("progress"), slowEl = $("slow");
+  var stepNames = ["prepare", "console", "open"];
+  Array.prototype.forEach.call(stepsEl.children, function (li, i) { li.textContent = pg.steps[i]; });
+  var track = { on: false, step: null, stepAt: 0, lastEvent: 0, done: 0, total: 0, phase: "", samples: [], timer: null };
+
+  function setStep(name) {
+    var index = stepNames.indexOf(name);
+    if (index === -1 || track.step === name) return;
+    track.step = name;
+    track.stepAt = Date.now();
+    track.samples = [];
+    // Nothing from the previous step (a note, a full bar) applies to this one.
+    slowEl.textContent = "";
+    slowEl.hidden = true;
+    barEl.firstElementChild.style.width = "";
+    Array.prototype.forEach.call(stepsEl.children, function (li, i) {
+      li.className = i < index ? "done" : i === index ? "active" : "";
+      if (i === index) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+    });
+    render();
+  }
+
+  function render() {
+    var copying = track.step === "prepare" && track.phase === "copy" && track.total > 0;
+    var indeterminate = !copying && (track.step === "prepare" || track.step === "console");
+    barEl.hidden = !(copying || indeterminate);
+    barEl.classList.toggle("indeterminate", indeterminate);
+    if (indeterminate) barEl.firstElementChild.style.width = "";
+    var elapsed = Math.floor((Date.now() - track.stepAt) / 1000);
+    if (copying) {
+      var percent = Math.min(100, Math.floor(track.done * 100 / track.total));
+      barEl.firstElementChild.style.width = percent + "%";
+      barEl.setAttribute("aria-valuenow", String(percent));
+      progressEl.textContent = pg.copying + " · " + track.done + " / " + track.total;
+      progressEl.hidden = false;
+    } else if (indeterminate && elapsed >= 3) {
+      barEl.firstElementChild.style.width = "";
+      barEl.removeAttribute("aria-valuenow");
+      progressEl.textContent = pg.waiting + " · " + elapsed + " s";
+      progressEl.hidden = false;
+    } else {
+      progressEl.hidden = true;
+    }
+  }
+
+  // Why it is slow: a low copy rate means the disk is busy; no event for a while means it is not
+  // answering at all; a long console start is reported plainly. Shown only after a grace period.
+  function hint() {
+    var now = Date.now(), elapsed = (now - track.stepAt) / 1000, text = "";
+    if (track.step === "prepare") {
+      var copying = track.phase === "copy" && track.total > 0;
+      var recent = track.samples.filter(function (s) { return now - s.at <= 5000; });
+      var rate = null;
+      if (copying && recent.length > 1) {
+        var first = recent[0], last = recent[recent.length - 1];
+        if (last.at > first.at) rate = (last.done - first.done) * 1000 / (last.at - first.at);
+      }
+      var remaining = track.total - track.done;
+      if (copying && elapsed > 5 && rate !== null && rate < 15 && remaining > 60) {
+        var minutes = Math.ceil(remaining / Math.max(rate, 0.2) / 60);
+        var eta = minutes <= 120 ? pg.eta.replace("{n}", String(Math.max(1, minutes))) : "";
+        text = pg.slowDisk.replace("{rate}", rate < 10 ? rate.toFixed(1) : String(Math.round(rate))).replace("{eta}", eta);
+      } else if (elapsed > 8 && now - track.lastEvent > 6000) {
+        text = pg.stalled;
+      }
+    } else if (track.step === "console" && elapsed > 8) {
+      text = pg.slowConsole;
+    }
+    slowEl.textContent = text;
+    slowEl.hidden = !text;
+  }
+
+  function trackStart() {
+    track.on = true; track.step = null; track.phase = ""; track.done = 0; track.total = 0;
+    track.lastEvent = Date.now();
+    stepsEl.hidden = false;
+    slowEl.hidden = true;
+    setStep("prepare");
+    if (!track.timer) track.timer = setInterval(function () { if (track.on) { render(); hint(); } }, 1000);
+  }
+
+  function trackStop() {
+    track.on = false;
+    stepsEl.hidden = true; barEl.hidden = true; progressEl.hidden = true; slowEl.hidden = true;
+    if (track.timer) { clearInterval(track.timer); track.timer = null; }
+  }
+
+  if (window.__TAURI__ && window.__TAURI__.event) {
+    window.__TAURI__.event.listen("console-progress", function (event) {
+      var p = event.payload || {};
+      if (!track.on) return;
+      track.lastEvent = Date.now();
+      if (p.step === "prepare") {
+        setStep("prepare");
+        track.phase = p.phase || "";
+        track.done = p.done || 0;
+        track.total = p.total || 0;
+        track.samples.push({ at: track.lastEvent, done: track.done });
+        if (track.samples.length > 60) track.samples.shift();
+      } else if (p.step === "console") {
+        setStep("console");
+      }
+      render();
+    }).catch(function () {});
+  }
+
   function show(message, isError) {
     statusEl.textContent = message;
     spinner.hidden = !!isError;
     problem.hidden = !isError;
     dontShowRow.hidden = true;
+    if (isError) trackStop();
   }
 
   function fail(err) {
@@ -91,6 +234,7 @@
   function openDashboard() {
     if (!consoleInfo) return;
     show(t.opening, false);
+    if (track.on) setStep("open");
     window.location.replace(consoleInfo.url + (language === "en" ? "" : language + "/"));
   }
 
@@ -109,12 +253,14 @@
   function start() {
     consoleInfo = null;
     show(t.starting, false);
+    trackStart();
     if (!invoke) { return fail(t.bridge); }
     var skipWarning = skipContainerWarning;
     skipContainerWarning = false;
     invoke("console_files_dir").then(function (path) { filesWhere.textContent = t.filesLabel + ": " + path; }, fail);
     invoke("console_start").then(function (info) {
       consoleInfo = info;
+      if (track.on) setStep("open");
       where.textContent = info.source + ": " + info.root;
       resetBtn.hidden = info.source !== "chosen";
       invoke("container_status").then(function (status) {

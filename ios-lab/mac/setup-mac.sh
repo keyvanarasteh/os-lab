@@ -39,6 +39,18 @@ else
   xcrun simctl list runtimes 2>/dev/null | grep '^iOS ' | sed 's/^/    /'
 fi
 
+# The native AX helper (MIR-09) is what makes element reads fast and rich; build it as part of
+# setup instead of waiting for a manual "Build AX helper" click. Needs only swiftc.
+say "native AX helper"
+if [ -x "$MAC_DIR/build/ax-helper" ]; then
+  say "already built"
+elif command -v swiftc >/dev/null 2>&1; then
+  bash "$MAC_DIR/macos-app.sh" build-ax-helper || warn "the AX helper did not build; element reads use the slower osascript path"
+else
+  warn "swiftc is missing (xcode-select --install); element reads use the slower osascript path"
+fi
+[ -f "$MAC_DIR/mac-lab.json" ] || say "optional tuning: cp ios-lab/mac/mac-lab.json.example ios-lab/mac/mac-lab.json"
+
 if [ "$INSTALL" -eq 1 ]; then
   say "installing Node/Appium tooling"
   bash "$MAC_DIR/appium.sh" install

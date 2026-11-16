@@ -113,6 +113,15 @@ fn chosen_root(app: &AppHandle) -> Option<PathBuf> {
 
 /// Env → chosen checkout → development checkout → the bundled runtime in the data folder.
 fn resolve_root(app: &AppHandle) -> Result<(PathBuf, Source), String> {
+    resolve_root_reporting(app, &mut |_| {})
+}
+
+/// `resolve_root`, reporting how far the bundled files are along (only the bundled copy has any
+/// work to report; a checkout or chosen folder is used as it is).
+fn resolve_root_reporting(
+    app: &AppHandle,
+    report: &mut dyn FnMut(runtime::SyncProgress),
+) -> Result<(PathBuf, Source), String> {
     if let Some(dir) = std::env::var_os("OSLAB_ROOT") {
         let dir = PathBuf::from(dir);
         return if runtime::is_root(&dir) {
@@ -133,13 +142,32 @@ fn resolve_root(app: &AppHandle) -> Result<(PathBuf, Source), String> {
         .map_err(|e| e.to_string())?
         .join("os-lab");
     let target = data_dir(app)?.join("os-lab");
-    runtime::sync_bundle(&bundle, &target, &app.package_info().version.to_string())?;
+    runtime::sync_bundle_reporting(&bundle, &target, &app.package_info().version.to_string(), report)?;
     Ok((target, Source::Bundled))
 }
 
 #[tauri::command]
 async fn console_start(app: AppHandle, state: State<'_, Console>) -> Result<Started, String> {
-    let (root, source) = resolve_root(&app)?;
+    // Preparing the files can take minutes on a busy disk, so it runs off the async workers and
+    // tells the launcher how far along it is (events: "console-progress").
+    let progress_app = app.clone();
+    let (root, source) = tauri::async_runtime::spawn_blocking(move || {
+        let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
+        resolve_root_reporting(&progress_app, &mut |p| {
+            // At most ~10 events a second, but never drop the first or the last of a phase.
+            let edge = p.done == 0 || (p.total > 0 && p.done >= p.total);
+            if edge || last.elapsed() >= std::time::Duration::from_millis(100) {
+                last = std::time::Instant::now();
+                let phase = match p.phase { runtime::SyncPhase::Check => "check", runtime::SyncPhase::Copy => "copy" };
+                let _ = progress_app.emit("console-progress", serde_json::json!({
+                    "step": "prepare", "phase": phase, "done": p.done, "total": p.total,
+                }));
+            }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    let _ = app.emit("console-progress", serde_json::json!({ "step": "console", "phase": "start", "done": 0, "total": 0 }));
     // Downloaded content packs (console/content.py) live in the app's data folder, beside but
     // never inside the bundled copy, so "reset" always returns to what shipped.
     let content = std::env::var_os("OSLAB_CONTENT_DIR").map(PathBuf::from)

@@ -25,6 +25,12 @@ folder on first launch and after an update. A sync never overwrites or removes `
 `config.env`, `storage/`, `artifacts/` and the other state names listed in `runtime.rs`; only the
 dashboard build is replaced wholesale.
 
+The launcher shows preparation, console startup and dashboard opening as separate steps. During
+bundled-runtime updates it shows the number of files processed, with a slow-disk or stalled-disk
+hint when preparation takes longer than expected. File synchronization runs on a blocking worker;
+an older dashboard build is moved aside and removed in the background. An interrupted cleanup is
+retried on the next update. Startup errors remain visible in the launcher.
+
 Use **File → Files folder…** to choose an empty folder for the app's writable files on macOS,
 Windows or Linux. The app copies its current data there before saving the choice. The bundled
 runtime (`os-lab/`), managed Python, downloaded installers, content updates and console logs then

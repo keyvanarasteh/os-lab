@@ -1,7 +1,8 @@
 # Dashboard
 
-The browser console: the host overview, every lab, and the Android Lab
-workbench, built from the qLar app shell (qLar PR #174).
+The browser console for the host, labs, and Android workbench.
+
+It is built from the qLar app shell (qLar PR #174).
 
 ## Architecture
 
@@ -9,7 +10,13 @@ A static Astro app in [[dashboard]] served by the Python console; there is no
 Node server at runtime.
 
 [[dashboard/src/shell/app-shell.tsx]] carries the sidebar (labs with their
-availability pills), Spotlight and theme ported from qLar. Pages are React
+availability pills), Spotlight and theme ported from qLar.
+[[dashboard/src/shell/lab-switcher.tsx]] is the ⌘L / Ctrl+L modal that sets the
+focused lab: a compact card per lab with its live availability, remembered in
+[[dashboard/src/shell/active-lab.ts]]. With a focus, the sidebar's OS Lab group
+keeps only that lab's entry (plus the firewall section); "All labs" in the
+switcher restores the full list, and Spotlight keeps every lab listed.
+Pages are React
 islands: [[dashboard/src/views/host-page.tsx]],
 [[dashboard/src/views/lab-page.tsx]], [[dashboard/src/views/jobs-page.tsx]],
 [[dashboard/src/views/contribute-page.tsx]] and
@@ -56,6 +63,30 @@ panic Stop, single-owner arming, and read-only windows/menu-bar/focused
 endpoints. `console/mcp_server.py` exposes the same guarded surface as a
 stdio MCP server — the model acts, the console guards, every step is
 audited. See [[ios-lab]] for permissions.
+
+
+## macOS engine panel
+
+[[dashboard/src/views/macos-engine-panel.tsx]] sits under the mirror and shows
+engine state, permissions, displays, element search and a live audit feed.
+
+It reads `/api/labs/macos/{capabilities,permissions,displays}` and searches
+one window through `…/apps/<id>/search`. The only write is Request access
+(`POST …/permission/request`), which fires the Accessibility dialog or opens
+a Privacy pane. The feed is an opt-in `EventSource` on `…/events` that closes
+when switched off, hidden or unmounted.
+
+## Windows Apps Lab panel
+
+On Windows hosts, `winapps` serves a read-only desktop mirror through
+`/api/labs/winapps/apps` and `/api/labs/winapps/apps/<hwnd>/screenshot`.
+
+The backend uses ctypes to enumerate visible, captioned top-level windows and
+captures one window with `PrintWindow(PW_RENDERFULLCONTENT)`. The panel shows
+the selected window at its own aspect ratio, its dimensions and an `Elevated`
+badge when the owning process is elevated; only the newest capture updates the
+view. It is mounted only locally, is separate from the WSL2-backed VM lifecycle,
+and does not offer input control.
 
 ## UX readiness
 

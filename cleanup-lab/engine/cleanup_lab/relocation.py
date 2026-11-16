@@ -195,17 +195,15 @@ def plan_resume(home_path, store_path):
     """Continue an interrupted move; never removes the set-aside original before verifying the store."""
     aside = home_path + ASIDE_SUFFIX
     if not _lexists(aside):
+        # Cancellation after copy verification leaves the original and the store copy,
+        # but has not renamed the original yet. Reverify before continuing.
+        if os.path.isdir(home_path) and os.path.isdir(store_path) and not _is_link(home_path):
+            return [Step("verify_copy", home_path, store_path),
+                    Step("rename", home_path, aside), Step("symlink", home_path, store_path),
+                    Step("verify_link", home_path, store_path), Step("remove_tree", aside)]
         raise RelocationError("Nothing to resume: no interrupted move was found.")
     if _lexists(home_path) and not _is_link(home_path):
-        if not os.path.isdir(store_path):
-            raise RelocationError("Nothing to resume: the set-aside copy has no verified store copy.")
-        return [
-            Step("verify_copy", home_path, store_path),
-            Step("rename", home_path, aside),
-            Step("symlink", home_path, store_path),
-            Step("verify_link", home_path, store_path),
-            Step("remove_tree", aside),
-        ]
+        raise RelocationError("Both the original and set-aside folder exist; inspect them before resuming.")
     steps = []
     if not _is_link(home_path):
         steps.extend([Step("symlink", home_path, store_path), Step("verify_link", home_path, store_path)])
@@ -267,6 +265,8 @@ def execute_steps(steps, *, progress_callback=None, cancel=None):
             elif step.op == "verify_copy":
                 verify_copy(step.src, step.dst)
             elif step.op == "rename":
+                if _lexists(step.dst):
+                    raise RelocationError("Refusing to replace an existing path at {0}.".format(step.dst))
                 os.rename(step.src, step.dst)
             elif step.op == "symlink":
                 os.symlink(step.dst, step.src)

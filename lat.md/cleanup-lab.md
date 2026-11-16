@@ -229,7 +229,9 @@ entry id and a destination volume from CLN-28's inventory (`GET
 `<volume>/oslab-caches/<entry id>`, the pair passes `safety.validate_copy`, the
 owning application must not be running, and there is no elevated fallback. An
 interrupted move is flagged in the status and continued by a typed resume that
-re-verifies the store copy before touching the aside. `POST
+re-verifies the store copy before touching the aside. A resume after a verified
+copy can continue before the rename; an existing aside path is never replaced.
+`POST
 /api/cleanup/relocation/plan` and `POST /api/cleanup/relocation/run` follow the
 typed preview → single-use job pattern and are audited.
 
@@ -316,7 +318,8 @@ catalog's never-preselect risk classes with per-entry reasons. Quick clean
 confirm → run flow. `run_hook_clean()` in the console executes the
 automated clean inside the monitor thread when a free-space crossing fires:
 engine-ready and no-overlap guards, Trash-only, audited with
-`automated: true`, announced by a post-run banner. The `bookmark-size`
+`automated: true`, announced by a post-run banner. The job reports `done`
+only after the bookmark's last-run timestamp has been saved. The `bookmark-size`
 trigger measures alerted bookmarks with a read-only entry-scoped scan and
 folds its events into the monitor store. `labctl cleanup bookmarks` lists
 them read-only.
@@ -355,6 +358,7 @@ data live).
 tree read-only (lstat only, symlinks never followed, hard links counted
 once, one filesystem, node/depth budgets that report `truncated`) over
 registered roots only — `deep-roots.json` ids plus custom overlay entries.
+Entries are traversed by name so a hard link is attributed consistently.
 A drill-down walks a relative path that must stay inside the same root, so
 no request steers the walker. Console: `GET /api/cleanup/explorer/roots`
 and typed `explorer`/`explorer-subtree` jobs. The Space Explorer tab never

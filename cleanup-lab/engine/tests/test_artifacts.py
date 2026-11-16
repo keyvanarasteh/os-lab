@@ -31,6 +31,15 @@ class ArtifactTests(unittest.TestCase):
         (project / 'Cargo.toml').symlink_to('/etc/hosts')
         self.assertIsNone(artifacts.classify_dir(str(target), self.signatures))
 
+    def test_venv_with_a_custom_name_needs_its_pyvenv_marker(self):
+        project = self.projects / 'python-test'
+        project.mkdir()
+        venv = project / '.venv-test'
+        venv.mkdir()
+        self.assertIsNone(artifacts.classify_dir(str(venv), self.signatures))
+        (venv / 'pyvenv.cfg').write_text('home=/usr/bin')
+        self.assertEqual(artifacts.classify_dir(str(venv), self.signatures).id, 'projects.python-venv')
+
     def test_venv_and_valid_cachedir_tag(self):
         project = self.projects / 'python'
         project.mkdir()

@@ -206,6 +206,17 @@ the computer-use runtimes share, with the guardrails intact:
   deliberately no arm tool — the human arms from the dashboard. `macos_task`
   runs a scripted sequence (max 25 steps) with one audit row per step for
   reproducible security reports.
+- **QcU parity** — engine pieces the standalone QcU package has:
+  `GET /api/labs/macos/{displays,capabilities,permissions,events}` and
+  `…/apps/<id>/search?q=` (also MCP `macos_search`, `macos_displays`,
+  `macos_capabilities`, `macos_permissions`); `events` is a live SSE audit
+  feed with a heartbeat that ends on disconnect, panic stop or the stream
+  cap. `POST …/permission/request` fires the Accessibility dialog or opens a
+  Privacy pane, and doctor names the app each grant belongs to. A second
+  owner arming gets `ARMED_BY_OTHER` with the holder named. Limits come from
+  env > `ios-lab/mac/mac-lab.json` > defaults, clamped. `OSLAB_AX_HELPER`
+  points at `ios-lab/mac/fake-ax-helper.py` so the act/verify paths run in
+  Linux CI; `make mac-setup` now builds the AX helper.
 - **Cleanup panel audit** — [[ios-lab/mac/cleanup-panel-verify.sh]]
   (`make -C ios-lab mac-cleanup-verify`) reproduces the 2026-11-15 cleaner
   audit against the running desktop app: it discovers the console port from

@@ -19,7 +19,7 @@ const content = {
   checkedAt: Date.now() / 1000, offline: false, source: "bundled", updateAvailable: true
 };
 
-async function mockApi(page: Page, os: "macos" | "windows" | "linux" = "macos", labPatch: Record<string, Partial<LabStatus>> = {}) {
+async function mockApi(page: Page, os: "macos" | "windows" | "linux" = "macos", labPatch: Record<string, Partial<LabStatus>> = {}, contentOffer = false) {
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};
@@ -46,7 +46,7 @@ async function mockApi(page: Page, os: "macos" | "windows" | "linux" = "macos", 
     };
     else if (/^\/api\/labs\/[a-z]+\/config$/.test(path)) body = { lab: path.split("/")[3], path: "config.env", exists: true, fields: [], profiles: [], backups: [], endpoints: [{ label: "Appium", address: "http://127.0.0.1:4723/" }] };
     else if (/^\/api\/labs\/[a-z]+\/monitor$/.test(path)) body = { lab: path.split("/")[3], state: "stopped", containers: [] };
-    else if (path === "/api/content/status" || path === "/api/content/check") body = content;
+    else if (path === "/api/content/status" || path === "/api/content/check") body = contentOffer ? content : { ...content, latest: null, updateAvailable: false };
     else if (path === "/api/content/update") body = { ...content, installed: true, version: "content-149", sequence: 149, updateAvailable: false };
     else if (path === "/api/reports") body = { reports: [] };
     else if (path === "/api/apks") body = { apks: [] };
@@ -64,8 +64,9 @@ async function mockApi(page: Page, os: "macos" | "windows" | "linux" = "macos", 
 }
 
 test("content card checks and installs while keeping advanced options available", async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, "macos", {}, true);
   await page.goto("/");
+  await page.getByRole("dialog", { name: "Updates available" }).getByRole("button", { name: "Later", exact: true }).click();
   const card = page.locator("#content");
   await expect(card).toBeVisible();
   await expect(card.getByText("A newer content pack is available.").first()).toBeVisible();
@@ -76,7 +77,7 @@ test("content card checks and installs while keeping advanced options available"
 });
 
 test("Turkish page renders the content card without layout overflow", async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, "macos", {}, true);
   await page.goto("/tr/");
   await expect(page.locator("html")).toHaveAttribute("lang", "tr");
   await expect(page.locator("#content")).toBeVisible();
@@ -86,7 +87,7 @@ test("Turkish page renders the content card without layout overflow", async ({ p
 
 for (const locale of ["ar", "fa"] as const) {
   test(`${locale} content page keeps its right-to-left layout inside the viewport`, async ({ page }) => {
-    await mockApi(page);
+    await mockApi(page, "macos", {}, true);
     await page.goto(`/${locale}/`);
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
@@ -445,6 +446,7 @@ test("Android run failures are shown next to the action", async ({ page }) => {
 });
 
 test("every local page type hydrates without a browser error", async ({ page }) => {
+  test.setTimeout(90_000); // This test navigates through 25 built pages.
   await mockApi(page);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -694,7 +696,7 @@ test("the app mirror previews mirror clicks and runs them directly while armed",
   } }));
 
   await page.goto("/labs/macos/");
-  await expect(page.getByLabel("Window")).toBeVisible();
+  await expect(page.getByLabel("Window", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Elements" }).click();
   const hotspot = page.getByRole("button", { name: "1: OK" });
   await expect(hotspot).toBeVisible();

@@ -10,10 +10,10 @@
  * mounts it, and a non-conforming payload renders as "no snapshot yet"
  * instead of crashing the island.
  */
-import { useState } from "react";
-import { ArrowClockwiseIcon, MonitorIcon } from "@phosphor-icons/react";
+import { useEffect } from "react";
+import { MonitorIcon } from "@phosphor-icons/react";
 import { Badge, Empty, Section, Status } from "../../components/ui";
-import { api, formatBytes, message, type CleanupWidgetSnapshot } from "../../lib/api";
+import { formatBytes, type CleanupWidgetSnapshot } from "../../lib/api";
 
 const STATUS_LABELS: Partial<Record<string, string>> = {
   "cleaning": "Cleaning",
@@ -40,37 +40,28 @@ function relative(seconds: number | null, fallback: string): string {
 }
 
 export function WidgetsCard({ snapshot, reload }: { snapshot: CleanupWidgetSnapshot | null; reload: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const valid = isSnapshot(snapshot);
 
-  function publish() {
-    setBusy(true); setError("");
-    void api.cleanupWidget()
-      .then(reload)
-      .catch((e) => setError(message(e)))
-      .finally(() => setBusy(false));
-  }
+  // Publishing is automatic: opening this page already builds and publishes the snapshot, and the
+  // console refreshes it on a timer, so there is nothing for the user to press.
+  useEffect(() => {
+    const timer = setInterval(reload, 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [reload]);
+
+  // Widgets are a macOS feature: on other systems the card would only be noise.
+  if (valid && snapshot.platform !== "macos") return null;
 
   return <Section id="cleanup-widgets" title="Desktop widgets" description="Glanceable storage and cleanup status in macOS Notification Center, kept fresh by this console.">
-    {valid && !snapshot.capable && snapshot.platform !== "macos" &&
-      <Status value={{ ok: true, text: "Widgets are a macOS feature; this machine publishes nothing." }} />}
     {valid && snapshot.platform === "macos" && !snapshot.capable &&
       <Status value={{ ok: true, text: "Publishing is idle until the installed os-lab app creates its widget container." }} />}
     {valid && snapshot.capable && !snapshot.publish.published && snapshot.publish.reason &&
       <Status value={{ ok: false, text: snapshot.publish.reason }} />}
-    {error && <Status value={{ ok: false, text: error }} />}
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <button type="button" className="iux-btn" data-variant="primary" disabled={busy} onClick={publish}>
-        <ArrowClockwiseIcon size={14} className="inline" /> Publish now
-      </button>
-      {valid && <span className="text-xs text-(--iux-muted-foreground)">
-        {snapshot.publish.published ? "published" : "not published"}
-        {snapshot.publish.published && ` · ${new Date(snapshot.capturedAt * 1000).toLocaleTimeString()}`}
-      </span>}
-    </div>
+    {valid && snapshot.capable && snapshot.publish.published &&
+      <Status value={{ ok: true, text: "Kept up to date automatically." }} />}
+    <details className="mt-3 text-sm">
+      <summary className="cursor-pointer text-(--iux-muted-foreground)">What the widget shows</summary>
     {valid && <div className="mt-3 rounded-md border border-(--iux-border) p-3">
-      <p className="text-xs font-medium text-(--iux-muted-foreground)">What the widget shows</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <Badge tone={snapshot.status === "ready-to-clean" ? "success" : snapshot.status === "cleaning" || snapshot.status === "scanning" ? "warning" : undefined}>
           {STATUS_LABELS[snapshot.status] ?? snapshot.status}
@@ -100,6 +91,7 @@ export function WidgetsCard({ snapshot, reload }: { snapshot: CleanupWidgetSnaps
         {` · ${snapshot.bookmarks.count} bookmarks (${snapshot.bookmarks.quickCleanCount} quick)`}
       </p>
     </div>}
+    </details>
     {!valid && <Empty>The widget snapshot appears after the first publish.</Empty>}
     <details className="mt-3 text-sm">
       <summary className="cursor-pointer text-(--iux-muted-foreground)">Adding the widget</summary>

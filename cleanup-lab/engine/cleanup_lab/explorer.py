@@ -141,7 +141,8 @@ def walk(root_path, *, cancel=None, progress_callback=None, max_nodes=MAX_NODES,
         counters["truncated"] = True
         return node, counters
     try:
-        entries = list(os.scandir(root_path))
+        # Stable traversal also makes hard-link attribution deterministic.
+        entries = sorted(os.scandir(root_path), key=lambda entry: entry.name)
     except OSError:
         node["unreadable"] = 1
         return node, counters
