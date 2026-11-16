@@ -479,6 +479,26 @@ export interface CleanupMonitorConfig {
   enabled: boolean; intervalSeconds: number; cooldownSeconds: number;
   volumes: { mountPoint: string; minFreeBytes: number; minFreePercent: number; enabled: boolean }[];
 }
+/** CLN-30: one typed event in the notification outbox. */
+export interface NotificationAction { id: string; label: string; route: string | null }
+export interface NotificationEvent {
+  id: number; at: number;
+  category: "job-done" | "job-failed" | "auto-clean" | "monitor-warning" | "monitor-recovered" | "monitor-error";
+  title: string; body: string; route: string | null; actions: NotificationAction[];
+}
+/** CLN-30: the desktop app's delivery report, null when the console runs alone. */
+export interface NotificationsRuntime {
+  platform?: string; appVersion?: string;
+  lastDeliveryAt?: number | null; lastDeliveryOk?: boolean; lastError?: string | null;
+}
+export interface CleanupNotificationsStatus {
+  enabled: boolean;
+  categories: Record<string, boolean>;
+  events: NotificationEvent[];
+  configError: string | null;
+  runtime: NotificationsRuntime | null;
+}
+export interface CleanupNotificationsConfig { enabled: boolean; categories?: Record<string, boolean> }
 /** CLNP-23: one registered Space Explorer root. */
 export interface CleanupExplorerRoot {
   id: string; name: string; source: string; path: string | null; available: boolean; reason: string;
@@ -679,6 +699,10 @@ export const api = {
   cleanupMonitor: () => call<CleanupMonitorStatus>("/api/cleanup/monitor"),
   cleanupMonitorConfig: (config: CleanupMonitorConfig) => post<CleanupMonitorStatus>("/api/cleanup/monitor/config", config),
   cleanupMonitorEvaluate: () => post<CleanupMonitorStatus>("/api/cleanup/monitor/evaluate"),
+  /** CLN-30: the notification outbox — config, events and the desktop runtime. */
+  cleanupNotifications: () => call<CleanupNotificationsStatus>("/api/cleanup/notifications"),
+  cleanupNotificationsConfig: (config: CleanupNotificationsConfig) => post<CleanupNotificationsStatus>("/api/cleanup/notifications/config", config),
+  cleanupNotificationsOpenSettings: () => post<{ opened: string }>("/api/cleanup/notifications/open-settings", {}),
   cleanupVolumes: () => call<CleanupVolumes>("/api/cleanup/volumes"),
   /** CLN-27: relocatable entries and destination volumes, then plan → confirm → run. */
   cleanupRelocation: () => call<CleanupRelocationStatus>("/api/cleanup/relocation"),
@@ -875,6 +899,8 @@ export const contentStore = createStore(api.contentStatus, 30000);
 export const jobsStore = createStore(async () => (await api.jobs()).jobs, 2500);
 export const healthStore = createStore(api.health, 5000);
 export const androidLogsStore = createStore(api.logs, 1000);
+/** CLN-30: the notification outbox, polled a little slower than the job list. */
+export const notificationsStore = createStore(api.cleanupNotifications, 5000);
 
 /** Poll one endpoint while mounted (for page-specific data such as one lab's monitor). */
 export function usePoll<T>(load: () => Promise<T>, intervalMs: number, deps: unknown[] = []) {

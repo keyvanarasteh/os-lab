@@ -373,6 +373,20 @@ const tasks: CleanupTask[] = [
     ],
     targetPaths: ["cleanup-lab/engine/", "console/"],
   },
+  {
+    id: "CLN-33",
+    title: "Local notifications: OS delivery in the desktop app, in-app toast stack",
+    priority: "Medium",
+    effort: "Medium",
+    summary:
+      "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab's lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.",
+    deliverables: [
+      "Typed outbox in the private state folder; config gate per category; route allowlist; no paths in records",
+      "Emitters appended at the existing publish_widget hooks, best-effort, never breaking a request or the monitor thread",
+      "Desktop watcher skips delivery while the window is focused on the dashboard; clicks deep-link via the oslab route allowlist",
+    ],
+    targetPaths: ["cleanup-lab/engine/", "console/", "dashboard/src/views/cleanup/", "dashboard/src/shell/", "app/src-tauri/"],
+  },
   // --- Cleaner Pro (CLNP) — shipped in PR #214 (feat/cleaner-pro) ---
   {
     id: "CLNP-01…05",

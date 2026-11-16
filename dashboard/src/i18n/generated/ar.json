@@ -2764,5 +2764,22 @@
   "All labs": "جميع المختبرات",
   "Task prompt": "موجّه المهمة",
   "Focus the sidebar on one lab": "تركيز الشريط الجانبي على مختبر واحد",
-  "to switch": "للتبديل"
+  "to switch": "للتبديل",
+  "Automated hook cleans": "التنظيفات التلقائية بواسطة الخطاف",
+  "Clear all": "مسح الكل",
+  "Desktop notifications": "إشعارات سطح المكتب",
+  "Dismiss notification": "تجاهل الإشعار",
+  "Job completions": "اكتمال المهام",
+  "Job failures": "فشل المهام",
+  "Monitor errors": "أخطاء المراقب",
+  "Monitor recoveries": "تعافي المراقب",
+  "Monitor warnings": "تحذيرات المراقب",
+  "Notification categories": "فئات الإشعارات",
+  "Notifications": "الإشعارات",
+  "Notifications enabled": "الإشعارات مفعّلة",
+  "Recent notifications (": "الإشعارات الأخيرة (",
+  "What the lab announces while it works: job completions, automated hook cleans and monitor events, as in-app toasts and desktop notifications.": "ما يعلنه المختبر أثناء عمله: اكتمال المهام، التنظيفات التلقائية بواسطة الخطاف وأحداث المراقب، كإشعارات داخل التطبيق وعلى سطح المكتب.",
+  "Local notifications: OS delivery in the desktop app, in-app toast stack": "الإشعارات المحلية: تسليم نظام التشغيل في تطبيق سطح المكتب، كومة إشعارات داخل التطبيق",
+  "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab’s lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.": "يُغلق مُخرَج إشعارات نظام التشغيل المؤجَّل من CLNP-09…13. تضيف خطافات دورة حياة المختبر (اكتمال المهام، التنظيف التلقائي بواسطة الخطاف، أحداث المراقب وأحجام المفضّلة) أحداثًا نوعيةً إلى صندوق إرسال محدود؛ يستعلم تطبيق سطح المكتب عبر واجهة الاسترجاع المحلي ويسلّم إشعارات النظام عبر tauri-plugin-notification من Rust (تحتفظ صفحة اللوحة بصفر IPC)؛ وتعرض اللوحة الأحداث نفسها ككومة إشعارات داخل التطبيق مع إجراءات وتكديس وتمرير للإغلاق، وبطاقة الإعدادات تملك التهيئة وتقرير تسليم سطح المكتب و ألواح إعدادات النظام الثابتة.",
+  "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab's lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.": "يُغلق مُخرَج إشعارات نظام التشغيل المؤجَّل من CLNP-09…13. تضيف خطافات دورة حياة المختبر (اكتمال المهام، التنظيف التلقائي بواسطة الخطاف، أحداث المراقب وأحجام المفضّلة) أحداثًا نوعيةً إلى صندوق إرسال محدود؛ يستعلم تطبيق سطح المكتب عبر واجهة الاسترجاع المحلي ويسلّم إشعارات النظام عبر tauri-plugin-notification من Rust (تحتفظ صفحة اللوحة بصفر IPC)؛ وتعرض اللوحة الأحداث نفسها ككومة إشعارات داخل التطبيق مع إجراءات وتكديس وتمرير للإغلاق، وبطاقة الإعدادات تملك التهيئة وتقرير تسليم سطح المكتب و ألواح إعدادات النظام الثابتة."
 }

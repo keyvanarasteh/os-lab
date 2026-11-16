@@ -2764,5 +2764,22 @@
   "All labs": "Tüm laboratuvarlar",
   "Task prompt": "Görev istemi",
   "Focus the sidebar on one lab": "Kenar çubuğunu tek bir laboratuvara odakla",
-  "to switch": "değiştirmek için"
+  "to switch": "değiştirmek için",
+  "Automated hook cleans": "Otomatik tetiklemeli temizlikler",
+  "Clear all": "Tümünü temizle",
+  "Desktop notifications": "Masaüstü bildirimleri",
+  "Dismiss notification": "Bildirimi kapat",
+  "Job completions": "İş tamamlamaları",
+  "Job failures": "İş başarısızlıkları",
+  "Monitor errors": "İzleyici hataları",
+  "Monitor recoveries": "İzleyici düzelmeleri",
+  "Monitor warnings": "İzleyici uyarıları",
+  "Notification categories": "Bildirim kategorileri",
+  "Notifications": "Bildirimler",
+  "Notifications enabled": "Bildirimler açık",
+  "Recent notifications (": "Son bildirimler (",
+  "What the lab announces while it works: job completions, automated hook cleans and monitor events, as in-app toasts and desktop notifications.": "Laboratuvar çalışırken haber verdiği şeyler: iş tamamlamaları, otomatik tetiklemeli temizlikler ve izleyici olayları; uygulama içi ve masaüstü bildirimleri olarak.",
+  "Local notifications: OS delivery in the desktop app, in-app toast stack": "Yerel bildirimler: masaüstü uygulamasında işletim sistemi teslimi, uygulama içi bildirim yığını",
+  "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab’s lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.": "CLNP-09…13’ten ertelenen işletim sistemi bildirimi taahhüdünü kapatır. Laboratuvarın yaşam döngüsü kancaları (iş tamamlamaları, otomatik tetiklemeli temizlik, izleyici ve yer-imi boyut olayları) yazılı olayları sınırlı bir kuyruğa ekler; masaüstü uygulaması bunları geri döngü API’si üzerinden yoklar ve Rust tarafında tauri-plugin-notification ile işletim sistemi bildirimleri olarak teslim eder (pano sayfası sıfır IPC tutar); pano aynı olayları eylemler, yığınlama ve kaydırarak kapatma içeren bir uygulama içi bildirim yığınında gösterir ve bir Ayarlar kartı yapılandırmayı, masaüstü teslim raporunu ve sabit sistem ayarları bölmelerini yönetir.",
+  "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab's lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.": "CLNP-09…13ten ertelenen işletim sistemi bildirimi taahhüdünü kapatır. Laboratuvarın yaşam döngüsü kancaları (iş tamamlamaları, otomatik tetiklemeli temizlik, izleyici ve yer-imi boyut olayları) yazılı olayları sınırlı bir kuyruğa ekler; masaüstü uygulaması bunları geri döngü APIsi üzerinden yoklar ve Rust tarafında tauri-plugin-notification ile işletim sistemi bildirimleri olarak teslim eder (pano sayfası sıfır IPC tutar); pano aynı olayları eylemler, yığınlama ve kaydırarak kapatma içeren bir uygulama içi bildirim yığınında gösterir ve bir Ayarlar kartı yapılandırmayı, masaüstü teslim raporunu ve sabit sistem ayarları bölmelerini yönetir."
 }

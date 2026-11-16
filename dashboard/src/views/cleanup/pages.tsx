@@ -12,6 +12,7 @@ import { bytes, itemStatusLabel, riskLabel, riskTone, sortEntries, totalsByRisk,
 import { CleanupExtraTools } from "./extra-tools";
 import { CrossPlatformLeftovers } from "./cross-leftovers";
 import { MonitorBanner, MonitorCard, MonitorStatsCard } from "./monitor-card";
+import { NotificationsCard } from "./notifications-card";
 import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
 import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
@@ -29,6 +30,7 @@ const WIDGET_SECTIONS: Record<string, CleanupPageId> = {
   "cleanup-monitor": "",
   "cleanup-permissions": "settings",
   "cleanup-bookmarks": "settings",
+  "cleanup-notifications": "settings",
   "overview-review": "",
   "overview-storage": ""
 };
@@ -394,7 +396,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const bookmarkedIds = new Set((bookmarks?.bookmarks ?? []).map((item) => item.entryId));
 
   /** Sections that moved with the settings split, and the tab hosting each. */
-  const SECTION_PAGE: Record<string, CleanupPageId> = { "cleanup-monitor": "settings", "cleanup-permissions": "settings", "cleanup-widgets": "settings", "cleanup-bookmarks": "settings", "overview-review": "", "overview-storage": "" };
+  const SECTION_PAGE: Record<string, CleanupPageId> = { "cleanup-monitor": "settings", "cleanup-permissions": "settings", "cleanup-widgets": "settings", "cleanup-bookmarks": "settings", "cleanup-notifications": "settings", "overview-review": "", "overview-storage": "" };
 
   /** CLNP-21: a capability card navigates a tab or its section, even when the section now lives on another tab. */
   function goCard(card: OverviewCard) {
@@ -638,6 +640,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
               onCatalogChanged={() => { void api.cleanupCatalog().then((catalog) => setEntries(catalog.entries)).catch(() => {}); }} />
             <PermissionsCard permissions={permissions} />
             <MonitorCard monitor={monitor} volumes={volumes} reload={monitorReload} />
+            <NotificationsCard />
             <WidgetsCard snapshot={widget} reload={reloadWidget} />
             <Section title="Tools & advanced" description="The detailed cleanup tools, one click away.">
               <OverviewCards go={goCard} />

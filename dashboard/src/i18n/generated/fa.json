@@ -2764,5 +2764,22 @@
   "All labs": "همه آزمایشگاه‌ها",
   "Task prompt": "پرامپت وظیفه",
   "Focus the sidebar on one lab": "تمرکز نوار کناری روی یک آزمایشگاه",
-  "to switch": "برای تغییر"
+  "to switch": "برای تغییر",
+  "Automated hook cleans": "پاک‌سازی‌های خودکار قلاب",
+  "Clear all": "پاک کردن همه",
+  "Desktop notifications": "اعلان‌های دسکتاپ",
+  "Dismiss notification": "بستن اعلان",
+  "Job completions": "تکمیل کارها",
+  "Job failures": "شکست کارها",
+  "Monitor errors": "خطاهای پایشگر",
+  "Monitor recoveries": "بهبودهای پایشگر",
+  "Monitor warnings": "هشدارهای پایشگر",
+  "Notification categories": "دسته‌های اعلان",
+  "Notifications": "اعلان‌ها",
+  "Notifications enabled": "اعلان‌ها فعال است",
+  "Recent notifications (": "اعلان‌های اخیر (",
+  "What the lab announces while it works: job completions, automated hook cleans and monitor events, as in-app toasts and desktop notifications.": "آنچه آزمایشگاه هنگام کار اعلام می‌کند: تکمیل کارها، پاک‌سازی‌های خودکار قلاب و رویدادهای پایشگر، به‌صورت اعلان درون‌برنامه‌ای و دسکتاپ.",
+  "Local notifications: OS delivery in the desktop app, in-app toast stack": "اعلان‌های محلی: تحویل سیستمی در اپلیکیشن دسکتاپ، پشته اعلان درون‌برنامه‌ای",
+  "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab’s lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.": "تحویل اعلان سیستمی که از CLNP-09…13 به تعویق افتاده بود را می‌بندد. قلاب‌های چرخه حیات آزمایشگاه (تکمیل کارها، پاک‌سازی خودکار قلاب، رویدادهای پایشگر و اندازه نشانک‌ها) رویدادهای نوع‌دار را به یک صندوق ارسال محدود اضافه می‌کنند؛ اپلیکیشن دسکتاپ آن را از طریق API لوپ‌بک پایش می‌کند و اعلان‌های سیستمی را با tauri-plugin-notification از Rust تحویل می‌دهد (صفحه داشبورد صفر IPC نگه می‌دارد)؛ داشبورد همان رویدادها را به‌صورت پشته اعلان درون‌برنامه‌ای با اقدامات، انباشته و کشیدن برای بستن نشان می‌دهد و یک کارت تنظیمات مالک پیکربندی، گزارش تحویل دسکتاپ و پنل‌های ثابت تنظیمات سیستم است.",
+  "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab's lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.": "تحویل اعلان سیستمی که از CLNP-09…13 به تعویق افتاده بود را می‌بندد. قلاب‌های چرخه حیات آزمایشگاه (تکمیل کارها، پاک‌سازی خودکار قلاب، رویدادهای پایشگر و اندازه نشانک‌ها) رویدادهای نوع‌دار را به یک صندوق ارسال محدود اضافه می‌کنند؛ اپلیکیشن دسکتاپ آن را از طریق API لوپ‌بک پایش می‌کند و اعلان‌های سیستمی را با tauri-plugin-notification از Rust تحویل می‌دهد (صفحه داشبورد صفر IPC نگه می‌دارد)؛ داشبورد همان رویدادها را به‌صورت پشته اعلان درون‌برنامه‌ای با اقدامات، انباشته و کشیدن برای بستن نشان می‌دهد و یک کارت تنظیمات مالک پیکربندی، گزارش تحویل دسکتاپ و پنل‌های ثابت تنظیمات سیستم است."
 }
