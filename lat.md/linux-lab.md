@@ -114,3 +114,37 @@ Validation and install steps, in order:
 
 Only install trusted `.deb` packages. Installation requires sudo
 permissions and may modify the operating system.
+
+## PENT-05 Binary hardening and crash triage
+
+PENT-05 verifies compiler/linker mitigations on ELF binaries and triages AFL++ crashes.
+
+[[linux-lab/scripts/pent-05-hardening-audit.sh]] copies each binary to a private
+snapshot, then reads `readelf -h/-l/-d/-s` from that one copy. Per binary it reports
+NX (non-executable `GNU_STACK`), PIE (`DYN` with `INTERP` or a `FLAGS_1 PIE`
+flag, so static PIE counts; other `DYN` files are `dso`), stack canary
+(`__stack_chk_fail`), RELRO (`GNU_RELRO` + `BIND_NOW` = full), and FORTIFY
+(`__*_chk` count, informational). The system ASLR level comes from
+`/proc/sys/kernel/randomize_va_space` and only `2` passes; `--no-aslr-check`
+skips that gate. Exit 0 means all hardened, 1 means a weakness or ASLR not full,
+2 means a usage, file or tool error. `--json` escapes every control character.
+
+[[linux-lab/scripts/pent-05-afl-triage.sh]] has two modes. `triage` replays each
+crash input against a target (`@@` = file path, else stdin) under its own
+watchdog: a marker file records a real timeout, the target gets TERM and then
+KILL, and only the first 1 MB of output is inspected. Results are bucketed by
+ASAN error type plus the full names of the top two app frames, signal (exit
+status above 128), hang, `exit:N`, or no-crash. A target exiting with a status
+above 128 on its own is indistinguishable from a signal in the shell, which is
+acceptable because ASAN runs with `abort_on_error=1`. `fuzz` builds
+`linux-lab/pent-05/hedef.c` with `afl-cc` + ASAN, runs `afl-fuzz -m none -V N`
+into a fresh output directory, exits 1 if `afl-fuzz` fails, and triages the
+crashes. Progress goes to stderr, so `--json` stdout stays one JSON document.
+Without AFL++ it prints `[skip]` to stderr and exits 0.
+
+`linux-lab/pent-05/` holds the deliberately vulnerable lab target, seeds, and a
+Makefile that builds `hedef-weak` (all mitigations off) and `hedef-hardened`
+(all on); `make audit` requires exit 0 for the hardened binary and exactly 1 for
+the weak one. Offline tests in [[linux-lab/tests/pent05_test.sh]] use a fake
+`readelf` and a fake crash target; [[linux-lab/tests/test_pent05.py]] also parses
+both tools' `--json` output with `json.loads`.
