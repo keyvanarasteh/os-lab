@@ -17,6 +17,11 @@
       "github": "iremysv"
     },
     {
+      "slug": "avelium-sec",
+      "company": "Avelium Siber ve Akademi Holding A.Ş.",
+      "github": "Erbay-Aydogan-BGT"
+    },
+    {
       "slug": "cok-siteli-kurumsal-guvenlik-duvari",
       "company": "Çok Siteli Kurumsal Güvenlik Duvarı Projesi",
       "github": "RedRiveRR"
@@ -88,28 +93,28 @@
     }
   ],
   "summary": {
-    "companies": 19,
-    "branches": 79,
-    "firewalls": 96,
-    "rules": 1835,
+    "companies": 20,
+    "branches": 84,
+    "firewalls": 101,
+    "rules": 1902,
     "priceUsd": {
       "min": 0,
       "max": 205357,
-      "total": 2003993.69
+      "total": 2075093.69
     },
     "chosenByVendor": {
-      "Fortinet": 75,
-      "Palo Alto Networks": 8,
+      "Fortinet": 78,
+      "Palo Alto Networks": 9,
       "Cloudflare": 6,
+      "Check Point": 3,
       "Açık kaynak": 2,
-      "Check Point": 2,
       "WatchGuard": 1,
       "Netgate": 1,
       "Deciso (açık kaynak)": 1
     },
     "chosenByProduct": {
       "Fortinet FortiGate 60F": 8,
-      "Fortinet FortiGate 200F": 7,
+      "Fortinet FortiGate 200F": 8,
       "Fortinet FortiGate 200F (HA)": 6,
       "Fortinet FortiGate 100F": 4,
       "Fortinet Fortinet FortiGate 200F": 4,
@@ -134,6 +139,10 @@
       "WatchGuard Firebox T-series": 1,
       "Fortinet FortiGate 200G": 1,
       "Fortinet FortiGate 120G": 1,
+      "Fortinet FortiGate 600F (HA Çifti) + FortiWeb WAF": 1,
+      "Check Point Check Point Quantum 6600": 1,
+      "Fortinet FortiGate 1000F (HA Çifti) + Cloudflare/ModSecurity WAF": 1,
+      "Palo Alto Networks Palo Alto PA-3430 (HA Çifti)": 1,
       "Fortinet FortiGate 80F (HA çifti, aktif-pasif)": 1,
       "Fortinet FortiGate 200G (HA çifti, aktif-pasif)": 1,
       "Cloudflare Cloudflare Business (WAF + DDoS + Bot) — 3 alan adı": 1,
@@ -167,13 +176,13 @@
       "Deciso (açık kaynak) OPNsense (Deciso DEC3800)": 1
     },
     "vendorsConsidered": {
-      "Fortinet": 115,
-      "Palo Alto Networks": 80,
-      "Check Point": 76,
+      "Fortinet": 120,
+      "Palo Alto Networks": 85,
+      "Check Point": 81,
+      "Cisco": 62,
       "Sophos": 57,
-      "Cisco": 57,
-      "Netgate": 16,
-      "Deciso": 14,
+      "Netgate": 19,
+      "Deciso": 16,
       "Cloudflare": 10,
       "WatchGuard": 6,
       "F5": 6,
@@ -1228,6 +1237,251 @@
           "vendor": "F5",
           "throughputGbps": null,
           "priceUsd": 46075
+        }
+      ]
+    },
+    {
+      "company": "Avelium Siber ve Akademi Holding A.Ş.",
+      "companySlug": "avelium-sec",
+      "sector": "Education & Cybersecurity R&D",
+      "author": "Erbay Aydoğan",
+      "branch": "İstanbul Merkez Ofisi (HQ)",
+      "branchId": "istanbul-hq",
+      "branchRole": "headquarters",
+      "location": "İstanbul, Türkiye",
+      "segment": "perimeter",
+      "product": "FortiGate 600F (HA Çifti) + FortiWeb WAF",
+      "vendor": "Fortinet",
+      "throughputGbps": 10.5,
+      "priceUsd": 14500,
+      "ruleCount": 17,
+      "actions": {
+        "allow": 11,
+        "deny": 4,
+        "reject": 0,
+        "limit": 2
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "PA-3420",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": 9.4,
+          "priceUsd": 22000
+        },
+        {
+          "product": "Quantum 6600",
+          "vendor": "Check Point",
+          "throughputGbps": 7.2,
+          "priceUsd": 17500
+        },
+        {
+          "product": "Firepower 2130",
+          "vendor": "Cisco",
+          "throughputGbps": 5.0,
+          "priceUsd": 16000
+        },
+        {
+          "product": "Netgate 8200 (pfSense+)",
+          "vendor": "Netgate",
+          "throughputGbps": 3.2,
+          "priceUsd": 1900
+        }
+      ]
+    },
+    {
+      "company": "Avelium Siber ve Akademi Holding A.Ş.",
+      "companySlug": "avelium-sec",
+      "sector": "Education & Cybersecurity R&D",
+      "author": "Erbay Aydoğan",
+      "branch": "Ankara Bölge Ofisi",
+      "branchId": "ankara-office",
+      "branchRole": "branch",
+      "location": "Ankara, Türkiye",
+      "segment": "perimeter",
+      "product": "FortiGate 200F",
+      "vendor": "Fortinet",
+      "throughputGbps": 3.0,
+      "priceUsd": 4200,
+      "ruleCount": 10,
+      "actions": {
+        "allow": 5,
+        "deny": 4,
+        "reject": 0,
+        "limit": 1
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "PA-850",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": 1.5,
+          "priceUsd": 6800
+        },
+        {
+          "product": "Quantum 6200",
+          "vendor": "Check Point",
+          "throughputGbps": 2.5,
+          "priceUsd": 5400
+        },
+        {
+          "product": "Firepower 1140",
+          "vendor": "Cisco",
+          "throughputGbps": 2.2,
+          "priceUsd": 4900
+        },
+        {
+          "product": "DEC2750 (OPNsense)",
+          "vendor": "Deciso",
+          "throughputGbps": 2.0,
+          "priceUsd": 1450
+        }
+      ]
+    },
+    {
+      "company": "Avelium Siber ve Akademi Holding A.Ş.",
+      "companySlug": "avelium-sec",
+      "sector": "Education & Cybersecurity R&D",
+      "author": "Erbay Aydoğan",
+      "branch": "Londra Uluslararası Ofisi",
+      "branchId": "london-office",
+      "branchRole": "branch",
+      "location": "Londra, Birleşik Krallık",
+      "segment": "perimeter",
+      "product": "Check Point Quantum 6600",
+      "vendor": "Check Point",
+      "throughputGbps": 3.8,
+      "priceUsd": 8900,
+      "ruleCount": 12,
+      "actions": {
+        "allow": 7,
+        "deny": 4,
+        "reject": 0,
+        "limit": 1
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "PA-1410",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": 3.2,
+          "priceUsd": 9500
+        },
+        {
+          "product": "FortiGate 200F",
+          "vendor": "Fortinet",
+          "throughputGbps": 3.0,
+          "priceUsd": 4200
+        },
+        {
+          "product": "Firepower 2110",
+          "vendor": "Cisco",
+          "throughputGbps": 2.5,
+          "priceUsd": 6200
+        },
+        {
+          "product": "Netgate 6100",
+          "vendor": "Netgate",
+          "throughputGbps": 1.8,
+          "priceUsd": 999
+        }
+      ]
+    },
+    {
+      "company": "Avelium Siber ve Akademi Holding A.Ş.",
+      "companySlug": "avelium-sec",
+      "sector": "Education & Cybersecurity R&D",
+      "author": "Erbay Aydoğan",
+      "branch": "Akademik Kampüs Şubesi (10.000 Öğrenci)",
+      "branchId": "academic-campus",
+      "branchRole": "campus",
+      "location": "İstanbul Kampüs, Türkiye",
+      "segment": "perimeter",
+      "product": "FortiGate 1000F (HA Çifti) + Cloudflare/ModSecurity WAF",
+      "vendor": "Fortinet",
+      "throughputGbps": 20.0,
+      "priceUsd": 18500,
+      "ruleCount": 16,
+      "actions": {
+        "allow": 8,
+        "deny": 6,
+        "reject": 0,
+        "limit": 2
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "PA-5410",
+          "vendor": "Palo Alto Networks",
+          "throughputGbps": 17.5,
+          "priceUsd": 38000
+        },
+        {
+          "product": "Quantum 7000",
+          "vendor": "Check Point",
+          "throughputGbps": 15.0,
+          "priceUsd": 29000
+        },
+        {
+          "product": "Firepower 3120",
+          "vendor": "Cisco",
+          "throughputGbps": 12.0,
+          "priceUsd": 24000
+        },
+        {
+          "product": "DEC4280 (OPNsense)",
+          "vendor": "Deciso",
+          "throughputGbps": 8.5,
+          "priceUsd": 3200
+        }
+      ]
+    },
+    {
+      "company": "Avelium Siber ve Akademi Holding A.Ş.",
+      "companySlug": "avelium-sec",
+      "sector": "Education & Cybersecurity R&D",
+      "author": "Erbay Aydoğan",
+      "branch": "Yazılım ve Ar-Ge Merkezi",
+      "branchId": "software-rnd-lab",
+      "branchRole": "datacenter",
+      "location": "İstanbul Teknopark, Türkiye",
+      "segment": "rnd",
+      "product": "Palo Alto PA-3430 (HA Çifti)",
+      "vendor": "Palo Alto Networks",
+      "throughputGbps": 12.5,
+      "priceUsd": 25000,
+      "ruleCount": 12,
+      "actions": {
+        "allow": 6,
+        "deny": 4,
+        "reject": 0,
+        "limit": 2
+      },
+      "alternativesCount": 4,
+      "alternatives": [
+        {
+          "product": "Quantum 6700",
+          "vendor": "Check Point",
+          "throughputGbps": 10.0,
+          "priceUsd": 21000
+        },
+        {
+          "product": "FortiGate 600F",
+          "vendor": "Fortinet",
+          "throughputGbps": 10.5,
+          "priceUsd": 14500
+        },
+        {
+          "product": "Firepower 2140",
+          "vendor": "Cisco",
+          "throughputGbps": 7.5,
+          "priceUsd": 19500
+        },
+        {
+          "product": "Netgate 1541",
+          "vendor": "Netgate",
+          "throughputGbps": 5.0,
+          "priceUsd": 2800
         }
       ]
     },
