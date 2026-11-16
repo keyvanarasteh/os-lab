@@ -98,7 +98,9 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
   const { data, error } = usePoll(() => api.macosApps(), 5000);
   const control = usePoll(() => api.macosControl(), 15000);
   const audit = usePoll(() => api.macosAudit(), 15000);
+  const displaysPoll = usePoll(() => api.macosDisplays(), 60000);
   const [windowId, setWindowId] = useState(0);
+  const [displayId, setDisplayId] = useState(0);
   const [float, setFloat] = useState(true);
   const [pos, setPos] = useState({ left: 0, top: 0, width: 440, height: 420 });
   const [showElements, setShowElements] = useState(false);
@@ -122,7 +124,9 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
   const ownerRef = useRef<string>(typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `panel-${Date.now()}`);
 
   const windows = data?.windows ?? [];
-  const selected = windows.find((w) => w.windowId === windowId) ?? windows[0] ?? null;
+  const displays = displaysPoll.data?.displays ?? [];
+  const display = displayId ? displays.find((d) => d.id === displayId) ?? null : null;
+  const selected = displayId ? null : (windows.find((w) => w.windowId === windowId) ?? windows[0] ?? null);
   const armed = control.data?.armed ?? false;
   const fps = hovering ? FPS_HOVER : FPS_IDLE;
 
@@ -154,9 +158,11 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
 
   /** The one-shot capture: the stream's fallback (MIR-04) and the Refresh button. */
   const grab = useCallback(async () => {
-    if (!selected) return;
+    const url = displayId ? api.macosDisplayScreenshotUrl(displayId)
+      : selected ? api.macosAppScreenshotUrl(selected.windowId) : null;
+    if (!url) return;
     try {
-      const res = await fetch(api.macosAppScreenshotUrl(selected.windowId), { cache: "no-store" });
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error || `${res.status} ${res.statusText}`);
@@ -166,13 +172,13 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
       setShot(null);
       setShotError(message(e));
     }
-  }, [selected?.windowId, setShotFromBytes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected?.windowId, displayId, setShotFromBytes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => {
     if (shotRef.current) URL.revokeObjectURL(shotRef.current);
   }, []);
   useEffect(() => {
-    if (!selected) {
+    if (!selected && !displayId) {
       setShot(null);
       setShotError(null);
       setStreamState("on");
@@ -187,16 +193,19 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
         }, MIRROR_INTERVAL)
       : undefined;
     return () => clearInterval(timer);
-  }, [selected?.windowId, streamState, grab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected?.windowId, displayId, streamState, grab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The streaming mirror (MIR-04): one multipart MJPEG response; the fetch is aborted on
   // hidden tabs, fps changes or panel close, and falls back to the poll on stream errors.
   useEffect(() => {
-    if (!selected || streamState !== "on" || !visible) return;
+    if ((!selected && !displayId) || streamState !== "on" || !visible) return;
+    const url = displayId ? api.macosDisplayStreamUrl(displayId, fps)
+      : selected ? api.macosAppStreamUrl(selected.windowId, fps) : null;
+    if (!url) return;
     const controller = new AbortController();
     (async () => {
       try {
-        const res = await fetch(api.macosAppStreamUrl(selected.windowId, fps), { signal: controller.signal, cache: "no-store" });
+        const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
         if (!res.ok || !res.body) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(body.error || `${res.status} ${res.statusText}`);
@@ -211,7 +220,7 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
       }
     })();
     return () => controller.abort();
-  }, [selected?.windowId, streamState, visible, fps, setShotFromBytes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected?.windowId, displayId, streamState, visible, fps, setShotFromBytes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Deep inspect (MIR-05): one mac2 session for the selected app, closed on every exit ──
   const closeDeep = useCallback((bundle?: string) => {
@@ -427,7 +436,7 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
-      <button type="button" className="iux-btn" data-variant="outline" onClick={() => void grab()} disabled={!selected}>
+      <button type="button" className="iux-btn" data-variant="outline" onClick={() => void grab()} disabled={!selected && !displayId}>
         <ArrowClockwiseIcon size={14} /> Refresh
       </button>
       <button type="button" className="iux-btn" data-variant="outline" aria-pressed={showElements}
@@ -475,12 +484,15 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
     </div>
   );
 
-  const mirror = bounds ? (
+  const frame = display
+    ? { x: display.x, y: display.y, width: display.width, height: display.height }
+    : bounds;
+  const mirror = frame ? (
     <div className="flex flex-col gap-2">
       <div
         ref={mirrorRef}
         className="relative w-full cursor-crosshair overflow-hidden rounded-xl border border-(--iux-border) bg-black"
-        style={{ aspectRatio: `${bounds.width} / ${bounds.height}` }}
+        style={{ aspectRatio: `${frame.width} / ${frame.height}` }}
         onPointerDown={mirrorClick}
         onPointerEnter={() => setHovering(true)}
         onPointerLeave={() => setHovering(false)}
@@ -490,7 +502,7 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
         }}
       >
         {shot ? (
-          <img src={shot} alt={`Mirror of ${selected?.app ?? "the app"}`} className="absolute inset-0 h-full w-full object-fill" draggable={false} />
+          <img src={shot} alt={`Mirror of ${display ? `display ${display.id}` : selected?.app ?? "the app"}`} className="absolute inset-0 h-full w-full object-fill" draggable={false} />
         ) : shotError ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
             <p className="text-xs text-zinc-400">{shotError}</p>
@@ -504,7 +516,7 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
             <CircleNotchIcon size={22} className="animate-spin text-zinc-500" aria-hidden />
           </div>
         )}
-        {showElements && shot
+        {showElements && shot && !displayId
           ? elements.map((element, i) => {
               const key = frameKey(element);
               const added = addedKeys.has(key);
@@ -518,7 +530,7 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
                       : changed ? "border border-dashed border-amber-400/80 bg-amber-400/15 text-amber-200"
                         : element.focused ? "border border-violet-400/80 bg-violet-400/15 text-violet-200"
                           : "border border-[#f36c21]/70 bg-[#f36c21]/15 text-[#ffb27a] hover:bg-[#f36c21]/35"}`}
-                  style={hotspotStyle(element, bounds)}
+                  style={hotspotStyle(element, frame)}
                   title={`${element.role}${element.label ? `: ${element.label}` : ""}`
                     + `${element.value ? ` — ${element.value.slice(0, 60)}` : ""}`
                     + `${element.actions?.length ? ` · ${element.actions.slice(0, 3).join(", ")}` : ""}`}
@@ -537,7 +549,7 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
                       menuOpened.current = false; // the long-press already opened the menu
                       return;
                     }
-                    clickAt(selected?.pid ?? 0, bounds.x + element.x + element.w / 2, bounds.y + element.y + element.h / 2, element.elementId);
+                    clickAt(selected?.pid ?? 0, frame.x + element.x + element.w / 2, frame.y + element.y + element.h / 2, element.elementId);
                   }}
                 >
                   {element.w > 24 && element.h > 14 ? i + 1 : null}
@@ -545,12 +557,12 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
               );
             })
           : null}
-        {showElements && shot
+        {showElements && shot && !displayId
           ? (diff?.removed ?? []).map((element, i) => (
               <span
                 key={`gone-${i}-${frameKey(element)}`}
                 className="pointer-events-none absolute rounded-md border border-dashed border-zinc-400/50 opacity-50"
-                style={hotspotStyle(element, bounds)}
+                style={hotspotStyle(element, frame)}
                 aria-hidden
               />
             ))
@@ -651,25 +663,46 @@ export function MacAppPanel({ onPreview, onHide }: { onPreview: (action: string,
               (System Settings › Privacy & Security).
             </p>
           )}
-          {windows.length ? (
+          {windows.length || displays.length ? (
             <>
-              <Field label="Window">
+              <Field label="Window or display">
                 <select
                   className="iux-input"
-                  value={selected?.windowId ?? 0}
-                  onChange={(e) => setWindowId(Number(e.target.value))}
-                  aria-label="Window"
+                  value={displayId ? `d${displayId}` : `w${selected?.windowId ?? 0}`}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.startsWith("d")) {
+                      setDisplayId(Number(value.slice(1)));
+                    } else {
+                      setDisplayId(0);
+                      setWindowId(Number(value.slice(1)));
+                    }
+                  }}
+                  aria-label="Window or display"
                 >
                   {windows.map((w) => (
-                    <option key={w.windowId} value={w.windowId}>
+                    <option key={`w${w.windowId}`} value={`w${w.windowId}`}>
                       {w.app}{w.title ? ` — ${w.title.slice(0, 40)}` : ""}{w.scale !== 1 ? ` · ${w.scale}×` : ""}
                     </option>
                   ))}
+                  {displays.length ? (
+                    <optgroup label="Whole displays">
+                      {displays.map((d) => (
+                        <option key={`d${d.id}`} value={`d${d.id}`}>
+                          {`Display ${d.id} — ${d.width}×${d.height} @ ${d.scale}× (observe only)`}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
                 </select>
               </Field>
               {mirror}
               {toolbar}
-              {armed ? (
+              {displayId ? (
+                <p className="text-xs text-(--iux-muted-foreground)">
+                  Whole display — observe only. Select a window to act on it.
+                </p>
+              ) : armed ? (
                 <p className="text-xs text-(--iux-warning)">
                   Armed — mirror clicks run immediately on this Mac. Control disarms itself after ten minutes.
                 </p>

@@ -426,6 +426,13 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(200, oslab.macos_session_state(REPO_ROOT))
         elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "displays":
             self._json(200, oslab.macos_displays())
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "displays"] and parts[5] == "screenshot":
+            try:
+                self._send_bytes(200, oslab.macos_display_screenshot(parts[4]), "image/png", cache="no-store")
+            except oslab.PlanError as e:
+                self._json(400, {"error": str(e)})
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "displays"] and parts[5] == "stream":
+            self._macos_display_stream(parts[4])
         elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "capabilities":
             self._json(200, oslab.macos_capabilities(REPO_ROOT))
         elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "permissions":
@@ -592,38 +599,55 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         except ValueError as e:
             self._json(400, {"error": str(e)})
 
-    def _macos_stream(self, window_id: str):
-        """MJPEG stream (MIR-04): multipart frames with no-store headers. The loop ends on
-        client disconnect, a missing window, or the ten-minute cap, so handlers never dangle."""
+    def _macos_fps(self) -> float:
+        """The mirror stream pace from the query string, bounded (0.5-8 fps)."""
         try:
-            wid = int(window_id)
-        except (TypeError, ValueError):
-            self._json(400, {"error": "Invalid window id"})
-            return
-        try:
-            fps = min(8.0, max(0.5, float((urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            return min(8.0, max(0.5, float((urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                                            .get("fps") or ["2"])[0])))
         except (TypeError, ValueError):
-            fps = 2.0
-        if not any(w["windowId"] == wid for w in oslab.macos_windows()["windows"]):
-            self._json(404, {"error": "That window is not on screen anymore; refresh the mirror"})
-            return
+            return 2.0
+
+    def _mirror_frames(self, frames) -> None:
+        """Write one multipart MJPEG response from a frame generator (MIR-04): no-store headers,
+        the hard cap, and a clean end on client disconnect or panic stop."""
         self.send_response(200)
         self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         deadline = time.time() + oslab._MACOS_STREAM_CAP
-        epoch = oslab._MACOS_STREAM_EPOCH
         try:
-            for frame in oslab.macos_window_stream(wid, fps, epoch):
+            for frame in frames:
                 self.wfile.write(b"--frame\r\nContent-Type: image/png\r\nContent-Length: "
                                  + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n")
                 self.wfile.flush()
                 if time.time() > deadline:
                     break
         except (OSError, ValueError):
-            pass  # the client hung up or the window vanished mid-frame; the panel falls back to the poll
+            pass  # the client hung up or the source vanished mid-frame; the panel falls back to the poll
+
+    def _macos_stream(self, window_id: str):
+        """Window MJPEG stream (MIR-04): multipart frames with no-store headers. The loop ends
+        on client disconnect, a missing window, or the ten-minute cap, so handlers never dangle."""
+        try:
+            wid = int(window_id)
+        except (TypeError, ValueError):
+            self._json(400, {"error": "Invalid window id"})
+            return
+        if not any(w["windowId"] == wid for w in oslab.macos_windows()["windows"]):
+            self._json(404, {"error": "That window is not on screen anymore; refresh the mirror"})
+            return
+        self._mirror_frames(oslab.macos_window_stream(wid, self._macos_fps(), oslab._MACOS_STREAM_EPOCH))
+
+    def _macos_display_stream(self, display_id: str):
+        """Whole-display MJPEG stream: the same frames loop, with the display id validated
+        against the displays list before the first frame."""
+        try:
+            oslab._macos_display_target(display_id)
+        except oslab.PlanError as e:
+            self._json(400, {"error": str(e)})
+            return
+        self._mirror_frames(oslab.macos_display_stream(display_id, self._macos_fps(), oslab._MACOS_STREAM_EPOCH))
 
     def _macos_events(self):
         """Live audit feed: text/event-stream of audit rows as they are recorded, a heartbeat

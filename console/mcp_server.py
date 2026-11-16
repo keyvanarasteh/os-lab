@@ -53,11 +53,13 @@ TOOLS = [
     },
     {
         "name": "macos_screenshot",
-        "description": "A PNG of one visible window (read-only; needs Screen Recording permission on the console).",
+        "description": "A PNG of one visible window (windowId) or one whole display (displayId) — read-only; needs Screen Recording permission on the console.",
         "inputSchema": {
             "type": "object",
-            "properties": {"windowId": {"type": "integer"}},
-            "required": ["windowId"],
+            "properties": {
+                "windowId": {"type": "integer", "description": "a window id from macos_apps"},
+                "displayId": {"type": "integer", "description": "a display id from macos_displays; captures the whole display"},
+            },
             "additionalProperties": False,
         },
     },
@@ -204,7 +206,7 @@ TOOLS = [
     },
     {
         "name": "macos_displays",
-        "description": "Active displays with origin, size and backing scale, so window coordinates can be reasoned about (read-only).",
+        "description": "Active displays with id, origin, size and backing scale — the ids the whole-display screenshot accepts (read-only).",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
@@ -291,7 +293,10 @@ def tool_call(name: str, args: dict) -> dict:
             content.append({"type": "image", "data": base64.b64encode(png).decode(), "mimeType": "image/png"})
         return {"content": content}
     if name == "macos_screenshot":
-        png = oslab.macos_window_screenshot(args.get("windowId"))
+        if args.get("displayId") is not None:
+            png = oslab.macos_display_screenshot(args["displayId"])
+        else:
+            png = oslab.macos_window_screenshot(args.get("windowId"))
         return {"content": [{"type": "image", "data": base64.b64encode(png).decode(), "mimeType": "image/png"}]}
     if name == "macos_click":
         pid, x, y, window = _window_point(args.get("windowId"), args)

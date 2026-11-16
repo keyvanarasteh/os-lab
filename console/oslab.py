@@ -792,7 +792,7 @@ class _MacosWindows:
             if mode:
                 points, pixels = self.cg.CGDisplayModeGetWidth(mode), self.cg.CGDisplayModeGetPixelWidth(mode)
                 scale = round(pixels / points, 2) if points else 1.0
-            out.append({"x": int(rect.origin.x), "y": int(rect.origin.y),
+            out.append({"id": int(did), "x": int(rect.origin.x), "y": int(rect.origin.y),
                         "width": int(rect.size.width), "height": int(rect.size.height), "scale": scale})
         return out
 
@@ -840,6 +840,59 @@ def macos_windows() -> dict:
     except OSError as e:
         return {"available": False, "reason": f"CoreGraphics is unavailable: {e}", "screenRecording": False, "windows": []}
     return {"available": True, "reason": None, "screenRecording": any(w["title"] for w in windows), "windows": windows}
+
+
+def _macos_display_target(display_id) -> tuple[int, int]:
+    """The display id and its 1-based screencapture index, validated against the displays
+    list (QcU mac-driver parity): an unknown id is refused, never guessed."""
+    if host_os() != "macos":
+        raise PlanError("The app mirror needs a Mac")
+    try:
+        display_id = int(display_id)
+    except (TypeError, ValueError):
+        raise PlanError("Invalid display id") from None
+    displays = macos_displays()["displays"]
+    for index, display in enumerate(displays):
+        if display.get("id") == display_id:
+            return display_id, index + 1
+    known = ", ".join(str(d.get("id")) for d in displays) or "none"
+    raise PlanError(f"Unknown display id {display_id}; active displays: {known}", code="INVALID_ARGS")
+
+
+def macos_display_screenshot(display_id) -> bytes:
+    """A PNG of one whole display (screencapture -D). Same host and permission behaviour as
+    the window capture: a failed or empty capture reports the Screen Recording grant."""
+    _, index = _macos_display_target(display_id)
+    fd, path = tempfile.mkstemp(suffix=".png")
+    try:
+        os.close(fd)
+        code, output = _capture(["screencapture", "-x", f"-D{index}", path], timeout=15)
+        with open(path, "rb") as f:
+            png = f.read()
+        if code != 0 or not png.startswith(b"\x89PNG"):
+            raise PlanError("Could not capture that display. If this keeps failing, grant Screen Recording "
+                            "to the console (System Settings > Privacy & Security) and retry.")
+        return png
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+def macos_display_stream(display_id, fps: float, epoch: int | None = None):
+    """Yield PNG frames of one whole display for the multipart response, with the same end
+    conditions as the window stream: client disconnect, panic stop, or the hard cap."""
+    _macos_display_target(display_id)  # validate before the loop starts
+    interval = 1.0 / fps
+    while True:
+        if epoch is not None and epoch != _MACOS_STREAM_EPOCH:
+            return  # a panic stop ended this stream
+        try:
+            yield macos_display_screenshot(display_id)
+        except PlanError:
+            return
+        time.sleep(interval)
 
 
 def macos_window_screenshot(window_id: int) -> bytes:

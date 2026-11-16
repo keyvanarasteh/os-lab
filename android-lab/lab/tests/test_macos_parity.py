@@ -359,3 +359,65 @@ def test_repl_stop_disarms_and_audits(mac, monkeypatch):
     repl.handle("stop")
     assert oslab.macos_control_state()["armed"] is False
     assert oslab.macos_audit_rows()["rows"][-1]["kind"] == "panic-stop"
+
+
+FAKE_PNG = b"\x89PNG\r\n\x1a\nrest-of-frame"
+
+
+def _fake_display_capture(calls):
+    """A screencapture stand-in that writes a small PNG to its output path."""
+    def capture(args, timeout=5.0, decode="utf-8"):
+        calls.append(list(args))
+        with open(args[-1], "wb") as f:
+            f.write(FAKE_PNG)
+        return 0, ""
+    return capture
+
+
+def test_display_target_is_validated_against_the_displays_list(mac, monkeypatch):
+    class Cg:
+        def screens(self):
+            return [{"id": 1, "x": 0, "y": 0, "width": 1512, "height": 982, "scale": 2.0},
+                    {"id": 7, "x": 1512, "y": 0, "width": 1920, "height": 1080, "scale": 1.0}]
+    monkeypatch.setattr(oslab, "_macos_cg", lambda: Cg())
+    assert oslab._macos_display_target(7) == (7, 2)  # the id plus its 1-based screencapture index
+    assert oslab._macos_display_target("1") == (1, 1)
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_display_target(9)
+    assert "9" in str(refused.value) and "1, 7" in str(refused.value)
+
+
+def test_display_screenshot_captures_the_whole_display(mac, monkeypatch):
+    class Cg:
+        def screens(self):
+            return [{"id": 4, "x": 0, "y": 0, "width": 1512, "height": 982, "scale": 2.0}]
+    monkeypatch.setattr(oslab, "_macos_cg", lambda: Cg())
+    calls = []
+    monkeypatch.setattr(oslab, "_capture", _fake_display_capture(calls))
+    assert oslab.macos_display_screenshot(4).startswith(b"\x89PNG")
+    assert calls[0][0] == "screencapture" and "-D1" in calls[0]
+    monkeypatch.setattr(oslab, "_capture", lambda args, timeout=5.0, decode="utf-8": (1, ""))
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab.macos_display_screenshot(4)
+    assert "Screen Recording" in str(refused.value)  # the permission stays honest
+
+
+def test_display_stream_validates_then_ends_on_a_failed_capture(mac, monkeypatch):
+    class Cg:
+        def screens(self):
+            return [{"id": 2, "x": 0, "y": 0, "width": 1512, "height": 982, "scale": 2.0}]
+    monkeypatch.setattr(oslab, "_macos_cg", lambda: Cg())
+    monkeypatch.setattr(oslab, "_capture", _fake_display_capture([]))
+    for frame in oslab.macos_display_stream(2, 8.0):
+        assert frame.startswith(b"\x89PNG")
+        break  # one frame is enough; the loop is infinite by design
+    with pytest.raises(oslab.PlanError):
+        next(oslab.macos_display_stream(99, 8.0))  # unknown id: refused before the first frame
+    monkeypatch.setattr(oslab, "_capture", lambda args, timeout=5.0, decode="utf-8": (1, ""))
+    assert list(oslab.macos_display_stream(2, 8.0)) == []  # capture failure ends the stream
+
+
+def test_display_capture_refused_off_a_mac(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "linux")
+    with pytest.raises(oslab.PlanError):
+        oslab.macos_display_screenshot(1)
