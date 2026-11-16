@@ -42,6 +42,7 @@ import { LabSwitcher, type LabSwitcherLab } from "./lab-switcher";
 import { labOfSection, useActiveLab, type ActiveLabId } from "./active-lab";
 import { toggleMode, useThemeMode } from "./theme";
 import { UpdateModal } from "../views/update-modal";
+import { ToastHost } from "./toasts";
 import { androidLogsStore, healthStore, hostStore, jobsStore, type LabId, type LabStatus } from "../lib/api";
 import { copy, firewallPath, type FirewallLocale } from "../firewall/locale";
 import { localeFromPath, localePath } from "../i18n/paths";
@@ -616,6 +617,7 @@ export function AppShell({
           onShowAll={showAllLabs}
         />
       )}
+      {PUBLIC_PAGES ? null : <ToastHost />}
       <Spotlight
         onQueryChange={setSourceQuery}
         searchError={sourceSearchError && !PUBLIC_PAGES ? "Source search unavailable" : undefined}

@@ -2764,5 +2764,22 @@
   "All labs": "Tous les laboratoires",
   "Task prompt": "Invite de tâche",
   "Focus the sidebar on one lab": "Concentrer la barre latérale sur un seul laboratoire",
-  "to switch": "pour changer"
+  "to switch": "pour changer",
+  "Automated hook cleans": "Nettoyages automatiques par hook",
+  "Clear all": "Tout effacer",
+  "Desktop notifications": "Notifications sur le bureau",
+  "Dismiss notification": "Fermer la notification",
+  "Job completions": "Tâches terminées",
+  "Job failures": "Échecs de tâches",
+  "Monitor errors": "Erreurs du moniteur",
+  "Monitor recoveries": "Rétablissements du moniteur",
+  "Monitor warnings": "Alertes du moniteur",
+  "Notification categories": "Catégories de notification",
+  "Notifications": "Notifications",
+  "Notifications enabled": "Notifications activées",
+  "Recent notifications (": "Notifications récentes (",
+  "What the lab announces while it works: job completions, automated hook cleans and monitor events, as in-app toasts and desktop notifications.": "Ce que le laboratoire annonce pendant qu’il travaille : tâches terminées, nettoyages automatiques par hook et événements du moniteur, sous forme de notifications dans l’application et sur le bureau.",
+  "Local notifications: OS delivery in the desktop app, in-app toast stack": "Notifications locales : livraison OS dans l’application de bureau, pile de notifications dans l’application",
+  "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab’s lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.": "Clôt le livrable de notification OS reporté depuis CLNP-09…13. Les hooks du cycle de vie du laboratoire (tâches terminées, nettoyage automatique par hook, événements du moniteur et des tailles de favoris) ajoutent des événements typés à une outbox bornée ; l’application de bureau l’interroge via l’API en boucle locale et délivre des notifications OS via tauri-plugin-notification depuis Rust (la page du tableau de bord garde zéro IPC) ; le tableau de bord affiche les mêmes événements dans une pile de notifications avec actions, empilement et balayage pour fermer, et une carte Réglages possède la configuration, le rapport de livraison bureau et les volets fixes des réglages système.",
+  "Closes the OS-notification deliverable deferred from CLNP-09…13. The lab's lifecycle hooks (job completions, the automated hook clean, monitor and bookmark-size events) append typed events to a bounded outbox; the desktop app polls it over the loopback API and delivers OS notifications through tauri-plugin-notification from Rust (the dashboard page keeps zero IPC); the dashboard shows the same events as an in-app toast stack with actions, stacking and swipe-to-dismiss, and a Settings card owns the config, the desktop delivery report and the fixed system-settings panes.": "Clôt le livrable de notification OS reporté depuis CLNP-09…13. Les hooks du cycle de vie du laboratoire (tâches terminées, nettoyage automatique par hook, événements du moniteur et des tailles de favoris) ajoutent des événements typés à une outbox bornée ; lapplication de bureau linterroge via lAPI en boucle locale et délivre des notifications OS via tauri-plugin-notification depuis Rust (la page du tableau de bord garde zéro IPC) ; le tableau de bord affiche les mêmes événements dans une pile de notifications avec actions, empilement et balayage pour fermer, et une carte Réglages possède la configuration, le rapport de livraison bureau et les volets fixes des réglages système."
 }

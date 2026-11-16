@@ -23,6 +23,7 @@ process, like the lab jobs: a restart loses them, and nothing is persisted.
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import subprocess
 import sys
@@ -59,6 +60,8 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "relocation-plan": ("action", "entryId", "destination"), "relocation-run": ("previewId",),
               "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "volumes"),
               "monitor-evaluate": (),
+              "notifications-config": ("enabled", "categories"),
+              "notifications-open": (),
               "permissions-open": ("permissionId",),
               "bookmarks-add": ("entryId",),
               "bookmarks-update": ("entryId", "priority", "quickClean", "autoCleanHook", "sizeAlert"),
@@ -93,6 +96,16 @@ def _query(query):
     """Reject duplicate or unexpected query parameters instead of guessing."""
     if query:
         raise CleanupError(400, "Unexpected query parameters")
+
+
+def _query_int(query, name):
+    """One optional whole-number query parameter (the CLN-30 outbox cursor)."""
+    values = (query or {}).get(name)
+    if not values:
+        return 0
+    if len(values) != 1 or not values[0].isdigit():
+        raise CleanupError(400, "{0} must be a whole number".format(name))
+    return int(values[0])
 
 
 def _object_body(body, kind):
@@ -224,6 +237,10 @@ class CleanupJobStore:
                 # it) skip the refresh here — their completion paths publish.
                 if args:
                     publish_widget(args[0])
+                    # CLN-30: every finished job lands in the notification
+                    # outbox (cancelled runs stay quiet; the hook clean
+                    # announces itself through notify_auto_clean instead).
+                    notify_job_finished(args[0], job)
         try:
             threading.Thread(target=run_and_refresh, args=(), daemon=True).start()
         except RuntimeError as exc:
@@ -750,6 +767,169 @@ def publish_widget(root):
         pass  # the widget is an optional surface; it never breaks the API
 
 
+#: CLN-30: where each finished job's outcome lives on the dashboard. Jobs that
+#: only measure point at Results; jobs that changed the disk point at History.
+_RESULT_ROUTE_BY_KIND = {
+    "scan": "results", "deep-scan": "results", "packages": "results",
+    "macos-leftovers": "results", "leftovers": "results", "vm-scan": "results",
+    "explorer": "results",
+    "plan": "scan", "clean": "history", "container-prune": "history",
+    "privileged-run": "history", "relocation-plan": "space",
+    "relocation-run": "history",
+}
+_JOB_LABELS = {
+    "scan": "Scan", "deep-scan": "Deep scan", "packages": "Package inventory",
+    "macos-leftovers": "macOS leftovers scan", "leftovers": "Leftovers scan",
+    "vm-scan": "VM inventory", "explorer": "Space explorer", "plan": "Plan",
+    "clean": "Clean", "container-prune": "Docker prune",
+    "privileged-run": "Privileged clean", "relocation-plan": "Relocation plan",
+    "relocation-run": "Relocation",
+}
+
+
+def _notify(root, category, title, body, *, route=None, actions=None):
+    """CLN-30: append one notification event at a lifecycle hook.
+
+    Always best-effort, exactly like ``publish_widget`` above: the outbox is
+    an optional surface and no failure here may ever reach a request or the
+    monitor thread. The desktop app polls the outbox and turns new events
+    into OS notifications; the dashboard renders them as in-app toasts.
+    """
+    try:
+        _module(root, "notifications").emit(category, title, body, route=route, actions=actions)
+    except Exception:
+        pass  # the notification outbox is an optional surface; it never breaks the caller
+
+
+def _human_bytes(count):
+    """A short English byte label for notification bodies."""
+    if not isinstance(count, (int, float)) or isinstance(count, bool):
+        return None
+    value = float(count)
+    for unit, factor in (("TB", 1024 ** 4), ("GB", 1024 ** 3), ("MB", 1024 ** 2), ("KB", 1024)):
+        if value >= factor:
+            return "{0:.1f} {1}".format(value / factor, unit)
+    return "{0} B".format(int(value))
+
+
+def notify_job_finished(root, job):
+    """CLN-30: the job hook — appended where ``_spawn`` already publishes.
+
+    Every finished job notifies (the lab's default is to tell about
+    everything, per category toggles); cancelled runs stay quiet because the
+    user cancelled them in the UI, and automated hook runs announce
+    themselves through ``notify_auto_clean`` with their own numbers.
+    """
+    state = job.state
+    if state == "cancelled" or job.request.get("automated") or root is None:
+        return
+    label = _JOB_LABELS.get(job.kind, job.kind)
+    if state == "failed":
+        _notify(root, "job-failed", "{0} failed".format(label),
+                str(job.error or "The job failed without a reason."),
+                route="history", actions=[{"id": "open", "label": "Open history", "route": "history"}])
+        return
+    result = job.result if isinstance(job.result, dict) else {}
+    totals = result.get("totals") if isinstance(result.get("totals"), dict) else {}
+    items = totals.get("paths", totals.get("files"))
+    removed = totals.get("bytes", totals.get("sizeBytes"))
+    if removed is None:
+        removed = result.get("bytesRemoved")
+    if job.kind in ("clean", "container-prune", "privileged-run", "relocation-run"):
+        size = _human_bytes(removed)
+        body = "Removed {0}.".format(size) if size else "The job finished."
+    else:
+        size = _human_bytes(removed)
+        count = items if isinstance(items, int) else None
+        parts = []
+        if count is not None:
+            parts.append("{0} items".format(count))
+        if size:
+            parts.append(size)
+        body = "Found {0}.".format(", ".join(parts)) if parts else "The job finished."
+    route = _RESULT_ROUTE_BY_KIND.get(job.kind, "dashboard")
+    action = {"id": "open", "label": "View results", "route": "results"} if route == "results" \
+        else {"id": "open", "label": "Open history", "route": "history"}
+    _notify(root, "job-done", "{0} finished".format(label), body, route=route, actions=[action])
+
+
+def notify_auto_clean(root, job):
+    """CLN-30: the hook-clean announcement for the automated Trash-only run."""
+    state = job.state
+    if state == "cancelled":
+        return
+    if state == "failed":
+        _notify(root, "auto-clean", "Automated clean failed",
+                str(job.error or "The automated clean failed without a reason."),
+                route="results", actions=[{"id": "open", "label": "View results", "route": "results"}])
+        return
+    totals = (job.result or {}).get("totals") if isinstance(job.result, dict) else {}
+    size = _human_bytes((totals or {}).get("bytes"))
+    body = "The Trash-only hook clean removed {0}.".format(size) if size \
+        else "The Trash-only hook clean finished."
+    _notify(root, "auto-clean", "Automated clean finished", body,
+            route="results", actions=[{"id": "open", "label": "View results", "route": "results"}])
+
+
+def notify_monitor_event(root, event):
+    """CLN-30: one monitor event (volume or bookmark trigger) as an event."""
+    if not isinstance(event, dict):
+        return
+    category = {"warning": "monitor-warning", "recovered": "monitor-recovered",
+                "error": "monitor-error"}.get(event.get("kind"))
+    if category is None or root is None:
+        return
+    message = event.get("message") if isinstance(event.get("message"), str) else ""
+    if category == "monitor-warning":
+        bookmark = event.get("bookmark")
+        if bookmark:
+            size = _human_bytes(event.get("sizeBytes"))
+            body = "Bookmarked item {0} is now {1} — above its size alert.".format(
+                bookmark, size or "large")
+            title = "Bookmarked item grew large"
+        else:
+            volume = event.get("volume") or "The home volume"
+            body = "{0} is below its free-space floor ({1} free).".format(
+                volume, _human_bytes(event.get("freeBytes")) or "little")
+            title = "Free space is running low"
+    elif category == "monitor-recovered":
+        title = "Monitor condition recovered"
+        body = message or "The trigger condition recovered."
+    else:
+        title = "Monitor check failed"
+        body = message or "A volume could not be measured."
+    _notify(root, category, title, body,
+            route="scan" if category == "monitor-warning" else "cleanup-monitor",
+            actions=[{"id": "scan", "label": "Run a scan", "route": "scan"},
+                     {"id": "open", "label": "Open monitor", "route": "cleanup-monitor"}])
+
+
+def _read_notifications_runtime():
+    """CLN-30: the desktop app's delivery report, when the console is its child.
+
+    The Tauri shell points ``OSLAB_NOTIFICATIONS_RUNTIME`` at a JSON file it
+    rewrites as it delivers notifications. A console started any other way
+    (labctl, a browser pointed at the port) has no runtime, and the dashboard
+    says so instead of guessing.
+    """
+    path = os.environ.get("OSLAB_NOTIFICATIONS_RUNTIME")
+    if not path:
+        return None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            runtime = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    return runtime if isinstance(runtime, dict) else None
+
+
+def notifications_status(root):
+    """CLN-30: GET /api/cleanup/notifications — config, outbox and runtime."""
+    payload = _module(root, "notifications").load()
+    payload["runtime"] = _read_notifications_runtime()
+    return payload
+
+
 def _bookmark_entries(root, loaded):
     """Join each bookmark with its catalog record for display."""
     try:
@@ -823,6 +1003,7 @@ def run_hook_clean(root):
             finally:
                 job.finishedAt = time.time()
                 publish_widget(root)  # CLW-04: the hook run changed the widget's story
+                notify_auto_clean(root, job)  # CLN-30: the hook run announces itself
 
         return JOBS._spawn(job, work, ())
 
@@ -885,6 +1066,10 @@ class MonitorRunner:
                 config = monitor.load()["config"]
                 if config["enabled"]:
                     result = monitor.run_evaluation()
+                    # CLN-30: every fresh monitor event lands in the outbox
+                    # before the hook decision below.
+                    for event in result.get("newEvents", []):
+                        notify_monitor_event(self.root, event)
                     # CLNP-16: a fresh free-space crossing arms the bookmark hook.
                     if any(event["kind"] == "warning" for event in result.get("newEvents", [])):
                         run_hook_clean(self.root)
@@ -909,6 +1094,10 @@ class MonitorRunner:
             if events:
                 bookmarks_mod.save(updated)
                 _module(self.root, "monitor").append_events(events)
+                # CLN-30: the size trigger appends into the monitor store
+                # directly, so the runner loop never sees these — notify here.
+                for event in events:
+                    notify_monitor_event(self.root, event)
         except Exception:
             pass  # the size trigger is optional; a failure never kills the runner
 
@@ -953,6 +1142,13 @@ class CleanupAPI:
             payload = _module(self.root, "monitor").status()
             payload["running"] = bool(payload["enabled"] and MONITOR.alive())
             return payload
+        if path == "/api/cleanup/notifications":
+            # CLN-30: config, outbox and the desktop app's runtime report.
+            _query(query)
+            return notifications_status(self.root)
+        if path == "/api/cleanup/notifications/outbox":
+            # CLN-30: the desktop app's watcher cursor, not a dashboard call.
+            return _module(self.root, "notifications").outbox(_query_int(query, "since"))
         if path == "/api/cleanup/permissions":
             # CLNP-03: read-only probes plus the reactive classification of the
             # latest scan's unreadable paths (deduplicated), when one exists.
@@ -1125,6 +1321,42 @@ class CleanupAPI:
             payload = monitor.status()
             payload["running"] = bool(payload["enabled"] and MONITOR.alive())
             return payload
+        if path == "/api/cleanup/notifications/config":
+            # CLN-30: the whole config is sent; the engine validates it.
+            _object_body(body, "notifications-config")
+            notifications = _module(self.root, "notifications")
+            try:
+                notifications.save_config(body)
+            except notifications.NotificationsConfigError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            return notifications_status(self.root)
+        if path == "/api/cleanup/notifications/open-settings":
+            # CLN-30: the grant round-trip, mirrored from the permissions
+            # endpoint — the page names the pane; the console opens the
+            # engine's fixed links. macOS uses `open`, Windows opens the
+            # ms-settings URI directly; Linux has no universal pane, so the
+            # engine returns no links and the answer is an honest 409.
+            _object_body(body, "notifications-open")
+            platform = _module(self.root, "paths").platform_id()
+            urls = _module(self.root, "notifications").settings_urls(platform)
+            if not urls:
+                raise CleanupError(409, "Notifications have no settings pane to open on this platform")
+            opened = None
+            for url in urls:
+                try:
+                    if platform == "windows":
+                        os.startfile(url)  # a fixed ms-settings URI, never a command string
+                        opened = url
+                        break
+                    run = subprocess.run(["open", url], capture_output=True, timeout=10)
+                    if run.returncode == 0:
+                        opened = url
+                        break
+                except (OSError, subprocess.SubprocessError):
+                    continue
+            if opened is None:
+                raise CleanupError(500, "Could not open the notification settings")
+            return {"opened": opened}
         if path == "/api/cleanup/bookmarks":
             _object_body(body, "bookmarks-add")
             entry_id = body.get("entryId")
