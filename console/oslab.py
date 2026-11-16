@@ -1237,16 +1237,36 @@ def macos_screen_locked() -> bool | None:
 
 def _macos_allowlist(root: str, app: str | None = None, bundle: str | None = None) -> None:
     """The agent app allowlist (MIR-11): ios-lab/mac/agent-apps.json lists app names or bundle
-    ids that input actions may drive; missing or empty means every mirror-visible app."""
+    ids that input actions may drive. A missing file or an empty list means every mirror-visible
+    app. A file that is present but unreadable, malformed or not a list of strings fails closed
+    (QcU allowlist parity): the action is refused with the file and the problem named, so a
+    broken allowlist can never silently widen what agents may drive."""
     path = os.path.join(root, "ios-lab", "mac", "agent-apps.json")
     try:
         with open(path, encoding="utf-8") as f:
-            allowed = json.load(f)
-    except (OSError, ValueError):
-        return
-    if not isinstance(allowed, list) or not allowed:
-        return
-    names = {str(entry).strip().lower() for entry in allowed if isinstance(entry, str)}
+            text = f.read()
+    except FileNotFoundError:
+        return  # no allowlist file: every mirror-visible app may be driven
+    except OSError as e:
+        raise PlanError(f"The agent allowlist {path} could not be read: {e}. Fix the file or "
+                        "remove it to allow every app", code="ALLOWLIST_INVALID", retry="never") from None
+    try:
+        allowed = json.loads(text)
+    except ValueError as e:
+        raise PlanError(f"The agent allowlist {path} is not valid JSON: {e}. Fix the file or "
+                        "remove it to allow every app", code="ALLOWLIST_INVALID", retry="never") from None
+    if not isinstance(allowed, list):
+        raise PlanError(f"The agent allowlist {path} must be a JSON list of app names or bundle "
+                        f"ids, not {type(allowed).__name__}", code="ALLOWLIST_INVALID", retry="never")
+    if not allowed:
+        return  # an empty list is an explicit "no restriction"
+    entries = [entry for entry in allowed if isinstance(entry, str)]
+    if len(entries) != len(allowed):
+        bad = next(entry for entry in allowed if not isinstance(entry, str))
+        raise PlanError(f"The agent allowlist {path} must contain only app names or bundle ids "
+                        f"(strings); entry {json.dumps(bad)} is {type(bad).__name__}",
+                        code="ALLOWLIST_INVALID", retry="never")
+    names = {entry.strip().lower() for entry in entries}
     if bundle and bundle.lower() in names:
         return
     app_name = (app or "").lower()

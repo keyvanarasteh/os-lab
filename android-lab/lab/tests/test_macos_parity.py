@@ -44,6 +44,54 @@ def test_config_env_beats_defaults_and_is_clamped(monkeypatch):
     assert config["streamCap"] == 600
 
 
+def _allowlist_root(tmp_path, content=None):
+    """A fake repo root whose ios-lab/mac/agent-apps.json holds the given text."""
+    folder = tmp_path / "ios-lab" / "mac"
+    folder.mkdir(parents=True)
+    entry = folder / "agent-apps.json"
+    if content is not None:
+        entry.write_text(content, encoding="utf-8")
+    return str(tmp_path)
+
+
+def test_allowlist_missing_file_and_empty_list_allow_every_app(tmp_path):
+    root = _allowlist_root(tmp_path)
+    oslab._macos_allowlist(root, app="Anything", bundle="com.any.app")  # no file: no restriction
+    root = _allowlist_root(tmp_path / "b", content="[]")
+    oslab._macos_allowlist(root, app="Anything", bundle="com.any.app")  # empty list: explicit no restriction
+
+
+def test_allowlist_admits_members_and_refuses_strangers(tmp_path):
+    root = _allowlist_root(tmp_path, content='["Finder", "com.example.app"]')
+    oslab._macos_allowlist(root, app="Finder")              # by name
+    oslab._macos_allowlist(root, bundle="com.example.APP")   # by bundle id, case-insensitive
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, bundle="com.stranger.app")
+    assert refused.value.code == "APP_NOT_ALLOWED"
+
+
+def test_allowlist_fails_closed_on_a_broken_file(tmp_path):
+    root = _allowlist_root(tmp_path, content='{"Finder": true}')  # a dict, not a list
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, app="Finder")
+    assert refused.value.code == "ALLOWLIST_INVALID"
+    assert "agent-apps.json" in str(refused.value)
+    entry = tmp_path / "ios-lab" / "mac" / "agent-apps.json"
+    entry.write_text('["Finder", 7]', encoding="utf-8")  # not a list of strings
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, app="Finder")
+    assert refused.value.code == "ALLOWLIST_INVALID"
+    entry.write_text('["Finder",', encoding="utf-8")  # malformed JSON
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, app="Finder")
+    assert refused.value.code == "ALLOWLIST_INVALID"
+    entry.unlink()
+    entry.mkdir()  # present but unreadable: a directory where the file should be
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, app="Finder")
+    assert refused.value.code == "ALLOWLIST_INVALID"
+
+
 def test_second_owner_cannot_arm_and_is_named(mac):
     oslab.macos_control_arm(None, True, "console")
     with pytest.raises(oslab.PlanError) as refused:
