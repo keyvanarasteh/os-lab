@@ -12,6 +12,7 @@
 
 mod console;
 mod container_runtime;
+mod notifications;
 mod python_runtime;
 mod runtime;
 mod widget;
@@ -35,7 +36,10 @@ const ROOT_KEY: &str = "root";
 const FILES_DIR_KEY: &str = "files_dir";
 const CONTAINER_WARNING_KEY: &str = "container_warning_hidden";
 
-fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+/// The app files folder (a user-chosen location or the default data dir).
+/// `notifications.rs` writes its delivery report here and `console.rs` hands
+/// the same path to the console through `OSLAB_NOTIFICATIONS_RUNTIME`.
+pub(crate) fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let default = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let selected = app.store(STORE).map_err(|e| e.to_string())?
         .get(FILES_DIR_KEY)
@@ -396,6 +400,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(Console::new())
         .on_menu_event(|app, event| {
             if event.id().as_ref() == "files_settings" {
@@ -441,6 +446,10 @@ pub fn run() {
             // CLW-04: reload the macOS widgets whenever the console publishes
             // a new snapshot; CLW-03: oslab:// deep links route in place.
             widget::start_reload_watcher();
+            // CLN-33: deliver the cleanup lab's outbox events as OS
+            // notifications (skipped while the window is focused on the
+            // dashboard — the page's own toast stack shows them).
+            notifications::start_outbox_watcher(app.handle().clone());
             let nav = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
@@ -477,13 +486,14 @@ pub fn run() {
 /// CLW-03: routes an oslab:// deep link into the dashboard in place. A known
 /// route only — unknown routes are refused rather than navigated blind. When
 /// the window still shows the launcher, the console URL hands it straight to
-/// the matching dashboard page.
-const WIDGET_ROUTES: [&str; 10] = [
+/// the matching dashboard page. CLN-33 reuses it for notification clicks.
+const WIDGET_ROUTES: [&str; 11] = [
     "dashboard", "scan", "results", "leftovers", "history", "space",
     "cleanup-bookmarks", "cleanup-monitor", "cleanup-permissions", "cleanup-widgets",
+    "cleanup-notifications",
 ];
 
-fn navigate_widget_route(app: &AppHandle, route: &str) {
+pub(crate) fn navigate_widget_route(app: &AppHandle, route: &str) {
     if !WIDGET_ROUTES.contains(&route) {
         return;
     }

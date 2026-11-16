@@ -123,6 +123,12 @@ impl Console {
             .env("OSLAB_CONTENT_DIR", content_dir)
             // Lets the dashboard compare this build with the published release (console/app_update.py).
             .env("OSLAB_APP_VERSION", app_version)
+            // CLN-33: where this app writes its notification delivery report;
+            // the console serves it back as the notifications runtime status.
+            .env(
+                "OSLAB_NOTIFICATIONS_RUNTIME",
+                data.join(crate::notifications::runtime_file_name()),
+            )
             .stdin(Stdio::null())
             .stdout(Stdio::from(out))
             .stderr(Stdio::from(err));
