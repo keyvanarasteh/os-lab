@@ -151,6 +151,52 @@ rollback.
 - `VERIFY.md` with reproducible steps: start a capped memory hog to trigger S2/S6 in a VM,
   kill the client network to trigger S7, and show both being classified.
 
+## Field record: the 2026-11-16 incident, worked by hand
+
+This is the investigation the tool should reproduce, and the fixes that were applied. It
+is the main fixture source for phase 2. Host details are removed.
+
+### Findings, in the order they were checked
+
+| Step | Finding | Scenario |
+|---|---|---|
+| Reboot | None: one boot, uptime 5 days | — |
+| Kernel log | One OOM kill (`uvicorn`, `oom_score_adj=200`) during the first crash; none after | S1 |
+| First plan | Said "no OOM kills" from an unreadable `dmesg` | S13 |
+| Memory | zram 100% full, disk swap in use, load up to 167 | S2 |
+| Workload | Two or more parallel `tsc --noEmit` (2-2.5 GB each) in separate worktrees, plus an agent process at 68% CPU for over an hour | S3, S4 |
+| Tunnels | Tunnels at `oom_score_adj` 0 and 200, `Restart=on-failure`; `MemoryMin` without an ancestor reservation was silently 0 | S9, S11 |
+| Tunnel units | Three tunnels the first plan called "unmanaged" were `systemd --user` units | S10 |
+| One tunnel | Repeated QUIC timeouts (18 in 10 min); 0 after switching it to HTTP/2 | S14 |
+| App "failed" twice | Exit 143 right after an auto-deploy message | S5 |
+| IDE log | 15 `No ptyHost heartbeat after 6 seconds` warnings, 11 inside the crash window; new IDE servers started next to old ones | S6 |
+| Reconnects with no freeze | Most reconnects had no heartbeat warning and no tunnel error, and every old SSH session was still alive (`ClientAliveInterval 0`) | S7 |
+| Pile-up | Old sessions and up to three IDE servers held memory and brought the next freeze closer | S8 |
+| Notes | Hand-written timestamps ran ahead of the server clock | S12 |
+| Boot order | The tunnel can start before its origin app, giving 502 until the app is up | S15 |
+
+### Fixes applied and what they did
+
+| Fix | Applied | Result |
+|---|---|---|
+| F1-F3 | Tunnel drop-ins (`OOMScoreAdjust=-900`, `MemoryMin=64M`, `MemorySwapMax=0`, `Restart=always`, `StartLimitIntervalSec=0`) plus `system.slice` `MemoryMin=256M` | `memory.min` read back non-zero; 0 tunnel restarts through later stalls |
+| F4 | One user tunnel moved to a system unit, started before the user unit was disabled | No downtime, no duplicate |
+| F5 | `flock` + `systemd-run --scope` wrapper, 3G high / 4G max, run log | Type-checks serialised; the log showed which agent ran what and when |
+| F6 | Agent rule in the app repo's `AGENTS.md` | Agents used the wrapper within minutes. It did not stop one agent re-running `tsc` every 3-6 min (needs a minimum gap) |
+| F8 | `sshd_config.d/40-keepalive.conf`: `ClientAliveInterval 15`, `ClientAliveCountMax 4`; `sshd -t`, reload | `sshd -T` showed 15 / 4; existing sessions kept running. Applies only to new sessions |
+| F9 | Not needed in the end | The two stale IDE servers exited by themselves; one server was left |
+| F11 | HTTP/2 transport for the failing tunnel | QUIC timeouts went from 18 per 10 min to 0 |
+| F10 | Pending (client side) | Reconnects continued with no server freeze, but the IDE now resumed the same server |
+
+### Lessons for the tool
+
+- Check `journalctl -k` before concluding "no OOM".
+- Read `/proc/<pid>/cgroup` before calling a process unmanaged.
+- Re-read effective values (`memory.min`, `oom_score_adj`, `sshd -T`) after every fix; settings can be accepted and do nothing.
+- Do not blame memory for every drop: check the 60 s before each reconnect for a freeze, and check whether the old session still exists.
+- A fix that only applies to new sessions (F8) must say so in its output.
+- A wrapper caps one run but not how often agents start runs; `workload` should report frequency per caller.
+
 ## Out of scope
 
 Fixing billing, CI or deploy pipelines; network diagnosis on the client machine (the tool
