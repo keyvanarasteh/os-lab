@@ -1,0 +1,19 @@
+{
+  "session_id": "broken-link-session",
+  "title": "Session With Dangling Target Reference",
+  "targets": [
+    { "id": "valid-host", "name": "Valid Host", "host": "10.10.10.1" }
+  ],
+  "scripts": [
+    { "id": "bad-script", "name": "Broken Script", "targets": ["non-existent-target"] }
+  ],
+  "findings": [
+    {
+      "id": "dangling-finding",
+      "title": "Finding Pointing to Missing Script",
+      "severity": "medium",
+      "target": "valid-host",
+      "script": "ghost-script"
+    }
+  ]
+}

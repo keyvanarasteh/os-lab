@@ -1,0 +1,12 @@
+{
+  "session_id": "orphan-node-session",
+  "title": "Session With Unlinked Target",
+  "targets": [
+    { "id": "linked-target", "name": "Primary Host", "host": "10.10.60.5" },
+    { "id": "forgotten-host", "name": "Unscanned Host", "host": "10.20.10.1" }
+  ],
+  "scripts": [
+    { "id": "port-probe", "name": "Port Probe", "targets": ["linked-target"] }
+  ],
+  "findings": []
+}

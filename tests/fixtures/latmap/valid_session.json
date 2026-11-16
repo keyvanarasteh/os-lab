@@ -1,0 +1,35 @@
+{
+  "session_id": "avelium-waf-audit",
+  "title": "Avelium WAF & Network Segmentation Session",
+  "doc_path": "lat.md/session-brain-map.md",
+  "targets": [
+    {
+      "id": "lms-waf-node",
+      "name": "Academic LMS WAF",
+      "host": "10.64.60.5",
+      "scope": "in-scope",
+      "tags": ["waf", "campus"],
+      "notes": "Inspects student HTTP/HTTPS requests before backend forwarding."
+    }
+  ],
+  "scripts": [
+    {
+      "id": "sqli-check",
+      "name": "SQLi WAF Rule Tester",
+      "path": "scripts/analysis/latmap.py",
+      "targets": ["lms-waf-node"],
+      "purpose": "Tests OWASP CRS SQL injection blocking."
+    }
+  ],
+  "findings": [
+    {
+      "id": "crs-942100-active",
+      "title": "SQLi Payload Blocked with HTTP 403",
+      "severity": "high",
+      "target": "lms-waf-node",
+      "script": "sqli-check",
+      "evidence": "WAF returned 403 Forbidden on union select probe.",
+      "remediation": "Keep OWASP CRS active in blocking mode."
+    }
+  ]
+}
