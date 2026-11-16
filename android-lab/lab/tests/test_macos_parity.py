@@ -141,6 +141,30 @@ def test_displays_are_json_on_a_mac_and_refused_elsewhere(mac, monkeypatch):
     assert oslab.macos_displays() == {"available": False, "reason": "The app mirror needs a Mac.", "displays": []}
 
 
+def test_new_navigation_keys_are_allowlisted_and_unknown_keys_refused():
+    for key in ("home", "end", "pageup", "pagedown"):
+        values = oslab._validated_input({"pid": 1, "x": 0, "y": 0, "kind": "key", "key": key})
+        assert values["key"] == key
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._validated_input({"pid": 1, "x": 0, "y": 0, "kind": "key", "key": "f13"})
+    assert refused.value.code == "INVALID_ARGS"
+
+
+def test_type_paste_and_tree_limits_are_configurable_and_honored(monkeypatch):
+    monkeypatch.setenv("OSLAB_MAC_TYPE_MAX", "300")
+    monkeypatch.setenv("OSLAB_MAC_PASTE_MAX", "1500")
+    monkeypatch.setenv("OSLAB_MAC_TREE_SIZE", "250")
+    config = oslab._load_macos_config()
+    assert (config["typeMax"], config["pasteMax"], config["treeSize"]) == (300, 1500, 250)
+    monkeypatch.setenv("OSLAB_MAC_TYPE_MAX", "nonsense")
+    assert oslab._load_macos_config()["typeMax"] == 200  # a typo keeps the default
+    ok = oslab._validated_input({"pid": 1, "x": 0, "y": 0, "kind": "type", "text": "a" * 200})
+    assert len(ok["text"]) == 200  # the default limit still gates the input family
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._validated_input({"pid": 1, "x": 0, "y": 0, "kind": "type", "text": "a" * 201})
+    assert refused.value.code == "INVALID_ARGS"
+
+
 def test_permissions_name_the_app_that_needs_the_grant(mac, monkeypatch):
     monkeypatch.setattr(oslab, "macos_responsible_app", lambda: "Terminal.app")
     permissions = oslab.macos_permissions(REPO_ROOT)

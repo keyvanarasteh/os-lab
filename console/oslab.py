@@ -665,7 +665,10 @@ def _load_macos_config() -> dict:
     limits = {"controlTimeout": (600, 30, 3600, "OSLAB_MAC_CONTROL_TIMEOUT"),
               "auditMax": (500, 50, 5000, "OSLAB_MAC_AUDIT_MAX"),
               "streamCap": (600, 30, 3600, "OSLAB_MAC_STREAM_CAP"),
-              "previewTtl": (60, 5, 3600, "OSLAB_MAC_PREVIEW_TTL")}
+              "previewTtl": (60, 5, 3600, "OSLAB_MAC_PREVIEW_TTL"),
+              "typeMax": (200, 1, 10000, "OSLAB_MAC_TYPE_MAX"),
+              "pasteMax": (2000, 1, 100000, "OSLAB_MAC_PASTE_MAX"),
+              "treeSize": (400, 50, 5000, "OSLAB_MAC_TREE_SIZE")}
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ios-lab", "mac", "mac-lab.json")
     try:
         with open(path, encoding="utf-8") as f:
@@ -910,7 +913,7 @@ _AX_PATH = re.compile(r"^[0-9.]{0,80}$")
 _AX_INTERACTIVE = {"Button", "CheckBox", "RadioButton", "PopUpButton", "MenuButton", "TextField",
                    "TextArea", "ComboBox", "SearchField", "Slider", "TabGroup", "Menu", "MenuItem",
                    "MenuBarItem", "Link", "Switch", "SegmentedControl", "TableRow", "OutlineRow"}
-_AX_ELEMENT_CAP = 400
+_AX_ELEMENT_CAP = _MACOS_CONFIG["treeSize"]
 
 
 def _ax_helper(root: str) -> str | None:
@@ -1629,9 +1632,9 @@ def macos_audit_preview(root: str, request: dict, kind: str, token: str | None =
 # newlines are refused here and in the script, and Enter is its own explicit key action.
 _MACOS_INPUT_KINDS = ("double", "right", "type", "key", "paste", "scroll")
 _MACOS_INPUT_KEYS = ("tab", "escape", "delete", "forward-delete", "up", "down", "left", "right",
-                     "space", "enter", "return")
-_INPUT_TEXT_MAX = 200
-_PASTE_TEXT_MAX = 2000
+                     "home", "end", "pageup", "pagedown", "space", "enter", "return")
+_INPUT_TEXT_MAX = _MACOS_CONFIG["typeMax"]
+_PASTE_TEXT_MAX = _MACOS_CONFIG["pasteMax"]
 
 
 def _validated_input(data: dict) -> dict:

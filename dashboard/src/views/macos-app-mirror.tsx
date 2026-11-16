@@ -29,7 +29,7 @@ const MIN_HEIGHT = 240;
 const FPS_HOVER = 5;
 const FPS_IDLE = 1.2;
 /** The allowlisted keys of macos-app.sh input; Enter is its own explicit action. */
-const INPUT_KEYS = ["tab", "escape", "delete", "forward-delete", "up", "down", "left", "right", "space", "enter"];
+const INPUT_KEYS = ["tab", "escape", "delete", "forward-delete", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", "space", "enter"];
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
