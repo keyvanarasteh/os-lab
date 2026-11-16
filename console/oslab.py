@@ -664,7 +664,8 @@ def _load_macos_config() -> dict:
     typo cannot turn the safety timers off."""
     limits = {"controlTimeout": (600, 30, 3600, "OSLAB_MAC_CONTROL_TIMEOUT"),
               "auditMax": (500, 50, 5000, "OSLAB_MAC_AUDIT_MAX"),
-              "streamCap": (600, 30, 3600, "OSLAB_MAC_STREAM_CAP")}
+              "streamCap": (600, 30, 3600, "OSLAB_MAC_STREAM_CAP"),
+              "previewTtl": (60, 5, 3600, "OSLAB_MAC_PREVIEW_TTL")}
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ios-lab", "mac", "mac-lab.json")
     try:
         with open(path, encoding="utf-8") as f:
@@ -1611,7 +1612,7 @@ _MACOS_MIRROR_ACTIONS = ("macos-click", "macos-input", "macos-element", "macos-s
 
 def macos_audit_preview(root: str, request: dict, kind: str, token: str | None = None) -> None:
     """Audit rows for the previewed half of the mirror pipeline (MIR-06): a plan preview and a
-    confirmed start. The token is recorded only as a short digest, never the signed secret."""
+    confirmed start. The token is recorded only as a short digest (tokenDigest), never the signed secret."""
     if not isinstance(request, dict) or request.get("lab") != "macos" \
             or request.get("action") not in _MACOS_MIRROR_ACTIONS:
         return
@@ -1619,7 +1620,7 @@ def macos_audit_preview(root: str, request: dict, kind: str, token: str | None =
               "inputKind": request.get("inputKind"), "key": request.get("inputKey"),
               "textLength": len(request.get("inputText") or "")}
     if isinstance(token, str) and token:
-        detail["token"] = hashlib.sha256(token.encode()).hexdigest()[:16]
+        detail["tokenDigest"] = hashlib.sha256(token.encode()).hexdigest()[:16]
     _macos_audit(root, kind, detail=detail)
 
 
@@ -2780,17 +2781,69 @@ def wsl_path(distro: str, path: str) -> str:
 
 
 class PlanSigner:
-    """Binds a confirmed plan to its request, so /start only runs what was previewed."""
+    """Binds a confirmed plan to its request, so /start only runs what was previewed.
 
-    def __init__(self) -> None:
+    Previews are expiring and one-use (QcU ConfirmGate parity): each carries the canonical
+    request digest with its issue and expiry seconds under an HMAC, is consumed by the first
+    successful verify, and a replay is refused. The pending table is pruned and capped on
+    every sign and verify, so it cannot grow without bound. The TTL comes from the mac-lab
+    config (env > file > defaults; default 60 s)."""
+
+    MAX_PENDING = 64
+
+    def __init__(self, ttl: int | None = None, max_pending: int | None = None) -> None:
         self._key = _secrets.token_bytes(32)
+        self._ttl = int(_MACOS_CONFIG["previewTtl"] if ttl is None else ttl)
+        self._max_pending = max(1, self.MAX_PENDING if max_pending is None else int(max_pending))
+        self._pending: dict[str, int] = {}  # outstanding preview -> expires-at second
+        self._lock = threading.Lock()
+
+    def _digest(self, request: dict) -> str:
+        body = json.dumps(request, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(body).hexdigest()[:32]
+
+    def _stamp(self, digest: str, issued: int, expires: int) -> str:
+        mac = hmac.new(self._key, f"{digest}.{issued}.{expires}".encode(), hashlib.sha256).hexdigest()
+        return f"v1.{issued}.{expires}.{mac}"
+
+    def _prune(self, now: float) -> None:
+        stale = [known for known, expires in self._pending.items() if expires <= now]
+        for known in stale:
+            del self._pending[known]
 
     def sign(self, request: dict) -> str:
-        body = json.dumps(request, sort_keys=True, separators=(",", ":")).encode()
-        return hmac.new(self._key, body, hashlib.sha256).hexdigest()
+        digest = self._digest(request)
+        now = int(time.time())
+        expires = now + self._ttl
+        preview = self._stamp(digest, now, expires)
+        with self._lock:
+            self._prune(now)
+            while len(self._pending) >= self._max_pending:
+                self._pending.pop(next(iter(self._pending)))
+            self._pending[preview] = expires
+        return preview
 
-    def verify(self, request: dict, token: str) -> bool:
-        return isinstance(token, str) and hmac.compare_digest(self.sign(request), token)
+    def verify(self, request: dict, preview: str | None) -> bool:
+        """True when the preview was issued for exactly this request, is still live and has not
+        been confirmed before. A failed verify does not consume the preview; a successful one
+        does, so the same preview can never start a second action."""
+        if not isinstance(preview, str) or not preview:
+            return False
+        parts = preview.split(".")
+        if len(parts) != 4 or parts[0] != "v1" or not parts[1].isdigit() or not parts[2].isdigit():
+            return False
+        issued, expires = int(parts[1]), int(parts[2])
+        now = time.time()
+        if now > expires or issued > expires:
+            return False
+        if not hmac.compare_digest(self._stamp(self._digest(request), issued, expires), preview):
+            return False
+        with self._lock:
+            self._prune(now)
+            if preview not in self._pending:
+                return False  # already confirmed (replay) or evicted from the bounded table
+            del self._pending[preview]
+        return True
 
 
 # ── Jobs ─────────────────────────────────────────────────────────────────────
