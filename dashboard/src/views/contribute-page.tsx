@@ -1470,6 +1470,25 @@ export const CURATED_TASKS: TodoTask[] = [
     targetPaths: ["linux-lab/scripts/"],
     suggestedBranch: "feat/dns-troubleshoot"
   },
+  {
+    id: "OS-41",
+    category: "os",
+    categoryLabel: "Open Source OS",
+    title: "Session-Drop & Memory-Stall Doctor",
+    priority: "High",
+    effort: "Medium",
+    summary:
+      "Answers \"the server crashed\": builds one timeline of reboots, OOM kills, planned restarts, swap and PSI stalls, IDE heartbeat drops, half-open SSH sessions and tunnel health, labels each disruption with a scenario and its evidence, and offers fixes that are applied only on approval.",
+    deliverables: [
+      "linux-lab/scripts/stall_doctor.py: snapshot, timeline, explain, sessions, tunnels, workload, lint, watch, advise/apply (read-only by default, --json)",
+      "Scenario rules S1–S15 (OOM kill, swap thrash, heavy jobs, planned restart, IDE stall, network-path drop, session leak, tunnel exposure, no-op protection settings) with fixture tests",
+      "Approval-gated fixes F1–F14 (tunnel OOM/memory/restart drop-ins, capped job wrapper, sshd keepalive, stale IDE server cleanup by PID) with rollback",
+      "linux-lab/docs/OS-41/VERIFY.md reproducing a stall and a network drop in a VM"
+    ],
+    reference: "docs/PLAN-OS-41-stall-detector.md, linux-lab/docs/OS-41/DETECTION-GUIDE.md",
+    targetPaths: ["linux-lab/scripts/", "linux-lab/docs/OS-41/"],
+    suggestedBranch: "feat/os-41-stall-doctor"
+  },
 
   // --- Firewall Solutions (BGT207) continued ---
   {
