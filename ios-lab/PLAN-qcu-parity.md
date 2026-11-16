@@ -96,3 +96,64 @@ Nothing here was exercised against a real input grant on a Mac.
 - `python3 -m compileall` for the console, `bash -n` for scripts, `lat check`
   after `lat.md` updates, dashboard `npm run check` / `test:i18n` / `build`.
 - Live runs on a Mac recorded in `ios-lab/VERIFY.md`.
+
+
+## Round 2: the QcU port (branch feat/qcu-port-safety-and-repl)
+
+Five agreed capabilities ported from QcU (commit 9c9f178), one commit each; guardrails
+unchanged. Token-path finding: the macOS mirror's previewed actions (macos-click,
+macos-input, macos-element, macos-set-value, macos-perform, macos-scroll) ride the shared
+`/api/labs/plan` → `/api/labs/start` flow with the module-global `SIGNER` — there is no
+separate macOS token path — so the stamp fix landed in `PlanSigner`, which also serves every
+other lab's preview and the Source Lab confirm flow (same sign/verify contract; stamps now
+expire and cannot be replayed). Armed mirror routes bypass preview stamps by design
+(armed control is their gate) and are unchanged.
+
+- [x] **Fail-closed app allowlist** (QcU safety/allowlist.ts). Missing file or `[]` still
+      allows all; a present-but-unreadable, malformed or non-string-list file refuses with
+      `ALLOWLIST_INVALID` naming the file and the problem.
+- [x] **Expiring, one-use preview stamps** (QcU safety/confirm.ts). `PlanSigner` stamps carry
+      the canonical request digest with issue/expiry seconds under an HMAC
+      (`v1.<issued>.<expires>.<mac>`), default TTL 60 s (`OSLAB_MAC_PREVIEW_TTL` /
+      mac-lab.json `previewTtl`, clamped 5–3600), consumed on the first successful verify —
+      replay refused, failed verifies do not consume, the pending table is pruned and capped
+      (64). The audit row records the stamp digest as `tokenDigest`.
+- [x] **Wider key list and configurable limits** (QcU engine/config.ts). Home, End, PageUp,
+      PageDown join the allowlist (console, script, dashboard); type/paste max length and the
+      element-tree cap are configurable (`OSLAB_MAC_TYPE_MAX` / `_PASTE_MAX` / `_TREE_SIZE`),
+      defaults unchanged; the script's backstop caps read the same env vars.
+- [x] **Native REPL parity** (QcU cli/repl.ts). ios-lab/mac/macos-repl.mjs (Appium mac2) is
+      replaced by console/macos_repl.py: one long-lived session over the native AX helper
+      path with apps/tree/find/click/type/shot plus key, scroll, paste, set-value, perform,
+      arm, disarm, confirm, stop. One session holds the arm, the element cache and the
+      signer — the QcU per-command-engine pitfall is avoided. State-changing commands go
+      through preview → confirm stamps or the armed gates; no bypass. Tests drive the fake
+      helper on Linux CI.
+- [x] **Whole-display capture and streaming** (QcU drivers/mac/mac-driver.ts). Display
+      records carry their CG id; `GET /api/labs/macos/displays/<id>/screenshot` and `…/stream`
+      validate the id against the displays list (`screencapture -D`) with the same host,
+      permission and panic-stop behaviour as the window path; the MCP macos_screenshot tool
+      takes displayId; the mirror picker gains a Whole-displays group (observe only).
+
+### Design notes (no code) — port only if X
+
+- **JSON-RPC stdio/HTTP engine + docs/PROTOCOL.md.** Port only if a second non-dashboard
+  consumer needs the lab over a stable wire protocol (an agent runtime that cannot run the
+  MCP stdio server, or remote operation). Recommendation: keep for now — the MCP server and
+  the local HTTP API already cover both known consumers, and a protocol copy doubles the
+  compatibility surface to maintain.
+- **Typed client SDK (QcUClient).** Port only if that protocol lands and a second codebase
+  starts calling it. Recommendation: skip — the dashboard's thin `api.ts` plus the MCP tools
+  are the typed clients; an SDK would re-wrap the same endpoints.
+- **Standalone macOS setup/status service.** Port only if the console ever needs to run
+  without the dashboard (headless Mac automation). Recommendation: keep for now — the
+  console already serves status/permissions/displays JSON and the scripts remain runnable
+  by hand.
+- **Platform driver interface + fake driver.** Port only if a second platform (Windows app
+  mirror parity, Linux desktop) starts driving the same act/verify paths. Recommendation:
+  partial — the fake AX helper (OSLAB_AX_HELPER) already gives CI the seam for macOS; a
+  general interface can wait for the second platform.
+
+Not ported, as agreed: deep-inspect sessions (unsupported on macOS per QcU; os-lab keeps its
+Appium mac2 deep inspect — the decision item above stays open), QcU's per-command CLI
+design, and everything already at parity.
