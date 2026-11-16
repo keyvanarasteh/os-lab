@@ -322,7 +322,7 @@ fi
 if want ext_scan; then
   stage_start ext_scan
   hdr "PENT-02 extension scanner tests (pytest)"
-  if [ -n "$PY" ] || pick_python; then
+  if ensure_pytest; then
     if ( cd "$ROOT" && cd scripts/analysis && "$PY" -m pytest ext_scan/tests -q ); then
       ok "scripts/analysis/ext_scan (PENT-02)"
     else
