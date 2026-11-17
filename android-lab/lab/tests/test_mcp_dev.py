@@ -67,8 +67,24 @@ def test_smoke_client_passes_against_the_dev_server():
     assert "tools/list" in proc.stdout
 
 
-def test_config_prints_both_client_entries():
-    proc = subprocess.run([sys.executable, DEV, "config", "--proxy"], capture_output=True, text=True, cwd=REPO_ROOT, timeout=30)
+def config(*extra):
+    return subprocess.run([sys.executable, DEV, "config", *extra], capture_output=True, text=True, cwd=REPO_ROOT, timeout=30)
+
+
+def test_config_prints_an_entry_for_every_agent_client():
+    proc = config("--proxy")
     assert proc.returncode == 0
-    assert "claude mcp add os-lab-macos --" in proc.stdout
-    assert '"mcpServers"' in proc.stdout and "mcp-dev.py" in proc.stdout and '"proxy"' in proc.stdout
+    out = proc.stdout
+    assert "claude mcp add os-lab-macos --" in out
+    assert "codex mcp add os-lab-macos --" in out and "[mcp_servers.os-lab-macos]" in out
+    assert "agy mcp add os-lab-macos " in out
+    assert '"type": "local"' in out and '"enabled": true' in out  # OpenCode
+    assert '"mcpServers"' in out  # ZCode
+    assert out.count("mcp-dev.py") >= 5 and "proxy" in out
+
+
+def test_config_can_print_one_client_and_without_proxy_points_at_the_server():
+    proc = config("--client", "codex")
+    assert proc.returncode == 0
+    assert "console/mcp_server.py" in proc.stdout and "mcp-dev.py" not in proc.stdout
+    assert "claude mcp add" not in proc.stdout and "agy mcp add" not in proc.stdout

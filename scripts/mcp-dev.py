@@ -7,7 +7,7 @@
   scripts/mcp-dev.py proxy                               stand in for the server in a client's config; run the real
                                                          server with --dev and restart it when console/*.py changes,
                                                          replaying the client's handshake so the session survives
-  scripts/mcp-dev.py config [--proxy]                    print the client config for this checkout
+  scripts/mcp-dev.py config [--proxy] [--client NAME]    print the registration for claude, codex, agy, opencode, zcode
 
 Only the server runs here. Input tools still need the human to arm control mode from the dashboard, and a
 `--call` of an input tool is refused by the console unless it is armed. Requests in flight when the proxy
@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 import threading
@@ -221,14 +222,54 @@ def cmd_proxy(_: argparse.Namespace) -> int:
     return 0
 
 
+CLIENTS = ("claude", "codex", "agy", "opencode", "zcode")
+NAME = "os-lab-macos"
+
+
+def client_entries(command: list[str]) -> dict[str, list[str]]:
+    """Per client: how to register the server, as printable lines. Verified against each CLI's `mcp add --help`
+    and the config files on this machine; ZCode's location is not verified."""
+    quoted = shlex.join(command)
+    json_entry = json.dumps({"mcpServers": {NAME: {"command": command[0], "args": command[1:]}}}, indent=2)
+    return {
+        "claude": [
+            "Claude Code (local scope, this project):",
+            f"  claude mcp add {NAME} -- {quoted}",
+            "  Add `--scope user` after `add` for every project, or `--scope project` to write .mcp.json.",
+        ],
+        "codex": [
+            "Codex CLI (writes ~/.codex/config.toml):",
+            f"  codex mcp add {NAME} -- {quoted}",
+            "  or by hand:",
+            f"  [mcp_servers.{NAME}]",
+            f"  command = {json.dumps(command[0])}",
+            f"  args = {json.dumps(command[1:])}",
+        ],
+        "agy": [
+            "Antigravity CLI, agy (writes ~/.gemini/config/mcp_config.json):",
+            f"  agy mcp add {NAME} {quoted}",
+        ],
+        "opencode": [
+            "OpenCode (merge into ~/.config/opencode/opencode.json, or opencode.json in a project; `opencode mcp add` is interactive):",
+            json.dumps({"mcp": {NAME: {"type": "local", "command": command, "enabled": True}}}, indent=2),
+        ],
+        "zcode": [
+            "ZCode (add in its MCP settings; I could not find a config file for it to verify, so this is the common mcpServers shape):",
+            json_entry,
+        ],
+    }
+
+
 def cmd_config(args: argparse.Namespace) -> int:
     script = os.path.join(REPO, "scripts", "mcp-dev.py") if args.proxy else SERVER
     command = [sys.executable, script] + (["proxy"] if args.proxy else [])
-    print("Claude Code:")
-    print("  claude mcp add os-lab-macos -- " + " ".join(command))
-    print("\nJSON (Claude Desktop, ZCode and similar):")
-    print(json.dumps({"mcpServers": {"os-lab-macos": {"command": command[0], "args": command[1:]}}}, indent=2))
-    print("\nThe human arms control mode from the dashboard; there is deliberately no arm tool.")
+    entries = client_entries(command)
+    chosen = CLIENTS if args.client == "all" else (args.client,)
+    for client in chosen:
+        print("\n".join(entries[client]) + "\n")
+    print("Nothing is written for you. The human arms control mode from the dashboard; there is deliberately no arm tool.")
+    if args.proxy:
+        print(f"The proxy path points at this checkout ({REPO}); register again from your main checkout after it merges.")
     return 0
 
 
@@ -242,6 +283,7 @@ def main() -> int:
     sub.add_parser("proxy", help="restart-on-change stdio proxy for a client config").set_defaults(fn=cmd_proxy)
     config = sub.add_parser("config", help="print the client config for this checkout")
     config.add_argument("--proxy", action="store_true", help="point the client at the restart-on-change proxy")
+    config.add_argument("--client", choices=("all",) + CLIENTS, default="all", help="print one client's entry (default all)")
     config.set_defaults(fn=cmd_config)
     args = parser.parse_args()
     return args.fn(args)
