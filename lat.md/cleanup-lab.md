@@ -527,10 +527,12 @@ checked safe groups and opens the shared confirmation dialog.
 
 ### Pro cards
 
-Below the Ready and Bookmarks cards, compact "pro" cards expose the remaining
-cleanup capabilities from the dashboard. Each loads real engine data, renders
-loading/empty states, and — for destructive actions — follows preview →
-confirm → run.
+Below the Ready and Bookmarks cards, compact action cards expose the remaining
+cleanup capabilities. Each shows a bounded live summary; details open in a
+focused dialog.
+
+The cards show loading, unavailable and error states. Destructive actions use
+typed previews and confirmation before running.
 
 * **Privileged actions** (CLN-20): lists the system-maintenance actions this
   host offers (risk and impact), previews the elevation command, candidate count
@@ -546,9 +548,11 @@ confirm → run.
 * **Cross-platform leftovers** (CLN-09/10): orphaned app data from OS package
   inventories with confidence badges (likely/possible/uncertain), report only.
 * **Containers & VMs** (CLN-08): Docker/Podman prune preview → confirm → run,
-  plus a virtual-machine inventory, report only.
-* **Custom entries** (CLNP-20): lists user folders bookmarked as `custom.<slug>`
-  entries with remove; adding a folder goes through Settings → Bookmarks.
+  plus a virtual-machine inventory, report only. VM detection remains available
+  when no container engine responds.
+* **Custom entries** (CLNP-20): lists all `custom.<slug>` catalog entries,
+  including folders without bookmarks, with remove; adding a folder goes
+  through Settings → Bookmarks.
 
 The Permissions card in Settings opens with the Full Disk Access guide ([[dashboard/src/views/cleanup/permission-guide.tsx]]): the app that needs the grant as a tile, Open System Settings, Reveal app again, Reset permissions and, once the toggle is on, Quit & Reopen. The console names the app from its own process tree (`_host_app` in [[console/cleanup_api.py]]) and reveals or resets only that bundle; the page supplies no path.
 

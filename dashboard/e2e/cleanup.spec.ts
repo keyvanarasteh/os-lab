@@ -12,6 +12,16 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
     if (route.request().method() === "POST") calls.push({ path, body });
     let data: unknown = {};
     if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/widget") data = {
+      schemaVersion: 1, capturedAt: 1, platform: "macos", capable: false,
+      disk: { mountPoint: null, totalBytes: null, freeBytes: null, usedPercent: null },
+      lastScan: null, progress: null,
+      cleanup: { totalReclaimedBytes: 0, lastRunAt: null },
+      monitor: { enabled: false, intervalSeconds: null, nextCheckAt: null, lastWarningAt: null, warningCount: 0 },
+      bookmarks: { count: 0, quickCleanCount: 0, hookCount: 0, alertCount: 0 },
+      permissions: { fullDiskAccess: null }, status: "up-to-date",
+      publish: { published: false, path: null, reason: null },
+    };
     else if (path === "/api/cleanup/monitor") data = { enabled: false, running: false, intervalSeconds: 300, cooldownSeconds: 3600, volumes: [], state: { volumes: {}, events: [], lastEvaluationAt: null, lastError: null }, activeWarnings: [], configError: null, checkedAt: 1 };
     else if (path === "/api/cleanup/volumes") data = { platform: "macos", threshold: 0.9, volumes: [{ mountPoint: "/", name: "Macintosh HD", device: "/dev/disk1", filesystem: "apfs", kind: "root", totalBytes: 500_000_000_000, freeBytes: 250_000_000_000, usedBytes: 250_000_000_000, usage: 0.5, purgeableBytes: null, isHome: true, pressure: "ok", error: null }], homeVolume: "/", warnings: [], error: null };
     else if (path === "/api/cleanup/bookmarks") data = { bookmarks: [], error: null };
@@ -39,7 +49,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await expect(page.getByRole("heading", { name: "Cleanup Lab" }).first()).toBeVisible();
   // CLNP-21/22: the overview — storage hero first, then the renamed review section.
   await expect(page.getByRole("heading", { name: "This computer's storage" })).toBeVisible();
-  await expect(page.getByText("50% used", { exact: false })).toBeVisible();
+  await expect(page.locator("#overview-storage").getByText("50% used", { exact: false })).toBeVisible();
   await expect(page.getByText("232.8 GB", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("Purgeable space is managed by macOS", { exact: false })).toBeVisible();
   // The summary cards: bookmarks on the right, the scan/clean summary on the left.
@@ -64,7 +74,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   expect(calls.filter((call) => call.path === "/api/cleanup/clean")[0].body).toEqual({ planId: "plan-1" });
   // CLNP-21: the Space Explorer capability card moved to Settings and still navigates its tab in place.
   await page.goto("/cleanup/settings/");
-  await page.getByRole("button", { name: "Space Explorer" }).click();
+  await page.getByRole("button", { name: "Space Explorer Browse folders by size, like dua" }).click();
   await expect(page).toHaveURL(/\/cleanup\/space\/$/);
   await expect(page.getByRole("heading", { name: "Space Explorer" })).toBeVisible();
   await expect(page.getByText("Pick a root and measure it to see its folders by size.")).toBeVisible();

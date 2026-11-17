@@ -42,6 +42,7 @@ async function mockConsole(page: import("@playwright/test").Page, overrides: Rec
     async function handle() {
       let data: unknown = {};
       if (path === "/api/cleanup/status") data = baseMocks;
+      else if (Object.hasOwn(overrides, path)) data = overrides[path];
       else if (path === "/api/cleanup/volumes") data = volumes;
       else if (path === "/api/cleanup/catalog") data = catalog;
       else if (path === "/api/cleanup/monitor") data = {
@@ -61,7 +62,6 @@ async function mockConsole(page: import("@playwright/test").Page, overrides: Rec
       else if (path === "/api/cleanup/bookmarks") data = { bookmarks: [], error: null };
       else if (path === "/api/cleanup/permissions") data = { platform: "macos", permissions: [] };
       else if (path === "/api/cleanup/jobs") data = { jobs };
-      else if (overrides[path]) data = overrides[path];
       else if (path.startsWith("/api/cleanup/jobs/")) {
         const kind = path.split("/")[4];
         data = { id: `job-${kind}`, kind, state: "done", request: {}, progress: {}, result: null, error: null };
@@ -127,6 +127,7 @@ test("privileged actions preview shows the command and run finishes", async ({ p
     "/api/cleanup/jobs/job-privileged": { id: "job-privileged", kind: "privileged-run", state: "done", request: { previewId: "prev-1" }, progress: {}, result: runResult, error: null },
   });
   await page.goto("/cleanup/");
+  await page.locator("#pro-privileged").getByRole("button", { name: "Details" }).click();
   await page.getByRole("button", { name: "Preview Docker prune" }).click();
   await expect(page.getByText("pkexec docker system prune --all --force", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Run", exact: true }).click();
@@ -147,8 +148,8 @@ test("deep scan lists available roots and runs a sweep", async ({ page }) => {
     "/api/cleanup/jobs/job-deep": { id: "job-deep", kind: "deep-scan", state: "done", request: { entryIds: ["home-projects"] }, progress: {}, result: scanResult, error: null },
   });
   await page.goto("/cleanup/");
+  await page.locator("#pro-deep-scan").getByRole("button", { name: "Details" }).click();
   await expect(page.getByRole("button", { name: "home-projects" })).toBeVisible();
-  await page.getByRole("button", { name: "home-projects" }).click();
   await page.getByRole("button", { name: "Scan", exact: true }).click();
   await expect(page.getByText("npm", { exact: false })).toBeVisible();
   await expect(page.getByText("/Users/test/Projects/demo", { exact: false })).toBeVisible();
@@ -162,6 +163,7 @@ test("simulators lists devices with size", async ({ page }) => {
     },
   });
   await page.goto("/cleanup/");
+  await page.locator("#pro-simulators").getByRole("button", { name: "Details" }).click();
   await expect(page.getByText("iPhone 16", { exact: false })).toBeVisible();
   await expect(page.locator("#pro-simulators").getByText("iOS 18.0", { exact: false })).toBeVisible();
 });
@@ -175,6 +177,7 @@ test("package review lists candidates", async ({ page }) => {
     "/api/cleanup/packages/scan": { id: "job-pkg", kind: "packages", state: "done", request: {}, progress: {}, result: scanResult, error: null },
   });
   await page.goto("/cleanup/");
+  await page.locator("#pro-packages").getByRole("button", { name: "Details" }).click();
   await page.getByRole("button", { name: "Scan packages", exact: true }).click();
   await expect(page.getByText("old-tool", { exact: true })).toBeVisible();
   await expect(page.getByText("brew uninstall old-tool", { exact: false })).toBeVisible();
@@ -190,6 +193,7 @@ test("leftovers scan lists items with confidence", async ({ page }) => {
     "/api/cleanup/leftovers/scan": { id: "job-left", kind: "leftovers", state: "done", request: {}, progress: {}, result: scanResult, error: null },
   });
   await page.goto("/cleanup/");
+  await page.locator("#pro-leftovers").getByRole("button", { name: "Details" }).click();
   await page.getByRole("button", { name: "Scan leftovers", exact: true }).click();
   await expect(page.getByText("Acme Helper", { exact: false })).toBeVisible();
   await expect(page.getByText("Likely leftover", { exact: false })).toBeVisible();
@@ -213,14 +217,87 @@ test("containers & VMs shows the engine and prune preview", async ({ page }) => 
   });
   await page.goto("/cleanup/");
   await expect(page.getByText("DOCKER", { exact: true })).toBeVisible();
+  await page.locator("#pro-containers").getByRole("button", { name: "Details" }).click();
   await page.getByRole("button", { name: "Preview containers.docker.dangling-volumes" }).click();
   await expect(page.getByText("docker volume prune --all --force", { exact: false })).toBeVisible();
+});
+
+test("VM inventory remains available without a container engine", async ({ page }) => {
+  const { calls } = await mockConsole(page, {
+    "/api/cleanup/containers": { available: false, engine: null, reason: "Docker and Podman are offline", actions: [] },
+    "/api/cleanup/vms/scan": { id: "job-vms", kind: "vm-scan", state: "done", request: {}, progress: {},
+      result: { cancelled: false, items: [{ id: "vm-one", name: "Development VM", path: "/VMs/dev", sizeBytes: 3_000_000_000, sizeOnDiskBytes: 3_000_000_000, files: 4, reportOnly: true }], unavailable: [] }, error: null },
+  });
+  await page.goto("/cleanup/");
+  const card = page.locator("#pro-containers");
+  await expect(card.getByText("Docker and Podman are offline")).toBeVisible();
+  await card.getByRole("button", { name: "Details" }).click();
+  await page.getByRole("button", { name: "Scan VMs" }).click();
+  await expect(page.getByText("Development VM")).toBeVisible();
+  expect(calls.some((call) => call.path === "/api/cleanup/vms/scan")).toBe(true);
+});
+
+test("VM scan failure stays beside its action", async ({ page }) => {
+  await mockConsole(page, {
+    "/api/cleanup/containers": { available: false, engine: null, reason: "Docker and Podman are offline", actions: [] },
+    "/api/cleanup/vms/scan": { id: "job-vms", kind: "vm-scan", state: "failed", request: {}, progress: {}, result: null, error: "Inventory permission denied" },
+  });
+  await page.goto("/cleanup/");
+  await page.locator("#pro-containers").getByRole("button", { name: "Details" }).click();
+  await page.getByRole("button", { name: "Scan VMs" }).click();
+  await expect(page.getByRole("dialog", { name: "Containers & VMs" }).getByText("Inventory permission denied")).toBeVisible();
 });
 
 test("custom entries shows empty state and an add link", async ({ page }) => {
   await mockConsole(page);
   await page.goto("/cleanup/");
+  await page.locator("#pro-custom").getByRole("button", { name: "Details" }).click();
   await expect(page.getByText("No custom folders yet.", { exact: false })).toBeVisible();
   await expect(page.getByText("Add a user folder in", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: "Settings → Bookmarks" })).toBeVisible();
+});
+
+test("custom entries include folders without bookmarks and remove by catalog id", async ({ page }) => {
+  const { calls } = await mockConsole(page, {
+    "/api/cleanup/catalog": { ...catalog, entries: [...catalog.entries, {
+      id: "custom.old-builds", name: "Old builds", category: "custom", risk: "medium",
+      hint: "User folder", impact: "", defaultSelected: false, needsPrivilege: false,
+      paths: [{ template: "/Users/test/Old builds", path: "/Users/test/Old builds", reason: "" }],
+    }] },
+    "/api/cleanup/custom-entries/remove": { entries: [], error: null },
+  });
+  await page.goto("/cleanup/");
+  const card = page.locator("#pro-custom");
+  await expect(card.getByText("Old builds")).toBeVisible();
+  await card.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByText("/Users/test/Old builds")).toBeVisible();
+  await page.getByRole("button", { name: "Remove custom entry" }).click();
+  await expect(page.getByText("No custom folders yet.")).toBeVisible();
+  expect(calls).toContainEqual({ path: "/api/cleanup/custom-entries/remove", body: { entryId: "custom.old-builds" } });
+});
+
+test("new action cards stay compact before and after a scan", async ({ page }) => {
+  await mockConsole(page, {
+    "/api/cleanup/packages/scan": { id: "job-pkg", kind: "packages", state: "done", request: {}, progress: {}, result: Array.from({ length: 24 }, (_, index) => ({
+      id: `brew:${index}`, name: `old-tool-${index}`, tool: "brew", version: "1.0",
+      command: ["brew", "uninstall", `old-tool-${index}`], reportOnly: true,
+    })), error: null },
+  });
+  await page.goto("/cleanup/");
+  const card = page.locator("#pro-packages");
+  await expect(card.getByText("Not scanned")).toBeVisible();
+  const before = await card.boundingBox();
+  await card.getByRole("button", { name: "Details" }).click();
+  await page.getByRole("button", { name: "Scan packages" }).click();
+  await expect(card.getByText("24", { exact: true })).toBeVisible();
+  const after = await card.boundingBox();
+  expect(before).not.toBeNull();
+  expect(after).not.toBeNull();
+  expect(after!.height).toBeLessThanOrEqual(before!.height + 30);
+  expect(await card.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+  await page.getByRole("dialog", { name: "Package review" }).getByRole("button", { name: "Close" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(card.getByRole("button", { name: "Details" })).toBeVisible();
+  expect(await card.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

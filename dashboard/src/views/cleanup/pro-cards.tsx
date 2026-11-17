@@ -17,10 +17,10 @@ import {
   ArrowsClockwiseIcon, BookmarkSimpleIcon, BugIcon, CubeIcon, HardDrivesIcon,
   MagnifyingGlassIcon, PackageIcon, SparkleIcon, TrashIcon, WrenchIcon,
 } from "@phosphor-icons/react";
-import { Badge, Status } from "../../components/ui";
+import { Badge, Modal, Status } from "../../components/ui";
 import {
   api, formatBytes,
-  type CleanupAuxJob, type BookmarksPayload, type CleanupDeepRoot,
+  type CleanupAuxJob, type CleanupEntry, type CleanupDeepRoot,
   type CleanupDeepScanItem, type CleanupPackageCandidate,
   type CleanupPrivilegedPreview, type CleanupPrivilegedRun, type CleanupPrivilegedStatus,
   type CleanupSimulators, type CleanupVMInventory, type CleanupContainerPreview,
@@ -48,7 +48,10 @@ export function ProCard({
   footer?: { key: string; icon: ReactNode; text: ReactNode }[];
   children?: ReactNode;
 }) {
-  return <section id={id} className={`iux-card ${children ? "" : "pb-4"}`}>
+  const [open, setOpen] = useState(false);
+  const hasDetails = Boolean(children && stats?.length);
+  const visibleFooter = footer?.slice(0, 2);
+  return <section id={id} className="iux-card flex min-h-44 flex-col overflow-hidden rounded-2xl bg-linear-to-b from-(--iux-card) to-(--iux-background) pb-4">
     <div className="flex items-center justify-between gap-3 px-4 pt-3">
       <span translate="no" className="text-[10px] font-semibold tracking-wide text-(--iux-muted-foreground)">os-lab</span>
       <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${DOT[dot]}`} />
@@ -73,15 +76,21 @@ export function ProCard({
       </div>
       <p className="mt-1 truncate text-[10px] text-(--iux-muted-foreground)">{bar.caption}</p>
     </div>}
-    {footer && footer.length > 0 && <div className="mt-2 border-t border-(--iux-border) px-4 pt-2">
-      <ul className="space-y-1 text-sm">
-        {footer.map((line) => <li key={line.key} className="flex items-start gap-1.5">
+    {visibleFooter && visibleFooter.length > 0 && <div className="mt-3 border-t border-(--iux-border) px-4 pt-2">
+      <ul className="space-y-1 text-xs text-(--iux-muted-foreground)">
+        {visibleFooter.map((line) => <li key={line.key} className="flex min-w-0 items-center gap-1.5 truncate">
           <span className="mt-0.5 shrink-0 text-[10px] text-(--iux-muted-foreground)" aria-hidden="true">{line.icon}</span>
-          <span className="min-w-0 flex-1 leading-relaxed">{line.text}</span>
+          <span className="min-w-0 flex-1 truncate">{line.text}</span>
         </li>)}
       </ul>
     </div>}
-    {children && <div className="mt-2 border-t border-(--iux-border) px-4 py-2">{children}</div>}
+    {hasDetails && <div className="mt-auto px-4 pt-3">
+      <button type="button" className="iux-btn w-full justify-center" data-variant="outline" onClick={() => setOpen(true)}>Details</button>
+    </div>}
+    {children && !hasDetails && <div className="mt-auto px-4 pt-3">{children}</div>}
+    {open && hasDetails && <Modal title={title} onClose={() => setOpen(false)}>
+      <div className="max-h-[65vh] overflow-y-auto px-1 py-2">{children}</div>
+    </Modal>}
   </section>;
 }
 
@@ -104,6 +113,8 @@ function ErrorLine({ text, className }: { text: string; className?: string }) {
 function useJob<T>(start: () => Promise<CleanupAuxJob<T>>, poll: (id: string) => Promise<CleanupAuxJob<T>>) {
   const [job, setJob] = useState<CleanupAuxJob<T> | null>(null);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const timer = useRef<number | null>(null);
   const alive = useRef(true);
 
@@ -113,9 +124,12 @@ function useJob<T>(start: () => Promise<CleanupAuxJob<T>>, poll: (id: string) =>
   }, []);
 
   async function run() {
+    if (submitting || job?.state === "running") return;
     setError("");
+    setSubmitting(true);
     try {
       const started = await start();
+      if (!alive.current) return;
       setJob(started);
       if (started.state === "running") {
         timer.current = window.setInterval(() => {
@@ -133,18 +147,22 @@ function useJob<T>(start: () => Promise<CleanupAuxJob<T>>, poll: (id: string) =>
         }, 650);
       }
     } catch (startError) {
-      setError(String(startError));
+      if (alive.current) setError(String(startError));
+    } finally {
+      if (alive.current) setSubmitting(false);
     }
   }
 
   async function cancel() {
-    if (!job) return;
+    if (!job || cancelling) return;
     setError("");
-    try { await api.cleanupCancel(job.id); setJob((old) => old ? { ...old, state: "cancelled" } : null); }
+    setCancelling(true);
+    try { await api.cleanupCancel(job.id); }
     catch (cancelError) { setError(String(cancelError)); }
+    finally { setCancelling(false); }
   }
 
-  return { job, error, run, cancel, busy: job?.state === "running" };
+  return { job, error, run, cancel, busy: submitting || job?.state === "running", cancelling };
 }
 
 export function relativeTime(atSeconds: number | null | undefined, locale: string, nowSeconds: number): string | null {
@@ -193,9 +211,8 @@ export function PrivilegedCard({ locale, now }: { locale: string; now: number })
   if (error) return <ProCard id="pro-privileged" title="Privileged actions" dot="danger" stats={[]}><ErrorLine text={error} className="px-4 py-2" /></ProCard>;
   if (!applicable) {
     return <ProCard id="pro-privileged" title="Privileged actions" dot="muted"
-      stats={[{ key: "platform", value: <span translate="no">{status?.platform}</span>, label: "Host" }]}
       footer={[{ key: "elevation", icon: <WrenchIcon size={13} />, text: <span>No typed elevation mechanism on this host</span> }]}>
-      <p className="px-4 py-2 text-[10px] text-(--iux-muted-foreground)">Privileged system maintenance is not offered on {status?.platform}.</p>
+      <p className="text-xs text-(--iux-muted-foreground)">Privileged system maintenance is not offered on <span translate="no">{status?.platform}</span>.</p>
     </ProCard>;
   }
 
@@ -268,7 +285,7 @@ export function DeepScanCard({ locale, now }: { locale: string; now: number }) {
 
   useEffect(() => {
     let alive = true;
-    void api.cleanupDeepRoots().then((value) => { if (alive) setRoots(value.roots.filter((root) => root.available)); }).catch((e) => { if (alive) setError(String(e)); });
+    void api.cleanupDeepRoots().then((value) => { if (alive) { setRoots(value.roots); setSelected(value.roots.filter((root) => root.available).map((root) => root.id)); } }).catch((e) => { if (alive) setError(String(e)); });
     return () => { alive = false; };
   }, []);
 
@@ -287,8 +304,8 @@ export function DeepScanCard({ locale, now }: { locale: string; now: number }) {
     actions={<ProAction label="Refresh" icon={<ArrowsClockwiseIcon size={15} />} onClick={() => { void api.cleanupDeepRoots().then((value) => setRoots(value.roots.filter((root) => root.available))).catch((e) => setError(String(e))); }} disabled={job.busy} />}
     stats={[
       { key: "roots", value: available.length, label: "Roots", tone: available.length ? "accent" : "muted" },
-      { key: "found", value: items.length, label: done ? "Projects found" : "Scanning", tone: items.length ? "accent" : "muted" },
-      { key: "size", value: formatBytes(totals), label: "Regeneratable", tone: totals ? "success" : "muted" },
+      { key: "found", value: done ? items.length : "—", label: done ? "Projects found" : job.busy ? "Scanning" : "Not scanned", tone: items.length ? "accent" : "muted" },
+      { key: "size", value: done ? formatBytes(totals) : "—", label: "Regeneratable", tone: totals ? "success" : "muted" },
     ]}
     footer={available.map((root) => ({
       key: root.id,
@@ -393,8 +410,8 @@ export function PackageReviewCard({}: {}) {
   const done = job.job?.state === "done";
   return <ProCard id="pro-packages" title="Package review" dot={done ? (items.length ? "success" : "muted") : job.busy ? "accent" : "muted"}
     stats={[
-      { key: "tools", value: byTool.size, label: "Tools", tone: byTool.size ? "accent" : "muted" },
-      { key: "candidates", value: items.length, label: done ? "Candidates" : "Scanning", tone: items.length ? "accent" : "muted" },
+      { key: "tools", value: done ? byTool.size : "—", label: "Tools", tone: byTool.size ? "accent" : "muted" },
+      { key: "candidates", value: done ? items.length : "—", label: done ? "Candidates" : job.busy ? "Scanning" : "Not scanned", tone: items.length ? "accent" : "muted" },
     ]}
     footer={Array.from(byTool.entries()).map(([tool, group]) => ({
       key: tool,
@@ -443,9 +460,9 @@ export function LeftoversCard({ locale, now }: { locale: string; now: number }) 
 
   return <ProCard id="pro-leftovers" title="Cross-platform leftovers" dot={done ? (items.length ? likely.length ? "danger" : "warning" : "muted") : job.busy ? "accent" : "muted"}
     stats={[
-      { key: "items", value: items.length, label: done ? "Leftovers" : "Scanning", tone: items.length ? "accent" : "muted" },
-      { key: "size", value: formatBytes(totalBytes), label: "Detected", tone: totalBytes ? "success" : "muted" },
-      { key: "likely", value: likely.length, label: "High confidence", tone: likely.length ? "danger" : "muted" },
+      { key: "items", value: done ? items.length : "—", label: done ? "Leftovers" : job.busy ? "Scanning" : "Not scanned", tone: items.length ? "accent" : "muted" },
+      { key: "size", value: done ? formatBytes(totalBytes) : "—", label: "Detected", tone: totalBytes ? "success" : "muted" },
+      { key: "likely", value: done ? likely.length : "—", label: "High confidence", tone: likely.length ? "danger" : "muted" },
     ]}
     footer={[
       { key: "sources", icon: <HardDrivesIcon size={13} />, text: job.job?.result?.inventorySources ? <span className="text-[10px] text-(--iux-muted-foreground)">{job.job.result.inventorySources.join(", ")}</span> : <span className="text-[10px] text-(--iux-muted-foreground)">—</span> },
@@ -518,25 +535,21 @@ export function ContainersVmsCard({ locale, now }: { locale: string; now: number
   const actions = caps?.actions ?? [];
 
   if (loading) return <ProCard id="pro-containers" title="Containers & VMs" dot="muted" stats={[]}><p className="px-4 py-2 text-[10px] text-(--iux-muted-foreground)">Checking container engine…</p></ProCard>;
-  if (error) return <ProCard id="pro-containers" title="Containers & VMs" dot="danger" stats={[]}><ErrorLine text={error} className="px-4 py-2" /></ProCard>;
-  if (!caps?.available) {
-    return <ProCard id="pro-containers" title="Containers & VMs" dot="muted" stats={[]}><p className="px-4 py-2 text-[10px] text-(--iux-muted-foreground)">{caps?.reason || "No container engine responds."}</p></ProCard>;
-  }
-
-  const vmDone = vmJob.job && vmJob.job.state !== "running";
-  return <ProCard id="pro-containers" title="Containers & VMs" dot={caps.available ? "accent" : "muted"}
+  const containerCaps = caps ?? { available: false, engine: null, actions: [], reason: error || "No container engine responds." };
+  const vmDone = vmJob.job?.state === "done";
+  return <ProCard id="pro-containers" title="Containers & VMs" dot={error ? "danger" : containerCaps.available ? "accent" : "muted"}
     actions={<ProAction label="Refresh" icon={<ArrowsClockwiseIcon size={15} />} onClick={() => { void api.cleanupContainers().then((value) => setCaps({ available: value.available, engine: value.engine, actions: value.actions.map((a) => ({ id: a.id, risk: a.risk })), reason: value.reason })).catch((e) => setError(String(e))); }} disabled={containerJob.busy} />}
     stats={[
-      { key: "engine", value: <span className="text-[10px]">{caps?.engine?.toUpperCase() ?? "—"}</span>, label: "Engine", tone: caps?.available ? "success" : "muted" },
+      { key: "engine", value: <span className="text-[10px]">{containerCaps.engine?.toUpperCase() ?? "—"}</span>, label: "Engine", tone: containerCaps.available ? "success" : "muted" },
       { key: "actions", value: actions.length, label: "Prunable", tone: actions.length ? "accent" : "muted" },
       { key: "vms", value: vmDone ? (vmJob.job?.result?.items.length ?? 0) : "—", label: "VMs", tone: vmDone ? "accent" : "muted" },
     ]}
-    footer={actions.map((action) => ({
+    footer={containerCaps.available ? actions.map((action) => ({
       key: action.id,
       icon: <Badge tone={action.risk === "high" ? "danger" : action.risk === "medium" ? "warning" : "success"}>{action.risk}</Badge>,
       text: <span className="text-sm">{action.id}</span>,
-    }))}>
-    {caps.available && <div className="px-4 py-2 space-y-1">
+    })) : [{ key: "engine-unavailable", icon: <CubeIcon size={13} />, text: containerCaps.reason || "No container engine responds." }]}>
+    {containerCaps.available && <div className="px-4 py-2 space-y-1">
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium text-sm">Preview & prune</span>
         {actions.map((action) => <button key={action.id} type="button" className="iux-btn iux-touch-target" data-variant="ghost" data-size="icon" disabled={containerJob.busy} title={`Preview ${action.id}`} onClick={() => void loadPreview(action.id)}>
@@ -559,6 +572,9 @@ export function ContainersVmsCard({ locale, now }: { locale: string; now: number
         </div>
         {containerJob.job && <p className="mt-0.5 text-[10px]">{containerJob.job.state === "running" ? "Pruning…" : containerJob.job.state === "failed" ? `Failed: ${containerJob.job.error}` : `Finished: ${containerJob.job.result?.bytesRemoved != null ? formatBytes(containerJob.job.result?.bytesRemoved) : containerJob.job.result?.output ?? "done"}`}</p>}
       </div>}
+    </div>}
+    <div className="px-4 py-2">
+      <p className="text-xs font-medium"><span>VMs</span> <span aria-hidden="true">·</span> <span className="text-(--iux-muted-foreground)">Report only</span></p>
       <div className="mt-2 flex gap-2">
         <button type="button" className="iux-btn" disabled={vmJob.busy} onClick={() => void scanVms()}>Scan VMs</button>
         {vmJob.busy && <button type="button" className="iux-btn" onClick={() => void vmJob.cancel()}>Cancel</button>}
@@ -569,9 +585,11 @@ export function ContainersVmsCard({ locale, now }: { locale: string; now: number
           <span className="flex items-center gap-1 text-[10px]"><Badge>Report only</Badge> <span dir="ltr" className="tabular-nums">{formatBytes(item.sizeBytes)}</span></span>
         </div>)}
       </div>}
+      {vmDone && !vmJob.job?.result?.items.length && <p className="mt-2 text-xs text-(--iux-muted-foreground)">No virtual machines found.</p>}
+      {vmJob.job?.state === "failed" && <ErrorLine text={vmJob.job.error || "VM scan failed."} className="pt-1" />}
       {vmJob.error && <ErrorLine text={vmJob.error} className="pt-1" />}
-    </div>}
-    {!caps.available && <p className="px-4 py-1 text-[10px] text-(--iux-muted-foreground)">No container engine responds.</p>}
+    </div>
+    {error && <ErrorLine text={error} className="px-4 pt-1" />}
     {containerJob.error && <ErrorLine text={containerJob.error} className="px-4 pt-1" />}
   </ProCard>;
 }
@@ -581,42 +599,46 @@ export function ContainersVmsCard({ locale, now }: { locale: string; now: number
  * List them with remove; adding a folder goes through the Settings flow.
  */
 export function CustomEntriesCard({ settingsHref }: { settingsHref: string }) {
-  const [bookmarks, setBookmarks] = useState<BookmarksPayload | null>(null);
+  const [entries, setEntries] = useState<CleanupEntry[] | null>(null);
   const [error, setError] = useState("");
+  const [removing, setRemoving] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    void api.cleanupBookmarks().then((value) => { if (alive) setBookmarks(value); }).catch(() => { if (alive) setBookmarks(null); });
+    void api.cleanupCatalog().then((value) => { if (alive) setEntries(value.entries); }).catch((e) => { if (alive) setError(String(e)); });
     return () => { alive = false; };
   }, []);
 
-  const items = bookmarks?.bookmarks.filter((item) => item.entryId.startsWith("custom.")) ?? [];
+  const items = entries?.filter((item) => item.id.startsWith("custom.")) ?? [];
 
   async function remove(entryId: string) {
     setError("");
-    try { await api.cleanupCustomRemove(entryId); void api.cleanupBookmarks().then(setBookmarks).catch(() => setBookmarks(null)); }
+    setRemoving(entryId);
+    try { await api.cleanupCustomRemove(entryId); setEntries((old) => old?.filter((entry) => entry.id !== entryId) ?? null); }
     catch (e) { setError(String(e)); }
+    finally { setRemoving(null); }
   }
 
+  if (entries == null && !error) return <ProCard id="pro-custom" title="Custom entries" dot="muted"><p>Loading custom folders…</p></ProCard>;
   return <ProCard id="pro-custom" title="Custom entries" dot={items.length ? "accent" : "muted"}
     stats={[
       { key: "count", value: items.length, label: "Custom folders", tone: items.length ? "accent" : "muted" },
     ]}
     actions={<a className="iux-btn iux-touch-target" data-variant="outline" data-size="icon" title="Add a folder" href={settingsHref}><SparkleIcon size={14} /></a>}
     footer={items.map((item) => ({
-      key: item.entryId,
+      key: item.id,
       icon: <BookmarkSimpleIcon size={13} />,
-      text: <><span className="font-medium truncate">{item.entry?.name ?? item.entryId}</span>
+      text: <><span className="font-medium truncate">{item.name}</span>
         <span className="text-(--iux-muted-foreground)"> · Your folder</span></>,
     }))}>
     {error && <ErrorLine text={error} className="px-4 pt-1" />}
     <div className="px-4 py-2 space-y-1">
-      {items.map((item) => <div key={item.entryId} className="flex items-center justify-between gap-2 py-1 text-xs">
+      {items.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 py-1 text-xs">
         <div className="min-w-0 flex-1">
-          <span className="font-medium truncate">{item.entry?.name ?? item.entryId}</span>
-          <p className="text-[10px] text-(--iux-muted-foreground) truncate">{item.entry?.paths.map((p) => p.path ?? p.reason).join(" · ") ?? item.entryId}</p>
+          <span className="font-medium truncate">{item.name}</span>
+          <p className="text-[10px] text-(--iux-muted-foreground) truncate">{item.paths.map((p) => p.path ?? p.reason).join(" · ")}</p>
         </div>
-        <button type="button" className="iux-btn iux-touch-target" data-variant="ghost" data-size="icon" title="Remove custom entry" onClick={() => void remove(item.entryId)}>✕</button>
+        <button type="button" className="iux-btn iux-touch-target" data-variant="ghost" data-size="icon" title="Remove custom entry" aria-label="Remove custom entry" disabled={removing !== null} onClick={() => void remove(item.id)}>✕</button>
       </div>)}
       {items.length === 0 && <p className="mt-1 text-[10px] text-(--iux-muted-foreground)">No custom folders yet.</p>}
       <p className="mt-1 text-[10px] text-(--iux-muted-foreground)">Add a user folder in <a className="underline" href={settingsHref}>Settings → Bookmarks</a>.</p>
