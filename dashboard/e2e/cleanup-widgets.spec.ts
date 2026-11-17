@@ -89,7 +89,8 @@ test("the overview card scrolls to the widgets section", async ({ page }) => {
   // The capability grid moved to the Settings tab with the cards it navigates to.
   await page.goto("/cleanup/settings/");
   await expect(page.getByRole("heading", { name: "Desktop widgets" }).first()).toBeVisible();
-  await page.getByRole("button", { name: /Desktop widgets/ }).click();
+  // The sidebar sub-nav has a link of the same name, so scope to the page body.
+  await page.getByRole("main").getByRole("button", { name: /Desktop widgets/ }).click();
   await expect(page.locator("#cleanup-widgets")).toBeInViewport();
 });
 

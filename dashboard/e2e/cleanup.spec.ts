@@ -44,7 +44,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await expect(page.getByText("Purgeable space is managed by macOS", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Quick clean" })).toBeVisible();
   // No bookmarks in this fixture, so the honest disabled state with its reason shows.
-  await expect(page.getByRole("button", { name: "Quick clean", exact: true })).toBeDisabled();
+  await expect(page.getByRole("main").getByRole("button", { name: "Quick clean", exact: true })).toBeDisabled();
   await expect(page.getByRole("heading", { name: "Clean", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Scan now" }).click();
   await expect(page.getByText("Last scan measured 142 B")).toBeVisible();
