@@ -205,7 +205,9 @@ def test_a_broken_manifest_refuses_instead_of_falling_open(tmp_path, monkeypatch
     assert not scope_guard.in_scope("host", "127.0.0.1")
     path.write_text("[" * 100000, encoding="utf-8")                       # deeper than the JSON decoder goes
     refused = scope_guard.check("host", "127.0.0.1")
-    assert not refused.allowed and "nested too deeply" in refused.reason
+    # older Pythons hit the recursion limit ("nested too deeply"); newer ones report invalid JSON.
+    # Either way the manifest is refused with a reason, never read as allowing everything.
+    assert not refused.allowed and ("nested too deeply" in refused.reason or "not valid JSON" in refused.reason)
     # a repeated field would silently replace the first one
     text = json.dumps(manifest(hosts=["8.8.8.8"], allowPublic=True))[:-1] + ', "hosts": ["127.0.0.1"]}'
     path.write_text(text, encoding="utf-8")
