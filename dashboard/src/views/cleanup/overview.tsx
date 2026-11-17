@@ -49,11 +49,13 @@ export function StorageHero({
   return <Section
     id="overview-storage"
     title={selected.isHome ? "This computer's storage" : "Storage"}
-    action={<button type="button" className="iux-btn" data-variant="ghost" title="Re-measure" onClick={onRefresh}>
-      <ArrowsClockwiseIcon size={16} />
-    </button>}
+    action={<span className="flex items-center gap-2">
+      {selected.usage != null && <span dir="ltr" className="text-sm tabular-nums text-(--iux-muted-foreground)">{Math.round(selected.usage * 100)}% used</span>}
+      <button type="button" className="iux-btn" data-variant="ghost" title="Re-measure" onClick={onRefresh}>
+        <ArrowsClockwiseIcon size={16} />
+      </button>
+    </span>}
     description={<span>
-      {selected.usage != null && <span dir="ltr">{Math.round(selected.usage * 100)}% used · </span>}
       <span translate="no">{selected.mountPoint}</span>
       {selected.pressure === "warning" && <span className="text-(--iux-danger)"> · running low</span>}
     </span>}>

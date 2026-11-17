@@ -495,6 +495,14 @@ The local app polls only while a job runs. Public Pages renders the routes witho
 engine calls or destructive controls. All eight route sets are built, including
 the seven translated locales.
 
+### Scan card and Catalogs
+
+The dashboard scan card ([[dashboard/src/views/cleanup/scan-card.tsx]]) shows "Scanning your Mac" with percent, bar, current path and Stop while a scan runs. When it finishes it shows "Scan complete", the selected size, a Clean action and the plan by tool group.
+
+[[dashboard/src/views/cleanup/groups.ts]] classifies every catalog entry into a tool group by id. [[dashboard/src/views/cleanup/catalog-page.tsx]] is `/cleanup/catalog/`: the group list, and with `#<group>` that group's own view (search, sort, select, bookmark, Rescan). Review removal sends the selection to the existing plan and confirmation dialog; nothing is cleaned without it. The sidebar has a Catalogs group with one entry per tool group.
+
+The Permissions card in Settings re-probes every 3 seconds while a permission is missing, so it flips to granted by itself. Drag-and-drop of the app into System Settings and an automatic restart need the desktop app and are not built.
+
 ## Console API
 
 `console/cleanup_api.py` answers `/api/cleanup/...`; the web console routes that prefix

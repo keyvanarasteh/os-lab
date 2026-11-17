@@ -44,6 +44,7 @@ import { toggleMode, useThemeMode } from "./theme";
 import { UpdateModal } from "../views/update-modal";
 import { androidLogsStore, healthStore, hostStore, jobsStore, type LabId, type LabStatus } from "../lib/api";
 import { copy, firewallPath, type FirewallLocale } from "../firewall/locale";
+import { CATALOG_GROUPS } from "../views/cleanup/groups";
 import { localeFromPath, localePath } from "../i18n/paths";
 
 export const REPO_URL = "https://github.com/keyvanarasteh/os-lab";
@@ -133,6 +134,12 @@ function cleanupNavItems(): SidebarItem[] {
     group("dashboard", "Dashboard", [["overview-storage", "Storage"], ["overview-quick-clean", "Quick clean"], ["overview-review", "Clean"], ["cleanup-monitor", "Monitor stats"]]),
     { id: "cleanup-space", label: "Space Explorer", icon },
     group("scan", "Advanced scan", [["scan-entries", "Catalog entries"], ["scan-plan", "Plan & confirm"], ["scan-containers", "Containers"], ["scan-vms", "Virtual machines"]]),
+    {
+      id: "cleanup-group-catalog",
+      label: "Catalogs",
+      icon,
+      children: [{ id: "cleanup-catalog", label: "All catalogs" }, ...CATALOG_GROUPS.filter((g) => g.id !== "other").map((g) => ({ id: `cleanup-catalog#${g.id}`, label: g.label }))]
+    },
     group("results", "Results", [["results-categories", "By category"], ["results-clean", "Clean result"]]),
     { id: "cleanup-leftovers", label: "Leftovers", icon },
     { id: "cleanup-history", label: "History", icon },
@@ -202,6 +209,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
         { id: "cleanup-dashboard", label: "Dashboard" },
         { id: "cleanup-space", label: "Space Explorer" },
         { id: "cleanup-scan", label: "Advanced scan" },
+        { id: "cleanup-catalog", label: "Catalogs" },
         { id: "cleanup-results", label: "Results" },
         { id: "cleanup-leftovers", label: "Leftovers" },
         { id: "cleanup-history", label: "History" },

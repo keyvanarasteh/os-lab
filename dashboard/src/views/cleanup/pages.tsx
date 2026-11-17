@@ -18,6 +18,9 @@ import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
 import { RelocationCard } from "./relocation-card";
 import { WidgetsCard } from "./widgets-card";
+import { ScanCard } from "./scan-card";
+import { CatalogPage } from "./catalog-page";
+import { CATALOG_GROUPS, groupIdOf } from "./groups";
 import type { BookmarksPayload, CleanupVolume, CleanupWidgetSnapshot } from "../../lib/api";
 
 /**
@@ -34,10 +37,10 @@ const WIDGET_SECTIONS: Record<string, CleanupPageId> = {
   "overview-storage": ""
 };
 
-export type CleanupPageId = "" | "settings" | "scan" | "results" | "leftovers" | "history" | "space" | "relocation";
-export const CLEANUP_PAGES: CleanupPageId[] = ["", "settings", "scan", "results", "leftovers", "history", "space", "relocation"];
+export type CleanupPageId = "" | "settings" | "scan" | "results" | "leftovers" | "history" | "space" | "relocation" | "catalog";
+export const CLEANUP_PAGES: CleanupPageId[] = ["", "settings", "scan", "results", "leftovers", "history", "space", "relocation", "catalog"];
 /** Any `/cleanup` route for any locale or base path, at the end of a pathname. */
-const CLEANUP_ROUTE = /\/cleanup(?:\/(settings|scan|results|leftovers|history|space|relocation))?\/?$/;
+const CLEANUP_ROUTE = /\/cleanup(?:\/(settings|scan|results|leftovers|history|space|relocation|catalog))?\/?$/;
 
 /**
  * CLNP-06: the cleanup route a pathname names, or null when it is not one.
@@ -152,6 +155,13 @@ function PermissionsCard({ permissions }: { permissions: CleanupPermissions | nu
   if (!applicable.length) return null;
   const classified = permissions.classification?.classified ?? [];
   return <Section id="cleanup-permissions" title="Permissions" description="What this computer lets the cleaner read, and how to grant more.">
+    {applicable.some((record) => record.granted !== true) ? <ol className="mb-3 grid gap-2 text-sm sm:grid-cols-3" aria-label="How to grant access">
+      <li className="rounded-md border border-(--iux-border) p-3"><b>1.</b> Open System Settings with the button on the permission below.</li>
+      <li className="rounded-md border border-(--iux-border) p-3"><b>2.</b> Switch the toggle on for this app, or add it with the + button.</li>
+      <li className="rounded-md border border-(--iux-border) p-3"><b>3.</b> Come back: this card detects the grant by itself within a few seconds.</li>
+    </ol> : <p role="status" className="mb-3 rounded-md border border-(--iux-success)/40 bg-(--iux-success)/10 p-3 text-sm">
+      All permissions are granted. macOS applies Full Disk Access only after the app is quit and reopened, so restart it once if scans still report unreadable folders.
+    </p>}
     <div className="divide-y divide-(--iux-border)">
       {applicable.map((record) => <div key={record.id} className="py-3 first:pt-0 last:pb-0">
         <div className="flex items-center gap-2">
@@ -391,6 +401,17 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     };
   }, []);
 
+  // Auto-detect a grant: while the Settings page lists a permission that is not granted yet, re-probe
+  // every 3 s so the card flips to "Granted" as soon as the toggle is switched in System Settings.
+  const needsGrant = (permissions?.permissions ?? []).some((record) => record.applicable && record.granted !== true);
+  useEffect(() => {
+    if (PUBLIC || page !== "settings" || !needsGrant) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void api.cleanupPermissions().then(setPermissions).catch(() => {});
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [page, needsGrant]);
+
   const reloadBookmarks = () => { void api.cleanupBookmarks().then(setBookmarks).catch(() => {}); };
   const reloadWidget = () => { void api.cleanupWidget().then(setWidget).catch(() => {}); };
   const bookmarkedIds = new Set((bookmarks?.bookmarks ?? []).map((item) => item.entryId));
@@ -454,9 +475,10 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   }, [page]);
 
   /** CLNP-06: one in-place navigation: URL, page state, scroll, dialog. */
-  function navigateTo(next: CleanupPageId, pushUrl = true) {
-    if (pushUrl && next !== page) window.history.pushState({}, "", link(next ? `${next}/` : ""));
+  function navigateTo(next: CleanupPageId, pushUrl = true, hash = "") {
+    if (pushUrl && (next !== page || hash !== window.location.hash)) window.history.pushState({}, "", link(next ? `${next}/` : "") + hash);
     setPage(next);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
     setConfirm(false);
     setBookmarkConfirm(false);
     window.scrollTo({ top: 0 });
@@ -472,7 +494,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     const next = parseCleanupPath(url.pathname);
     if (next === null) return;
     event.preventDefault();
-    navigateTo(next, url.pathname !== window.location.pathname);
+    navigateTo(next, url.pathname !== window.location.pathname || url.hash !== window.location.hash, url.hash);
   }
 
   // A sidebar sub-nav link (/cleanup/<page>/#section) lands on its card once the page has loaded its data.
@@ -557,6 +579,16 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   // Advanced-scan card grid: sizes, sort order and cleanability ranking.
   const sizes = useMemo(() => new Map((latestScan?.entries ?? []).map((item) => [item.id, item.sizeBytes])), [latestScan]);
   const maxSize = useMemo(() => Math.max(0, ...sizes.values()), [sizes]);
+  const [dashChecked, setDashChecked] = useState<string[] | null>(null);
+  useEffect(() => { setDashChecked(null); }, [latestScan]);
+  const defaultChecked = useMemo(() => entries.filter((item) => item.defaultSelected && (sizes.get(item.id) ?? 0) > 0).map((item) => item.id), [entries, sizes]);
+  const [catalogGroup, setCatalogGroup] = useState("");
+  useEffect(() => {
+    const read = () => { const id = decodeURIComponent(window.location.hash.slice(1)); setCatalogGroup(CATALOG_GROUPS.some((group) => group.id === id) ? id : ""); };
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, [page]);
   const selectedBytes = useMemo(() => selected.reduce((sum, id) => sum + (sizes.get(id) ?? 0), 0), [selected, sizes]);
   const sortedEntries = useMemo(() => sortEntries(entries, sizes, order), [entries, sizes, order]);
   const riskTotals = useMemo(() => totalsByRisk(entries, sizes), [entries, sizes]);
@@ -606,7 +638,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   }
 
   const tabs: { id: CleanupPageId; label: string; path: string }[] = [
-    { id: "", label: "Dashboard", path: "" }, { id: "space", label: "Space Explorer", path: "space/" }, { id: "scan", label: "Advanced scan", path: "scan/" }, { id: "results", label: "Results", path: "results/" },
+    { id: "", label: "Dashboard", path: "" }, { id: "space", label: "Space Explorer", path: "space/" }, { id: "scan", label: "Advanced scan", path: "scan/" }, { id: "catalog", label: "Catalogs", path: "catalog/" }, { id: "results", label: "Results", path: "results/" },
     { id: "leftovers", label: "Leftovers", path: "leftovers/" }, { id: "history", label: "History", path: "history/" }, { id: "relocation", label: "Relocation", path: "relocation/" }, { id: "settings", label: "Settings", path: "settings/" }
   ];
   return <AppShell activeId={`cleanup-${page || "dashboard"}`}>
@@ -637,20 +669,11 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
             {!PUBLIC && status?.state === "ready" && <div className="grid items-start gap-5 lg:grid-cols-2">
               <QuickCleanCard bookmarks={bookmarks} busy={busy} canWork={canWork} measured={measured} refusals={quickRefusals}
                 onQuickClean={runQuickClean} settingsHref={link("settings/")} />
-              <Section id="overview-review" title="Clean" description="Scan the safe categories, review the plan, then confirm. Nothing is removed during a scan.">
-                <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-(--iux-muted-foreground)">{status?.state === "ready" ? "Ready to scan" : "Scan unavailable until setup is complete"} · {entries.length} categories available</p><button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !entries.length} onClick={() => void start(() => api.cleanupScan(entries.map((item) => item.id)))}>{latestScan ? "Scan again" : "Scan now"}</button></div>
-                {active?.state === "running" && <div className="mt-4" role="status"><p>{active.kind} in progress · <span dir="ltr">{String(active.progress?.pathsDone ?? active.progress?.itemsDone ?? 0)} / {String(active.progress?.pathsTotal ?? active.progress?.itemsTotal ?? "…")}</span></p><progress className="mt-2 w-full" max={Number(active.progress?.pathsTotal ?? active.progress?.itemsTotal ?? 1)} value={Number(active.progress?.pathsDone ?? active.progress?.itemsDone ?? 0)} /><p className="break-all text-xs text-(--iux-muted-foreground)" translate="no">{active.progress?.currentPath}</p><button type="button" className="iux-btn mt-2" onClick={() => void cancel()}>Cancel</button></div>}
-                {active?.state === "failed" && <Status value={{ ok: false, text: active.error || "The cleanup job failed." }} />}{actionError && <Status value={{ ok: false, text: actionError }} />}
-                {latestScan && <>
-                  <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Cleanup preset"><button type="button" className="iux-btn" data-variant={preset === "recommended" ? "primary" : "outline"} aria-pressed={preset === "recommended"} disabled={busy} onClick={() => { setPreset("recommended"); setConfirm(false); }}>Recommended</button><button type="button" className="iux-btn" data-variant={preset === "extended" ? "primary" : "outline"} aria-pressed={preset === "extended"} disabled={busy} onClick={() => { setPreset("extended"); setConfirm(false); }}>More safe options</button></div>
-                  <p className="mt-3 text-sm">{suggested.length} <span>categories · </span><span dir="ltr" className="tabular-nums">{bytes(suggestedBytes)}</span><span> measured · Move to Trash</span></p><p className="text-sm text-(--iux-muted-foreground)">High risk, privacy, credentials and privileged items require separate review.</p>
-                  {suggested.length ? <details className="mt-3 text-sm"><summary className="cursor-pointer">Included categories</summary><ul className="mt-2 space-y-1">{suggested.map((item) => <li key={item.id}>{item.name} · <span dir="ltr" className="tabular-nums">{bytes(measured.get(item.id)?.sizeBytes ?? 0)}</span></li>)}</ul></details> : <Empty>No safe cleanup suggestions in this scan.</Empty>}
-                  <div className="mt-4 flex flex-wrap gap-2"><button type="button" className="iux-btn" disabled={!canWork || latestScan.cancelled || !suggested.length} onClick={() => void start(() => api.cleanupPlan(suggestedIds, "trash"))}>Review plan</button><a className="iux-btn" href={link("results/")}>Full scan report</a><a className="iux-btn" href={link("scan/")}>Choose individual items</a></div>
-                  {latestPlan && planMatches && <div className="mt-4 rounded-md border border-(--iux-border) p-3 text-sm"><p><span className="font-semibold tabular-nums">{latestPlan.totals.ready}</span> items ready · <span dir="ltr" className="tabular-nums">{bytes(latestPlan.totals.bytes)}</span> · {latestPlan.totals.skipped} skipped</p><p>Plan expires in {Math.max(0, Math.ceil(latestPlan.expiresAt - now))} seconds. Cleaning moves items to Trash; it does not free disk space until Trash is emptied.</p><details className="mt-2"><summary className="cursor-pointer">Plan details</summary>{latestPlan.items.map((item, index) => <p key={`${item.entryId}-${index}`} className="mt-2 break-all"><span dir="ltr" className="tabular-nums">{bytes(item.sizeBytes)}</span> · {item.status} · {item.entryName} · <span translate="no">{item.path}</span>{item.reason && ` · ${item.reason}`}</p>)}</details>{planUsed && <p>This plan was already run. Review a new plan.</p>}<button type="button" className="iux-btn mt-3" data-variant="primary" disabled={!canConfirmSuggested} onClick={() => setConfirm(true)}>Confirm clean</button></div>}
-                  {confirm && latestPlan && planMatches && <ConfirmDialog plan={latestPlan} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
-                    onRun={() => void start(() => api.cleanupClean(latestPlan.planId))} onClose={() => setConfirm(false)} />}
-                </>}
-              </Section>
+              <ScanCard active={active} entries={entries} measured={sizes} checked={dashChecked ?? defaultChecked} setChecked={setDashChecked}
+                canWork={canWork} scanned={!!latestScan} error={actionError}
+                onScan={() => void start(() => api.cleanupScan(entries.map((item) => item.id)))} onCancel={() => void cancel()}
+                onClean={(ids) => void start(() => api.cleanupPlan(ids, "trash"))}
+                groupHref={(id) => link(`catalog/#${id}`)} />
             </div>}
             {!PUBLIC && status?.state === "ready" && <MonitorStatsCard monitor={monitor} volumes={volumes} settingsHref={link("settings/")} />}
             {latestClean && <Section title="Latest clean report" description={`${latestClean.totals.trashed} moved to Trash · ${latestClean.totals.skipped} skipped · ${latestClean.totals.failed} failed`}>
@@ -786,6 +809,13 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
             </Section>}
             <CleanupExtraTools now={now} />
           </>}
+          {page === "catalog" && !PUBLIC && <CatalogPage entries={entries} sizes={sizes} groupId={catalogGroup} groupHref={(id) => link(id ? `catalog/#${id}` : "catalog/")}
+            selected={selected} setSelected={(ids) => { setSelected(ids); setConfirm(false); }} busy={!!busy} canWork={canWork} isPublic={PUBLIC}
+            bookmarkedIds={bookmarkedIds} onBookmark={toggleBookmark}
+            onScan={(ids) => void start(() => api.cleanupScan(ids))}
+            onReview={(ids) => { setSelected(ids); void start(() => api.cleanupPlan(ids, mode)); }} />}
+          {(page === "" || page === "catalog") && !PUBLIC && confirm && latestPlan && <ConfirmDialog plan={latestPlan} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
+            onRun={() => void start(() => api.cleanupClean(latestPlan.planId))} onClose={() => setConfirm(false)} />}
           {page === "results" && <>
             <Section id="results-categories" title="Results by category" description="Measurements from the latest scan in this console session.">
               {!latestScan ? <Empty>No scan results yet. Run a scan first.</Empty> : <>
