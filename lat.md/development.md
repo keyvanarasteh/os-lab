@@ -56,7 +56,7 @@ Suites are small modules in `scripts/ux/suites/` that export `name` and `run(ux)
 
 `node scripts/ux/run.mjs --list` lists them; `--suite shell,cleanup`, `--base <url>`, `--out <dir>` and `--headed` choose what to run. It exits 2 when nothing answers at the base URL.
 
-- `shell` ([[scripts/ux/suites/shell.mjs]]) checks the collapsible Help group, its remembered state, the lab switcher, Firewall Lab as a lab and the focused-lab navigation.
+- `shell` ([[scripts/ux/suites/shell.mjs]]) checks the collapsible Help group, its remembered state, the lab switcher, Firewall Lab as a lab, the focused-lab navigation and the Cleanup Lab sub-navs (Settings last, groups closed, a link lands on its card).
 - `cleanup` ([[scripts/ux/suites/cleanup.mjs]]) checks the grouped volume cards, the sticky Advanced scan toolbar at desktop and phone width, the compact grid, the per-entry context menu and that Review & clean only builds a plan.
 
 A new suite is one file; use the exact visible text a user sees, wait for hydration with `goto(..., { waitFor })`, and check network side effects with `requestsTo`.

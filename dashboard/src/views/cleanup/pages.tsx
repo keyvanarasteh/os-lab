@@ -475,6 +475,22 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     navigateTo(next, url.pathname !== window.location.pathname);
   }
 
+  // A sidebar sub-nav link (/cleanup/<page>/#section) lands on its card once the page has loaded its data.
+  useEffect(() => {
+    if (loading || typeof window === "undefined" || !window.location.hash) return;
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    let timer = 0;
+    const frame = requestAnimationFrame(() => {
+      const card = document.getElementById(id);
+      if (!card) return;
+      card.scrollIntoView({ block: "start" });
+      // :target only applies to elements present at navigation; the cards render after the data loads.
+      card.setAttribute("data-landed", "");
+      timer = window.setTimeout(() => card.removeAttribute("data-landed"), 4000);
+    });
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(timer); };
+  }, [loading, page]);
+
   // CLW-03: the desktop app drives these globals — oslab:// deep links land
   // as __oslabNavigate (a tab id like "scan/" or a section id) and the
   // widget's quick-clean intent lands as __oslabQuickClean, which follows
@@ -590,8 +606,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   }
 
   const tabs: { id: CleanupPageId; label: string; path: string }[] = [
-    { id: "", label: "Dashboard", path: "" }, { id: "settings", label: "Settings", path: "settings/" }, { id: "space", label: "Space Explorer", path: "space/" }, { id: "scan", label: "Advanced scan", path: "scan/" }, { id: "results", label: "Results", path: "results/" },
-    { id: "leftovers", label: "Leftovers", path: "leftovers/" }, { id: "history", label: "History", path: "history/" }, { id: "relocation", label: "Relocation", path: "relocation/" }
+    { id: "", label: "Dashboard", path: "" }, { id: "space", label: "Space Explorer", path: "space/" }, { id: "scan", label: "Advanced scan", path: "scan/" }, { id: "results", label: "Results", path: "results/" },
+    { id: "leftovers", label: "Leftovers", path: "leftovers/" }, { id: "history", label: "History", path: "history/" }, { id: "relocation", label: "Relocation", path: "relocation/" }, { id: "settings", label: "Settings", path: "settings/" }
   ];
   return <AppShell activeId={`cleanup-${page || "dashboard"}`}>
     <TopBar title="Cleanup Lab" icon={<BroomIcon size={20} />} />
@@ -655,7 +671,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
             <PermissionsCard permissions={permissions} />
             <MonitorCard monitor={monitor} volumes={volumes} reload={monitorReload} />
             <WidgetsCard snapshot={widget} reload={reloadWidget} />
-            <Section title="Tools & advanced" description="The detailed cleanup tools, one click away.">
+            <Section id="cleanup-tools" title="Tools & advanced" description="The detailed cleanup tools, one click away.">
               <OverviewCards go={goCard} />
             </Section>
           </>}
@@ -664,7 +680,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
               onRun={() => void start(() => api.cleanupClean(active.result.planId))}
               onClose={() => { setBookmarkConfirm(false); }} />}
           {page === "scan" && <>
-            <Section title="Scan" description="Choose catalog entries. Scanning only measures files; it does not remove them.">
+            <Section id="scan-entries" title="Scan" description="Choose catalog entries. Scanning only measures files; it does not remove them.">
               {!entries.length ? <Empty>No cleanup entries are available on this system.</Empty> : <>
                 <div className="sticky top-14 z-10 -mx-2 border-b border-(--iux-border) bg-(--iux-card) px-2 py-2" data-testid="scan-toolbar">
                 <div className="flex flex-wrap items-center gap-2">
@@ -752,7 +768,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                 {[...new Set(permissions!.classification!.classified.map((item) => permissionName(item.permissionId, permissions!)))].join(", ")}
               </p>}
             </Section>}
-            <Section title="Plan & confirm" description="A plan checks every path again. Trash is the default; permanent deletion requires an explicit choice.">
+            <Section id="scan-plan" title="Plan & confirm" description="A plan checks every path again. Trash is the default; permanent deletion requires an explicit choice.">
               <label className="text-sm">Mode <select value={mode} disabled={busy} onChange={(event) => { setMode(event.target.value as "trash" | "delete"); setConfirm(false); }} className="iux-input ml-2"><option value="trash">Trash (default)</option><option value="delete">Delete permanently</option></select></label>
               {mode === "delete" && <p className="mt-2 text-sm">Deleting permanently cannot be undone.</p>}
               <div className="mt-3"><button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !selected.length} onClick={reviewAndClean}>Review & clean</button></div>
@@ -771,7 +787,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
             <CleanupExtraTools now={now} />
           </>}
           {page === "results" && <>
-            <Section title="Results by category" description="Measurements from the latest scan in this console session.">
+            <Section id="results-categories" title="Results by category" description="Measurements from the latest scan in this console session.">
               {!latestScan ? <Empty>No scan results yet. Run a scan first.</Empty> : <>
                 {latestScan.cancelled && <p>Scan cancelled. Results are partial.</p>}
                 {resultGroups.map(([category, group]) => <div key={category} className="mt-4 first:mt-0">
@@ -790,7 +806,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                 {!latestScan.entries.length && <Empty>No measured results yet.</Empty>}
               </>}
             </Section>
-            <Section title="Clean result" description={latestClean ? <span dir="ltr">{`${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not freed" : "deleted permanently"}`}</span> : undefined}>
+            <Section id="results-clean" title="Clean result" description={latestClean ? <span dir="ltr">{`${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not freed" : "deleted permanently"}`}</span> : undefined}>
               {!latestClean ? <Empty>No clean results yet.</Empty> : <>
                 <div className="flex flex-wrap gap-2">
                   <Badge tone={latestClean.totals.trashed ? "success" : undefined}>{itemStatusLabel("trashed")} {latestClean.totals.trashed}</Badge>

@@ -146,7 +146,14 @@ and monitor stats) and a Settings tab, with the detail tabs keeping their
 routes ([[dashboard/src/views/cleanup/pages.tsx]]).
 
 Settings hosts bookmarks, permissions, the monitor configuration, widgets and
-the tools hub. The public route explains that the engine is local, while the
+the tools hub, and is the last item in the Cleanup Lab nav and tab strip.
+
+In the sidebar, Dashboard, Advanced scan, Results and Settings are collapsible
+groups, closed until their page is open. Each lists an Overview entry plus one
+sub-nav per card, such as Storage, Plan & confirm or Desktop widgets. A
+sub-nav link (`/cleanup/<page>/#<section>`) loads the page, scrolls to that
+card once its data is in and outlines it for a few seconds. Spaces, Leftovers,
+History and Relocation have a single card and no group. The public route explains that the engine is local, while the
 local app uses typed cleanup jobs and a confirm step.
 
 [[dashboard/src/views/source/pages.tsx]] provides localized Source Lab routes and

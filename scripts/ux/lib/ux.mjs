@@ -51,6 +51,7 @@ export class UxSession {
     const browser = await chromium.launch({ headless });
     const context = await browser.newContext({ viewport });
     const session = new UxSession(browser, context, await context.newPage(), { base, out, viewport });
+    fs.rmSync(path.join(out, "shots"), { recursive: true, force: true }); // stale shots of an earlier run would be misleading
     fs.mkdirSync(path.join(out, "shots"), { recursive: true });
     return session;
   }

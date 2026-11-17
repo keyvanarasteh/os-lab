@@ -492,3 +492,7 @@ dialog.iux-modal::backdrop {
     animation: none;
   }
 }
+
+/* A sub-nav link lands on its card: leave room under the sticky header and mark the target. */
+section[id] { scroll-margin-top: 4.5rem; }
+section[id]:target, section[id][data-landed] { outline: 2px solid #f36c21; outline-offset: 3px; border-radius: 0.75rem; }

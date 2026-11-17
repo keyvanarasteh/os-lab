@@ -69,7 +69,7 @@ export function CleanupExtraTools({ now }: { now: number }) {
 
   const containerBusy = containerPending || containerJob?.state === "running";
   return <>
-    <Section title="Containers" description="Preview candidates before pruning. Volumes may contain persistent data.">
+    <Section id="scan-containers" title="Containers" description="Preview candidates before pruning. Volumes may contain persistent data.">
       {capabilityError && <Status value={{ ok: false, text: capabilityError }} />}
       {capabilityError && <button type="button" className="iux-btn" onClick={() => {
         setCapabilityError("");
@@ -106,7 +106,7 @@ export function CleanupExtraTools({ now }: { now: number }) {
       {containerJob?.state === "failed" && <Status value={{ ok: false, text: containerJob.error || containerJob.result?.error || "Container prune failed." }} />}
       {containerError && <Status value={{ ok: false, text: containerError }} />}
     </Section>
-    <Section title="Virtual machines" description="Report only. No virtual machines are deleted here.">
+    <Section id="scan-vms" title="Virtual machines" description="Report only. No virtual machines are deleted here.">
       <button type="button" className="iux-btn" disabled={vmPending || vmJob?.state === "running"} onClick={() => void scanVMs()}>Scan virtual machines</button>
       {vmJob?.state === "running" && <p role="status">VM inventory in progress…</p>}
       {vmJob?.state === "failed" && <Status value={{ ok: false, text: vmJob.error || "VM inventory failed." }} />}
