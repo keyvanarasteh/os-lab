@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>os-lab dashboard verification — e2e, Playwright and typecheck coverage</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --paper:       #F5F6F8;
+    --paper-2:     #EDEFF3;
+    --ink:         #171C24;
+    --muted:       #5B6472;
+    --soft:        #8A93A1;
+    --rule:        rgba(23,28,36,0.12);
+    --rule-solid:  rgba(23,28,36,0.22);
+    --signal:      #4EA8FF;
+    --signal-deep: #1B6FAE;
+    --font-sans:  'Geist', system-ui, sans-serif;
+    --font-serif: 'Instrument Serif', serif;
+    --font-mono:  'Geist Mono', ui-monospace, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 4rem 2rem 5rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .frame { max-width: 1180px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.65rem;
+  }
+
+  h1 {
+    font-family: var(--font-serif);
+    font-size: clamp(2rem, 3.6vw + 0.6rem, 3rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+    margin-bottom: 1.1rem;
+  }
+
+  .lead {
+    font-size: 1.02rem;
+    line-height: 1.65;
+    color: var(--muted);
+    max-width: 66ch;
+  }
+
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--soft);
+    margin-top: 1.4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+  }
+  .meta code { color: var(--muted); }
+
+  section { margin-top: 4.5rem; }
+
+  .sec-num {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    color: var(--soft);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-family: var(--font-serif);
+    font-size: 1.72rem;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin-bottom: 0.7rem;
+  }
+
+  h3 {
+    font-family: var(--font-sans);
+    font-size: 1.02rem;
+    font-weight: 600;
+    margin: 2.4rem 0 0.55rem;
+  }
+
+  .sub {
+    font-size: 0.94rem;
+    line-height: 1.62;
+    color: var(--muted);
+    max-width: 72ch;
+    margin-bottom: 1.4rem;
+  }
+
+  svg { width: 100%; height: auto; display: block; }
+
+  .figure-note {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.65;
+    color: var(--soft);
+    margin-top: 1rem;
+    padding-left: 0.85rem;
+    border-left: 2px solid var(--rule-solid);
+  }
+  .figure-note b { color: var(--muted); font-weight: 500; }
+
+  .table-wrap { margin-top: 0.5rem; overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+
+  th {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--soft);
+    text-align: left;
+    padding: 0 0.7rem 0.55rem;
+    border-bottom: 1px solid var(--rule-solid);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--muted);
+  }
+
+  td:first-child { color: var(--ink); }
+  tr:last-child td { border-bottom: none; }
+
+  code, .m {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    color: var(--ink);
+  }
+
+  .yes { color: var(--signal-deep); font-weight: 500; }
+  .no  { color: var(--soft); }
+  td.r { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+
+  .tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 0.08rem 0.32rem;
+    border: 1px solid var(--rule-solid);
+    border-radius: 3px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .tag.full { border-color: var(--signal); color: var(--signal-deep); }
+  .tag.none { color: var(--soft); border-color: var(--rule); }
+
+  .callout {
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--signal);
+    border-radius: 6px;
+    padding: 1rem 1.15rem;
+    margin: 1.6rem 0;
+    font-size: 0.85rem;
+    line-height: 1.62;
+    color: var(--muted);
+  }
+  .callout b { color: var(--ink); font-weight: 600; }
+  .callout code { color: var(--ink); }
+
+  .cards {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 0.9fr;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .card {
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.15rem 1.25rem;
+  }
+  .card .eyebrow { font-size: 0.6rem; margin-bottom: 0.55rem; }
+  .card h4 { font-size: 0.9rem; font-weight: 600; line-height: 1.35; margin-bottom: 0.5rem; }
+  .card p { font-size: 0.8rem; line-height: 1.62; color: var(--muted); }
+
+  footer {
+    margin-top: 4.5rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule-solid);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    line-height: 1.8;
+    color: var(--soft);
+  }
+  footer li { list-style: none; }
+  footer code { font-size: 0.68rem; color: var(--muted); }
+
+  @media (max-width: 760px) {
+    body { padding: 2.5rem 1rem 3.5rem; }
+    .cards { grid-template-columns: 1fr; }
+    table { font-size: 0.74rem; }
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <p class="eyebrow">os-lab · dashboard verification</p>
+  <h1>What the e2e, Playwright and typecheck layers really cover</h1>
+  <p class="lead">
+    Three verification layers guard the dashboard, and they cover very different surfaces. This page
+    maps all of them: the full e2e flow from a changed file to an executed spec, every route and
+    locale the specs touch, the run classifications the selector can return, and what the typecheck
+    does and does not see.
+  </p>
+  <p class="meta">
+    Read from <code>dashboard/e2e/affected.json</code>, <code>dashboard/scripts/affected.mjs</code>,
+    <code>dashboard/e2e/*.spec.ts</code>, <code>dashboard/tsconfig.json</code> and
+    <code>dashboard/package.json</code>; counts and timings measured locally on this branch, not inferred.
+  </p>
+
+  <!-- ============================================================ 01 FLOW -->
+  <section>
+    <p class="sec-num">01 · the e2e flow</p>
+    <h2>From a changed file to an executed spec</h2>
+    <p class="sub">
+      Selection is deterministic: one map decides, and the first matching rule wins. The same map
+      drives the local runner and CI, so a branch cannot see a different set of specs in the two
+      places.
+    </p>
+
+    <svg viewBox="0 0 1200 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="flow-title flow-desc">
+      <title id="flow-title">The dashboard e2e selection flow from changed files to a sharded Playwright run</title>
+      <desc id="flow-desc">Changed files pass through the ignore and full filters, the first matching rule in affected.json picks specs and routes, and the result becomes a none, some or full classification that Playwright runs in shards; an ignored file short-circuits to the nothing-runs outcome.</desc>
+      <defs>
+        <marker id="flow-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5B6472"/></marker>
+      </defs>
+
+      <rect width="1200" height="460" fill="#F5F6F8"/>
+
+      <!-- forward rail: node centre y=120 -->
+      <line x1="184" y1="120" x2="220" y2="120" stroke="#5B6472" stroke-width="1" marker-end="url(#flow-arrow)"/>
+      <line x1="392" y1="120" x2="428" y2="120" stroke="#5B6472" stroke-width="1" marker-end="url(#flow-arrow)"/>
+      <line x1="600" y1="120" x2="636" y2="120" stroke="#5B6472" stroke-width="1" marker-end="url(#flow-arrow)"/>
+      <line x1="808" y1="120" x2="844" y2="120" stroke="#5B6472" stroke-width="1" marker-end="url(#flow-arrow)"/>
+      <line x1="1016" y1="120" x2="1052" y2="120" stroke="#5B6472" stroke-width="1" marker-end="url(#flow-arrow)"/>
+
+      <!-- short-circuit: First match bottom → down → right → into Nothing-runs top -->
+      <path d="M 514,200 V 268 Q 514,276 522,276 H 714 Q 722,276 722,284 V 292"
+            fill="none" stroke="#5B6472" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#flow-arrow)"/>
+      <rect x="530" y="256" width="72" height="12" rx="2" fill="#F5F6F8"/>
+      <text x="566" y="266" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">IGNORED</text>
+
+      <!-- nodes -->
+      <rect x="24" y="80" width="160" height="80" rx="6" fill="#5B6472" fill-opacity="0.10" stroke="#8A93A1" stroke-width="1"/>
+      <rect x="220" y="80" width="172" height="80" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="428" y="80" width="172" height="80" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="636" y="80" width="172" height="80" rx="6" fill="#4EA8FF" fill-opacity="0.10" stroke="#4EA8FF" stroke-width="1.2"/>
+      <rect x="844" y="80" width="172" height="80" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="1052" y="80" width="124" height="80" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="636" y="292" width="172" height="64" rx="6" fill="#F5F6F8" stroke="#171C24" stroke-opacity="0.20" stroke-dasharray="4,3"/>
+
+      <text x="104" y="112" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Changed files</text>
+      <text x="104" y="134" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">changed-files.sh</text>
+      <text x="306" y="112" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Filter</text>
+      <text x="306" y="134" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">ignore · full</text>
+      <text x="514" y="112" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">First match</text>
+      <text x="514" y="134" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">affected.json rules</text>
+      <text x="722" y="112" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Classify</text>
+      <text x="722" y="134" fill="#1B6FAE" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">none · some · full</text>
+      <text x="930" y="112" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Specs + routes</text>
+      <text x="930" y="134" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">+ locales</text>
+      <text x="1114" y="112" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Playwright</text>
+      <text x="1114" y="134" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">sharded</text>
+
+      <text x="722" y="322" fill="#5B6472" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Nothing runs</text>
+      <text x="722" y="342" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">mode: none → run=false</text>
+
+      <!-- legend sits below every node and the short-circuit path -->
+      <line x1="24" y1="400" x2="1176" y2="400" stroke="rgba(23,28,36,0.12)" stroke-width="0.8"/>
+      <text x="24" y="420" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+      <line x1="116" y1="416" x2="148" y2="416" stroke="#5B6472" stroke-width="1"/>
+      <text x="158" y="420" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ALWAYS EVALUATED</text>
+      <line x1="348" y1="416" x2="380" y2="416" stroke="#5B6472" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="390" y="420" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SHORT-CIRCUIT</text>
+    </svg>
+
+    <p class="figure-note">
+      <b>The selector is shared code.</b> <code>affected.mjs</code> is imported by
+      <code>scripts/e2e.sh --changed</code>, by <code>dashboard-e2e.yml</code> on a pull request, and by
+      its own unit test <code>scripts/affected.test.mjs</code> — so the three cannot drift without a
+      test failing.
+    </p>
+  </section>
+
+  <!-- ============================================================ 02 CLASSES -->
+  <section>
+    <p class="sec-num">02 · run classifications</p>
+    <h2>Four outcomes, and what each one costs</h2>
+    <p class="sub">
+      The selector can only return these outcomes. The distinction that matters operationally is that
+      <code>none</code> and <code>unmapped</code> look similar in a summary but mean opposite things.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Classification</th><th>Trigger</th><th>Specs run</th><th>CI shards</th><th>Failure means</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag none">none</span></td>
+            <td>Every changed path matched <code>ignore</code>, or none matched a rule</td>
+            <td class="r">0</td>
+            <td class="r">—</td>
+            <td class="no">Nothing to learn; the change is outside the dashboard</td>
+          </tr>
+          <tr>
+            <td><span class="tag">some · narrow</span></td>
+            <td>1–3 specs selected by rules</td>
+            <td class="r">1–3</td>
+            <td class="r">1</td>
+            <td>The specific view that changed is broken</td>
+          </tr>
+          <tr>
+            <td><span class="tag">some · wide</span></td>
+            <td>4 or more specs selected</td>
+            <td class="r">4–12</td>
+            <td class="r">2</td>
+            <td>A shared surface broke several views at once</td>
+          </tr>
+          <tr>
+            <td><span class="tag full">full</span></td>
+            <td>A path in <code>full</code>: <code>package.json</code>, <code>package-lock.json</code>, <code>playwright.config.ts</code>, <code>tsconfig.json</code>, <code>e2e/affected.json</code></td>
+            <td class="r">12</td>
+            <td class="r">4</td>
+            <td>Toolchain or test config changed; every view is suspect</td>
+          </tr>
+          <tr>
+            <td><span class="tag">some · unmapped</span></td>
+            <td>A dashboard path matched no rule — falls back to the smoke set and is listed under <code>unmapped</code></td>
+            <td class="r">4 + 5 routes</td>
+            <td class="r">1</td>
+            <td>A coverage gap: a new view nobody mapped</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <b><code>unmapped</code> is reported locally and dropped in CI.</b> When a dashboard file matches
+      no rule, the selector falls back to the four smoke specs — the run goes green and the new view
+      stays untested. <code>scripts/e2e.sh</code> does print it
+      (<code>unmapped: … (smoke set added; add them to e2e/affected.json)</code>), but
+      <code>dashboard-e2e.yml</code> writes only <code>mode</code>, <code>specs</code> and
+      <code>shards</code> to the step summary, so on a pull request the fallback is silent and the job
+      still passes. Adding a rule is the only thing that closes it.
+    </div>
+  </section>
+
+  <!-- ============================================================ 03 SPECS -->
+  <section>
+    <p class="sec-num">03 · spec inventory</p>
+    <h2>Twelve specs, one screenshot crawler, 88 tests</h2>
+    <p class="sub">
+      Counts are the declared <code>test()</code> calls. Four specs expand a locale or OS loop at
+      runtime, so the executed test count is higher than the declared one — noted per row.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Spec</th><th>Declared tests</th><th>Routes it drives</th><th>Loop expansion</th><th>Coverage area</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>health-and-content</code></td><td class="r">29</td>
+            <td><code>/</code>, <code>/health/</code>, <code>/tr/</code>, <code>/ar/</code>, <code>/fa/</code>, <code>/legal/*</code>, <code>/firewall/</code>, <code>/android/*</code>, <code>/labs/{ios,macos,android}/</code></td>
+            <td>2 + 3 + 3 + 2 = +7</td>
+            <td>The widest spec: host cards, RTL layout, per-OS health, App Intents, simulator frames</td>
+          </tr>
+          <tr>
+            <td><code>source</code></td><td class="r">15</td>
+            <td><code>/source/</code> + 7 sub-pages, <code>/tr/source/docs/import/</code></td>
+            <td>1 × 7 destinations</td>
+            <td>Hydration, query links, Spotlight, mobile drawer, matrices, loading/empty/error</td>
+          </tr>
+          <tr>
+            <td><code>cleanup-widgets</code></td><td class="r">9</td>
+            <td><code>/cleanup/</code>, <code>/cleanup/settings/</code>, <code>/jobs/</code></td>
+            <td>—</td>
+            <td>Widget snapshot, not-capable reason, empty payload, deep links, command bridge</td>
+          </tr>
+          <tr>
+            <td><code>cleanup</code></td><td class="r">5</td>
+            <td><code>/cleanup/</code>, <code>/cleanup/{scan,settings,results,leftovers,history}/</code></td>
+            <td>—</td>
+            <td>Scan → plan → confirm → report, advanced typed-cleaning, container prune, leftovers</td>
+          </tr>
+          <tr>
+            <td><code>web-lab</code></td><td class="r">5</td>
+            <td><code>/web-lab/</code></td>
+            <td>—</td>
+            <td>Engine start/stop, window injection, JS execution, snapshot polling, device toggle</td>
+          </tr>
+          <tr>
+            <td><code>how-to-use</code></td><td class="r">4</td>
+            <td><code>/how-to-use/</code>, <code>/feedback/</code></td>
+            <td>—</td>
+            <td>Command inventory vs shipped CLI, prompt build, clipboard rejection, mobile drawer</td>
+          </tr>
+          <tr>
+            <td><code>lab-switcher</code></td><td class="r">4</td>
+            <td><code>/</code>, <code>/labs/macos/</code>, <code>/labs/ios/</code></td>
+            <td>—</td>
+            <td>⌘L switcher, sidebar focus narrowing, deep links, Spotlight independence</td>
+          </tr>
+          <tr>
+            <td><code>winapps</code></td><td class="r">4</td>
+            <td><code>/labs/winapps/</code></td>
+            <td>—</td>
+            <td>Window mirror, elevated marker, unavailable native mirror, non-Windows no-query</td>
+          </tr>
+          <tr>
+            <td><code>cleanup-relocation</code></td><td class="r">2</td>
+            <td><code>/cleanup/relocation/</code></td>
+            <td>—</td>
+            <td>List → plan → confirm → run a move; interrupted-move resume banner</td>
+          </tr>
+          <tr>
+            <td><code>cleanup-space</code></td><td class="r">2</td>
+            <td><code>/cleanup/space/</code></td>
+            <td>—</td>
+            <td>Measure a root, drill down, breadcrumbs; unknown root refused</td>
+          </tr>
+          <tr>
+            <td><code>cleanup-tabs</code></td><td class="r">2</td>
+            <td><code>/cleanup/settings/</code>, <code>/cleanup/history/</code></td>
+            <td>—</td>
+            <td>In-place tab navigation without reload; deep link lands on the right tab</td>
+          </tr>
+          <tr>
+            <td><code>cleanup-bookmarks</code></td><td class="r">1</td>
+            <td><code>/cleanup/scan/</code>, <code>/cleanup/settings/</code></td>
+            <td>—</td>
+            <td>Bookmark toggle and quick-clean confirmation</td>
+          </tr>
+          <tr>
+            <td><code>crawl</code> <span class="tag none">opt-in</span></td><td class="r">0 declared</td>
+            <td>22 routes × locales × widths</td>
+            <td>22 × 8 × 2 = 352</td>
+            <td>Full-page PNG per combination; ignored unless <code>OSLAB_CRAWL=1</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="figure-note">
+      <b>Declared 88 · executed more.</b> <code>29+15+9+5+5+4+4+4+2+2+2+1 = 82</code> static tests plus
+      4 looped specs that expand to 7, 7, 3 and 3 — the executed count depends on the locale and OS
+      variables, which is why CI reports a shard duration instead of a number.
+    </p>
+  </section>
+
+  <!-- ============================================================ 04 ROUTES -->
+  <section>
+    <p class="sec-num">04 · route coverage</p>
+    <h2>Which routes have a spec, and which only have a crawl</h2>
+    <p class="sub">
+      Every route family the dashboard generates, against the three layers that could catch a
+      regression in it. “Crawl” alone means a screenshot proves it rendered, not that it behaves. The
+      specs navigate to 40 distinct literal paths; the crawler visits a fixed 22.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Route</th><th>e2e spec</th><th>Crawl</th><th>Typecheck</th><th>Locales driven</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/</code></td><td class="yes">health-and-content, lab-switcher</td><td>yes</td><td class="yes">yes</td><td>en, tr, ar, fa</td></tr>
+          <tr><td><code>/health/</code></td><td class="yes">health-and-content</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/jobs/</code></td><td class="yes">health-and-content, cleanup-widgets</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/content/</code></td><td class="yes">health-and-content</td><td>yes</td><td class="yes">yes</td><td>en, tr</td></tr>
+          <tr><td><code>/contribute/</code></td><td class="yes">health-and-content</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/feedback/</code></td><td class="yes">how-to-use</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/how-to-use/</code></td><td class="yes">how-to-use</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/legal/{terms,privacy}/</code></td><td class="yes">health-and-content</td><td>privacy</td><td class="yes">yes</td><td>en, ar</td></tr>
+          <tr><td><code>/legal/{acceptable-use,third-party}/</code></td><td class="no">none</td><td class="no">no</td><td class="yes">yes</td><td>—</td></tr>
+          <tr><td><code>/firewall/</code></td><td class="yes">health-and-content</td><td>yes</td><td class="yes">yes</td><td>en, ar</td></tr>
+          <tr><td><code>/cleanup/</code></td><td class="yes">cleanup, cleanup-widgets</td><td>yes</td><td class="yes">yes</td><td>en, tr</td></tr>
+          <tr><td><code>/cleanup/scan/</code></td><td class="yes">cleanup, cleanup-bookmarks</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/cleanup/settings/</code></td><td class="yes">cleanup, cleanup-tabs, cleanup-widgets, cleanup-bookmarks</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/cleanup/{results,leftovers,history}/</code></td><td class="yes">cleanup, cleanup-tabs</td><td>no</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/cleanup/{space,relocation}/</code></td><td class="yes">cleanup-space, cleanup-relocation</td><td class="no">no</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/cleanup/catalog/</code></td><td class="no">none</td><td class="no">no</td><td class="yes">yes</td><td>—</td></tr>
+          <tr><td><code>/source/</code></td><td class="yes">source</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/source/analyzer/</code></td><td class="yes">source</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/source/{pipeline,brain,deep-analysis,evidence,sources,settings/runtime}/</code></td><td class="yes">source</td><td class="no">no</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/source/docs/*</code></td><td class="yes">source</td><td class="no">no</td><td class="yes">yes</td><td>en, tr</td></tr>
+          <tr><td><code>/web-lab/</code></td><td class="yes">web-lab</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/labs/ios/</code>, <code>/labs/macos/</code></td><td class="yes">lab-switcher, health-and-content</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/labs/{windows,linux,android,source}/</code></td><td class="yes">health-and-content</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/labs/winapps/</code></td><td class="yes">winapps</td><td>yes</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/android/</code>, <code>/android/{console,workflows}/</code></td><td class="yes">health-and-content</td><td>partial</td><td class="yes">yes</td><td>en</td></tr>
+          <tr><td><code>/android/{analytics,providers,sitemap}/</code></td><td class="no">none</td><td class="no">no</td><td class="yes">yes</td><td>—</td></tr>
+          <tr><td><code>/404</code></td><td class="no">none</td><td class="no">no</td><td class="yes">yes</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <b>Five route families have no behaviour coverage at all:</b> <code>/legal/acceptable-use/</code>,
+      <code>/legal/third-party/</code>, <code>/cleanup/catalog/</code>,
+      <code>/android/{analytics,providers,sitemap}/</code> and <code>/404</code>. They are typechecked
+      and built, but nothing asserts they render correctly, and the crawler does not visit them either.
+    </div>
+  </section>
+
+  <!-- ============================================================ 05 TYPECHECK -->
+  <section>
+    <p class="sec-num">05 · typecheck</p>
+    <h2>103 source files, one prerequisite that decides pass or fail</h2>
+    <p class="sub">
+      <code>npm run check</code> is plain <code>tsc --noEmit</code> under
+      <code>astro/tsconfigs/strict</code>. Run it before <code>astro sync</code> and it reports 26 errors
+      that are all missing generated types — not real defects.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Property</th><th>Value</th><th>Evidence</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Command</td><td><code>tsc --noEmit</code></td><td><code>dashboard/package.json</code> → <code>check</code></td></tr>
+          <tr><td>Config</td><td><code>astro/tsconfigs/strict</code>, <code>jsx: react-jsx</code></td><td><code>dashboard/tsconfig.json</code></td></tr>
+          <tr><td>Include</td><td><code>.astro/types.d.ts</code>, <code>**/*</code> (excludes <code>dist</code>, <code>node_modules</code>)</td><td><code>tsconfig.json</code></td></tr>
+          <tr><td>Files typechecked</td><td>131 total · <strong>103 under <code>src/</code></strong> (all of them)</td><td><code>tsc --listFilesOnly</code></td></tr>
+          <tr><td>Breakdown</td><td>63 views · 14 apk-lab · 9 firewall · 8 shell · 5 lib · 2 i18n · 1 health · 1 components</td><td><code>tsc --listFilesOnly</code></td></tr>
+          <tr><td>Prerequisite</td><td><code>npx astro sync</code> first — CI does this in the same step</td><td><code>dashboard-e2e.yml</code> → <code>check</code></td></tr>
+          <tr><td>Without sync</td><td>26 errors, all <code>ImportMeta.env</code> / <code>.md?raw</code> / CSS side-effect imports</td><td>measured on this branch</td></tr>
+          <tr><td>With sync</td><td>0 errors, 7.8–8.6 s warm (3 runs)</td><td>measured on this branch</td></tr>
+          <tr><td>Not covered</td><td><code>.astro</code> templates are type-checked only through generated types; no <code>astro check</code> in the chain</td><td><code>package.json</code> has no <code>astro check</code> script</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <b>The asymmetry to know:</b> CI runs <code>astro sync &amp;&amp; npm run check</code> as one step, so
+      CI can never see the 26-error state. Anyone running <code>npm run check</code> locally on a fresh
+      worktree without <code>astro sync</code> sees a red result that means nothing. The repo's own
+      contributor docs list <code>npm run check</code> without the sync prefix.
+    </div>
+  </section>
+
+  <!-- ============================================================ 06 GAPS -->
+  <section>
+    <p class="sec-num">06 · layer comparison</p>
+    <h2>What each layer can and cannot catch</h2>
+    <p class="sub">
+      The three layers are complementary, but they are not interchangeable, and the gaps are
+      structural rather than accidental.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Layer</th><th>Catches</th><th>Cannot catch</th><th>Cost</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Typecheck</strong></td>
+            <td>Type errors, missing props, wrong imports across all 103 source files</td>
+            <td>Anything about behaviour, layout, or a route that renders wrongly</td>
+            <td class="r">~8 s, no browser</td>
+          </tr>
+          <tr>
+            <td><strong>Playwright specs</strong></td>
+            <td>Behaviour on the 22 routes they drive: clicks, requests, navigation, error states</td>
+            <td>Routes with no spec; visual regressions (assertions are DOM-based)</td>
+            <td class="r">1–2 browsers, sharded 1/2/4</td>
+          </tr>
+          <tr>
+            <td><strong>Crawl</strong></td>
+            <td>Nothing — it only produces PNGs; a human has to look</td>
+            <td>Everything, unless the images are reviewed</td>
+            <td class="r">22 routes × 8 locales × 2 widths = 352</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <p class="eyebrow">Biggest gap</p>
+        <h4>Shared code does not select shared specs</h4>
+        <p>
+          <code>console/**</code> selects every unit stage but zero e2e specs — measured:
+          <code>affected.mjs console/oslab.py</code> returns <code>mode: none</code>. A console change can
+          break every dashboard page and no browser test runs.
+        </p>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Silent fallback</p>
+        <h4>Unmapped means smoke, not failure</h4>
+        <p>
+          A new view with no rule runs the four smoke specs instead. The run is green and the new view
+          is untested; <code>e2e.sh</code> prints the <code>unmapped</code> list locally, but the
+          workflow summary omits it, so the fallback never blocks a PR.
+        </p>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Coverage shape</p>
+        <h4>One spec carries a third of the tests</h4>
+        <p>
+          <code>health-and-content</code> holds 29 of 82 declared tests and drives 12 route families.
+          It is the single point where a flake costs the most time.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    os-lab · dashboard verification coverage · measured against the branch that adds this file
+    <ul>
+      <li>selection · <code>dashboard/e2e/affected.json</code>, <code>dashboard/scripts/affected.mjs</code>, <code>scripts/e2e.sh</code></li>
+      <li>specs · <code>dashboard/e2e/*.spec.ts</code> (12 specs + <code>crawl.spec.ts</code>)</li>
+      <li>typecheck · <code>dashboard/tsconfig.json</code>, <code>dashboard/package.json</code>, <code>tsc --listFilesOnly</code></li>
+      <li>CI · <code>.github/workflows/dashboard-e2e.yml</code> (<code>plan</code> → <code>check</code> ∥ <code>browser</code> → <code>report</code>)</li>
+    </ul>
+  </footer>
+
+</div>
+</body>
+</html>

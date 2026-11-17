@@ -269,6 +269,13 @@ merge, and a route matrix showing which routes the local console and GitHub Page
 serve and in which locales. It is a standalone page, not part of the dashboard
 build.
 
+[[docs/e2e-coverage.html]] maps the three dashboard verification layers against
+each other: the e2e selection flow and its `none`/`some`/`full` classifications,
+the twelve specs with their routes and loop expansion, which routes have a spec
+versus only a crawl, and what `npm run check` does and does not see. Its counts and
+timings were measured, not estimated; it also records the gaps — `console/**`
+selects no e2e spec, and five route families have no behaviour test.
+
 They are in [[CONTRIBUTING.md]], step by step from setup to pull request, and
 the [[dashboard]] renders the same file at `/contribute/`. Contributions must not
 add vendor binaries or proprietary media (see [[legal#Google platform-tools]]).
