@@ -156,6 +156,34 @@ def test_mutation_guards_and_delete_contract(console):
     assert call(console, "/api/source/brain/files/%2e%2e/private.json")[0] == 400
 
 
+def test_refused_post_drains_its_body(console, monkeypatch):
+    """An early refusal must still read the request body, or closing the socket resets the
+    connection and the client can lose the 403. The header bytes must not count as body."""
+    import socket
+    from urllib.parse import urlsplit
+
+    left_after = []
+    original = web_ui.LabHttpHandler._drain_request_body
+
+    def spy(self):
+        original(self)
+        left_after.append(int(self.headers.get("Content-Length", 0)) - self.rfile.count)
+
+    monkeypatch.setattr(web_ui.LabHttpHandler, "_drain_request_body", spy)
+    port = urlsplit(console[0]).port
+    for host in ("other.invalid", f"127.0.0.1:{port}"):
+        body = b"{}"
+        headers = b"" if host != "other.invalid" else b"X-OSLab: 1\r\n"
+        with socket.create_connection(("127.0.0.1", port), timeout=15) as sock:
+            sock.sendall(b"POST /api/source/detection HTTP/1.1\r\nHost: " + host.encode() + b"\r\n" + headers
+                         + b"Content-Length: 2\r\nConnection: close\r\n\r\n" + body)
+            reply = b""
+            while chunk := sock.recv(65536):
+                reply += chunk
+        assert reply.startswith(b"HTTP/1.0 403")
+    assert left_after == [0, 0]
+
+
 def test_merge_background_plan_and_build(console):
     options = {"slugs": ["local__sample"], "allowClone": False, "name": "Console owned fixture", "plan": True}
     plan_job = confirmed(console, "/api/source/deep-analysis/merge", options)

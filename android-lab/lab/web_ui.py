@@ -181,6 +181,13 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         super().setup()
         self.rfile = _CountingReader(self.rfile)
 
+    def parse_request(self):
+        # The request line and headers are read through the same stream: restart the count once
+        # they are parsed, so `count` is the body bytes a handler read and the drain sees what is left.
+        parsed = super().parse_request()
+        self.rfile.count = 0
+        return parsed
+
     def _drain_request_body(self):
         """Read what a handler left unread before the connection closes.
 
