@@ -21,6 +21,7 @@ a sticky top bar and the Android Lab accent. It needs no build step and no netwo
 import sys
 import os
 import json
+import math
 import subprocess
 import shutil
 import threading
@@ -542,6 +543,8 @@ class LabHttpHandler(BaseHTTPRequestHandler):
                 self._send_bytes(200, winapps.winapps_window_screenshot(parts[4]), "image/png", cache="no-store")
             except winapps.WinAppError as exc:
                 self._json(400, {"error": str(exc)})
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "winapps", "apps"] and parts[5] == "stream":
+            self._winapps_stream(parts[4])
         elif path == "/api/jobs":
             self._json(200, {"jobs": JOBS.list()})
         elif len(parts) == 3 and parts[:2] == ["api", "jobs"]:
@@ -691,6 +694,60 @@ class LabHttpHandler(BaseHTTPRequestHandler):
                     break
         except (OSError, ValueError):
             pass  # the client hung up or the window vanished mid-frame; the panel falls back to the poll
+
+    def _winapps_stream(self, window_id: str):
+        """Bounded multipart PNG stream for one HWND; a disconnect closes its generator."""
+        if winapps is None:
+            self._json(501, {"error": "The Windows app mirror module (console/winapps.py) is not installed"})
+            return
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        raw_fps = (query.get("fps") or [str(winapps.DEFAULT_STREAM_FPS)])[0]
+        try:
+            fps = float(raw_fps)
+        except ValueError:
+            fps = winapps.DEFAULT_STREAM_FPS
+        if not math.isfinite(fps):
+            fps = winapps.DEFAULT_STREAM_FPS
+        fps = min(winapps.MAX_STREAM_FPS, max(winapps.MIN_STREAM_FPS, fps))
+
+        frames = None
+        try:
+            frames = iter(winapps.winapps_window_stream(window_id, fps))
+            first = next(frames)
+        except winapps.WinAppError as exc:
+            close = getattr(frames, "close", None)
+            if close:
+                close()
+            self._json(400, {"error": str(exc)})
+            return
+        except StopIteration:
+            close = getattr(frames, "close", None)
+            if close:
+                close()
+            self._json(500, {"error": "The Windows window stream ended before its first frame"})
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+
+        def write_frame(frame: bytes):
+            self.wfile.write(b"--frame\r\nContent-Type: image/png\r\nContent-Length: "
+                             + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n")
+            self.wfile.flush()
+
+        try:
+            write_frame(first)
+            for frame in frames:
+                write_frame(frame)
+        except OSError:
+            pass  # the client disconnected or its socket closed
+        finally:
+            close = getattr(frames, "close", None)
+            if close:
+                close()
 
     def _macos_events(self):
         """Live audit feed: text/event-stream of audit rows as they are recorded, a heartbeat

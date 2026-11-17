@@ -771,6 +771,8 @@ export const api = {
     post<{ ok: boolean; actionSent: boolean }>("/api/labs/macos/element/perform", input),
   winappsApps: () => call<WinAppsInfo>("/api/labs/winapps/apps"),
   winappsAppScreenshotUrl: (windowId: number) => `/api/labs/winapps/apps/${windowId}/screenshot`,
+  winappsAppStreamUrl: (windowId: number, fps: number) =>
+    `/api/labs/winapps/apps/${windowId}/stream?fps=${fps}`,
   plan: (request: LabRequest) => post<{ plan: LabPlan; token: string }>("/api/labs/plan", { request }),
   start: (request: LabRequest, token: string) => post<LabJob>("/api/labs/start", { request, token }),
   jobs: () => call<{ jobs: LabJob[] }>("/api/jobs"),

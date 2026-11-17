@@ -190,6 +190,36 @@ def test_a_stale_window_id_is_refused(host):
         winapps.winapps_window_screenshot(1234)
 
 
+def test_window_stream_yields_frames_and_stops_when_the_window_disappears(host, monkeypatch):
+    calls = []
+
+    def capture(window_id):
+        calls.append(window_id)
+        if len(calls) == 1:
+            return b"first-frame"
+        raise winapps.WinAppError("That window is not on screen anymore")
+
+    monkeypatch.setattr(winapps, "winapps_window_screenshot", capture)
+    monkeypatch.setattr(winapps.time, "sleep", lambda _seconds: None)
+    assert list(winapps.winapps_window_stream(1234, 2.0)) == [b"first-frame"]
+    assert calls == [1234, 1234]
+
+
+@pytest.mark.parametrize("fps", [0, -1, 0.49, 8.01, float("nan"), float("inf")])
+def test_window_stream_rejects_unbounded_frame_rates(host, fps):
+    with pytest.raises(winapps.WinAppError, match="Frame rate"):
+        next(winapps.winapps_window_stream(1234, fps))
+
+
+def test_window_stream_refuses_a_stale_hwnd_before_the_first_frame(host, monkeypatch):
+    def stale(_window_id):
+        raise winapps.WinAppError("That window is not on screen anymore")
+
+    monkeypatch.setattr(winapps, "winapps_window_screenshot", stale)
+    with pytest.raises(winapps.WinAppError, match="not on screen"):
+        next(winapps.winapps_window_stream(1234, 2.0))
+
+
 def test_oversized_windows_are_refused_before_any_capture(host):
     host.setattr(winapps, "_user32", FakeUser32(rect=(0, 0, 20000, 20000)))
     with pytest.raises(winapps.WinAppError, match="too large"):

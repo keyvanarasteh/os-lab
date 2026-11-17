@@ -91,6 +91,14 @@ badge when the owning process is elevated; only the newest capture updates the
 view. It is mounted only locally, is separate from the WSL2-backed VM lifecycle,
 and does not offer input control.
 
+The local panel also supports a draggable/resizable floating mirror, dock/hide,
+and a bounded multipart PNG stream at
+`/api/labs/winapps/apps/<hwnd>/stream?fps=` with a screenshot-poll fallback.
+The stream validates the HWND before responding, disables caching, and closes
+when the client disconnects, the window disappears or the stream reaches its
+time limit. It remains read-only; Windows UI Automation hotspots and input
+control are separate future work.
+
 ## UX readiness
 
 [[ux-readiness]] records the dashboard's action, endpoint, and navigation

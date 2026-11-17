@@ -159,6 +159,50 @@ def test_winapps_screenshot_serves_a_png_and_reports_stale_windows(web_server, m
     assert "not on screen" in json.loads(caught.value.read().decode("utf-8"))["error"]
 
 
+def test_winapps_stream_serves_bounded_multipart_frames_without_caching(web_server, monkeypatch):
+    import web_ui
+
+    frames = []
+
+    def stream(window_id, fps):
+        frames.append((window_id, fps))
+        return (b"\x89PNG first", b"\x89PNG second")
+
+    monkeypatch.setattr(web_ui.winapps, "winapps_window_stream", stream)
+    reply = urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps/7/stream?fps=50")
+    body = reply.read()
+    assert reply.status == 200
+    assert reply.headers["Content-Type"] == "multipart/x-mixed-replace; boundary=frame"
+    assert reply.headers["Cache-Control"] == "no-store"
+    assert reply.headers["X-Content-Type-Options"] == "nosniff"
+    assert body.count(b"--frame\r\n") == 2
+    assert b"Content-Type: image/png\r\n" in body
+    assert b"\x89PNG first" in body and b"\x89PNG second" in body
+    assert frames == [("7", web_ui.winapps.MAX_STREAM_FPS)]
+
+
+def test_winapps_stream_reports_a_stale_window_before_streaming(web_server, monkeypatch):
+    import web_ui
+
+    def stale(_window_id, _fps):
+        raise web_ui.winapps.WinAppError("That window is not on screen anymore; refresh the mirror")
+
+    monkeypatch.setattr(web_ui.winapps, "winapps_window_stream", stale)
+    with pytest.raises(urllib.error.HTTPError) as caught:
+        urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps/7/stream")
+    assert caught.value.code == 400
+    assert "not on screen" in json.loads(caught.value.read().decode("utf-8"))["error"]
+
+
+def test_winapps_stream_is_unavailable_without_the_native_module(web_server, monkeypatch):
+    import web_ui
+
+    monkeypatch.setattr(web_ui, "winapps", None)
+    with pytest.raises(urllib.error.HTTPError) as caught:
+        urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps/7/stream")
+    assert caught.value.code == 501
+
+
 def test_winapps_doctor_endpoint_serves_the_probe_and_is_501_without_the_module(web_server, monkeypatch):
     import web_ui
 

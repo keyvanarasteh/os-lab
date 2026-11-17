@@ -8,13 +8,14 @@ never exposes process command lines or performs input control.
 from __future__ import annotations
 
 import ctypes
+import math
 import struct
 import sys
 import time
 import zlib
 from ctypes import wintypes
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 PW_RENDERFULLCONTENT = 0x00000002
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = ctypes.c_void_p(-4)
@@ -28,6 +29,10 @@ MAX_TITLE_CHARS = 512
 MAX_WINDOW_CHARS = 200
 # 8K at 32 bits is ~130 MB of pixels; anything larger is refused instead of exhausting memory.
 MAX_CAPTURE_PIXELS = 7680 * 4320
+MIN_STREAM_FPS = 0.5
+MAX_STREAM_FPS = 8.0
+DEFAULT_STREAM_FPS = 1.2
+MAX_STREAM_SECONDS = 600
 TOOL_CLASSES = {
     "Shell_TrayWnd",
     "Shell_SecondaryTrayWnd",
@@ -379,6 +384,32 @@ def winapps_window_screenshot(window_id: int) -> bytes:
     if not captured or rows != height:
         raise WinAppError("Could not capture that window; try another application window")
     return _png(width, height, bytes(pixels))
+
+
+def winapps_window_stream(window_id: int | str, fps: float) -> Iterator[bytes]:
+    """Yield bounded PNG frames for one still-visible window.
+
+    The first capture happens before the HTTP handler sends stream headers, so a stale
+    HWND can still be reported as a normal client error. If it disappears later, the
+    stream ends cleanly and the dashboard can fall back to individual captures.
+    """
+    if not math.isfinite(fps) or not MIN_STREAM_FPS <= fps <= MAX_STREAM_FPS:
+        raise WinAppError(f"Frame rate must be between {MIN_STREAM_FPS:g} and {MAX_STREAM_FPS:g} FPS")
+
+    deadline = time.monotonic() + MAX_STREAM_SECONDS
+    yield winapps_window_screenshot(window_id)
+    interval = 1.0 / fps
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return
+        time.sleep(min(interval, remaining))
+        if time.monotonic() >= deadline:
+            return
+        try:
+            yield winapps_window_screenshot(window_id)
+        except WinAppError:
+            return
 
 
 def doctor() -> dict[str, Any]:

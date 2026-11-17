@@ -66,10 +66,20 @@ test("the Windows Apps Lab mirrors one real window without offering control", as
     contentType: "image/png",
     body: PNG_1X1
   }));
+  const streamBody = Buffer.concat([
+    Buffer.from(`--frame\r\nContent-Type: image/png\r\nContent-Length: ${PNG_1X1.length}\r\n\r\n`),
+    PNG_1X1,
+    Buffer.from("\r\n")
+  ]);
+  await page.route("**/api/labs/winapps/apps/100/stream?fps=*", (route) => route.fulfill({
+    status: 200,
+    contentType: "multipart/x-mixed-replace; boundary=frame",
+    body: streamBody
+  }));
 
   await page.goto("/labs/winapps/");
-  await expect(page.getByRole("heading", { name: "Window mirror" })).toBeVisible();
-  await expect(page.locator("select#winapps-window")).toContainText("Notepad");
+  await expect(page.getByText("App mirror")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Window" })).toContainText("Notepad");
   await expect(page.getByText("320×240")).toBeVisible();
   const mirror = page.locator("img[alt='Mirror of Notepad']");
   // Painted at the window's own 4:3 shape, not collapsed to an empty box.
@@ -79,6 +89,55 @@ test("the Windows Apps Lab mirrors one real window without offering control", as
   expect(box!.width / box!.height).toBeCloseTo(320 / 240, 1);
   await expect(page.getByText("Elevated")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Arm control" })).toHaveCount(0);
+});
+
+test("the mirror can be dragged, resized, docked, hidden and reopened", async ({ page }) => {
+  await mockApi(page);
+  await page.route("**/api/labs/winapps/apps/100/screenshot", (route) => route.fulfill({
+    status: 200,
+    contentType: "image/png",
+    body: PNG_1X1
+  }));
+  await page.route("**/api/labs/winapps/apps/100/stream?fps=*", (route) => route.fulfill({
+    status: 200,
+    contentType: "multipart/x-mixed-replace; boundary=frame",
+    body: Buffer.concat([
+      Buffer.from(`--frame\r\nContent-Type: image/png\r\nContent-Length: ${PNG_1X1.length}\r\n\r\n`),
+      PNG_1X1,
+      Buffer.from("\r\n")
+    ])
+  }));
+
+  await page.goto("/labs/winapps/");
+  const panel = page.locator(".iux-card.fixed");
+  await expect(panel).toBeVisible();
+  const beforeDrag = await panel.boundingBox();
+  const header = panel.locator(":scope > div").first();
+  const headerBox = await header.boundingBox();
+  await page.mouse.move(headerBox!.x + 100, headerBox!.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(headerBox!.x + 60, headerBox!.y - 10);
+  await page.mouse.up();
+  const afterDrag = await panel.boundingBox();
+  expect(afterDrag!.x).toBeLessThan(beforeDrag!.x - 30);
+  expect(afterDrag!.y).toBeLessThan(beforeDrag!.y - 15);
+
+  const beforeResize = await panel.boundingBox();
+  const resizeHandle = panel.locator(".cursor-nwse-resize");
+  const handleBox = await resizeHandle.boundingBox();
+  await page.mouse.move(handleBox!.x + 4, handleBox!.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(handleBox!.x + 44, handleBox!.y + 34);
+  await page.mouse.up();
+  const afterResize = await panel.boundingBox();
+  expect(afterResize!.width).toBeGreaterThan(beforeResize!.width + 20);
+  expect(afterResize!.height).toBeGreaterThan(beforeResize!.height + 15);
+
+  await page.getByRole("button", { name: "Dock the panel" }).click();
+  await expect(page.getByRole("button", { name: "Float the panel" })).toBeVisible();
+  await page.getByRole("button", { name: "Hide the app mirror" }).click();
+  await page.getByRole("button", { name: "Show the app mirror" }).click();
+  await expect(page.getByText("App mirror")).toBeVisible();
 });
 
 test("an elevated window is marked instead of silently failing", async ({ page }) => {
