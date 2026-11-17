@@ -2764,5 +2764,11 @@
   "All labs": "Tüm laboratuvarlar",
   "Task prompt": "Görev istemi",
   "Focus the sidebar on one lab": "Kenar çubuğunu tek bir laboratuvara odakla",
-  "to switch": "değiştirmek için"
+  "to switch": "değiştirmek için",
+  "Disks": "Diskler",
+  "Free": "Boş",
+  "Total": "Toplam",
+  "Simulators and devices": "Simülatörler ve cihazlar",
+  "Temporary": "Geçici",
+  "mount points": "bağlama noktası"
 }

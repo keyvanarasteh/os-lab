@@ -2764,5 +2764,11 @@
   "All labs": "همه آزمایشگاه‌ها",
   "Task prompt": "پرامپت وظیفه",
   "Focus the sidebar on one lab": "تمرکز نوار کناری روی یک آزمایشگاه",
-  "to switch": "برای تغییر"
+  "to switch": "برای تغییر",
+  "Disks": "دیسک‌ها",
+  "Free": "آزاد",
+  "Total": "کل",
+  "Simulators and devices": "شبیه‌سازها و دستگاه‌ها",
+  "Temporary": "موقت",
+  "mount points": "نقطه اتصال"
 }

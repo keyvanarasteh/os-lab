@@ -6,8 +6,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { LabId } from "../lib/api";
 
-/** The cleanup lab has no engine status of its own but is a sidebar lab like the others. */
-export type ActiveLabId = LabId | "cleanup";
+/** The cleanup and firewall labs have no engine status of their own but are sidebar labs like the others. */
+export type ActiveLabId = LabId | "cleanup" | "firewall";
 
 const KEY = "oslab.sidebar.activeLab";
 
@@ -35,6 +35,7 @@ export function labOfSection(activeId: string): ActiveLabId | null {
   if (activeId === "android" || activeId.startsWith("android-")) return "android";
   if (activeId.startsWith("source-")) return "source";
   if (activeId.startsWith("cleanup-")) return "cleanup";
+  if (activeId === "firewall" || activeId.startsWith("firewall-")) return "firewall";
   if (activeId === "web-lab") return "web";
   return null;
 }

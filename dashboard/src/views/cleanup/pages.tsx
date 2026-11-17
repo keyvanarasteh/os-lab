@@ -539,6 +539,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   // Advanced-scan card grid: sizes, sort order and cleanability ranking.
   const sizes = useMemo(() => new Map((latestScan?.entries ?? []).map((item) => [item.id, item.sizeBytes])), [latestScan]);
   const maxSize = useMemo(() => Math.max(0, ...sizes.values()), [sizes]);
+  const selectedBytes = useMemo(() => selected.reduce((sum, id) => sum + (sizes.get(id) ?? 0), 0), [selected, sizes]);
   const sortedEntries = useMemo(() => sortEntries(entries, sizes, order), [entries, sizes, order]);
   const riskTotals = useMemo(() => totalsByRisk(entries, sizes), [entries, sizes]);
   const resultGroups = useMemo(() => {
@@ -577,7 +578,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     { id: "", label: "Dashboard", path: "" }, { id: "settings", label: "Settings", path: "settings/" }, { id: "space", label: "Space Explorer", path: "space/" }, { id: "scan", label: "Advanced scan", path: "scan/" }, { id: "results", label: "Results", path: "results/" },
     { id: "leftovers", label: "Leftovers", path: "leftovers/" }, { id: "history", label: "History", path: "history/" }, { id: "relocation", label: "Relocation", path: "relocation/" }
   ];
-  return <AppShell activeId={`cleanup-${page || "scan"}`}>
+  return <AppShell activeId={`cleanup-${page || "dashboard"}`}>
     <TopBar title="Cleanup Lab" icon={<BroomIcon size={20} />} />
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6" onClick={onNavClick}>
       <PageHead toolbarOnly icon={<BroomIcon size={22} />} title="Cleanup Lab" description="Measure reclaimable space, review a plan, then confirm each clean."
@@ -650,6 +651,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           {page === "scan" && <>
             <Section title="Scan" description="Choose catalog entries. Scanning only measures files; it does not remove them.">
               {!entries.length ? <Empty>No cleanup entries are available on this system.</Empty> : <>
+                <div className="sticky top-14 z-10 -mx-2 border-b border-(--iux-border) bg-(--iux-card) px-2 py-2" data-testid="scan-toolbar">
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" className="iux-btn" data-variant="ghost" disabled={busy} title="Select default entries"
                     onClick={() => { setSelected(defaults); setConfirm(false); }}>Defaults</button>
@@ -659,13 +661,23 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                     onClick={() => { setSelected([]); setConfirm(false); }}>None</button>
                   <span className="text-sm text-(--iux-muted-foreground)">
                     <span className="font-medium text-(--iux-foreground)">{selected.length}</span> / {entries.length} <span>selected</span>
+                    {selectedBytes > 0 && <span dir="ltr" className="tabular-nums"> · {bytes(selectedBytes)}</span>}
                   </span>
-                  <div role="group" aria-label="Sort entries" className="ms-auto flex gap-1">
+                  <div role="group" aria-label="Sort entries" className="flex gap-1 sm:ms-auto">
                     <button type="button" className="iux-btn" data-variant={order === "size" ? "outline" : "ghost"} aria-pressed={order === "size"}
                       onClick={() => setOrder("size")}>Largest first</button>
                     <button type="button" className="iux-btn" data-variant={order === "cleanable" ? "outline" : "ghost"} aria-pressed={order === "cleanable"}
                       onClick={() => setOrder("cleanable")}>Safest first</button>
                   </div>
+                  <div className="flex gap-2 max-sm:order-first max-sm:w-full">
+                    <button type="button" className="iux-btn max-sm:flex-1" data-variant="primary" disabled={!canWork || !selected.length} onClick={() => void start(() => api.cleanupScan(selected))}>Scan selected</button>
+                    {active?.state === "running" && <button type="button" className="iux-btn" onClick={() => void cancel()}>Cancel</button>}
+                  </div>
+                </div>
+                {active?.state === "running" && <div className="mt-2 space-y-1">
+                  <div className="iux-progress h-1 rounded-full" aria-hidden="true" />
+                  <p role="status" aria-live="polite" className="text-xs">{active.kind} in progress · <span dir="ltr">{String(active.progress?.pathsDone ?? active.progress?.itemsDone ?? 0)} / {String(active.progress?.pathsTotal ?? active.progress?.itemsTotal ?? 0)}</span><span translate="no" className="block truncate">{active.progress?.currentPath}</span></p>
+                </div>}
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">{sortedEntries.map((item) => {
                   const size = sizes.get(item.id);
@@ -691,12 +703,6 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                   </label>;
                 })}</div>
               </>}
-              <div className="mt-3 flex flex-wrap gap-2"><button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !selected.length} onClick={() => void start(() => api.cleanupScan(selected))}>Scan selected</button>
-                {active?.state === "running" && <button type="button" className="iux-btn" onClick={() => void cancel()}>Cancel</button>}</div>
-              {active?.state === "running" && <div className="mt-3 space-y-2">
-                <div className="iux-progress h-1 rounded-full" aria-hidden="true" />
-                <p role="status">{active.kind} in progress · <span dir="ltr">{String(active.progress?.pathsDone ?? active.progress?.itemsDone ?? 0)} / {String(active.progress?.pathsTotal ?? active.progress?.itemsTotal ?? 0)}</span><span translate="no" className="block break-all">{active.progress?.currentPath}</span></p>
-              </div>}
               {active?.state === "failed" && <Status value={{ ok: false, text: active.error || "The cleanup job failed." }} />}
               {actionError && <Status value={{ ok: false, text: actionError }} />}
             </Section>

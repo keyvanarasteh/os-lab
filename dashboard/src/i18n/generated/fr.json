@@ -2764,5 +2764,11 @@
   "All labs": "Tous les laboratoires",
   "Task prompt": "Invite de tâche",
   "Focus the sidebar on one lab": "Concentrer la barre latérale sur un seul laboratoire",
-  "to switch": "pour changer"
+  "to switch": "pour changer",
+  "Disks": "Disques",
+  "Free": "Libre",
+  "Total": "Total",
+  "Simulators and devices": "Simulateurs et appareils",
+  "Temporary": "Temporaire",
+  "mount points": "points de montage"
 }

@@ -72,11 +72,12 @@ export function sectionHref(id: string): string {
   if (id.startsWith("how-to-use")) return localized("/how-to-use/");
   if (id === "feedback") return localized("/feedback/");
   if (id === "content") return localized("/content/");
-  if (id.startsWith("cleanup-")) return localized(`/cleanup/${id === "cleanup-scan" ? "" : id.slice(8) + "/"}`);
+  if (id.startsWith("cleanup-")) return localized(`/cleanup/${id === "cleanup-dashboard" ? "" : id.slice(8) + "/"}`);
   if (id === "web-lab") return localized("/web-lab/");
-  if (id === "firewall") {
+  if (id === "firewall" || id === "firewall-lab" || id === "firewall-companies" || id === "firewall-add") {
     const locale = typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname);
-    return firewallPath(locale);
+    const hash = id === "firewall-companies" ? "#companies" : id === "firewall-add" ? "#add" : "";
+    return `${firewallPath(locale)}${hash}`;
   }
   if (id.startsWith("legal-")) return localized(`/legal/${id.slice(6)}/`);
   if (id === "android-overview") return localized("/android/");
@@ -124,7 +125,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
         { id: "host", label: "Home", icon: <DesktopTowerIcon size={16} /> },
         { id: "firewall", label: copy[locale].lab, icon: <FireIcon size={16} /> },
         { id: "source-overview", label: "Source Lab", icon: LAB_ICON.source() },
-        { id: "cleanup-scan", label: "Cleanup Lab", icon: <BroomIcon size={16} /> },
+        { id: "cleanup-dashboard", label: "Cleanup Lab", icon: <BroomIcon size={16} /> },
         { id: "feedback", label: "Feedback", icon: <ChatCircleTextIcon size={16} /> },
         { id: "repo", label: "Repository", icon: <BookOpenIcon size={16} /> },
         HOW_TO_USE_ITEM
@@ -174,8 +175,14 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
       label: "Cleanup Lab",
       icon: <BroomIcon size={16} />,
       children: [
-        { id: "cleanup-scan", label: "Dashboard" },
-        { id: "cleanup-settings", label: "Settings" }
+        { id: "cleanup-dashboard", label: "Dashboard" },
+        { id: "cleanup-settings", label: "Settings" },
+        { id: "cleanup-space", label: "Space Explorer" },
+        { id: "cleanup-scan", label: "Advanced scan" },
+        { id: "cleanup-results", label: "Results" },
+        { id: "cleanup-leftovers", label: "Leftovers" },
+        { id: "cleanup-history", label: "History" },
+        { id: "cleanup-relocation", label: "Relocation" }
       ]
     },
     web: {
@@ -188,19 +195,37 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
         { id: "lab-web", label: "Readiness & setup" }
       ]
     },
+    firewall: {
+      id: "firewall-lab",
+      label: copy[locale].lab,
+      icon: <FireIcon size={16} />,
+      children: [
+        { id: "firewall", label: copy[locale].overview },
+        { id: "firewall-companies", label: copy[locale].companies },
+        { id: "firewall-add", label: copy[locale].add }
+      ]
+    },
     ios: labItem("ios", "iOS Lab"),
     windows: labItem("windows", "Windows Lab"),
     winapps: labItem("winapps", "Windows Apps Lab"),
     macos: labItem("macos", "macOS Lab"),
     linux: labItem("linux", "Linux Lab")
   };
+  // A focused lab replaces the "OS Lab" group with its own group: the lab's name and its nav items.
+  const focusedItem = activeLab ? labNav[activeLab] : null;
+  const focusedItems: SidebarItem[] = focusedItem
+    ? focusedItem.children?.length
+      ? focusedItem.children.map((leaf) => ({ id: leaf.id, label: leaf.label, icon: focusedItem.icon, badge: leaf.badge }))
+      : [focusedItem]
+    : [];
   const osLabItems = activeLab
-    ? [labNav[activeLab]]
+    ? focusedItems
     : [
         labNav.android,
         labNav.source,
         labNav.cleanup,
         labNav.web,
+        labNav.firewall,
         ...(labShown(labs, "ios", activeId) ? [labNav.ios] : []),
         ...(labShown(labs, "windows", activeId) ? [labNav.windows] : []),
         ...(labShown(labs, "winapps", activeId) ? [labNav.winapps] : []),
@@ -221,11 +246,13 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
       ]
     },
     {
-      label: "OS Lab",
-      items: [...osLabItems, { id: "firewall", label: copy[locale].lab, icon: <FireIcon size={16} /> }]
+      label: focusedItem ? focusedItem.label : "OS Lab",
+      items: osLabItems
     },
     {
       label: "Help",
+      collapsible: true,
+      defaultOpen: false,
       items: [
         { id: "health", label: "Health check", icon: <HeartbeatIcon size={16} /> },
         {
@@ -443,6 +470,13 @@ export function AppShell({
         summary: "Measure reclaimable space, review a plan, then confirm each clean."
       },
       {
+        id: "firewall",
+        label: copy[locale].lab,
+        icon: <FireIcon size={18} />,
+        summary: "BGT207 dream-company firewall designs — branches, segmentation, products and rule sets",
+        badge: <SidebarBadge>Ready</SidebarBadge>
+      },
+      {
         id: "web",
         label: status("web")?.label ?? "Web Lab",
         icon: LAB_ICON.web(18),
@@ -485,7 +519,7 @@ export function AppShell({
         badge: running.has("linux") ? <RunningDot /> : <StatePill lab={status("linux")} />
       }
     ];
-  }, [host?.labs, running, androidRunning]);
+  }, [host?.labs, running, androidRunning, locale]);
   const meta = useMemo(buildMeta, []);
   const records = useMemo<SpotlightRecord[]>(
     () => [
@@ -581,7 +615,7 @@ export function AppShell({
   const pickLab = (id: ActiveLabId) => {
     setSwitcherOpen(false);
     chooseActiveLab(id);
-    go(id === "cleanup" ? sectionHref("cleanup-scan") : labHref(id));
+    go(id === "cleanup" ? sectionHref("cleanup-dashboard") : id === "firewall" ? sectionHref("firewall") : labHref(id));
   };
   const showAllLabs = () => {
     setSwitcherOpen(false);

@@ -2764,5 +2764,11 @@
   "All labs": "جميع المختبرات",
   "Task prompt": "موجّه المهمة",
   "Focus the sidebar on one lab": "تركيز الشريط الجانبي على مختبر واحد",
-  "to switch": "للتبديل"
+  "to switch": "للتبديل",
+  "Disks": "الأقراص",
+  "Free": "المتاح",
+  "Total": "الإجمالي",
+  "Simulators and devices": "المحاكيات والأجهزة",
+  "Temporary": "مؤقتة",
+  "mount points": "نقاط التركيب"
 }

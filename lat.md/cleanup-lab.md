@@ -192,7 +192,11 @@ and pseudo filesystems are filtered before any capacity call; Windows
 enumerates drives through kernel32, Linux reads `/proc/self/mountinfo`, and
 macOS parses the fixed `mount` probe plus an optional fixed `diskutil info
 -plist` probe. An unreadable volume carries an `error` instead of failing the
-probe. The `/cleanup/` volumes card is the dashboard layer's part.
+probe. The `/cleanup/` volumes card is the dashboard layer's part: the storage card shows the
+home volume as the hero, and the other volumes as a closed "Other volumes" section of display-only
+cards (name, mount path, used/free bar, sizes, kind) grouped into Disks (open), System,
+Simulators and devices, and Temporary. Mounts reporting the same device collapse into one card
+that lists its mount points ([[dashboard/src/views/cleanup/volume-cards.tsx]]).
 
 ## Privileged actions
 
@@ -450,6 +454,11 @@ Advanced scan, Results, Leftovers, History, Relocation — keep their routes and
 behavior; the shared tab row renders on the Settings and detail pages, the
 local main page reaches Settings through the page-head action, and Public
 Pages keeps the full tab row without engine calls.
+
+The Advanced scan page keeps its Defaults / All / None, sort, "Scan selected",
+Cancel and progress in one sticky toolbar under the page top bar, with the
+selected measured size beside the count, so a scan starts without scrolling
+past the 68-entry grid.
 
 Its confirmation opens the shared native dialog (focus containment,
 Escape/backdrop close, focus return) that lists ready items with sizes and
