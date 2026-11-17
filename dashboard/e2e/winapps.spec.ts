@@ -27,7 +27,7 @@ const PNG_1X1 = Buffer.from(
 );
 
 const labs: LabStatus[] = [
-  { id: "winapps", label: "Windows Apps Lab", summary: "Read-only mirror of visible desktop applications on this Windows host.", state: "ready", provider: "native-windows", reasons: [], requirements: [], notes: [], actions: [], installed: true },
+  { id: "winapps", label: "Windows Apps Lab", summary: "Local Windows app mirror with guarded UI Automation and input.", state: "ready", provider: "native-windows", reasons: [], requirements: [], notes: [], actions: [], installed: true },
   { id: "windows", label: "Windows Lab", summary: "Windows VM", state: "needs-setup", provider: "wsl2", reasons: [], requirements: [], notes: [], actions: [], installed: true },
   { id: "source", label: "Source Lab", summary: "Local source analysis", state: "ready", provider: "native-python", reasons: [], requirements: [], notes: [], actions: [], installed: true },
   { id: "macos", label: "macOS Lab", summary: "Native Xcode Simulator", state: "unavailable", provider: null, reasons: [], requirements: [], notes: [], actions: [], installed: true },
@@ -37,6 +37,7 @@ const labs: LabStatus[] = [
 ];
 
 async function mockApi(page: Page, os: "windows" | "linux" = "windows") {
+  let controlState = { armed: false, owner: null as string | null, expiresInSec: 0 };
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};
@@ -53,23 +54,58 @@ async function mockApi(page: Page, os: "windows" | "linux" = "windows") {
     else if (path === "/api/health") body = { status: "ok", version: "test", console: true };
     else if (path === "/api/jobs") body = { jobs: [] };
     else if (path === "/api/labs/winapps/apps") body = winapps;
+    else if (path === "/api/labs/winapps/control") {
+      if (route.request().method() === "POST") {
+        const request = route.request().postDataJSON() as { armed: boolean; owner: string };
+        controlState = request.armed
+          ? { armed: true, owner: request.owner, expiresInSec: 600 }
+          : { armed: false, owner: null, expiresInSec: 0 };
+      }
+      body = controlState;
+    }
+    else if (path === "/api/labs/winapps/apps/100/elements") body = {
+      windowId: 100, app: "Notepad", bounds: { x: 10, y: 20, width: 320, height: 240 },
+      revision: "rev-1", engine: "uia", trimmed: false,
+      elements: [{ elementId: "save-button", role: "Button", label: "Save", x: 40, y: 20, w: 80, h: 24, enabled: true, focused: false }],
+      diff: { added: [], changed: [], removed: [] }
+    };
+    else if (path === "/api/labs/winapps/apps/100/search") body = {
+      windowId: 100, app: "Notepad", revision: "rev-1", engine: "uia", query: "save", count: 1,
+      hits: [{ elementId: "save-button", role: "Button", label: "Save", x: 40, y: 20, w: 80, h: 24, enabled: true, focused: false }]
+    };
+    else if (path === "/api/labs/winapps/click") body = { ok: true, actionSent: true, windowId: 100, x: 80, y: 32 };
+    else if (path === "/api/labs/winapps/input") body = { ok: true, actionSent: true, windowId: 100, kind: "type", textLength: 5 };
+    else if (path === "/api/labs/winapps/stop") {
+      controlState = { armed: false, owner: null, expiresInSec: 0 };
+      body = { ok: true, disarmed: true };
+    }
     else if (path === "/api/labs/winapps/config") body = { lab: "winapps", path: "config.env", exists: true, fields: [], profiles: [], backups: [], endpoints: [] };
     else if (path === "/api/labs/winapps/monitor") body = { lab: "winapps", state: "stopped", containers: [] };
     await route.fulfill({ json: body });
   });
 }
 
-test("the Windows Apps Lab mirrors one real window without offering control", async ({ page }) => {
+test("the Windows Apps Lab mirrors a real window and exposes UI Automation controls", async ({ page }) => {
   await mockApi(page);
   await page.route("**/api/labs/winapps/apps/100/screenshot", (route) => route.fulfill({
     status: 200,
     contentType: "image/png",
     body: PNG_1X1
   }));
+  const streamBody = Buffer.concat([
+    Buffer.from(`--frame\r\nContent-Type: image/png\r\nContent-Length: ${PNG_1X1.length}\r\n\r\n`),
+    PNG_1X1,
+    Buffer.from("\r\n")
+  ]);
+  await page.route("**/api/labs/winapps/apps/100/stream?fps=*", (route) => route.fulfill({
+    status: 200,
+    contentType: "multipart/x-mixed-replace; boundary=frame",
+    body: streamBody
+  }));
 
   await page.goto("/labs/winapps/");
-  await expect(page.getByRole("heading", { name: "Window mirror" })).toBeVisible();
-  await expect(page.locator("select#winapps-window")).toContainText("Notepad");
+  await expect(page.getByText("App mirror")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Window" })).toContainText("Notepad");
   await expect(page.getByText("320×240")).toBeVisible();
   const mirror = page.locator("img[alt='Mirror of Notepad']");
   // Painted at the window's own 4:3 shape, not collapsed to an empty box.
@@ -78,7 +114,109 @@ test("the Windows Apps Lab mirrors one real window without offering control", as
   expect(box!.height).toBeGreaterThan(100);
   expect(box!.width / box!.height).toBeCloseTo(320 / 240, 1);
   await expect(page.getByText("Elevated")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Arm control" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Arm control" })).toBeVisible();
+});
+
+test("UIA hotspots and keyboard input require preview, arm and explicit confirmation", async ({ page }) => {
+  const actions: { path: string; body: Record<string, unknown> }[] = [];
+  await mockApi(page);
+  await page.route("**/api/labs/winapps/apps/100/screenshot", (route) => route.fulfill({
+    status: 200, contentType: "image/png", body: PNG_1X1
+  }));
+  await page.route("**/api/labs/winapps/apps/100/stream?fps=*", (route) => route.fulfill({
+    status: 200,
+    contentType: "multipart/x-mixed-replace; boundary=frame",
+    body: Buffer.concat([
+      Buffer.from(`--frame\r\nContent-Type: image/png\r\nContent-Length: ${PNG_1X1.length}\r\n\r\n`),
+      PNG_1X1,
+      Buffer.from("\r\n")
+    ])
+  }));
+  await page.route("**/api/labs/winapps/click", async (route) => {
+    actions.push({ path: "click", body: route.request().postDataJSON() as Record<string, unknown> });
+    await route.fulfill({ json: { ok: true, actionSent: true, windowId: 100, x: 80, y: 32 } });
+  });
+  await page.route("**/api/labs/winapps/input", async (route) => {
+    actions.push({ path: "input", body: route.request().postDataJSON() as Record<string, unknown> });
+    await route.fulfill({ json: { ok: true, actionSent: true, windowId: 100, kind: "type", textLength: 5 } });
+  });
+
+  await page.goto("/labs/winapps/");
+  await page.getByRole("button", { name: "Elements" }).click();
+  await page.getByRole("textbox", { name: "Search elements" }).fill("save");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByText("1 matches")).toBeVisible();
+  const hotspot = page.getByRole("button", { name: "Button: Save" });
+  await expect(hotspot).toBeVisible();
+  await hotspot.click();
+  await expect(page.getByRole("dialog")).toContainText("Click UI element");
+  await expect(page.getByRole("button", { name: "Confirm and send" })).toBeDisabled();
+  await expect(page.getByText("Arm control before confirming this action.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await page.getByRole("button", { name: "Arm control" }).click();
+  await expect(page.getByRole("button", { name: "Disarm control" })).toBeVisible();
+  await hotspot.click();
+  await page.getByRole("button", { name: "Confirm and send" }).click();
+  await expect.poll(() => actions.length).toBe(1);
+  expect(actions[0]).toMatchObject({ path: "click", body: { confirm: true, owner: expect.any(String), windowId: 100 } });
+
+  await page.getByRole("textbox", { name: "Text to type" }).fill("hello");
+  await page.getByRole("button", { name: "Preview text" }).click();
+  await expect(page.getByRole("dialog")).toContainText("hello");
+  await expect.poll(() => actions.length).toBe(1);
+  await page.getByRole("button", { name: "Confirm and send" }).click();
+  await expect.poll(() => actions.length).toBe(2);
+  expect(actions[1]).toMatchObject({ path: "input", body: { confirm: true, kind: "type", text: "hello" } });
+});
+
+test("the mirror can be dragged, resized, docked, hidden and reopened", async ({ page }) => {
+  await mockApi(page);
+  await page.route("**/api/labs/winapps/apps/100/screenshot", (route) => route.fulfill({
+    status: 200,
+    contentType: "image/png",
+    body: PNG_1X1
+  }));
+  await page.route("**/api/labs/winapps/apps/100/stream?fps=*", (route) => route.fulfill({
+    status: 200,
+    contentType: "multipart/x-mixed-replace; boundary=frame",
+    body: Buffer.concat([
+      Buffer.from(`--frame\r\nContent-Type: image/png\r\nContent-Length: ${PNG_1X1.length}\r\n\r\n`),
+      PNG_1X1,
+      Buffer.from("\r\n")
+    ])
+  }));
+
+  await page.goto("/labs/winapps/");
+  const panel = page.locator(".iux-card.fixed");
+  await expect(panel).toBeVisible();
+  const beforeDrag = await panel.boundingBox();
+  const header = panel.locator(":scope > div").first();
+  const headerBox = await header.boundingBox();
+  await page.mouse.move(headerBox!.x + 100, headerBox!.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(headerBox!.x + 60, headerBox!.y - 10);
+  await page.mouse.up();
+  const afterDrag = await panel.boundingBox();
+  expect(afterDrag!.x).toBeLessThan(beforeDrag!.x - 30);
+  expect(afterDrag!.y).toBeLessThan(beforeDrag!.y - 15);
+
+  const beforeResize = await panel.boundingBox();
+  const resizeHandle = panel.locator(".cursor-nwse-resize");
+  const handleBox = await resizeHandle.boundingBox();
+  await page.mouse.move(handleBox!.x + 4, handleBox!.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(handleBox!.x + 44, handleBox!.y + 34);
+  await page.mouse.up();
+  const afterResize = await panel.boundingBox();
+  expect(afterResize!.width).toBeGreaterThan(beforeResize!.width + 20);
+  expect(afterResize!.height).toBeGreaterThan(beforeResize!.height + 15);
+
+  await page.getByRole("button", { name: "Dock the panel" }).click();
+  await expect(page.getByRole("button", { name: "Float the panel" })).toBeVisible();
+  await page.getByRole("button", { name: "Hide the app mirror" }).click();
+  await page.getByRole("button", { name: "Show the app mirror" }).click();
+  await expect(page.getByText("App mirror")).toBeVisible();
 });
 
 test("an elevated window is marked instead of silently failing", async ({ page }) => {

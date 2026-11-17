@@ -374,6 +374,49 @@ export interface WinAppsInfo {
   reason: string | null;
   windows: WinApp[];
 }
+export interface WinElement {
+  elementId: string;
+  role: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  enabled: boolean;
+  focused: boolean;
+  movedFrom?: { x: number; y: number };
+}
+export interface WinElementDiff {
+  added: WinElement[];
+  changed: WinElement[];
+  removed: WinElement[];
+}
+export interface WinElementsInfo {
+  windowId: number;
+  app: string;
+  bounds: { x: number; y: number; width: number; height: number };
+  revision: string;
+  engine: "uia";
+  trimmed: boolean;
+  elements: WinElement[];
+  diff: WinElementDiff;
+}
+export interface WinSearchInfo {
+  windowId: number;
+  app: string;
+  revision: string;
+  engine: "uia";
+  query: string;
+  count: number;
+  hits: WinElement[];
+}
+export interface WinControlState {
+  armed: boolean;
+  owner: string | null;
+  expiresInSec: number;
+}
+export type WinInputKind = "type" | "key";
+export type WinInputKey = "tab" | "escape" | "backspace" | "delete" | "up" | "down" | "left" | "right" | "space" | "enter";
 export interface Report {
   name: string;
   url: string;
@@ -771,6 +814,20 @@ export const api = {
     post<{ ok: boolean; actionSent: boolean }>("/api/labs/macos/element/perform", input),
   winappsApps: () => call<WinAppsInfo>("/api/labs/winapps/apps"),
   winappsAppScreenshotUrl: (windowId: number) => `/api/labs/winapps/apps/${windowId}/screenshot`,
+  winappsAppStreamUrl: (windowId: number, fps: number) =>
+    `/api/labs/winapps/apps/${windowId}/stream?fps=${fps}`,
+  winappsElements: (windowId: number, revision?: string) =>
+    call<WinElementsInfo>(`/api/labs/winapps/apps/${windowId}/elements${revision ? `?revision=${encodeURIComponent(revision)}` : ""}`),
+  winappsSearch: (windowId: number, query: string) =>
+    call<WinSearchInfo>(`/api/labs/winapps/apps/${windowId}/search?q=${encodeURIComponent(query)}`),
+  winappsControl: () => call<WinControlState>("/api/labs/winapps/control"),
+  winappsControlArm: (armed: boolean, owner?: string) =>
+    post<WinControlState>("/api/labs/winapps/control", { armed, owner }),
+  winappsClick: (input: { windowId: number; x: number; y: number; owner: string; confirm: true }) =>
+    post<{ ok: boolean; actionSent: boolean; windowId: number; x: number; y: number }>("/api/labs/winapps/click", input),
+  winappsInput: (input: { windowId: number; kind: WinInputKind; owner: string; confirm: true; text?: string; key?: WinInputKey }) =>
+    post<{ ok: boolean; actionSent: boolean; windowId: number; kind: WinInputKind; textLength: number; key?: WinInputKey }>("/api/labs/winapps/input", input),
+  winappsStop: () => post<{ ok: boolean; disarmed: boolean }>("/api/labs/winapps/stop", {}),
   plan: (request: LabRequest) => post<{ plan: LabPlan; token: string }>("/api/labs/plan", { request }),
   start: (request: LabRequest, token: string) => post<LabJob>("/api/labs/start", { request, token }),
   jobs: () => call<{ jobs: LabJob[] }>("/api/jobs"),

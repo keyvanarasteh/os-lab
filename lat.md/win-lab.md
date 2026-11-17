@@ -40,9 +40,10 @@ the disk and reinstalls on next boot.
 
 On a real Windows host, the dashboard can open the separate `winapps` lab.
 
-It serves a read-only desktop mirror through [[console/winapps.py]] with ctypes
-window enumeration and a `PrintWindow` capture; no process control is offered.
-This is separate from the Windows VM lifecycle and public Pages never mounts it.
+It serves a local desktop mirror through [[console/winapps.py]] with ctypes
+window enumeration, `PrintWindow` capture and standard-library COM UI
+Automation; this is separate from the Windows VM lifecycle and public Pages
+never mounts it.
 
 A window is listed only when it is actually on screen: visible, captioned,
 not minimized, not a tool or shell window and not DWM-cloaked (suspended UWP
@@ -51,6 +52,17 @@ frames stay "visible" to Win32 but cannot be seen). Each entry carries
 window a standard-user console cannot capture is marked rather than hidden.
 `GET /api/labs/winapps/doctor` and `python console/winapps.py --doctor` report
 the desktop session, this console's own elevation and one live capture probe.
+
+The UI Automation tree exposes only visible control-view elements, omits
+password controls and value properties, bounds labels and result counts, and
+returns window-relative bounds plus a per-HWND revision diff. Search is limited
+to roles and labels. Input is opt-in: a single local owner holds a ten-minute
+arm lock, every click/type/allowlisted key requires an explicit confirmation,
+and each action revalidates the visible HWND; keyboard input also verifies that
+the target is foreground. `/api/labs/winapps/stop` disarms and ends active
+mirror streams. POST requests remain protected by the console's Host and
+`X-OSLab: 1` checks; the bounded audit ring records action metadata but never
+the typed text.
 
 ## Research
 

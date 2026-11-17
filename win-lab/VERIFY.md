@@ -134,5 +134,51 @@ this revision (no Rust change since the previous run).
 - The CI jobs `release-win` and `release-linux` fail with "updater signing key
   is missing (TAURI_SIGNING_PRIVATE_KEY)". That is a missing repository secret
   for the Tauri release build, not a test failure in this change.
-- No process was started or terminated by this feature or its tests, and no
-  host data from this verification was sent off-machine.
+- In the original verification run, no application process was started or
+  terminated by the feature or its tests. The live follow-up below started and
+  closed only a temporary headless Chromium process. No host data from these
+  verifications was sent off-machine.
+
+## 8. Live mirror follow-up (2026-11-17)
+
+The console and dashboard were left running on loopback:
+
+```powershell
+# Repository root
+$env:PYTHONUTF8=1
+.venv-test\Scripts\python.exe android-lab\lab\web_ui.py 5050
+
+# dashboard/
+npm.cmd run dev -- --host 127.0.0.1 --port 4321 --strictPort
+```
+
+Observed live responses:
+
+- `GET http://127.0.0.1:5050/api/health` → HTTP 200.
+- `GET http://127.0.0.1:5050/api/host` → HTTP 200, Windows, 8 labs
+  (12.3 seconds on this host).
+- `GET http://127.0.0.1:5050/api/labs/winapps/apps` → HTTP 200, 2 visible
+  windows at the time of this run.
+- A real listed desktop window's `/screenshot` endpoint → HTTP 200,
+  `image/png`, 1936 × 1048, 131618 bytes; PNG chunk CRCs and decompression
+  passed. The image was validated in memory only, not saved.
+- The same window's `/stream?fps=2` endpoint → HTTP 200,
+  `multipart/x-mixed-replace`, `Cache-Control: no-store`; two 1936 × 1048 PNG
+  frames passed CRC and decompression checks. The stream response was closed
+  by the client after those frames.
+- `GET http://127.0.0.1:4321/labs/winapps/` → HTTP 200.
+
+Live UI check: Chromium headless via Playwright, against the real dashboard and
+console with no API mocks. The inline Node.js Playwright run selected a real
+window; both screenshot and stream requests returned HTTP 200 and stream
+updates changed the rendered image. Drag moved the panel from approximately
+`(1120, 220)` to `(420, 142)`; resize reached 700 × 700 px; dock, float, hide
+and reopen all passed. Result: `PASS`. The global update dialog was dismissed
+after the host response completed so it could not intercept pointer input.
+
+The saved evidence intentionally hides the selected window label and
+strongly blurs its pixels; the screenshot demonstrates the panel layout and
+controls without exposing desktop content. The live PNGs above were validated
+in memory and are not included.
+
+![Privacy-redacted live WinApps mirror](evidence/winapps-live-mirror.png)
