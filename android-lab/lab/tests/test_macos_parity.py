@@ -1,7 +1,9 @@
 """macOS Lab engine parity with QcU: config precedence, arm owner, capabilities, displays,
-element search, permissions, the live audit feed. A fake AX helper stands in for the Mac, so
-these run on Linux CI (OSLAB_AX_HELPER)."""
+element search, permissions, the live audit feed, the allowlist, preview stamps and the
+native REPL. A fake AX helper stands in for the Mac, so these run on Linux CI (OSLAB_AX_HELPER)."""
+import functools
 import http.client
+import io
 import os
 import sys
 import threading
@@ -42,6 +44,54 @@ def test_config_env_beats_defaults_and_is_clamped(monkeypatch):
     assert config["controlTimeout"] == 120
     assert config["auditMax"] == 50
     assert config["streamCap"] == 600
+
+
+def _allowlist_root(tmp_path, content=None):
+    """A fake repo root whose ios-lab/mac/agent-apps.json holds the given text."""
+    folder = tmp_path / "ios-lab" / "mac"
+    folder.mkdir(parents=True)
+    entry = folder / "agent-apps.json"
+    if content is not None:
+        entry.write_text(content, encoding="utf-8")
+    return str(tmp_path)
+
+
+def test_allowlist_missing_file_and_empty_list_allow_every_app(tmp_path):
+    root = _allowlist_root(tmp_path)
+    oslab._macos_allowlist(root, app="Anything", bundle="com.any.app")  # no file: no restriction
+    root = _allowlist_root(tmp_path / "b", content="[]")
+    oslab._macos_allowlist(root, app="Anything", bundle="com.any.app")  # empty list: explicit no restriction
+
+
+def test_allowlist_admits_members_and_refuses_strangers(tmp_path):
+    root = _allowlist_root(tmp_path, content='["Finder", "com.example.app"]')
+    oslab._macos_allowlist(root, app="Finder")              # by name
+    oslab._macos_allowlist(root, bundle="com.example.APP")   # by bundle id, case-insensitive
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, bundle="com.stranger.app")
+    assert refused.value.code == "APP_NOT_ALLOWED"
+
+
+def test_allowlist_fails_closed_on_a_broken_file(tmp_path):
+    root = _allowlist_root(tmp_path, content='{"Finder": true}')  # a dict, not a list
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, app="Finder")
+    assert refused.value.code == "ALLOWLIST_INVALID"
+    assert "agent-apps.json" in str(refused.value)
+    entry = tmp_path / "ios-lab" / "mac" / "agent-apps.json"
+    entry.write_text('["Finder", 7]', encoding="utf-8")  # not a list of strings
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, app="Finder")
+    assert refused.value.code == "ALLOWLIST_INVALID"
+    entry.write_text('["Finder",', encoding="utf-8")  # malformed JSON
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, app="Finder")
+    assert refused.value.code == "ALLOWLIST_INVALID"
+    entry.unlink()
+    entry.mkdir()  # present but unreadable: a directory where the file should be
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_allowlist(root, app="Finder")
+    assert refused.value.code == "ALLOWLIST_INVALID"
 
 
 def test_second_owner_cannot_arm_and_is_named(mac):
@@ -91,6 +141,30 @@ def test_displays_are_json_on_a_mac_and_refused_elsewhere(mac, monkeypatch):
     assert oslab.macos_displays()["displays"][0]["scale"] == 2.0
     monkeypatch.setattr(oslab, "host_os", lambda: "linux")
     assert oslab.macos_displays() == {"available": False, "reason": "The app mirror needs a Mac.", "displays": []}
+
+
+def test_new_navigation_keys_are_allowlisted_and_unknown_keys_refused():
+    for key in ("home", "end", "pageup", "pagedown"):
+        values = oslab._validated_input({"pid": 1, "x": 0, "y": 0, "kind": "key", "key": key})
+        assert values["key"] == key
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._validated_input({"pid": 1, "x": 0, "y": 0, "kind": "key", "key": "f13"})
+    assert refused.value.code == "INVALID_ARGS"
+
+
+def test_type_paste_and_tree_limits_are_configurable_and_honored(monkeypatch):
+    monkeypatch.setenv("OSLAB_MAC_TYPE_MAX", "300")
+    monkeypatch.setenv("OSLAB_MAC_PASTE_MAX", "1500")
+    monkeypatch.setenv("OSLAB_MAC_TREE_SIZE", "250")
+    config = oslab._load_macos_config()
+    assert (config["typeMax"], config["pasteMax"], config["treeSize"]) == (300, 1500, 250)
+    monkeypatch.setenv("OSLAB_MAC_TYPE_MAX", "nonsense")
+    assert oslab._load_macos_config()["typeMax"] == 200  # a typo keeps the default
+    ok = oslab._validated_input({"pid": 1, "x": 0, "y": 0, "kind": "type", "text": "a" * 200})
+    assert len(ok["text"]) == 200  # the default limit still gates the input family
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._validated_input({"pid": 1, "x": 0, "y": 0, "kind": "type", "text": "a" * 201})
+    assert refused.value.code == "INVALID_ARGS"
 
 
 def test_permissions_name_the_app_that_needs_the_grant(mac, monkeypatch):
@@ -166,3 +240,184 @@ def test_events_stream_delivers_rows_and_ends_on_panic_stop(events_server):
         if chunk == b"" and response.isclosed():
             break
     assert response.isclosed() or response.read() == b""
+
+def make_repl_host(root):
+    """A fake macOS host for oslab.plan: the mirror actions are available on this lab."""
+    return {"os": "macos", "arch": "arm64", "root": root,
+            "kvm": {"present": True, "usable": True},
+            "wsl": {"guest": False, "distributions": []},
+            "runtime": None,
+            "xcode": {"installed": True, "iosRuntime": True, "iosDevice": True},
+            "tools": [{"id": tool, "label": label, "found": tool in ("xcrun", "brew", "node"), "path": None}
+                      for tool, label in oslab.TOOLS]}
+
+
+def _repl(monkeypatch, input_lines=""):
+    """A REPL session over the fake helper; the plan executor is stubbed, so confirmed plans never run."""
+    import macos_repl
+    monkeypatch.setattr(oslab, "host_info", lambda root: make_repl_host(root))
+    repl = macos_repl.MacRepl(REPO_ROOT, input=io.StringIO(input_lines), output=io.StringIO())
+    repl.runs = []
+    repl._execute = lambda plan: (repl.runs.append(plan) or (0, "stubbed output"))
+    return repl
+
+
+def _stamp_of(out):
+    for line in out.splitlines():
+        if line.strip().startswith("stamp: "):
+            return line.strip().split()[1]
+    return None
+
+
+def _save_index(repl):
+    repl.handle("tree")
+    return next(i for i, entry in enumerate(repl.numbered, 1)
+                if entry["element"].get("label") == "Save")
+
+
+def test_repl_previews_then_confirms_once_and_refuses_replay(mac, monkeypatch):
+    repl = _repl(monkeypatch)
+    index = _save_index(repl)
+    repl.handle(f"click {index}")
+    assert repl.runs == []  # a preview never executes
+    stamp = _stamp_of(repl.output.getvalue())
+    assert stamp and stamp.startswith("v1.")
+    repl.handle("confirm not-the-stamp")
+    assert repl.runs == []
+    repl.handle(f"confirm {stamp}")
+    assert len(repl.runs) == 1 and repl.runs[0]["action"] == "macos-click"
+    kinds = [row["kind"] for row in oslab.macos_audit_rows()["rows"]]
+    assert "preview" in kinds and "preview-confirmed" in kinds
+    repl.handle(f"confirm {stamp}")  # replay: the first confirm consumed the stamp
+    assert len(repl.runs) == 1
+    assert "nothing to confirm" in repl.output.getvalue()
+
+
+def test_repl_expired_stamp_refused(mac, monkeypatch):
+    monkeypatch.setattr(oslab, "PlanSigner", functools.partial(oslab.PlanSigner, ttl=1))
+    repl = _repl(monkeypatch)
+    index = _save_index(repl)
+    repl.handle(f"click {index}")
+    stamp = _stamp_of(repl.output.getvalue())
+    time.sleep(1.1)
+    repl.handle(f"confirm {stamp}")
+    assert repl.runs == [] and "no longer valid" in repl.output.getvalue()
+
+
+def test_repl_arm_persists_across_commands_and_refuses_a_second_owner(mac, monkeypatch):
+    repl = _repl(monkeypatch)
+    index = _save_index(repl)  # tree reads before the _capture stub: the fake helper answers it
+    captured = []
+    monkeypatch.setattr(oslab, "_capture",
+                        lambda args, timeout=5.0, decode="utf-8": captured.append(args) or (0, "ok"))
+    repl.handle("arm")
+    assert oslab.macos_control_state()["owner"] == "repl"
+    repl.handle(f"click {index}")  # armed: runs now, no preview
+    assert "executed" in repl.output.getvalue() and repl.runs == []
+    repl.handle("apps")  # a read-only command between actions: the session keeps the arm
+    repl.handle(f"click {index}")
+    clicks = [args for args in captured if args[0] == "bash"]
+    assert len(clicks) == 2 and clicks[0][2] == "click"
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab.macos_control_arm(REPO_ROOT, True, "dashboard")
+    assert refused.value.code == "ARMED_BY_OTHER"
+    repl.handle("disarm")
+    assert oslab.macos_control_state()["armed"] is False
+
+
+def test_repl_paste_needs_explicit_confirm_even_while_armed(mac, monkeypatch):
+    repl = _repl(monkeypatch, input_lines="n\ny\n")
+    _save_index(repl)  # tree reads before the _capture stub: the fake helper answers it
+    captured = []
+    monkeypatch.setattr(oslab, "_capture",
+                        lambda args, timeout=5.0, decode="utf-8": captured.append(args) or (0, "ok"))
+    repl.handle("arm")
+    repl.handle("paste hello")
+    assert "cancelled" in repl.output.getvalue()
+    repl.handle("paste hello")
+    pastes = [args for args in captured if args[0] == "bash" and "paste" in args]
+    assert pastes and "hello" in pastes[-1]
+
+
+def test_repl_key_scroll_set_value_and_perform_preview_through_the_plan(mac, monkeypatch):
+    repl = _repl(monkeypatch)
+    index = _save_index(repl)
+    repl.handle("key enter")
+    assert "key enter" in repl.output.getvalue().replace('"', "")
+    repl.handle("scroll down 5")
+    assert "down:5" in repl.output.getvalue()
+    repl.handle(f"set-value {index} Ada Lovelace")
+    assert "axset" in repl.output.getvalue()
+    repl.handle(f"perform {index} AXPress")
+    assert "axperform" in repl.output.getvalue()
+    assert repl.runs == []  # everything stays a preview while disarmed
+
+
+def test_repl_stop_disarms_and_audits(mac, monkeypatch):
+    repl = _repl(monkeypatch)
+    oslab.macos_control_arm(REPO_ROOT, True, "repl")
+    repl.handle("stop")
+    assert oslab.macos_control_state()["armed"] is False
+    assert oslab.macos_audit_rows()["rows"][-1]["kind"] == "panic-stop"
+
+
+FAKE_PNG = b"\x89PNG\r\n\x1a\nrest-of-frame"
+
+
+def _fake_display_capture(calls):
+    """A screencapture stand-in that writes a small PNG to its output path."""
+    def capture(args, timeout=5.0, decode="utf-8"):
+        calls.append(list(args))
+        with open(args[-1], "wb") as f:
+            f.write(FAKE_PNG)
+        return 0, ""
+    return capture
+
+
+def test_display_target_is_validated_against_the_displays_list(mac, monkeypatch):
+    class Cg:
+        def screens(self):
+            return [{"id": 1, "x": 0, "y": 0, "width": 1512, "height": 982, "scale": 2.0},
+                    {"id": 7, "x": 1512, "y": 0, "width": 1920, "height": 1080, "scale": 1.0}]
+    monkeypatch.setattr(oslab, "_macos_cg", lambda: Cg())
+    assert oslab._macos_display_target(7) == (7, 2)  # the id plus its 1-based screencapture index
+    assert oslab._macos_display_target("1") == (1, 1)
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab._macos_display_target(9)
+    assert "9" in str(refused.value) and "1, 7" in str(refused.value)
+
+
+def test_display_screenshot_captures_the_whole_display(mac, monkeypatch):
+    class Cg:
+        def screens(self):
+            return [{"id": 4, "x": 0, "y": 0, "width": 1512, "height": 982, "scale": 2.0}]
+    monkeypatch.setattr(oslab, "_macos_cg", lambda: Cg())
+    calls = []
+    monkeypatch.setattr(oslab, "_capture", _fake_display_capture(calls))
+    assert oslab.macos_display_screenshot(4).startswith(b"\x89PNG")
+    assert calls[0][0] == "screencapture" and "-D1" in calls[0]
+    monkeypatch.setattr(oslab, "_capture", lambda args, timeout=5.0, decode="utf-8": (1, ""))
+    with pytest.raises(oslab.PlanError) as refused:
+        oslab.macos_display_screenshot(4)
+    assert "Screen Recording" in str(refused.value)  # the permission stays honest
+
+
+def test_display_stream_validates_then_ends_on_a_failed_capture(mac, monkeypatch):
+    class Cg:
+        def screens(self):
+            return [{"id": 2, "x": 0, "y": 0, "width": 1512, "height": 982, "scale": 2.0}]
+    monkeypatch.setattr(oslab, "_macos_cg", lambda: Cg())
+    monkeypatch.setattr(oslab, "_capture", _fake_display_capture([]))
+    for frame in oslab.macos_display_stream(2, 8.0):
+        assert frame.startswith(b"\x89PNG")
+        break  # one frame is enough; the loop is infinite by design
+    with pytest.raises(oslab.PlanError):
+        next(oslab.macos_display_stream(99, 8.0))  # unknown id: refused before the first frame
+    monkeypatch.setattr(oslab, "_capture", lambda args, timeout=5.0, decode="utf-8": (1, ""))
+    assert list(oslab.macos_display_stream(2, 8.0)) == []  # capture failure ends the stream
+
+
+def test_display_capture_refused_off_a_mac(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "linux")
+    with pytest.raises(oslab.PlanError):
+        oslab.macos_display_screenshot(1)

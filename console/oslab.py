@@ -664,7 +664,11 @@ def _load_macos_config() -> dict:
     typo cannot turn the safety timers off."""
     limits = {"controlTimeout": (600, 30, 3600, "OSLAB_MAC_CONTROL_TIMEOUT"),
               "auditMax": (500, 50, 5000, "OSLAB_MAC_AUDIT_MAX"),
-              "streamCap": (600, 30, 3600, "OSLAB_MAC_STREAM_CAP")}
+              "streamCap": (600, 30, 3600, "OSLAB_MAC_STREAM_CAP"),
+              "previewTtl": (60, 5, 3600, "OSLAB_MAC_PREVIEW_TTL"),
+              "typeMax": (200, 1, 10000, "OSLAB_MAC_TYPE_MAX"),
+              "pasteMax": (2000, 1, 100000, "OSLAB_MAC_PASTE_MAX"),
+              "treeSize": (400, 50, 5000, "OSLAB_MAC_TREE_SIZE")}
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ios-lab", "mac", "mac-lab.json")
     try:
         with open(path, encoding="utf-8") as f:
@@ -788,7 +792,7 @@ class _MacosWindows:
             if mode:
                 points, pixels = self.cg.CGDisplayModeGetWidth(mode), self.cg.CGDisplayModeGetPixelWidth(mode)
                 scale = round(pixels / points, 2) if points else 1.0
-            out.append({"x": int(rect.origin.x), "y": int(rect.origin.y),
+            out.append({"id": int(did), "x": int(rect.origin.x), "y": int(rect.origin.y),
                         "width": int(rect.size.width), "height": int(rect.size.height), "scale": scale})
         return out
 
@@ -836,6 +840,59 @@ def macos_windows() -> dict:
     except OSError as e:
         return {"available": False, "reason": f"CoreGraphics is unavailable: {e}", "screenRecording": False, "windows": []}
     return {"available": True, "reason": None, "screenRecording": any(w["title"] for w in windows), "windows": windows}
+
+
+def _macos_display_target(display_id) -> tuple[int, int]:
+    """The display id and its 1-based screencapture index, validated against the displays
+    list (QcU mac-driver parity): an unknown id is refused, never guessed."""
+    if host_os() != "macos":
+        raise PlanError("The app mirror needs a Mac")
+    try:
+        display_id = int(display_id)
+    except (TypeError, ValueError):
+        raise PlanError("Invalid display id") from None
+    displays = macos_displays()["displays"]
+    for index, display in enumerate(displays):
+        if display.get("id") == display_id:
+            return display_id, index + 1
+    known = ", ".join(str(d.get("id")) for d in displays) or "none"
+    raise PlanError(f"Unknown display id {display_id}; active displays: {known}", code="INVALID_ARGS")
+
+
+def macos_display_screenshot(display_id) -> bytes:
+    """A PNG of one whole display (screencapture -D). Same host and permission behaviour as
+    the window capture: a failed or empty capture reports the Screen Recording grant."""
+    _, index = _macos_display_target(display_id)
+    fd, path = tempfile.mkstemp(suffix=".png")
+    try:
+        os.close(fd)
+        code, output = _capture(["screencapture", "-x", f"-D{index}", path], timeout=15)
+        with open(path, "rb") as f:
+            png = f.read()
+        if code != 0 or not png.startswith(b"\x89PNG"):
+            raise PlanError("Could not capture that display. If this keeps failing, grant Screen Recording "
+                            "to the console (System Settings > Privacy & Security) and retry.")
+        return png
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+def macos_display_stream(display_id, fps: float, epoch: int | None = None):
+    """Yield PNG frames of one whole display for the multipart response, with the same end
+    conditions as the window stream: client disconnect, panic stop, or the hard cap."""
+    _macos_display_target(display_id)  # validate before the loop starts
+    interval = 1.0 / fps
+    while True:
+        if epoch is not None and epoch != _MACOS_STREAM_EPOCH:
+            return  # a panic stop ended this stream
+        try:
+            yield macos_display_screenshot(display_id)
+        except PlanError:
+            return
+        time.sleep(interval)
 
 
 def macos_window_screenshot(window_id: int) -> bytes:
@@ -909,7 +966,7 @@ _AX_PATH = re.compile(r"^[0-9.]{0,80}$")
 _AX_INTERACTIVE = {"Button", "CheckBox", "RadioButton", "PopUpButton", "MenuButton", "TextField",
                    "TextArea", "ComboBox", "SearchField", "Slider", "TabGroup", "Menu", "MenuItem",
                    "MenuBarItem", "Link", "Switch", "SegmentedControl", "TableRow", "OutlineRow"}
-_AX_ELEMENT_CAP = 400
+_AX_ELEMENT_CAP = _MACOS_CONFIG["treeSize"]
 
 
 def _ax_helper(root: str) -> str | None:
@@ -1237,16 +1294,36 @@ def macos_screen_locked() -> bool | None:
 
 def _macos_allowlist(root: str, app: str | None = None, bundle: str | None = None) -> None:
     """The agent app allowlist (MIR-11): ios-lab/mac/agent-apps.json lists app names or bundle
-    ids that input actions may drive; missing or empty means every mirror-visible app."""
+    ids that input actions may drive. A missing file or an empty list means every mirror-visible
+    app. A file that is present but unreadable, malformed or not a list of strings fails closed
+    (QcU allowlist parity): the action is refused with the file and the problem named, so a
+    broken allowlist can never silently widen what agents may drive."""
     path = os.path.join(root, "ios-lab", "mac", "agent-apps.json")
     try:
         with open(path, encoding="utf-8") as f:
-            allowed = json.load(f)
-    except (OSError, ValueError):
-        return
-    if not isinstance(allowed, list) or not allowed:
-        return
-    names = {str(entry).strip().lower() for entry in allowed if isinstance(entry, str)}
+            text = f.read()
+    except FileNotFoundError:
+        return  # no allowlist file: every mirror-visible app may be driven
+    except OSError as e:
+        raise PlanError(f"The agent allowlist {path} could not be read: {e}. Fix the file or "
+                        "remove it to allow every app", code="ALLOWLIST_INVALID", retry="never") from None
+    try:
+        allowed = json.loads(text)
+    except ValueError as e:
+        raise PlanError(f"The agent allowlist {path} is not valid JSON: {e}. Fix the file or "
+                        "remove it to allow every app", code="ALLOWLIST_INVALID", retry="never") from None
+    if not isinstance(allowed, list):
+        raise PlanError(f"The agent allowlist {path} must be a JSON list of app names or bundle "
+                        f"ids, not {type(allowed).__name__}", code="ALLOWLIST_INVALID", retry="never")
+    if not allowed:
+        return  # an empty list is an explicit "no restriction"
+    entries = [entry for entry in allowed if isinstance(entry, str)]
+    if len(entries) != len(allowed):
+        bad = next(entry for entry in allowed if not isinstance(entry, str))
+        raise PlanError(f"The agent allowlist {path} must contain only app names or bundle ids "
+                        f"(strings); entry {json.dumps(bad)} is {type(bad).__name__}",
+                        code="ALLOWLIST_INVALID", retry="never")
+    names = {entry.strip().lower() for entry in entries}
     if bundle and bundle.lower() in names:
         return
     app_name = (app or "").lower()
@@ -1591,7 +1668,7 @@ _MACOS_MIRROR_ACTIONS = ("macos-click", "macos-input", "macos-element", "macos-s
 
 def macos_audit_preview(root: str, request: dict, kind: str, token: str | None = None) -> None:
     """Audit rows for the previewed half of the mirror pipeline (MIR-06): a plan preview and a
-    confirmed start. The token is recorded only as a short digest, never the signed secret."""
+    confirmed start. The token is recorded only as a short digest (tokenDigest), never the signed secret."""
     if not isinstance(request, dict) or request.get("lab") != "macos" \
             or request.get("action") not in _MACOS_MIRROR_ACTIONS:
         return
@@ -1599,7 +1676,7 @@ def macos_audit_preview(root: str, request: dict, kind: str, token: str | None =
               "inputKind": request.get("inputKind"), "key": request.get("inputKey"),
               "textLength": len(request.get("inputText") or "")}
     if isinstance(token, str) and token:
-        detail["token"] = hashlib.sha256(token.encode()).hexdigest()[:16]
+        detail["tokenDigest"] = hashlib.sha256(token.encode()).hexdigest()[:16]
     _macos_audit(root, kind, detail=detail)
 
 
@@ -1608,9 +1685,9 @@ def macos_audit_preview(root: str, request: dict, kind: str, token: str | None =
 # newlines are refused here and in the script, and Enter is its own explicit key action.
 _MACOS_INPUT_KINDS = ("double", "right", "type", "key", "paste", "scroll")
 _MACOS_INPUT_KEYS = ("tab", "escape", "delete", "forward-delete", "up", "down", "left", "right",
-                     "space", "enter", "return")
-_INPUT_TEXT_MAX = 200
-_PASTE_TEXT_MAX = 2000
+                     "home", "end", "pageup", "pagedown", "space", "enter", "return")
+_INPUT_TEXT_MAX = _MACOS_CONFIG["typeMax"]
+_PASTE_TEXT_MAX = _MACOS_CONFIG["pasteMax"]
 
 
 def _validated_input(data: dict) -> dict:
@@ -2760,17 +2837,74 @@ def wsl_path(distro: str, path: str) -> str:
 
 
 class PlanSigner:
-    """Binds a confirmed plan to its request, so /start only runs what was previewed."""
+    """Binds a confirmed plan to its request, so /start only runs what was previewed.
 
-    def __init__(self) -> None:
+    Previews are expiring and one-use (QcU ConfirmGate parity): each carries the canonical
+    request digest with its issue and expiry seconds under an HMAC, is consumed by the first
+    successful verify, and a replay is refused. The pending table is pruned and capped on
+    every sign and verify, so it cannot grow without bound. The TTL comes from the mac-lab
+    config (env > file > defaults; default 60 s)."""
+
+    MAX_PENDING = 64
+
+    def __init__(self, ttl: int | None = None, max_pending: int | None = None) -> None:
         self._key = _secrets.token_bytes(32)
+        self._ttl = int(_MACOS_CONFIG["previewTtl"] if ttl is None else ttl)
+        self._max_pending = max(1, self.MAX_PENDING if max_pending is None else int(max_pending))
+        self._pending: dict[str, int] = {}  # outstanding preview -> expires-at second
+        self._lock = threading.Lock()
+
+    def _digest(self, request: dict) -> str:
+        body = json.dumps(request, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(body).hexdigest()[:32]
+
+    def _stamp(self, digest: str, issued: int, expires: int) -> str:
+        mac = hmac.new(self._key, f"{digest}.{issued}.{expires}".encode(), hashlib.sha256).hexdigest()
+        return f"v1.{issued}.{expires}.{mac}"
+
+    def _prune(self, now: float) -> None:
+        stale = [known for known, expires in self._pending.items() if expires <= now]
+        for known in stale:
+            del self._pending[known]
+
+    @property
+    def ttl(self) -> int:
+        """How many seconds a preview stays confirmable."""
+        return self._ttl
 
     def sign(self, request: dict) -> str:
-        body = json.dumps(request, sort_keys=True, separators=(",", ":")).encode()
-        return hmac.new(self._key, body, hashlib.sha256).hexdigest()
+        digest = self._digest(request)
+        now = int(time.time())
+        expires = now + self._ttl
+        preview = self._stamp(digest, now, expires)
+        with self._lock:
+            self._prune(now)
+            while len(self._pending) >= self._max_pending:
+                self._pending.pop(next(iter(self._pending)))
+            self._pending[preview] = expires
+        return preview
 
-    def verify(self, request: dict, token: str) -> bool:
-        return isinstance(token, str) and hmac.compare_digest(self.sign(request), token)
+    def verify(self, request: dict, preview: str | None) -> bool:
+        """True when the preview was issued for exactly this request, is still live and has not
+        been confirmed before. A failed verify does not consume the preview; a successful one
+        does, so the same preview can never start a second action."""
+        if not isinstance(preview, str) or not preview:
+            return False
+        parts = preview.split(".")
+        if len(parts) != 4 or parts[0] != "v1" or not parts[1].isdigit() or not parts[2].isdigit():
+            return False
+        issued, expires = int(parts[1]), int(parts[2])
+        now = time.time()
+        if now > expires or issued > expires:
+            return False
+        if not hmac.compare_digest(self._stamp(self._digest(request), issued, expires), preview):
+            return False
+        with self._lock:
+            self._prune(now)
+            if preview not in self._pending:
+                return False  # already confirmed (replay) or evicted from the bounded table
+            del self._pending[preview]
+        return True
 
 
 # ── Jobs ─────────────────────────────────────────────────────────────────────

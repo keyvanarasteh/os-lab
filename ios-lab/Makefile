@@ -146,7 +146,7 @@ mac-app-doctor: ## macOS host: check the macOS Lab's app automation stack (Appiu
 mac-app-smoke: ## macOS host: run one mac2 session that activates Finder on this Mac
 	bash mac/macos-app.sh smoke
 
-mac-app-repl: ## macOS host: interactive mac2 REPL for macOS apps (APP=<bundle-id>, default Finder)
+mac-app-repl: ## macOS host: interactive REPL over the native AX helper (APP=<app name or bundle id>, default Finder)
 	APP="$(APP)" bash mac/macos-app.sh repl
 
 mac-status: ## macOS host: show Xcode, booted simulators and Appium state

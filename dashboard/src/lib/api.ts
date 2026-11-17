@@ -305,6 +305,7 @@ export interface MacAuditState {
   rows: MacAuditRow[];
 }
 export interface MacDisplay {
+  id: number;
   x: number;
   y: number;
   width: number;
@@ -728,6 +729,8 @@ export const api = {
   iosRealScreenshotUrl: (udid: string) => `/api/labs/ios/screenshot?udid=${encodeURIComponent(udid)}`,
   macosApps: () => call<MacAppsInfo>("/api/labs/macos/apps"),
   macosAppScreenshotUrl: (windowId: number) => `/api/labs/macos/apps/${windowId}/screenshot`,
+  macosDisplayScreenshotUrl: (displayId: number) => `/api/labs/macos/displays/${displayId}/screenshot`,
+  macosDisplayStreamUrl: (displayId: number, fps: number) => `/api/labs/macos/displays/${displayId}/stream?fps=${fps}`,
   macosElements: (windowId: number, revision?: string) =>
     call<MacElementsInfo>(`/api/labs/macos/apps/${windowId}/elements${revision ? `?revision=${encodeURIComponent(revision)}` : ""}`),
   macosAppStreamUrl: (windowId: number, fps: number) => `/api/labs/macos/apps/${windowId}/stream?fps=${fps}`,

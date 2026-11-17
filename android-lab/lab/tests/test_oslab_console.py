@@ -272,6 +272,41 @@ def test_plan_signer_binds_the_exact_request():
     assert not oslab.PlanSigner().verify(req, token)
 
 
+def test_preview_stamp_expires_and_refuses_replay():
+    signer = oslab.PlanSigner(ttl=1)
+    req = {"lab": "linux", "action": "start"}
+    first = signer.sign(req)
+    assert signer.verify(copy.deepcopy(req), first)
+    assert not signer.verify(copy.deepcopy(req), first)  # replay: the successful verify consumed it
+    second = signer.sign(req)
+    time.sleep(1.1)
+    assert not signer.verify(copy.deepcopy(req), second)  # expired: re-preview
+
+
+def test_preview_stamp_binds_the_digest_and_survives_a_failed_verify():
+    signer = oslab.PlanSigner(ttl=120)
+    req = {"lab": "linux", "action": "start"}
+    preview = signer.sign(req)
+    assert not signer.verify({"lab": "linux", "action": "stop"}, preview)  # wrong request
+    assert signer.verify(copy.deepcopy(req), preview)  # a failed verify does not consume
+    tampered = preview[:-1] + ("0" if preview[-1] != "0" else "1")
+    assert not signer.verify(copy.deepcopy(req), tampered)  # tampered stamp
+    assert not signer.verify(copy.deepcopy(req), "0" * 64)  # legacy unsigned stamps: refused, fail closed
+
+
+def test_preview_pending_table_is_pruned_and_capped():
+    signer = oslab.PlanSigner(ttl=1, max_pending=2)
+    a, b = signer.sign({"n": 1}), signer.sign({"n": 2})
+    c = signer.sign({"n": 3})  # the cap evicts the oldest outstanding preview
+    assert not signer.verify({"n": 1}, a)
+    assert signer.verify({"n": 2}, b) and signer.verify({"n": 3}, c)
+    signer = oslab.PlanSigner(ttl=1, max_pending=8)
+    signer.sign({"n": 1})
+    time.sleep(1.1)
+    signer.sign({"n": 2})  # pruning drops the expired preview on the next sign
+    assert len(signer._pending) == 1
+
+
 def test_env_parsing_and_secret_masking(tmp_path):
     text = "# comment\nexport WEB_PORT=9000\nUSER_PASSWORD='hunter22'\nBAD LINE\nAPI_TOKEN=\n"
     entries = oslab.env_entries(text)

@@ -163,7 +163,7 @@ export function MacEnginePanel() {
           {displays.data?.displays?.length ? (
             <ul className="flex flex-col gap-1 text-sm">
               {displays.data.displays.map((d, i) => (
-                <li key={`${d.x}-${d.y}-${i}`}>{`${d.width}×${d.height} pt · ${d.x},${d.y} · ${d.scale}×`}</li>
+                <li key={`${d.x}-${d.y}-${i}`}>{`#${d.id} · ${d.width}×${d.height} pt · ${d.x},${d.y} · ${d.scale}×`}</li>
               ))}
             </ul>
           ) : (

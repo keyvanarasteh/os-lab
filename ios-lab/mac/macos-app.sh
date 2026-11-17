@@ -216,19 +216,15 @@ PY
     say "macOS app smoke passed: mac2 session $SESSION_ID activated Finder"
     ;;
   repl)
-    # Interactive mac2 REPL (macos-repl.mjs): a local operator tool with its own terminal
-    # session. Never a console job — stdin does not survive the background job runner, and
-    # the web console keeps its preview → confirm model for everything it runs.
-    command -v node >/dev/null 2>&1 || die "node is required for the REPL (brew install node)"
-    APPIUM="$(appium_bin)"
-    [ -n "$APPIUM" ] || die "Appium is not installed; use Install Appium in the macOS Lab page"
-    if [ -x "$MANAGED_BIN" ]; then export APPIUM_HOME="$APPIUM_PREFIX/home"; fi
-    "$APPIUM" driver list --installed 2>/dev/null | grep -q mac2 \
-      || die "the Appium mac2 driver is not installed; run Install Appium again"
-    curl -fsS --max-time 2 "http://${APPIUM_HOST}:${APPIUM_PORT}/status" >/dev/null 2>&1 \
-      || die "Appium is not running on ${APPIUM_HOST}:${APPIUM_PORT}; start it first (make mac-appium)"
+    # Interactive macOS Lab REPL (console/macos_repl.py): a local operator tool with its own
+    # terminal session over the native AX helper — no Appium needed. Never a console job —
+    # stdin does not survive the background job runner, and the web console keeps its
+    # preview → confirm model for everything it runs.
+    command -v python3 >/dev/null 2>&1 || die "python3 is required for the REPL"
+    [ -x "$MAC_DIR/build/ax-helper" ] \
+      || warn "native AX helper: not built (Build AX helper in the macOS Lab page); reads fall back to osascript"
     mkdir -p "$LAB_DIR/artifacts"
-    exec node "$MAC_DIR/macos-repl.mjs" "http://${APPIUM_HOST}:${APPIUM_PORT}" "${MACOS_APP:-com.apple.finder}" "$LAB_DIR/artifacts"
+    exec python3 "$LAB_DIR/../console/macos_repl.py" --app "${MACOS_APP:-Finder}" --artifacts "$LAB_DIR/artifacts"
     ;;
   click)
     # One real click on this Mac: bring the owning app forward, then post the event at the
@@ -290,7 +286,9 @@ PY
         case "$PAYLOAD" in
           ''|*[![:print:]]*) die "the text may only contain printable characters (no Return)" ;;
         esac
-        [ "${#PAYLOAD}" -le 200 ] || die "the text is longer than 200 characters"
+        TYPE_MAX="${OSLAB_MAC_TYPE_MAX:-200}"
+        case "$TYPE_MAX" in ''|*[!0-9]*) TYPE_MAX=200 ;; esac
+        [ "${#PAYLOAD}" -le "$TYPE_MAX" ] || die "the text is longer than ${TYPE_MAX} characters"
         ESCAPED="$(printf '%s' "$PAYLOAD" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
         osascript -e "tell application \"System Events\" to keystroke \"$ESCAPED\"" \
           || die "the text could not be typed; grant Accessibility permission to the console"
@@ -298,14 +296,15 @@ PY
         ;;
       key)
         case "$PAYLOAD" in
-          tab|escape|delete|forward-delete|up|down|left|right|space|enter|return) ;;
-          *) die "key must be one of: tab, escape, delete, forward-delete, up, down, left, right, space, enter" ;;
+          tab|escape|delete|forward-delete|up|down|left|right|space|enter|return|home|end|pageup|pagedown) ;;
+          *) die "key must be one of: tab, escape, delete, forward-delete, up, down, left, right, space, enter, return, home, end, pageup, pagedown" ;;
         esac
         osascript -l JavaScript -e '
           ObjC.import("CoreGraphics");
           function run(argv) {
             const codes = { tab: 48, escape: 53, delete: 51, "forward-delete": 117,
-                            up: 126, down: 125, left: 123, right: 124, space: 49, enter: 36, return: 36 };
+                            up: 126, down: 125, left: 123, right: 124, space: 49, enter: 36, return: 36,
+                            home: 115, end: 119, pageup: 116, pagedown: 121 };
             const code = codes[argv[0]];
             $.CGEventPost($.kCGHIDEventTap, $.CGEventCreateKeyboardEvent($(), code, true));
             $.CGEventPost($.kCGHIDEventTap, $.CGEventCreateKeyboardEvent($(), code, false));
@@ -332,7 +331,9 @@ PY
         # MIR-07: clipboard paste — the one input that may carry newlines, gated behind an
         # explicit confirm even while armed (MIR-11). The clipboard is replaced, honestly.
         [ -n "$PAYLOAD" ] || die "a paste needs text"
-        [ "${#PAYLOAD}" -le 2000 ] || die "the text is longer than 2000 characters"
+        PASTE_MAX="${OSLAB_MAC_PASTE_MAX:-2000}"
+        case "$PASTE_MAX" in ''|*[!0-9]*) PASTE_MAX=2000 ;; esac
+        [ "${#PAYLOAD}" -le "$PASTE_MAX" ] || die "the text is longer than ${PASTE_MAX} characters"
         printf '%s' "$PAYLOAD" | pbcopy || die "the clipboard could not be written"
         osascript -e 'tell application "System Events" to keystroke "v" using command down' \
           || die "the paste could not be posted; grant Accessibility permission to the console"
@@ -392,7 +393,9 @@ PY
         case "$PAYLOAD" in
           ''|*[![:print:]]*) die "the text may only contain printable characters (no Return)" ;;
         esac
-        [ "${#PAYLOAD}" -le 200 ] || die "the text is longer than 200 characters"
+        TYPE_MAX="${OSLAB_MAC_TYPE_MAX:-200}"
+        case "$TYPE_MAX" in ''|*[!0-9]*) TYPE_MAX=200 ;; esac
+        [ "${#PAYLOAD}" -le "$TYPE_MAX" ] || die "the text is longer than ${TYPE_MAX} characters"
         TEXT="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$PAYLOAD")" \
           || die "the text could not be encoded"
         curl -fsS --max-time 30 -X POST "http://${APPIUM_HOST}:${APPIUM_PORT}/session/$SESSION/element/$ELEMENT/value" \

@@ -47,13 +47,19 @@ and mac2 needs Accessibility permission in System Settings to control
 applications. `appium.sh install` installs both the XCUITest and mac2
 drivers, so one Appium server serves both lab pages.
 
-Beyond the one-shot smoke run, [[ios-lab/mac/macos-repl.mjs]] keeps a mac2
-session open for interactive work from a terminal
-(`make -C ios-lab mac-app-repl APP=<bundle-id>`): it prints the app's
-accessibility tree, finds elements by label and clicks or types into them
-by number, and saves screenshots into artifacts/. It is a local operator
-tool — the web console never runs interactive sessions and keeps its
-preview → confirm model for every action it does run.
+Beyond the one-shot smoke run, [[console/macos_repl.py]] (launched by `make -C ios-lab
+mac-app-repl APP=<app name or bundle id>`) keeps one console session open for interactive
+work from a terminal over the native AX helper — no Appium needed: it prints the window's
+element tree, finds elements by label or value, clicks or types into them by number, saves
+screenshots into artifacts/, and carries the input family (key, scroll, paste), set-value
+and perform. It is a local operator tool — the web console never runs interactive sessions
+and keeps its preview → confirm model for every action it does run. The REPL holds one
+session, so arm state, the numbered element cache and the pending preview persist between
+commands (QcU's CLI builds a new engine per command and loses the arm — this REPL
+deliberately does not), and every state-changing command goes through the same gates as the
+API: disarmed it prints a preview and a one-use expiring stamp that `confirm <stamp>`
+consumes; armed it runs immediately through the armed functions, and submit-class actions
+(Enter/Return keys, pastes) still ask for an explicit confirmation.
 
 The dashboard's simulator panel (see [[dashboard]]) drives the same scripts:
 `start` accepts a `device` (a UDID or unique name, validated against
@@ -124,7 +130,13 @@ list comes from CoreGraphics through ctypes (the osascript ObjC bridge is
 unstable on current macOS), captures from `screencapture -l` (Screen
 Recording permission) and element hotspots from
 [[ios-lab/mac/ax-elements.applescript]] over System Events (Accessibility
-permission). `macos-app.sh click` brings the owning app forward and posts
+permission). Whole displays can be captured and streamed too: display
+records carry their CG id, `GET /api/labs/macos/displays/<id>/screenshot`
+and `…/stream` validate the id against the displays list (`screencapture
+-D`, QcU mac-driver parity), and the mirror picker and the MCP
+macos_screenshot tool accept a display target next to the window target —
+observe only, since hotspot clicks and the input family stay window-bound.
+`macos-app.sh click` brings the owning app forward and posts
 one CGEvent click; the mirror previews it like any action, and clicks land
 without a preview only while control mode is armed.
 
@@ -132,11 +144,16 @@ The app mirror roadmap (MIR-01…06, see
 [[ios-lab/PLAN-macos-mirror-roadmap.md]]) extends the same pipeline:
 
 - **Input family (MIR-01)** — `macos-app.sh input <pid> <x> <y> <kind>`
-  posts double-clicks, right-clicks, typed text and one allowlisted key.
-  Typed text is echoed in its preview and never sends Return; Enter is its
-  own explicit `key enter` action. Right-click or long-press a hotspot for
+  posts double-clicks, right-clicks, typed text and one allowlisted key
+  (tab, escape, delete, forward-delete, arrows, home, end, pageup,
+  pagedown, space, enter, return — never arbitrary key codes). Typed text
+  is echoed in its preview and never sends Return; Enter is its own
+  explicit `key enter` action. Right-click or long-press a hotspot for
   the menu; the panel routes everything through the same preview → confirm
-  (or armed) flow as the single click.
+  (or armed) flow as the single click. The type/paste max length and the
+  element-tree cap ride the mac-lab config (env > file > defaults:
+  OSLAB_MAC_TYPE_MAX / _PASTE_MAX / _TREE_SIZE), as does the preview stamp
+  TTL (OSLAB_MAC_PREVIEW_TTL, default 60 s).
 - **Diff overlay (MIR-02)** — `GET …/elements?revision=` returns
   `{added, removed, changed}` against the cached previous tree when the
   revision token matches; the panel rings new hotspots and fades removed
@@ -198,7 +215,11 @@ the computer-use runtimes share, with the guardrails intact:
   is the panic stop (disarm + close sessions + end streams via the stream
   epoch); armed control has a single owner; a locked screen refuses input;
   `ios-lab/mac/agent-apps.json` optionally allowlists the apps agents may
-  drive.
+  drive — a missing file or an empty list allows every mirror-visible app,
+  while a file that is present but unreadable, malformed or not a list of
+  strings fails closed: the action is refused with the file and the problem
+  named (ALLOWLIST_INVALID), so a broken allowlist can never silently widen
+  what agents may drive.
 - **MCP surface (MIR-12)** — `console/mcp_server.py` (stdlib stdio MCP,
   `make -C ios-lab mac-mcp`) exposes observe/act/verify/stop tools to
   computer-use agents. Read-only tools are always available; every input
