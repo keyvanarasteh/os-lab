@@ -2801,5 +2801,12 @@
   "found": "gefunden",
   "selected ·": "ausgewählt ·",
   "shown": "angezeigt",
-  "← All catalogs": "← Alle Kataloge"
+  "← All catalogs": "← Alle Kataloge",
+  "Full Disk Access is on": "Vollzugriff auf die Festplatte ist aktiv",
+  "One permission, then we're done": "Eine Berechtigung, dann sind wir fertig",
+  "Reset permissions": "Berechtigungen zurücksetzen",
+  "Reveal app again": "App erneut anzeigen",
+  "Scans can read protected folders.": "Scans können geschützte Ordner lesen.",
+  "macOS hides some folders from every app until you allow it. In System Settings, turn on": "macOS verbirgt einige Ordner vor jeder App, bis du es erlaubst. Aktiviere in den Systemeinstellungen",
+  "under Privacy &amp; Security → Full Disk Access.": "unter Datenschutz &amp; Sicherheit → Vollzugriff auf die Festplatte."
 }

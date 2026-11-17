@@ -2801,5 +2801,12 @@
   "found": "تم العثور عليه",
   "selected ·": "محدد ·",
   "shown": "معروض",
-  "← All catalogs": "← كل الفهارس"
+  "← All catalogs": "← كل الفهارس",
+  "Full Disk Access is on": "الوصول الكامل إلى القرص مفعّل",
+  "One permission, then we're done": "إذن واحد ثم ننتهي",
+  "Reset permissions": "إعادة تعيين الأذونات",
+  "Reveal app again": "أظهر التطبيق مرة أخرى",
+  "Scans can read protected folders.": "يمكن للفحوص قراءة المجلدات المحمية.",
+  "macOS hides some folders from every app until you allow it. In System Settings, turn on": "يخفي macOS بعض المجلدات عن كل التطبيقات حتى تسمح بذلك. في إعدادات النظام، فعّل",
+  "under Privacy &amp; Security → Full Disk Access.": "ضمن الخصوصية والأمان ← الوصول الكامل إلى القرص."
 }

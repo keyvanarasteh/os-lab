@@ -264,6 +264,29 @@ async fn container_get(app: AppHandle) -> Result<String, String> {
     Ok(path.display().to_string())
 }
 
+/// The app's own bundle: the .app that contains this executable, or None when run unbundled (dev).
+fn own_bundle() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    exe.ancestors().find(|p| p.extension().map_or(false, |e| e == "app")).map(PathBuf::from)
+}
+
+/// Grant helper for the dashboard's Full Disk Access guide: relaunch this app so a fresh grant
+/// takes effect. Takes no argument from the page; it only restarts the app it is running in.
+#[tauri::command]
+fn app_relaunch(app: AppHandle) {
+    app.restart();
+}
+
+/// Grant helper: start a native drag of this app's own icon so the page can offer drag-to-Settings.
+/// The dragged path is never supplied by the page; it is always this app's bundle.
+#[tauri::command]
+fn app_drag_self(window: tauri::WebviewWindow) -> Result<(), String> {
+    let bundle = own_bundle().ok_or("Not running from an app bundle")?;
+    let icon = drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec());
+    drag::start_drag(&window, drag::DragItem::Files(vec![bundle]), icon, |_, _| {}, drag::Options::default())
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn console_status(state: State<'_, Console>) -> Option<String> {
     state.running_url()
@@ -441,6 +464,8 @@ pub fn run() {
             console_start,
             console_status,
             console_restart,
+            app_relaunch,
+            app_drag_self,
             console_choose_root,
             console_reset_root,
             console_logs,

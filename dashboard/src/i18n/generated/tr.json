@@ -2801,5 +2801,12 @@
   "found": "bulundu",
   "selected ·": "seçili ·",
   "shown": "gösterilen",
-  "← All catalogs": "← Tüm kataloglar"
+  "← All catalogs": "← Tüm kataloglar",
+  "Full Disk Access is on": "Tam Disk Erişimi açık",
+  "One permission, then we're done": "Tek bir izin, sonra bitti",
+  "Reset permissions": "İzinleri sıfırla",
+  "Reveal app again": "Uygulamayı yeniden göster",
+  "Scans can read protected folders.": "Taramalar korumalı klasörleri okuyabilir.",
+  "macOS hides some folders from every app until you allow it. In System Settings, turn on": "macOS, siz izin verene kadar bazı klasörleri tüm uygulamalardan gizler. Sistem Ayarları’nda şunu açın:",
+  "under Privacy &amp; Security → Full Disk Access.": "Gizlilik ve Güvenlik → Tam Disk Erişimi altında."
 }

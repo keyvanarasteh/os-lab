@@ -2801,5 +2801,12 @@
   "found": "یافت شد",
   "selected ·": "انتخاب‌شده ·",
   "shown": "نمایش‌داده‌شده",
-  "← All catalogs": "← همهٔ کاتالوگ‌ها"
+  "← All catalogs": "← همهٔ کاتالوگ‌ها",
+  "Full Disk Access is on": "دسترسی کامل به دیسک فعال است",
+  "One permission, then we're done": "فقط یک مجوز، و کار تمام است",
+  "Reset permissions": "بازنشانی مجوزها",
+  "Reveal app again": "نمایش دوبارهٔ برنامه",
+  "Scans can read protected folders.": "اسکن‌ها می‌توانند پوشه‌های محافظت‌شده را بخوانند.",
+  "macOS hides some folders from every app until you allow it. In System Settings, turn on": "macOS تا وقتی اجازه ندهید برخی پوشه‌ها را از همهٔ برنامه‌ها پنهان می‌کند. در تنظیمات سیستم این را روشن کنید:",
+  "under Privacy &amp; Security → Full Disk Access.": "در حریم خصوصی و امنیت ← دسترسی کامل به دیسک."
 }

@@ -13,7 +13,9 @@ single-instance, store, dialog and opener plugins, without its agent-host code.
    console, so every page and lab action (preview → token → run) behaves as in `./labctl ui`.
 
 Nothing in the app runs lab commands. The dashboard page gets **no Tauri IPC**
-(`capabilities/launcher.json` names the launcher window only). Links that leave the console open in
+except two commands for the Full Disk Access guide, `app_relaunch` and `app_drag_self`, neither of
+which takes an argument (`capabilities/dashboard-grant.json`; `capabilities/launcher.json` names the
+launcher window). Links that leave the console open in
 the system browser. The console runs under a small supervisor and exits with the app, even if the
 app is killed; quitting stops its process group, jobs included.
 

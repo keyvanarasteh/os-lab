@@ -19,6 +19,7 @@ import { SpaceExplorer } from "./space-explorer";
 import { RelocationCard } from "./relocation-card";
 import { WidgetsCard } from "./widgets-card";
 import { ScanCard } from "./scan-card";
+import { PermissionGuide } from "./permission-guide";
 import { CatalogPage } from "./catalog-page";
 import { CATALOG_GROUPS, groupIdOf } from "./groups";
 import type { BookmarksPayload, CleanupVolume, CleanupWidgetSnapshot } from "../../lib/api";
@@ -155,13 +156,8 @@ function PermissionsCard({ permissions }: { permissions: CleanupPermissions | nu
   if (!applicable.length) return null;
   const classified = permissions.classification?.classified ?? [];
   return <Section id="cleanup-permissions" title="Permissions" description="What this computer lets the cleaner read, and how to grant more.">
-    {applicable.some((record) => record.granted !== true) ? <ol className="mb-3 grid gap-2 text-sm sm:grid-cols-3" aria-label="How to grant access">
-      <li className="rounded-md border border-(--iux-border) p-3"><b>1.</b> Open System Settings with the button on the permission below.</li>
-      <li className="rounded-md border border-(--iux-border) p-3"><b>2.</b> Switch the toggle on for this app, or add it with the + button.</li>
-      <li className="rounded-md border border-(--iux-border) p-3"><b>3.</b> Come back: this card detects the grant by itself within a few seconds.</li>
-    </ol> : <p role="status" className="mb-3 rounded-md border border-(--iux-success)/40 bg-(--iux-success)/10 p-3 text-sm">
-      All permissions are granted. macOS applies Full Disk Access only after the app is quit and reopened, so restart it once if scans still report unreadable folders.
-    </p>}
+    {(() => { const fda = applicable.find((record) => record.id === "macos-full-disk-access");
+      return fda ? <PermissionGuide permissionId={fda.id} granted={fda.granted === true} /> : null; })()}
     <div className="divide-y divide-(--iux-border)">
       {applicable.map((record) => <div key={record.id} className="py-3 first:pt-0 last:pb-0">
         <div className="flex items-center gap-2">

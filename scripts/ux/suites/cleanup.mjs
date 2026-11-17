@@ -73,4 +73,12 @@ export async function run(ux) {
   if (await back.count()) await back.click(); else await page.keyboard.press("Escape");
 
   ux.check("no console or page errors during the suite", ux.consoleErrors().length === 0, ux.consoleErrors().slice(0, 2).join(" | ").slice(0, 200));
+
+  // Permissions guide: the app tile, Settings and Finder actions, or the granted state.
+  await ux.goto("/cleanup/settings/", { waitFor: "#cleanup-permissions" });
+  const guide = page.locator("#cleanup-permissions");
+  const granted = (await guide.getByText("Full Disk Access is on").count()) > 0;
+  ux.check("permission guide shows its tile and actions, or the granted state",
+    granted || ((await guide.getByTestId("permission-guide").getByRole("button", { name: "Open System Settings" }).count()) === 1 && (await guide.getByRole("button", { name: "Reveal app again" }).count()) === 1));
+  await ux.shot("permission-guide", { locator: guide });
 }

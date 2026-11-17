@@ -678,6 +678,10 @@ export const api = {
   cleanupPermissions: () => call<CleanupPermissions>("/api/cleanup/permissions"),
   /** The grant round-trip: name a permission, the console opens System Settings. */
   cleanupPermissionsOpen: (permissionId: string) => post<{ permissionId: string; opened: string }>("/api/cleanup/permissions/open-settings", { permissionId }),
+  /** The app bundle the console runs under: the one that needs Full Disk Access. */
+  cleanupHostApp: () => call<{ app: { path: string; name: string; bundleId: string | null } | null }>("/api/cleanup/permissions/host-app"),
+  cleanupRevealApp: () => post<{ revealed: string }>("/api/cleanup/permissions/reveal-app", {}),
+  cleanupResetPermission: () => post<{ reset: string }>("/api/cleanup/permissions/reset", {}),
   cleanupMonitor: () => call<CleanupMonitorStatus>("/api/cleanup/monitor"),
   cleanupMonitorConfig: (config: CleanupMonitorConfig) => post<CleanupMonitorStatus>("/api/cleanup/monitor/config", config),
   cleanupMonitorEvaluate: () => post<CleanupMonitorStatus>("/api/cleanup/monitor/evaluate"),

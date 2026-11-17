@@ -501,7 +501,9 @@ The dashboard scan card ([[dashboard/src/views/cleanup/scan-card.tsx]]) shows "S
 
 [[dashboard/src/views/cleanup/groups.ts]] classifies every catalog entry into a tool group by id. [[dashboard/src/views/cleanup/catalog-page.tsx]] is `/cleanup/catalog/`: the group list, and with `#<group>` that group's own view (search, sort, select, bookmark, Rescan). Review removal sends the selection to the existing plan and confirmation dialog; nothing is cleaned without it. The sidebar has a Catalogs group with one entry per tool group.
 
-The Permissions card in Settings re-probes every 3 seconds while a permission is missing, so it flips to granted by itself. Drag-and-drop of the app into System Settings and an automatic restart need the desktop app and are not built.
+The Permissions card in Settings opens with the Full Disk Access guide ([[dashboard/src/views/cleanup/permission-guide.tsx]]): the app that needs the grant as a tile, Open System Settings, Reveal app again, Reset permissions and, once the toggle is on, Quit & Reopen. The console names the app from its own process tree (`_host_app` in [[console/cleanup_api.py]]) and reveals or resets only that bundle; the page supplies no path.
+
+In the desktop app the tile drags natively and Quit & Reopen relaunches. Both are two narrow commands (`app_drag_self`, `app_relaunch`) granted to the local dashboard origin by `app/src-tauri/capabilities/dashboard-grant.json`; the drag path is always the app's own bundle. A running process cannot see its own fresh grant, so the card reads granted after the relaunch. In a browser the tile falls back to Reveal in Finder.
 
 ## Console API
 
