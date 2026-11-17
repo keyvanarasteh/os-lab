@@ -244,7 +244,9 @@ scripts. The tests are in [[android-lab/lab/tests/test_scope_guard.py]].
 
 ## Session scribe
 
-PENT-20 runner and CLI in [[scripts/session_scribe/cli.py]].
+PENT-20 runner and CLI in [[scripts/session_scribe/cli.py]]: a scoped, logged pentest subagent session.
+
+The parts:
 [[scripts/session_scribe/scope_guard.py#ScopeGuard]] enforces [[scripts/session_scribe/scope.json]] CIDRs/domains/ports/commands,
 [[scripts/session_scribe/prompt_guard.py#PromptInjectionGuard]] blocks jailbreaks/exfil payloads,
 [[scripts/session_scribe/circuit_breaker.py#SubagentCircuitBreaker]] locks offenders until human-token reset,

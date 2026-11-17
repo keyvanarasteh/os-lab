@@ -78,6 +78,6 @@ A change is done when typecheck, translations, graph and a real browser run agre
 2. Engine changes: `python3 -m unittest discover -s tests -t .` in `cleanup-lab/engine`.
 3. `lat check`; `lat.md/tooling.md` has one older too-long paragraph that is not from this work.
 4. `scripts/ux/dev-stack.sh dev`, then `node scripts/ux/run.mjs` and look at the screenshots.
-5. Run mode (`run`) for anything that must work from the built app; the Playwright suite (`scripts/e2e.sh`) is a separate, heavier step that asks for a mode first.
+5. Run mode (`run`) for anything that must work from the built app; the Playwright suite (`scripts/e2e.sh`) is a separate, heavier step; ask the user before running it.
 
 Parallel agents each take a task with disjoint files, run the same checks without e2e, and report files changed, checks and what is left; the lead re-runs the browser suite because agents cannot see the page.
