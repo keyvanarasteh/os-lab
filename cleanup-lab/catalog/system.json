@@ -96,6 +96,19 @@
       }
     },
     {
+      "id": "system.crash-reports-system",
+      "name": "System crash reports",
+      "category": "system",
+      "risk": "medium",
+      "hint": "Machine-wide crash diagnostics. Owned by root, so it is measured only.",
+      "impact": "Old crash diagnostics will no longer be available for debugging.",
+      "defaultSelected": false,
+      "needsPrivilege": true,
+      "paths": {
+        "macos": ["/Library/Logs/DiagnosticReports"]
+      }
+    },
+    {
       "id": "system.crash-reports",
       "name": "Crash reports",
       "category": "system",

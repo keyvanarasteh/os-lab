@@ -394,6 +394,8 @@ export interface CleanupStatus {
 export interface CleanupEntry {
   id: string; name: string; category: string; risk: string; hint: string; impact: string;
   defaultSelected: boolean; needsPrivilege: boolean;
+  /** False for measured-only entries (toolchains, agent data): a plan skips them. Absent on older consoles. */
+  cleanable?: boolean; family?: string;
   paths: { template: string; path: string | null; reason: string; source?: string }[];
 }
 export interface CleanupScan {

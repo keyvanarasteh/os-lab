@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BroomIcon } from "@phosphor-icons/react";
+import { BroomIcon, DotsThreeIcon } from "@phosphor-icons/react";
 import { AppShell } from "../../shell/app-shell";
 import { TopBar } from "../../shell/top-bar";
 import { Badge, Empty, PageHead, Section, Status } from "../../components/ui";
@@ -7,6 +7,7 @@ import { api, usePoll, type CleanupEntry, type CleanupHistory, type CleanupJob, 
 import { localeFromPath, localePath } from "../../i18n/paths";
 import { keepModalFocus } from "../modal-focus";
 import { InfoPopover } from "./info-popover";
+import { EntryMenu, type EntryMenuItem, type EntryMenuState } from "./entry-menu";
 import { CategoryIcon, PrivilegeMarker, StatusIcon } from "./icons";
 import { bytes, itemStatusLabel, riskLabel, riskTone, sortEntries, totalsByRisk, type SortOrder } from "./format";
 import { CleanupExtraTools } from "./extra-tools";
@@ -299,6 +300,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const [actionError, setActionError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"trash" | "delete">("trash");
+  const [entryMenu, setEntryMenu] = useState<EntryMenuState | null>(null);
   const [preset, setPreset] = useState<"recommended" | "extended">("recommended");
   const [confirm, setConfirm] = useState(false);
   const [bookmarkConfirm, setBookmarkConfirm] = useState(false);
@@ -568,6 +570,19 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     try { await api.cleanupCancel(active.id); }
     catch (error) { setActionError(errorText(error)); }
   }
+  function entryMenuItems(item: CleanupEntry): EntryMenuItem[] {
+    const on = selected.includes(item.id);
+    const notReady = status?.state !== "ready" ? "The cleanup engine is not ready." : busy ? "Another job is running." : undefined;
+    const cleanBlock = notReady ?? (item.cleanable === false ? "Measured only: this entry is never cleaned." : item.needsPrivilege ? "Needs administrator rights, so a plan skips it." : undefined);
+    return [
+      { id: "scan", label: "Scan this entry", disabledReason: notReady, onSelect: () => void start(() => api.cleanupScan([item.id])) },
+      { id: "clean", label: mode === "delete" ? "Review & delete permanently…" : "Review & clean…", disabledReason: cleanBlock, tone: mode === "delete" ? "danger" : undefined,
+        onSelect: () => { setSelected((old) => old.includes(item.id) ? old : [...old, item.id]); void start(() => api.cleanupPlan([item.id], mode)); } },
+      { id: "select", label: on ? "Deselect" : "Select", separatorBefore: true, onSelect: () => { setSelected((old) => on ? old.filter((id) => id !== item.id) : [...old, item.id]); setConfirm(false); } },
+      { id: "only", label: "Select only this", onSelect: () => { setSelected([item.id]); setConfirm(false); } },
+      ...(!PUBLIC ? [{ id: "bookmark", label: bookmarkedIds.has(item.id) ? "Remove bookmark" : "Add bookmark", separatorBefore: true, onSelect: () => toggleBookmark(item.id) }] : [])
+    ];
+  }
   function reviewAndClean() {
     setActionError("");
     if (planCurrent) setConfirm(true);
@@ -679,29 +694,37 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                   <p role="status" aria-live="polite" className="text-xs">{active.kind} in progress · <span dir="ltr">{String(active.progress?.pathsDone ?? active.progress?.itemsDone ?? 0)} / {String(active.progress?.pathsTotal ?? active.progress?.itemsTotal ?? 0)}</span><span translate="no" className="block truncate">{active.progress?.currentPath}</span></p>
                 </div>}
                 </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">{sortedEntries.map((item) => {
+                <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(13.5rem,1fr))] gap-1.5">{sortedEntries.map((item) => {
                   const size = sizes.get(item.id);
                   const on = selected.includes(item.id);
-                  return <label key={item.id}
-                    className={`flex cursor-pointer flex-col gap-2 rounded-md border p-3 text-sm transition-colors ${on ? "border-[#f36c21]/70 bg-[#f36c21]/5" : "border-(--iux-border)"}`}>
-                    <span className="flex items-center gap-2">
-                      <input type="checkbox" className="iux-touch-target size-4 shrink-0 accent-[#f36c21]" checked={on} disabled={busy}
+                  return <label key={item.id} onContextMenu={(event) => { event.preventDefault(); setEntryMenu({ x: event.clientX, y: event.clientY, entryId: item.id }); }}
+                    className={`flex cursor-pointer flex-col gap-1 rounded-md border px-2 py-1.5 text-xs transition-colors ${on ? "border-[#f36c21]/70 bg-[#f36c21]/5" : "border-(--iux-border)"}`}>
+                    <span className="flex items-center gap-1.5">
+                      <input type="checkbox" className="iux-touch-target size-3.5 shrink-0 accent-[#f36c21]" checked={on} disabled={busy}
                         onChange={(event) => { setSelected((old) => event.target.checked ? [...old, item.id] : old.filter((id) => id !== item.id)); setConfirm(false); }} />
-                      <CategoryIcon category={item.category} />
-                      <span className="min-w-0 flex-1 truncate font-medium">{item.name}</span>
+                      <CategoryIcon category={item.category} size={12} />
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={item.name}>{item.name}</span>
                       {item.needsPrivilege && <PrivilegeMarker />}
+                      <button type="button" className="iux-btn" data-variant="ghost" aria-haspopup="menu" aria-label={`Actions for ${item.name}`}
+                        onClick={(event) => { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); setEntryMenu({ x: box.left, y: box.bottom + 4, entryId: item.id }); }}>
+                        <DotsThreeIcon size={14} weight="bold" />
+                      </button>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Badge tone={riskTone(item.risk)}>{riskLabel(item.risk)}</Badge>
                       {!PUBLIC && <BookmarkToggle entryId={item.id} bookmarked={bookmarkedIds.has(item.id)} busy={busy} onToggle={toggleBookmark} />}
                       <InfoPopover><EntryDetails entry={item} /></InfoPopover>
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <Badge tone={riskTone(item.risk)}>{riskLabel(item.risk)}</Badge>
-                      <span dir="ltr" className="ms-auto tabular-nums">
+                      <span dir="ltr" className="ms-auto whitespace-nowrap tabular-nums">
                         {size != null ? bytes(size) : item.paths.some((path) => path.path) ? "Not measured" : "Unavailable"}
                       </span>
                     </span>
                     {size != null && <SizeBar value={size} max={maxSize} />}
                   </label>;
                 })}</div>
+                {entryMenu && (() => {
+                  const item = entries.find((entry) => entry.id === entryMenu.entryId);
+                  return item ? <EntryMenu state={entryMenu} title={item.name} items={entryMenuItems(item)} onClose={() => setEntryMenu(null)} /> : null;
+                })()}
               </>}
               {active?.state === "failed" && <Status value={{ ok: false, text: active.error || "The cleanup job failed." }} />}
               {actionError && <Status value={{ ok: false, text: actionError }} />}

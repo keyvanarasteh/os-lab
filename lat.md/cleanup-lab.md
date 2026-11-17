@@ -40,6 +40,11 @@ pre-selected; every browser names its owning process for the running-app guard.
 CLN-06 adds [[cleanup-lab/catalog/developers.json]] with per-OS developer cache
 defaults, credentials and toolchains.
 
+A real disk review added `uv`, VS Code extensions, `rembg`, Codex runtimes, the whole GOPATH and Cargo home,
+the shared os-lab cache, Homebrew's Cellar and system crash reports, plus an `agents` family
+([[cleanup-lab/catalog/agents.json]]) for AI agent data. Agent, toolchain and workspace entries are
+`cleanable: false` and the Cellar is measured only, so a plan skips them and Homebrew packages go through `brew uninstall`.
+
 The catalog reports binary presence through `shutil.which` without a shell.
 Shell functions are tracked by their directories. Credential entries are never
 pre-selected; toolchains and local clusters have `cleanable: false` and the
