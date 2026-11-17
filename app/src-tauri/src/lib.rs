@@ -635,5 +635,7 @@ mod files_dir_tests {
         assert_eq!(localized_dashboard_path(&english, "labs/macos/"), "labs/macos/");
         assert_eq!(localized_dashboard_path(&turkish, "labs/macos/#intent=panic-stop"),
                    "tr/labs/macos/#intent=panic-stop");
+        assert_eq!(localized_dashboard_path(&turkish, "labs/macos/#intent=verify-submission"),
+                   "tr/labs/macos/#intent=verify-submission");
     }
 }

@@ -18,6 +18,22 @@ public struct OpenMacLabIntent: AppIntent {
     }
 }
 
+/// Opens the guarded macOS Lab in the workflow used to inspect a submission
+/// and capture evidence. The intent deliberately does not identify a student,
+/// launch submitted code, arm control, or send input.
+public struct VerifyLabSubmissionIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Verify Lab Submission"
+    public static let description = IntentDescription("Opens macOS Lab to inspect a lab submission and capture evidence safely.")
+    public static let openAppWhenRun: Bool = true
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult {
+        try WidgetConfig.requestMacLab(.verifySubmission)
+        return .result()
+    }
+}
+
 public struct PanicStopMacLabIntent: AppIntent {
     public static let title: LocalizedStringResource = "Panic stop macOS Lab"
     public static let description = IntentDescription("Disarms macOS Lab control, closes deep-inspect sessions, and ends mirror streams.")
@@ -41,6 +57,16 @@ public struct OSLabAppShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Open macOS Lab",
             systemImageName: "macwindow"
+        )
+
+        AppShortcut(
+            intent: VerifyLabSubmissionIntent(),
+            phrases: [
+                "Verify a lab submission in \(.applicationName)",
+                "Review student lab work in \(.applicationName)",
+            ],
+            shortTitle: "Verify submission",
+            systemImageName: "doc.text.magnifyingglass"
         )
 
         AppShortcut(

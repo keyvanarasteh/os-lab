@@ -2836,5 +2836,6 @@
   "Preparing…": "Préparation…",
   "Stopping macOS Lab control…": "Arrêt du contrôle du labo macOS…",
   "macOS Lab control stopped.": "Le contrôle du labo macOS est arrêté.",
-  "Could not stop macOS Lab control:": "Impossible d’arrêter le contrôle du labo macOS :"
+  "Could not stop macOS Lab control:": "Impossible d’arrêter le contrôle du labo macOS :",
+  "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.": "La vérification du rendu est ouverte. Sélectionnez une fenêtre Terminal ou de machine virtuelle pour l’inspecter et capturer des preuves. Les actions de contrôle exigent toujours une confirmation ou l’activation du mode de contrôle."
 }

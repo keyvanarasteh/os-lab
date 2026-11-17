@@ -21,10 +21,12 @@ public enum WidgetConfig {
     }
 
     /// A system shortcut opens the host app, which consumes this short-lived
-    /// handoff after its local console is ready. The intent never arms control;
-    /// it can only open the lab or invoke its always-safe panic stop.
+    /// handoff after its local console is ready. The intent never arms control
+    /// or launches submitted code; it can open the lab, enter its generic
+    /// review workflow, or invoke its always-safe panic stop.
     public enum MacLabIntentRequest: String {
         case open
+        case verifySubmission = "verify-submission"
         case panicStop = "panic-stop"
     }
 

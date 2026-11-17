@@ -206,13 +206,17 @@ the computer-use runtimes share, with the guardrails intact:
   deliberately no arm tool — the human arms from the dashboard. `macos_task`
   runs a scripted sequence (max 25 steps) with one audit row per step for
   reproducible security reports.
-- **App Intents** — the macOS widget extension publishes two narrow system
-  actions to Shortcuts, Siri and Spotlight: open the live macOS Lab, or run
-  its idempotent panic stop. Intents hand a timestamped request through the
-  App Group to the Tauri host, which waits for the local console, routes to
-  `/labs/macos/`, and shows the stop result. There is deliberately no arm,
-  click or type intent: the human still arms control in the dashboard and
-  volatile PIDs/coordinates never become Shortcut parameters.
+- **App Intents** — the macOS widget extension publishes three narrow system
+  actions to Shortcuts, Siri and Spotlight: open the live macOS Lab, open its
+  guarded submission-review workflow, or run its idempotent panic stop. The
+  review action is intentionally generic: it carries no student data and does
+  not launch submitted code; it opens the live mirror so the operator can pick
+  a Terminal or VM window and capture evidence. Intents hand a timestamped
+  request through the App Group to the Tauri host, which waits for the local
+  console, routes to `/labs/macos/`, and shows the handoff or stop result. There
+  is deliberately no arm, click, type, or run-submission intent: the human
+  still arms control in the dashboard and volatile PIDs/coordinates never
+  become Shortcut parameters.
 - **QcU parity** — engine pieces the standalone QcU package has:
   `GET /api/labs/macos/{displays,capabilities,permissions,events}` and
   `…/apps/<id>/search?q=` (also MCP `macos_search`, `macos_displays`,

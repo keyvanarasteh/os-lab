@@ -2836,5 +2836,6 @@
   "Preparing…": "جارٍ التحضير…",
   "Stopping macOS Lab control…": "جارٍ إيقاف التحكم في مختبر macOS…",
   "macOS Lab control stopped.": "تم إيقاف التحكم في مختبر macOS.",
-  "Could not stop macOS Lab control:": "تعذّر إيقاف التحكم في مختبر macOS:"
+  "Could not stop macOS Lab control:": "تعذّر إيقاف التحكم في مختبر macOS:",
+  "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.": "فُتحت مراجعة التسليم. اختر نافذة Terminal أو آلة افتراضية لفحصها والتقاط الأدلة. ما زالت إجراءات التحكم تتطلب التأكيد أو تفعيل وضع التحكم."
 }

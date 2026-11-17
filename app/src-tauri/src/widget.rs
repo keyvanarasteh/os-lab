@@ -59,6 +59,7 @@ fn pending_mac_lab_intent_file_in(dir: &Path) -> PathBuf {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MacLabIntentRequest {
     Open,
+    VerifySubmission,
     PanicStop,
 }
 
@@ -66,6 +67,7 @@ impl MacLabIntentRequest {
     pub fn dashboard_route(self) -> &'static str {
         match self {
             Self::Open => "labs/macos/",
+            Self::VerifySubmission => "labs/macos/#intent=verify-submission",
             Self::PanicStop => "labs/macos/#intent=panic-stop",
         }
     }
@@ -94,6 +96,7 @@ fn consume_pending_mac_lab_intent_in(dir: Option<&Path>) -> Option<MacLabIntentR
     let mut fields = raw.split_whitespace();
     let request = match fields.next()? {
         "open" => MacLabIntentRequest::Open,
+        "verify-submission" => MacLabIntentRequest::VerifySubmission,
         "panic-stop" => MacLabIntentRequest::PanicStop,
         _ => return None,
     };
@@ -258,6 +261,22 @@ mod tests {
         assert_eq!(consume_pending_mac_lab_intent_in(Some(&base)), Some(MacLabIntentRequest::PanicStop));
         assert_eq!(MacLabIntentRequest::PanicStop.dashboard_route(), "labs/macos/#intent=panic-stop");
         assert_eq!(consume_pending_mac_lab_intent_in(Some(&base)), None);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn submission_verification_routes_to_the_guarded_review_workflow() {
+        let base = temp_group("submission-review");
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64();
+        std::fs::write(pending_mac_lab_intent_file_in(&base), format!("verify-submission\n{now}")).unwrap();
+        assert_eq!(
+            consume_pending_mac_lab_intent_in(Some(&base)),
+            Some(MacLabIntentRequest::VerifySubmission)
+        );
+        assert_eq!(
+            MacLabIntentRequest::VerifySubmission.dashboard_route(),
+            "labs/macos/#intent=verify-submission"
+        );
         let _ = std::fs::remove_dir_all(&base);
     }
 

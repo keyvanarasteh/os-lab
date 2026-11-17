@@ -508,13 +508,22 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lab?.id, lab?.actions.length]);
 
-  // Native App Intents route the always-safe panic stop here. Arming is never
-  // available through a shortcut; it remains an explicit dashboard action.
+  // Native App Intents route guarded workflows here. Submission review only
+  // opens the existing mirror; panic stop is the sole action completed by the
+  // route. Arming is never available through a shortcut.
   useEffect(() => {
     if (labId !== "macos") return;
     const handleIntent = () => {
-      if (window.location.hash !== "#intent=panic-stop") return;
+      const intent = window.location.hash;
+      if (intent !== "#intent=panic-stop" && intent !== "#intent=verify-submission") return;
       history.replaceState(null, "", window.location.pathname);
+      if (intent === "#intent=verify-submission") {
+        setIntentStatus({
+          state: "success",
+          message: "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.",
+        });
+        return;
+      }
       setIntentStatus({ state: "pending", message: "Stopping macOS Lab control…" });
       void api.macosStop().then(() => {
         setIntentStatus({ state: "success", message: "macOS Lab control stopped." });

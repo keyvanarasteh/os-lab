@@ -167,6 +167,20 @@ test("the macOS Lab panic-stop App Intent reports success and failure", async ({
   await expect(page.getByRole("alert")).toContainText("Could not stop macOS Lab control: Stop bridge unavailable");
 });
 
+test("the submission-review App Intent opens the guarded macOS Lab workflow", async ({ page }) => {
+  await mockApi(page, "macos");
+  let stops = 0;
+  await page.route("**/api/labs/macos/stop", (route) => {
+    stops += 1;
+    return route.fulfill({ json: { ok: true, disarmed: true, sessionsClosed: [] } });
+  });
+  await page.goto("/labs/macos/#intent=verify-submission");
+  await expect(page.getByRole("status")).toContainText("Submission review opened.");
+  await expect(page.getByRole("status")).toContainText("Control actions still require confirmation or armed mode.");
+  await expect(page).toHaveURL(/\/labs\/macos\/$/);
+  expect(stops).toBe(0);
+});
+
 test("the iOS actions card checks real devices and the frame captures a selected phone", async ({ page }) => {
   await mockApi(page, "macos");
   const udid = "C2AC1E99-DB20-5F29-BC57-4EE540DCFEBA";

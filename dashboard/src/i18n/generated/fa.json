@@ -2836,5 +2836,6 @@
   "Preparing…": "در حال آماده‌سازی…",
   "Stopping macOS Lab control…": "در حال توقف کنترل آزمایشگاه macOS…",
   "macOS Lab control stopped.": "کنترل آزمایشگاه macOS متوقف شد.",
-  "Could not stop macOS Lab control:": "توقف کنترل آزمایشگاه macOS ممکن نشد:"
+  "Could not stop macOS Lab control:": "توقف کنترل آزمایشگاه macOS ممکن نشد:",
+  "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.": "بررسی تحویل باز شد. برای بازرسی و ثبت شواهد، یک پنجرهٔ Terminal یا ماشین مجازی را انتخاب کنید. اقدام‌های کنترلی همچنان به تأیید یا فعال‌بودن حالت کنترل نیاز دارند."
 }

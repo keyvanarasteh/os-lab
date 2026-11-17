@@ -2836,5 +2836,6 @@
   "Preparing…": "Hazırlanıyor…",
   "Stopping macOS Lab control…": "macOS Lab denetimi durduruluyor…",
   "macOS Lab control stopped.": "macOS Lab denetimi durduruldu.",
-  "Could not stop macOS Lab control:": "macOS Lab denetimi durdurulamadı:"
+  "Could not stop macOS Lab control:": "macOS Lab denetimi durdurulamadı:",
+  "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.": "Teslim incelemesi açıldı. İncelemek ve kanıt yakalamak için bir Terminal veya VM penceresi seçin. Denetim eylemleri yine onay veya etkinleştirilmiş denetim modu gerektirir."
 }
