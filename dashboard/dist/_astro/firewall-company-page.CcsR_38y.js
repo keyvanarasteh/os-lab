@@ -1,0 +1,1 @@
+export{t as FirewallCompanyPage}from"./firewall-company-page.DCZFVC-t.js";

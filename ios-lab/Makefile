@@ -12,7 +12,7 @@ CONFIRM ?=
 PROFILE ?=
 INSTALL ?=
 
-.PHONY: help preflight setup prepare up up-gpu boot wait status monitor profiles logs shell web vnc restart update down backup restore install-service uninstall-service reset clean env mac-doctor mac-setup mac-profiles mac-profile mac-sim mac-stop mac-appium mac-appium-stop mac-status
+.PHONY: help preflight setup prepare up up-gpu boot wait status monitor profiles logs shell web vnc restart update down backup restore install-service uninstall-service reset clean env mac-doctor mac-setup mac-profiles mac-profile mac-sim mac-stop mac-appium mac-appium-stop mac-idb-install mac-idb mac-idb-stop mac-xcuitest mac-app-doctor mac-app-smoke mac-app-repl mac-status mac-ax-helper mac-mcp
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -122,11 +122,41 @@ mac-sim: ## macOS host: boot the configured Simulator and open Simulator.app
 mac-stop: ## macOS host: shut down simulators and the Simulator app
 	bash mac/stop-simulator.sh
 
-mac-appium: ## macOS host: start Appium (XCUITest driver)
+mac-appium: ## macOS host: start Appium (XCUITest and mac2 drivers)
 	bash mac/appium.sh start
 
 mac-appium-stop: ## macOS host: stop Appium
 	bash mac/appium.sh stop
 
+mac-idb-install: ## macOS host: install idb companion (Homebrew) and client
+	bash mac/idb.sh install
+
+mac-idb: ## macOS host: start an idb companion for the booted simulator
+	bash mac/idb.sh start
+
+mac-idb-stop: ## macOS host: stop the idb companion
+	bash mac/idb.sh stop
+
+mac-xcuitest: ## macOS host: run one XCUITest session through Appium on the booted simulator
+	bash mac/xcuitest.sh smoke
+
+mac-app-doctor: ## macOS host: check the macOS Lab's app automation stack (Appium mac2)
+	bash mac/macos-app.sh doctor
+
+mac-app-smoke: ## macOS host: run one mac2 session that activates Finder on this Mac
+	bash mac/macos-app.sh smoke
+
+mac-app-repl: ## macOS host: interactive mac2 REPL for macOS apps (APP=<bundle-id>, default Finder)
+	APP="$(APP)" bash mac/macos-app.sh repl
+
 mac-status: ## macOS host: show Xcode, booted simulators and Appium state
 	bash mac/status-mac.sh
+
+mac-ax-helper: ## macOS host: compile the native AX helper for rich element reads (MIR-09)
+	bash mac/macos-app.sh build-ax-helper
+
+mac-mcp: ## macOS host: run the guarded MCP server for computer-use agents (MIR-12)
+	python3 ../console/mcp_server.py
+
+mac-cleanup-verify: ## macOS host: audit the running app's Cleanup panel + scans (BOOKMARK=1 RECORD=1 PORT=)
+	bash mac/cleanup-panel-verify.sh

@@ -24,6 +24,7 @@ import json
 import subprocess
 import shutil
 import threading
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import urllib.parse
 from http.server import ThreadingHTTPServer
@@ -39,6 +40,27 @@ try:
     import content as content_packs  # noqa: E402  (console/content.py: signed content updates)
 except ImportError:
     content_packs = None
+try:
+    import app_update as app_updates  # noqa: E402  (console/app_update.py: signed app releases)
+except ImportError:
+    app_updates = None
+try:
+    import source_api  # noqa: E402
+    import source_artifacts  # noqa: E402  (console/source_artifacts.py: read-only Source Lab output)
+except ImportError:
+    source_artifacts = None
+try:
+    import cleanup_api  # noqa: E402  (console/cleanup_api.py: Cleanup Lab readiness and, later, scan/clean)
+except ImportError:
+    cleanup_api = None
+try:
+    import web_api  # noqa: E402  (console/web_api.py: Web Lab engine readiness and proxy)
+except ImportError:
+    web_api = None
+try:
+    import winapps  # noqa: E402  (console/winapps.py: read-only native Windows app mirror)
+except ImportError:
+    winapps = None
 ARTIFACTS_DIR = os.path.join(SCRIPT_DIR, "artifacts")
 SCRIPTS_DIR = os.path.join(SCRIPT_DIR, "scripts")
 
@@ -118,6 +140,7 @@ HOST_CACHE = {"at": 0.0, "value": None}
 HOST_LOCK = threading.Lock()
 CONTENT = (content_packs.ContentStore(content_packs.default_content_dir(), REPO_ROOT)
            if content_packs else None)
+APP = app_updates.AppUpdateStore() if app_updates else None
 JOBS = oslab.JobService(REPO_ROOT) if oslab else None
 SIGNER = oslab.PlanSigner() if oslab else None
 
@@ -132,10 +155,65 @@ def cached_host():
         return HOST_CACHE["value"]
 
 
+class _CountingReader:
+    """Wraps the request stream and counts the bytes a handler really consumed."""
+
+    def __init__(self, raw):
+        self._raw = raw
+        self.count = 0
+
+    def read(self, size=-1):
+        data = self._raw.read(size)
+        self.count += len(data)
+        return data
+
+    def readline(self, size=-1):
+        data = self._raw.readline(size)
+        self.count += len(data)
+        return data
+
+    def __getattr__(self, name):
+        return getattr(self._raw, name)
+
+
 class LabHttpHandler(BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.rfile = _CountingReader(self.rfile)
+
+    def parse_request(self):
+        # The request line and headers are read through the same stream: restart the count once
+        # they are parsed, so `count` is the body bytes a handler read and the drain sees what is left.
+        parsed = super().parse_request()
+        self.rfile.count = 0
+        return parsed
+
+    def _drain_request_body(self):
+        """Read what a handler left unread before the connection closes.
+
+        A request refused early (403, 413, 501...) never reads its body. Closing a socket that still
+        holds unread bytes makes the OS send a reset, and the client can see "connection reset"
+        instead of the refusal. Small bodies are discarded; anything declared larger than the cap
+        just closes the connection.
+        """
+        try:
+            declared = int(self.headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            return
+        left = declared - getattr(self.rfile, "count", 0)
+        if left <= 0:
+            return
+        if left > 1_000_000:
+            self.close_connection = True
+            return
+        try:
+            self.rfile.read(left)
+        except OSError:
+            self.close_connection = True
+
     def log_message(self, fmt, *args):
         # Polling is frequent; keep the terminal for errors
-        if not self.path.startswith(("/api/logs", "/api/jobs", "/api/health", "/api/host", "/api/labs/", "/api/capabilities")):
+        if not self.path.startswith(("/api/logs", "/api/jobs", "/api/health", "/api/host", "/api/labs/", "/api/capabilities", "/api/cleanup", "/api/web")):
             super().log_message(fmt, *args)
 
     def _host_ok(self) -> bool:
@@ -151,7 +229,7 @@ class LabHttpHandler(BaseHTTPRequestHandler):
 
     def _read_json(self):
         length = int(self.headers.get("Content-Length", 0) or 0)
-        if length > 1_000_000:
+        if length < 0 or length > 1_000_000:
             raise ValueError("Request too large")
         body = self.rfile.read(length) if length else b"{}"
         data = json.loads(body.decode("utf-8") or "{}")
@@ -164,17 +242,29 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             return
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        if path == "/api/source" or path.startswith("/api/source/"):
+            self._source_get(path, urllib.parse.parse_qs(parsed.query, keep_blank_values=True))
+            return
         if path.startswith("/api/content"):
             self._content_get(path, urllib.parse.parse_qs(parsed.query))
             return
-        if path.startswith(("/api/host", "/api/labs", "/api/jobs", "/api/capabilities")):
+        if path.startswith("/api/cleanup"):
+            self._cleanup_get(path, urllib.parse.parse_qs(parsed.query, keep_blank_values=True))
+            return
+        if path.startswith("/api/web"):
+            self._web_get(path, urllib.parse.parse_qs(parsed.query, keep_blank_values=True))
+            return
+        if path.startswith("/api/app/update"):
+            self._app_get(path)
+            return
+        if path.startswith(("/api/host", "/api/labs", "/api/jobs", "/api/capabilities", "/api/scope")):
             if not oslab:
                 self._json(501, {"error": "The console module (console/oslab.py) is not installed"})
                 return
             try:
                 self._lab_get(path)
             except oslab.PlanError as e:
-                self._json(400, {"error": str(e)})
+                self._json(400, {"error": str(e), "code": getattr(e, "code", None), "retry": getattr(e, "retry", None)})
             return
         if path in ("/classic", "/classic/"):
             self._send_bytes(200, read_web_file("index.html"), "text/html; charset=utf-8")
@@ -184,6 +274,153 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._serve_dashboard(root, path)
             return
         self._android_get()
+
+    def _source_reply(self, status, data, confirmation=False):
+        if isinstance(data, source_api.Download):
+            self.send_response(status)
+            self.send_header("Content-Type", data.mime)
+            self.send_header("Content-Disposition", f'attachment; filename="{data.name}"')
+            self.send_header("Content-Length", str(len(data.content)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(data.content)
+        else:
+            safe = source_api.redact(REPO_ROOT, data)
+            if confirmation and isinstance(data, dict) and "token" in data:
+                safe["token"] = data["token"]
+            body = json.dumps(safe, allow_nan=False).encode("utf-8")
+            if len(body) > source_artifacts.MAX_TOTAL:
+                raise source_artifacts.ArtifactError(413, "Source response exceeds the read limit")
+            self._send_bytes(status, body, "application/json; charset=utf-8", cache="no-store")
+
+    def _cleanup_get(self, path: str, query: dict):
+        """Cleanup Lab: readiness, catalog and the scan jobs' progress and results (CLN-01…03)."""
+        if cleanup_api is None:
+            self._json(501, {"error": "Cleanup Lab console support is not installed"})
+            return
+        try:
+            self._json(200, cleanup_api.CleanupAPI(REPO_ROOT).get(path, query))
+        except cleanup_api.CleanupError as exc:
+            self._json(exc.status, {"error": str(exc)})
+
+    def _cleanup_post(self, path: str):
+        """Cleanup Lab: typed actions only (start a scan, plan or clean job, cancel one)."""
+        if cleanup_api is None:
+            self._json(501, {"error": "Cleanup Lab console support is not installed"})
+            return
+        try:
+            data = self._read_json()
+            job = cleanup_api.CleanupAPI(REPO_ROOT).post(path, data)
+            payload = job.to_dict() if hasattr(job, "to_dict") else job
+            # 202: the job keeps running after the answer (the jobs endpoints poll it).
+            self._json(
+                202 if path in ("/api/cleanup/scan", "/api/cleanup/plan", "/api/cleanup/clean") else 200,
+                payload,
+            )
+        except cleanup_api.CleanupError as exc:
+            self._json(exc.status, {"error": str(exc)})
+        except ValueError as e:
+            self._json(400, {"error": str(e)})
+
+    def _weblab(self):
+        if web_api is None:
+            self._json(501, {"error": "Web Lab console support is not installed"})
+            return None
+        if not hasattr(self, "_weblab_api"):
+            self._weblab_api = web_api.WebLabAPI(REPO_ROOT)
+        return self._weblab_api
+
+    def _web_get(self, path: str, query: dict):
+        """Web Lab: readiness, windows, injections, profiles and captured events."""
+        api = self._weblab()
+        if api is None:
+            return
+        try:
+            self._json(200, api.get(path, query))
+        except web_api.WebLabError as exc:
+            self._json(exc.status, {"error": str(exc)})
+
+    def _web_post(self, path: str):
+        """Web Lab: typed actions only (engine start/stop, windows, injections)."""
+        api = self._weblab()
+        if api is None:
+            return
+        try:
+            data = self._read_json()
+            self._json(200, api.post(path, data))
+        except web_api.WebLabError as exc:
+            self._json(exc.status, {"error": str(exc)})
+        except ValueError as e:
+            self._json(400, {"error": str(e)})
+
+    def _source_get(self, path: str, query: dict):
+        if source_artifacts is None or not oslab:
+            self._json(501, {"error": "Source Lab console support is not installed"})
+            return
+        try:
+            self._source_reply(200, source_api.SourceAPI(REPO_ROOT, JOBS, SIGNER).get(path, query))
+        except source_artifacts.ArtifactError as exc:
+            self._source_reply(exc.status, {"error": str(exc)})
+        except (OSError, ValueError, TypeError, KeyError, RecursionError):
+            self._source_reply(400, {"error": "Invalid or unavailable Source Lab artifact"})
+
+    def _source_mutate(self, path: str, method="POST"):
+        if source_artifacts is None or not oslab:
+            self._json(501, {"error": "Source Lab console support is not installed"})
+            return
+        try:
+            lengths = self.headers.get_all("Content-Length", [])
+            if self.headers.get("Transfer-Encoding") or len(lengths) > 1:
+                raise source_artifacts.ArtifactError(400, "Invalid request framing")
+            length = int(lengths[0]) if lengths else 0
+            if not 0 <= length <= 65536:
+                raise source_artifacts.ArtifactError(413, "Source request exceeds the size limit")
+            data = self._read_json()
+            if urllib.parse.urlparse(self.path).query:
+                raise source_artifacts.ArtifactError(400, "Mutation parameters belong in the JSON body")
+            status, result = source_api.SourceAPI(REPO_ROOT, JOBS, SIGNER).mutate(path, data, method)
+            self._source_reply(status, result, confirmation=True)
+        except source_artifacts.ArtifactError as exc:
+            self._source_reply(exc.status, {"error": str(exc)})
+        except oslab.PlanError as exc:
+            self._source_reply(409, {"error": str(exc)})
+        except (OSError, ValueError, TypeError, KeyError, RecursionError):
+            self._source_reply(400, {"error": "Invalid Source Lab request or unavailable private storage"})
+
+    def do_DELETE(self):
+        try:
+            self._do_delete()
+        finally:
+            self._drain_request_body()
+
+    def _do_delete(self):
+        if not self._host_ok():
+            return
+        if self.headers.get("X-OSLab") != "1":
+            self._json(403, {"error": "Missing X-OSLab header"})
+            return
+        path = urllib.parse.urlparse(self.path).path
+        if path.startswith("/api/web"):
+            api = self._weblab()
+            if api is None:
+                return
+            try:
+                self._json(200, api.delete(path))
+            except web_api.WebLabError as exc:
+                self._json(exc.status, {"error": str(exc)})
+            return
+        parts = [p for p in path.split("/") if p]
+        if len(parts) == 5 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "session":
+            if not oslab:
+                self._json(501, {"error": "The console module (console/oslab.py) is not installed"})
+                return
+            try:
+                self._json(200, oslab.macos_session_close(REPO_ROOT, parts[4]))
+            except oslab.PlanError as e:
+                self._json(400, {"error": str(e)})
+            return
+        self._source_mutate(path, "DELETE")
 
     def _send_bytes(self, status: int, body: bytes, content_type: str, cache: str = "no-cache"):
         self.send_response(status)
@@ -218,10 +455,93 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(200, {"host": host, "labs": oslab.lab_catalog(REPO_ROOT, host)["labs"]})
         elif path == "/api/capabilities":
             self._json(200, oslab.capability_catalog())
+        elif path == "/api/scope":
+            self._json(200, oslab.scope_status(REPO_ROOT))
         elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] in oslab.LABS and parts[3] == "config":
             self._json(200, oslab.lab_config(REPO_ROOT, parts[2]))
         elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] in oslab.LABS and parts[3] == "monitor":
             self._json(200, oslab.monitor(REPO_ROOT, parts[2], cached_host()))
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "ios" and parts[3] == "simulator":
+            self._json(200, oslab.ios_simulator(REPO_ROOT))
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "ios" and parts[3] == "devices":
+            self._json(200, oslab.ios_devices())
+        elif len(parts) == 5 and parts[:2] == ["api", "labs"] and parts[2] == "ios" and parts[3] == "devices" and parts[4] == "check":
+            udid = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("udid") or [""])[0]
+            try:
+                self._json(200, oslab.ios_device_check(udid))
+            except oslab.PlanError as e:
+                self._json(400, {"error": str(e)})
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "ios" and parts[3] == "resources":
+            self._json(200, oslab.ios_resources())
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "ios" and parts[3] == "screenshot":
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            udid = (query.get("udid") or [""])[0]
+            simulator_device = (query.get("device") or [""])[0]
+            self._send_bytes(200, oslab.ios_real_device_screenshot(udid) if udid else oslab.ios_screenshot(simulator_device or None),
+                             "image/png", cache="no-store")
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "apps":
+            self._json(200, oslab.macos_windows())
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "control":
+            self._json(200, oslab.macos_control_state())
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "session":
+            self._json(200, oslab.macos_session_state(REPO_ROOT))
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "displays":
+            self._json(200, oslab.macos_displays())
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "capabilities":
+            self._json(200, oslab.macos_capabilities(REPO_ROOT))
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "permissions":
+            self._json(200, oslab.macos_permissions(REPO_ROOT))
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "events":
+            self._macos_events()
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "audit":
+            self._json(200, oslab.macos_audit_rows())
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "macos" and parts[3] == "audit.json":
+            body = oslab.macos_audit_download()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Disposition", 'attachment; filename="macos-audit.json"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(body)
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "apps"] and parts[5] == "screenshot":
+            self._send_bytes(200, oslab.macos_window_screenshot(parts[4]), "image/png", cache="no-store")
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "apps"] and parts[5] == "elements":
+            revision = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                        .get("revision") or [None])[0]
+            self._json(200, oslab.macos_window_elements(REPO_ROOT, parts[4], revision))
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "apps"] and parts[5] == "search":
+            query = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("q") or [""])[0]
+            self._json(200, oslab.macos_search_elements(REPO_ROOT, parts[4], query))
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "apps"] and parts[5] == "stream":
+            self._macos_stream(parts[4])
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "apps"] and parts[5] == "windows":
+            self._json(200, oslab.macos_ax_windows(REPO_ROOT, {"pid": parts[4]}))
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "apps"] and parts[5] == "menubar":
+            self._json(200, oslab.macos_ax_menubar(REPO_ROOT, {"pid": parts[4]}))
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "apps"] and parts[5] == "focused":
+            self._json(200, oslab.macos_ax_focused(REPO_ROOT, {"pid": parts[4]}))
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "session"] and parts[5] == "elements":
+            self._json(200, oslab.macos_session_elements(REPO_ROOT, parts[4]))
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "winapps" and parts[3] == "apps":
+            # Native Windows app mirror is read-only and independent of the Windows VM lifecycle.
+            if winapps is None:
+                self._json(501, {"error": "The Windows app mirror module (console/winapps.py) is not installed"})
+                return
+            self._json(200, winapps.winapps_windows())
+        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "winapps" and parts[3] == "doctor":
+            if winapps is None:
+                self._json(501, {"error": "The Windows app mirror module (console/winapps.py) is not installed"})
+                return
+            self._json(200, winapps.doctor())
+        elif len(parts) == 6 and parts[:2] == ["api", "labs"] and parts[2] == "winapps" and parts[3] == "apps" and parts[5] == "screenshot":
+            if winapps is None:
+                self._json(501, {"error": "The Windows app mirror module (console/winapps.py) is not installed"})
+                return
+            try:
+                self._send_bytes(200, winapps.winapps_window_screenshot(parts[4]), "image/png", cache="no-store")
+            except winapps.WinAppError as exc:
+                self._json(400, {"error": str(exc)})
         elif path == "/api/jobs":
             self._json(200, {"jobs": JOBS.list()})
         elif len(parts) == 3 and parts[:2] == ["api", "jobs"]:
@@ -234,6 +554,12 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Not found"})
 
     def do_POST(self):
+        try:
+            self._do_post()
+        finally:
+            self._drain_request_body()
+
+    def _do_post(self):
         if not self._host_ok():
             return
         # Browsers cannot add a custom header cross-site without a CORS preflight, which this
@@ -242,8 +568,20 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(403, {"error": "Missing X-OSLab header"})
             return
         path = urllib.parse.urlparse(self.path).path
+        if path == "/api/source" or path.startswith("/api/source/"):
+            self._source_mutate(path)
+            return
         if path.startswith("/api/content"):
             self._content_post(path)
+            return
+        if path.startswith("/api/app/update"):
+            self._app_post(path)
+            return
+        if path.startswith("/api/cleanup"):
+            self._cleanup_post(path)
+            return
+        if path.startswith("/api/web"):
+            self._web_post(path)
             return
         if path.startswith(("/api/labs", "/api/jobs")):
             if not oslab:
@@ -252,7 +590,7 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             try:
                 self._lab_post(path)
             except (oslab.PlanError, ValueError) as e:
-                self._json(400, {"error": str(e)})
+                self._json(400, {"error": str(e), "code": getattr(e, "code", None), "retry": getattr(e, "retry", None)})
             return
         self._android_post()
 
@@ -294,20 +632,144 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         except ValueError as e:
             self._json(400, {"error": str(e)})
 
+    def _app_get(self, path: str):
+        """App updates: the newest signed release and any install in progress (see console/app_update.py)."""
+        if not APP:
+            self._json(501, {"error": "The app update module (console/app_update.py) is not installed"})
+            return
+        if path == "/api/app/update":
+            self._json(200, APP.state())
+        else:
+            self._json(404, {"error": "Not found"})
+
+    def _app_post(self, path: str):
+        if not APP:
+            self._json(501, {"error": "The app update module (console/app_update.py) is not installed"})
+            return
+        try:
+            self._read_json()
+            if path == "/api/app/update/check":
+                self._json(200, APP.check())
+            elif path == "/api/app/update/install":
+                self._json(202, APP.install())
+            else:
+                self._json(404, {"error": "Not found"})
+        except app_updates.AppUpdateError as e:
+            self._json(400, {"error": str(e)})
+        except ValueError as e:
+            self._json(400, {"error": str(e)})
+
+    def _macos_stream(self, window_id: str):
+        """MJPEG stream (MIR-04): multipart frames with no-store headers. The loop ends on
+        client disconnect, a missing window, or the ten-minute cap, so handlers never dangle."""
+        try:
+            wid = int(window_id)
+        except (TypeError, ValueError):
+            self._json(400, {"error": "Invalid window id"})
+            return
+        try:
+            fps = min(8.0, max(0.5, float((urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                                           .get("fps") or ["2"])[0])))
+        except (TypeError, ValueError):
+            fps = 2.0
+        if not any(w["windowId"] == wid for w in oslab.macos_windows()["windows"]):
+            self._json(404, {"error": "That window is not on screen anymore; refresh the mirror"})
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        deadline = time.time() + oslab._MACOS_STREAM_CAP
+        epoch = oslab._MACOS_STREAM_EPOCH
+        try:
+            for frame in oslab.macos_window_stream(wid, fps, epoch):
+                self.wfile.write(b"--frame\r\nContent-Type: image/png\r\nContent-Length: "
+                                 + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n")
+                self.wfile.flush()
+                if time.time() > deadline:
+                    break
+        except (OSError, ValueError):
+            pass  # the client hung up or the window vanished mid-frame; the panel falls back to the poll
+
+    def _macos_events(self):
+        """Live audit feed: text/event-stream of audit rows as they are recorded, a heartbeat
+        every 15 s, and the same bounds as the mirror stream — it ends on client disconnect, the
+        panic stop (stream epoch) or the stream cap, so handlers never dangle."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        epoch = oslab._MACOS_STREAM_EPOCH
+        deadline = time.time() + oslab._MACOS_STREAM_CAP
+        _, seq = oslab.macos_audit_since(10 ** 12)  # start at "now": history is on /audit
+        last_beat = 0.0
+        try:
+            self.wfile.write(b"retry: 3000\n\n")
+            while time.time() < deadline and oslab._MACOS_STREAM_EPOCH == epoch:
+                rows, latest = oslab.macos_audit_since(seq)
+                for row in rows:
+                    self.wfile.write(b"data: " + json.dumps(row).encode("utf-8") + b"\n\n")
+                seq = latest
+                if rows or time.time() - last_beat >= 15:
+                    if not rows:
+                        self.wfile.write(b": heartbeat\n\n")
+                    self.wfile.flush()
+                    last_beat = time.time()
+                time.sleep(0.5)
+        except (OSError, ValueError):
+            pass  # the client hung up; nothing to clean up
+
     def _lab_post(self, path: str):
         parts = [p for p in path.split("/") if p]
-        if path == "/api/labs/plan":
+        if path == "/api/labs/macos/control":
+            data = self._read_json()
+            owner = data.get("owner") if isinstance(data.get("owner"), str) and len(data.get("owner")) <= 64 else None
+            self._json(200, oslab.macos_control_arm(REPO_ROOT, data.get("armed") is True, owner))
+        elif path == "/api/labs/macos/click":
+            # Armed control mode only: a previewed click goes through /api/labs/plan + /api/labs/start.
+            self._json(200, oslab.macos_control_click(REPO_ROOT, self._read_json()))
+        elif path == "/api/labs/macos/input":
+            # Armed control mode only: the mirror's double/right/type/key/paste family (MIR-01).
+            self._json(200, oslab.macos_control_input(REPO_ROOT, self._read_json()))
+        elif path == "/api/labs/macos/element/set":
+            # Armed control mode only: one AX value write through the native helper (MIR-07).
+            self._json(200, oslab.macos_ax_set(REPO_ROOT, self._read_json()))
+        elif path == "/api/labs/macos/element/perform":
+            # Armed control mode only: one advertised AX action (MIR-07).
+            self._json(200, oslab.macos_ax_perform(REPO_ROOT, self._read_json()))
+        elif path == "/api/labs/macos/element/read":
+            # Read-only: one attribute of one element by path (MIR-08).
+            self._json(200, oslab.macos_ax_read(REPO_ROOT, self._read_json()))
+        elif path == "/api/labs/macos/permission/request":
+            # Consent only: fires the Accessibility dialog or opens the Privacy pane; nothing else changes.
+            self._json(200, oslab.macos_request_access(REPO_ROOT, self._read_json()))
+        elif path == "/api/labs/macos/stop":
+            # The panic stop (MIR-11): disarm, close sessions, end streams — always safe.
+            self._json(200, oslab.macos_panic_stop(REPO_ROOT))
+        elif path == "/api/labs/macos/session":
+            # Open one deep-inspect mac2 session (MIR-05); armed control mode only.
+            self._json(200, oslab.macos_session_open(REPO_ROOT, self._read_json()))
+        elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "session"] and parts[5] == "action":
+            self._json(200, oslab.macos_session_action(REPO_ROOT, parts[4], self._read_json()))
+        elif path == "/api/labs/plan":
             request = self._read_json().get("request") or {}
             plan = oslab.plan(REPO_ROOT, request, cached_host())
-            self._json(200, {"plan": plan, "token": SIGNER.sign(request)})
+            token = SIGNER.sign({"request": request, "plan": plan} if request.get("lab") == "source" else request)
+            oslab.macos_audit_preview(REPO_ROOT, request, "preview", token)
+            self._json(200, {"plan": plan, "token": token})
         elif path == "/api/labs/start":
             data = self._read_json()
             request = data.get("request") or {}
-            if not SIGNER.verify(request, data.get("token")):
+            plan = oslab.plan(REPO_ROOT, request, cached_host())
+            signed = {"request": request, "plan": plan} if request.get("lab") == "source" else request
+            if not SIGNER.verify(signed, data.get("token")):
                 self._json(409, {"error": "Preview this action before running it"})
                 return
             plan = oslab.plan(REPO_ROOT, request, cached_host())
             job = JOBS.start(plan)
+            oslab.macos_audit_preview(REPO_ROOT, request, "preview-confirmed", data.get("token"))
             self._json(200, job.to_dict())
         elif len(parts) == 4 and parts[:2] == ["api", "jobs"] and parts[3] == "cancel":
             self._read_json()

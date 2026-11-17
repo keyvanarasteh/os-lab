@@ -68,6 +68,7 @@ pub struct Started {
     pub source: Source,
     pub python: String,
     pub log: String,
+    pub route: Option<String>,
 }
 
 impl Console {
@@ -88,7 +89,7 @@ impl Console {
         healthy(port).then(|| url_for(port))
     }
 
-    pub fn start(&self, root: &Path, source: Source, log: &Path, data_dir: &Path, content_dir: &Path) -> Result<Started, String> {
+    pub fn start(&self, root: &Path, source: Source, log: &Path, data_dir: &Path, content_dir: &Path, app_version: &str) -> Result<Started, String> {
         if let Some(url) = self.running_url() {
             return Ok(Started {
                 url,
@@ -96,6 +97,7 @@ impl Console {
                 source,
                 python: String::new(),
                 log: log.display().to_string(),
+                route: None,
             });
         }
         self.stop();
@@ -121,6 +123,8 @@ impl Console {
             .env("PYTHONUNBUFFERED", "1")
             .env("PYTHONIOENCODING", "utf-8")
             .env("OSLAB_CONTENT_DIR", content_dir)
+            // Lets the dashboard compare this build with the published release (console/app_update.py).
+            .env("OSLAB_APP_VERSION", app_version)
             .stdin(Stdio::null())
             .stdout(Stdio::from(out))
             .stderr(Stdio::from(err));
@@ -159,6 +163,7 @@ impl Console {
             source,
             python,
             log: log.display().to_string(),
+            route: None,
         })
     }
 
@@ -200,7 +205,53 @@ pub fn healthy(port: u16) -> bool {
     head[..n].starts_with(b"HTTP/1.") && head[..n].windows(3).any(|w| w == b"200")
 }
 
-/// The first Python 3.9+ on PATH. On Windows the `py` launcher comes first.
+/// `POST <path>` with `{}` as the body, over a plain socket like `healthy`.
+///
+/// The command bridge (AGQ-01) uses this for the two actions it may run; the
+/// endpoints take no parameters, so there is no way to smuggle a request in.
+/// Returns the response body; a non-2xx status is an `Err` carrying the
+/// console's own message, which the dashboard then shows unchanged.
+pub fn post_action(port: u16, path: &str) -> Result<String, String> {
+    if !path.starts_with("/api/") {
+        return Err(format!("refused {path}: actions must target the console API"));
+    }
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_millis(800))
+        .map_err(|e| format!("Could not reach the console: {e}"))?;
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
+    let body = "{}";
+    // `X-OSLab: 1` is the console's own guard against another local page
+    // driving the lab (the dashboard sends it on every POST); a request
+    // without it is answered 403 and would look like a broken command.
+    let req = format!(
+        "POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nX-OSLab: 1\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream.write_all(req.as_bytes()).map_err(|e| format!("Could not send the request: {e}"))?;
+    let mut raw = Vec::new();
+    stream.read_to_end(&mut raw).map_err(|e| format!("Could not read the response: {e}"))?;
+    let text = String::from_utf8_lossy(&raw).to_string();
+    let (head, body) = text.split_once("\r\n\r\n").unwrap_or((text.as_str(), ""));
+    let status = head
+        .split_whitespace()
+        .nth(1)
+        .and_then(|code| code.parse::<u16>().ok())
+        .ok_or_else(|| format!("Unexpected response from the console: {}", head.lines().next().unwrap_or("")))?;
+    let body = body.trim().to_string();
+    if (200..300).contains(&status) {
+        Ok(body)
+    } else {
+        // The console answers errors as {"error": "..."}; show that text, not a code.
+        let message = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|value| value.get("error").and_then(|e| e.as_str()).map(str::to_string))
+            .unwrap_or_else(|| if body.is_empty() { format!("The console answered {status}") } else { body.clone() });
+        Err(message)
+    }
+}
+
+/// The first Python supported by every bundled lab. On Windows the `py` launcher comes first.
 pub fn find_python(data_dir: &Path) -> Result<String, String> {
     let managed = crate::python_runtime::saved_python(data_dir);
     let host: &[&str] = if cfg!(windows) { &["py", "python", "python3"] } else { &["python3", "python"] };
@@ -209,7 +260,7 @@ pub fn find_python(data_dir: &Path) -> Result<String, String> {
         if name == "py" {
             cmd.arg("-3");
         }
-        cmd.args(["-c", "import sys; print(sys.version_info >= (3, 9))"]);
+        cmd.args(["-c", "import sys; print(sys.version_info >= (3, 11))"]);
         hide_window(&mut cmd);
         if let Ok(out) = cmd.output() {
             if out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "True" {
@@ -217,7 +268,7 @@ pub fn find_python(data_dir: &Path) -> Result<String, String> {
             }
         }
     }
-    Err("Python 3.9 or newer was not found. Choose Get Python to install a managed copy for os-lab, then retry.".to_string())
+    Err("Python 3.11 or newer was not found. Choose Get Python to install a managed copy for os-lab, then retry.".to_string())
 }
 
 pub fn tail(path: &Path, lines: usize) -> String {
@@ -310,6 +361,41 @@ mod tests {
             assert_eq!(healthy(port), want, "{reply}");
             handle.join().unwrap();
         }
+    }
+
+    #[test]
+    fn post_action_returns_the_body_and_the_console_error_text() {
+        for (reply, want) in [
+            ("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"ok\":true}", Ok("{\"ok\":true}".to_string())),
+            ("HTTP/1.1 400 Bad Request\r\n\r\n{\"error\":\"Control mode is not armed\"}", Err("Control mode is not armed".to_string())),
+            ("HTTP/1.1 501 Not Implemented\r\n\r\n", Err("The console answered 501".to_string())),
+        ] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let handle = std::thread::spawn(move || {
+                if let Ok((mut s, _)) = listener.accept() {
+                    let mut buf = [0u8; 512];
+                    let read = s.read(&mut buf).unwrap_or(0);
+                    // The request is a well-formed POST with an empty JSON body.
+                    let request = String::from_utf8_lossy(&buf[..read]).to_string();
+                    assert!(request.starts_with("POST /api/labs/macos/stop HTTP/1.1"), "{request}");
+                    // Without this header the console answers 403 "Missing X-OSLab header".
+                    assert!(request.contains("\r\nX-OSLab: 1\r\n"), "{request}");
+                    assert!(request.trim_end().ends_with("{}"), "{request}");
+                    let _ = s.write_all(reply.as_bytes());
+                }
+            });
+            let result = post_action(port, "/api/labs/macos/stop").map_err(|e| e);
+            assert_eq!(result.map_err(|e| e), want, "{reply}");
+            handle.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn post_action_refuses_a_path_outside_the_console_api() {
+        let port = free_port().unwrap();
+        assert!(post_action(port, "/etc/passwd").unwrap_err().contains("refused"));
+        assert!(post_action(port, "http://example.com/").unwrap_err().contains("refused"));
     }
 
     #[test]

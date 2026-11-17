@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "family": "simulators",
+  "entries": [
+    {
+      "id": "simulators.coresimulator-devices",
+      "name": "iOS Simulator devices",
+      "category": "simulator",
+      "risk": "high",
+      "hint": "Per-device simulator data under this account. It is measured for relocation; the Relocation tab moves it to another volume.",
+      "impact": "Cleaning is disabled: deleting this folder would destroy every simulator with its apps and data.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "paths",
+      "owningProcesses": ["Simulator", "Xcode"],
+      "paths": {
+        "macos": [
+          "~/Library/Developer/CoreSimulator/Devices"
+        ]
+      },
+      "cleanable": false,
+      "note": "Relocation-only entry (CLN-27): Move/Restore happen on the Relocation tab and replace the folder with a symlink to the copy on the destination volume."
+    }
+  ]
+}

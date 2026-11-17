@@ -62,3 +62,29 @@ first available iPhone when the configured device is not installed.
   VM for untrusted apps.
 - For CI, use a real macOS runner with Xcode rather than the Linux container
   path.
+
+### Real devices and Xcode location
+
+The dashboard's iOS Actions card, simulator panel and `make mac-doctor` report two things the
+simulator scripts alone never could:
+
+- **Real devices** — paired or connected iPhones and iPads, listed read-only
+  via `xcrun devicectl` (simulator rows are filtered out). The Actions card
+  checks the current connection tunnel automatically; a paired phone whose
+  tunnel is unavailable appears dimmed as Offline. Selecting a connected
+  real device in the simulator panel captures its screen with `xcrun devicectl
+  device capture screenshot`, without WebDriverAgent. Actually driving the
+  device still needs Developer Mode and a WebDriverAgent signed to your team
+  (a free personal team works for a first run; the existing Appium XCUITest
+  stack drives it once WDA is installed).
+- **Where Xcode lives** — detection follows `xcode-select`/PATH, never an
+  assumed install path. An Xcode installed on another volume (e.g.
+  `/Volumes/Apps/Applications/Xcode.app`) is detected wherever it is and the
+  doctor prints the resolved `xcodebuild` path; the drawer shows the app
+  location.
+- **Storage pressure** — when the system disk runs low, the drawer points at
+  the Cleanup Lab's Relocation tab, which can move
+  `~/Library/Developer/CoreSimulator/Devices` to another volume behind a
+  verified symlink (close Xcode and Simulator first — the owning-app lock
+  refuses the move while they run). Simulator runtimes are system-managed and
+  cannot be relocated this way.

@@ -153,7 +153,7 @@ export function ProvidersPage() {
   const [apk] = useApk();
   return (
     <Frame id="providers" title="Code & Providers">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<PlugsConnectedIcon size={22} />}
         title="Code & target providers"
         description="Where the lab gets its targets: attached ADB devices, staged APKs, the emulator stack's endpoints and the bundled Frida hooks."
@@ -181,9 +181,13 @@ export function ProvidersPage() {
             </ul>
           )}
         </Section>
-        <Section icon={<CpuIcon size={16} />} title="Emulator stack endpoints" description={<>Published when the dynamic stack runs (<a className="underline" href={labHref("android")}>Runtime &amp; setup</a>).</>}>
-          <EndpointList items={ANDROID_ENDPOINTS} />
-        </Section>
+        <details className="iux-card p-5">
+          <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+            <CpuIcon size={16} className="text-[#f36c21]" /> Emulator stack endpoints
+          </summary>
+          <p className="mt-2 text-sm text-(--iux-muted-foreground)">Published when the dynamic stack runs (<a className="underline" href={labHref("android")}>Runtime &amp; setup</a>).</p>
+          <div className="mt-4"><EndpointList items={ANDROID_ENDPOINTS} /></div>
+        </details>
       </div>
       <Section icon={<UploadSimpleIcon size={16} />} title="Target APK" description="Upload a package or enter a path on disk.">
         <ApkTarget />
@@ -262,7 +266,7 @@ export function WorkflowsPage() {
   );
   return (
     <Frame id="workflows" title="Agentic Workflows & DAG">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<TreeStructureIcon size={22} />}
         title="Agentic Orchestration & Workflows"
         description="Multi-phase pipelines for autonomous mobile penetration testing and reverse engineering."
@@ -312,10 +316,12 @@ export function ConsolePage() {
   const running = Boolean(data?.running);
   const jobs = useMemo(() => parseJobs(data?.logs ?? [], running), [data, running]);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
   const lines = (data?.logs ?? []).map((l) => l.replace(/^\n+|\n+$/g, "")).filter((l, i) => l || i > 0);
   return (
     <Frame id="console" title="Execution & Progress Console">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<TerminalIcon size={22} />}
         title="Execution Engine & Progress Console"
         description="Live output of workbench jobs (WF1, scanners, fuzzer, patcher, playbooks) and their outcome."
@@ -332,12 +338,12 @@ export function ConsolePage() {
                     setStatus({ ok: false, text: message(e) });
                   }
                 }}
-                className="flex items-center gap-1.5 rounded-lg border border-red-500/50 bg-red-500/10 px-3.5 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20"
+                className="iux-touch-target flex items-center gap-1.5 rounded-lg border border-red-500/50 bg-red-500/10 px-3.5 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20"
               >
                 <StopIcon size={14} weight="fill" /> Stop job
               </button>
             ) : (
-              <a href="/android/workflows/" className="flex items-center gap-1.5 rounded-lg bg-[#00d084] px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-[#00d084]/90">
+              <a href="/android/workflows/" className="iux-touch-target flex items-center gap-1.5 rounded-lg bg-[#00d084] px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-[#00d084]/90">
                 <PlayIcon size={14} weight="fill" /> New run
               </a>
             )}
@@ -345,18 +351,29 @@ export function ConsolePage() {
               type="button"
               className="iux-btn"
               data-variant="outline"
-              disabled={running}
+              disabled={running || clearing}
               onClick={async () => {
-                await api.clearLogs();
-                await androidLogsStore.refresh();
+                setClearing(true);
+                setStatus(null);
+                setClearError(null);
+                try {
+                  await api.clearLogs();
+                  await androidLogsStore.refresh();
+                  setStatus({ ok: true, text: "Logs cleared." });
+                } catch (error) {
+                  setClearError(message(error));
+                } finally {
+                  setClearing(false);
+                }
               }}
             >
-              <TrashIcon size={14} /> Clear
+              <TrashIcon size={14} /> {clearing ? "Clearing…" : "Clear"}
             </button>
           </>
         }
       />
       <Status value={status} />
+      {clearError ? <p role="alert" className="text-sm text-(--iux-danger)"><span>Could not clear logs:</span> <span data-no-translate>{clearError}</span>. <span>Try again.</span></p> : null}
       <ProgressConsoleReport
         title="Execution Pipeline Status"
         description="Jobs started from this console, newest first. Output streams below as it arrives."
@@ -426,7 +443,7 @@ export function AnalyticsPage() {
   }, [wasRunning]);
   return (
     <Frame id="analytics" title="Security Analytics">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<ChartBarIcon size={22} />}
         title="Analytics & reports"
         description="Outcomes of this session's runs and the security reports generated so far."
@@ -498,7 +515,7 @@ export function SitemapPage() {
   );
   return (
     <Frame id="sitemap" title="Routes & Sitemap">
-      <PageHead
+      <PageHead toolbarOnly
         icon={<MapTrifoldIcon size={22} />}
         title="Routes & capability sitemap"
         description="Every page, workflow, endpoint and lab of the console, and where it leads."

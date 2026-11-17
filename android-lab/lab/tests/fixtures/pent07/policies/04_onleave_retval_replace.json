@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "policy_id": "04_onleave_retval_replace",
+  "description": "onLeave retval.replace policy (degistir.js): observes failed check (0) and rewrites return value to 1.",
+  "target": {
+    "source": "android-lab/lab/tests/targets/hedef.c",
+    "function": "parola_kontrol"
+  },
+  "schedule": {
+    "iterations": 3,
+    "interval_ms": 2000
+  },
+  "inputs": {
+    "parola": "deneme123",
+    "yetki_seviyesi": 1
+  },
+  "rules": [
+    {
+      "function": "parola_kontrol",
+      "onEnter": {
+        "observe_args": [
+          {
+            "index": 0,
+            "name": "girilen_parola",
+            "type": "utf8"
+          },
+          {
+            "index": 1,
+            "name": "yetki_seviyesi",
+            "type": "int32"
+          }
+        ],
+        "tamper_args": []
+      },
+      "onLeave": {
+        "observe_retval": true,
+        "retval_replace": {
+          "enabled": true,
+          "when_equals": 0,
+          "value": 1,
+          "type": "int32"
+        }
+      }
+    }
+  ]
+}

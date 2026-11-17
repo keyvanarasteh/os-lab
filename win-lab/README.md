@@ -51,6 +51,25 @@ The first boot downloads media and installs Windows automatically. Expect
 Connect over RDP (`make rdp` prints the details) or use the web viewer for the
 initial setup.
 
+## Windows Apps Lab
+
+On a real Windows host, a separate `/labs/winapps/` page mirrors one visible
+desktop window. It is independent of this Windows VM, works before the VM is set
+up, and offers no input or process control in the read-only phase. The collector
+is [`console/winapps.py`](../console/winapps.py) (standard-library ctypes only).
+
+```powershell
+python console/winapps.py            # JSON window inventory
+python console/winapps.py --doctor   # desktop session, console elevation, capture probe
+```
+
+Honest limits: a window is listed only when it is on screen (visible, captioned,
+not minimized, not a tool window and not DWM-cloaked, so suspended UWP frames are
+skipped). `PrintWindow` captures what Windows will render for that window; a
+standard-user console may be refused or get a blank image for elevated windows,
+which the list marks `Elevated` and `--doctor` reports for the console itself.
+UAC secure-desktop prompts cannot be captured.
+
 ## Make targets
 
 | Target | What it does |

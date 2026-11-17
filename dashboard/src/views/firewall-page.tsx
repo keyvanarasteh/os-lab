@@ -105,7 +105,7 @@ function FirewallCard({ fw, locale }: { fw: Firewall; locale: FirewallLocale }) 
       <button
         type="button"
         onClick={() => setShowAlts((v) => !v)}
-        className="mt-2 text-xs font-semibold text-[#f36c21] hover:underline"
+        className="iux-touch-target mt-2 inline-flex items-center text-xs font-semibold text-[#f36c21] hover:underline"
       >
         {showAlts ? t.hide : t.show} {fw.alternatives.length} {t.alternatives}
       </button>
@@ -315,7 +315,7 @@ export function FirewallPage({ locale = "en" }: { locale?: FirewallLocale }) {
             <div className="mt-3"><FirewallLanguageSwitch locale={locale} /></div>
           </header>
 
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[#f36c21]/50 bg-[#f36c21]/5 p-4">
+          <div id="add" className="flex scroll-mt-20 flex-wrap items-center gap-3 rounded-xl border border-dashed border-[#f36c21]/50 bg-[#f36c21]/5 p-4">
             <GitPullRequestIcon size={20} className="text-[#f36c21]" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">{t.add}</p>
@@ -330,7 +330,7 @@ export function FirewallPage({ locale = "en" }: { locale?: FirewallLocale }) {
 
           {companies.length ? (
             <>
-              <nav aria-label={t.companies} className="flex flex-wrap gap-2 border-b border-(--iux-border) pb-3">
+              <nav id="companies" aria-label={t.companies} className="flex scroll-mt-20 flex-wrap gap-2 border-b border-(--iux-border) pb-3">
                 {companies.map((c) => (
                   <button
                     key={c.slug}

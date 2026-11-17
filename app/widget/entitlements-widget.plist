@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- CLW-03: macOS requires all App Extensions (.appex) to be sandboxed.
+     The extension shares the App Group container with the host app to read
+     widget-snapshot.json and write the quick-clean intent request. -->
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.keyvanarasteh.oslab</string>
+	</array>
+</dict>
+</plist>

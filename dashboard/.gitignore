@@ -7,3 +7,7 @@ build-pages/
 build-pages.raw/
 # Freshness-check builds made by scripts/run-tests.sh
 .check-build.*/
+# Test builds made by scripts/e2e.sh (served instead of the committed dist/)
+.e2e-dist/
+# Per-worktree Vite cache (plan item I), kept out of the shared node_modules
+.vite-cache/

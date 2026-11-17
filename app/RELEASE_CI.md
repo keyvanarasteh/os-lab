@@ -8,7 +8,7 @@ manually without publishing, to inspect its build artifacts.
 | Workflow | Output | Automatic tag publishing |
 |---|---|---|
 | `release-linux` | amd64 and arm64 Debian, RPM and AppImage packages, with SHA-256 files | yes |
-| `release-win` | x64 NSIS and MSI, with SHA-256 files | after SignPath is configured |
+| `release-win` | x64 NSIS and MSI, with SHA-256 files | yes, unsigned until SignPath is configured |
 | `release-mac` | universal signed and notarized DMG, with SHA-256 file | after Apple secrets and `MACOS_RELEASE_CI_ENABLED=true` are set |
 | `updater-manifest` | signed artifact URLs for the in-app updater | manual, after all platform installers are published |
 
@@ -57,12 +57,25 @@ the local signed release command remains `app/scripts/release-mac.sh --publish`.
 Never commit certificate or key files. The workflow writes the temporary key into the runner's
 private temporary directory and the runner is discarded after the job.
 
+## Telegram notifications
+
+The release workflows (`release-mac`, `release-win`, `release-linux`) and `updater-manifest`
+report their outcome to Telegram when the repository secrets `TELEGRAM_BOT_TOKEN` (a bot token
+from [@BotFather](https://t.me/BotFather)) and `TELEGRAM_CHAT_ID` (the chat to post into) are
+set; send the bot any message and read `getUpdates` once to learn the chat id. Without the
+secrets the reporting step skips silently and nothing else changes. Reports cover real builds
+only — tag and manual runs — never pull-request dry runs, and the scheduled 20-minute
+safety-net runs of `updater-manifest` stay quiet. A Telegram failure never fails the release:
+the send step continues on error.
+
 ## Windows signing setup
 
-Follow [SIGNING.md](SIGNING.md) to enroll the project in SignPath Foundation and configure
-`SIGNPATH_API_TOKEN` and `SIGNPATH_ORGANIZATION_ID`. The workflow verifies both Authenticode
-signatures before publishing. A valid signature helps establish trust; SmartScreen reputation may
-still take time to build. Unsigned builds remain available as workflow artifacts for inspection.
+Until SignPath is configured, every `app-v*` tag publishes unsigned installers (SmartScreen
+warns) and the release notes state the code-signing policy. Follow [SIGNING.md](SIGNING.md) to
+enroll the project in SignPath Foundation and configure `SIGNPATH_API_TOKEN` and
+`SIGNPATH_ORGANIZATION_ID`; from the next tag on, the workflow signs through SignPath, verifies
+both Authenticode signatures and publishes those instead, with no workflow change. A valid
+signature helps establish trust; SmartScreen reputation may still take time to build.
 
 ## Release order
 

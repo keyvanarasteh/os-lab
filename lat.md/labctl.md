@@ -16,6 +16,15 @@ The mappings are `win` -> [[win-lab]], `android` -> [[android-lab/lab]], `ios`
 `win` and `linux` (plus `ios` on Linux). On macOS, `ios` is redirected to the
 native `make -C ios-lab mac-*` path.
 
+Source Lab dispatches directly to [[source-lab/run.py#main]] through
+`source` or `source-lab`. It is included in `all status`, `all doctor` and
+`all monitor`, but not in VM start/stop/restart/profile fan-out.
+
+Web Lab dispatches through `web` or `web-lab` to
+`make -C web-lab` ([[web-lab/Makefile]]): doctor, setup, up/start, stop,
+status, monitor, open, events, test and clean. It is not part of `all`
+fan-out, and it has no profiles, resize or service verbs.
+
 ## Commands
 
 The CLI exposes profiles, config, lifecycle, status/monitor, logs, shell, urls,
@@ -36,3 +45,7 @@ The CLI branches on the lab for container names, endpoints, URLs and resize
 semantics (SSH for linux, RDP for win, VNC for ios), and normalizes RAM units
 per lab. The matching Makefiles are [[win-lab/Makefile]], [[linux-lab/Makefile]],
 [[ios-lab/Makefile]] and [[android-lab/lab/Makefile]].
+
+Source CLI verbs also include evidence contracts, detection, maps, crawler/CSV
+operations and explicit [[source-lab/IMPORT.md]] dry-run/copy/rollback.
+[[source-lab/RUNBOOK.md]] explains local operation and release gates.

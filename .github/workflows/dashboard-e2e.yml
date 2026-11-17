@@ -1,18 +1,94 @@
 name: dashboard-e2e
 
+# Plan items D, O and Q:
+# - `plan` refuses PRs that change dashboard/dist (master rebuilds it after merge, see
+#   dashboard-dist.yml) and picks the specs: on PRs only those that cover the changed files
+#   (dashboard/e2e/affected.json), on master the whole suite.
+# - `check` runs the typecheck, translations and the e2e change map (fast; a required check).
+# - `browser` runs the picked specs in shards with cached Playwright browsers.
+# - `report` merges the shard reports and uploads them only when something failed.
+
 on:
   pull_request:
     paths:
       - 'dashboard/**'
+      - 'docs/legal/**'
+      - 'scripts/lib/changed-files.sh'
       - '.github/workflows/dashboard-e2e.yml'
   push:
     branches: [master]
     paths:
       - 'dashboard/**'
+      - 'docs/legal/**'
+      - '!dashboard/dist/**'
       - '.github/workflows/dashboard-e2e.yml'
+  workflow_dispatch:
+
+# Plan item M: a newer push to the same PR cancels the older run. Pushes to master,
+# tags and manual runs are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 jobs:
-  browser:
+  plan:
+    runs-on: ubuntu-22.04
+    outputs:
+      run: ${{ steps.pick.outputs.run }}
+      specs: ${{ steps.pick.outputs.specs }}
+      shards: ${{ steps.pick.outputs.shards }}
+      total: ${{ steps.pick.outputs.total }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Feature PRs do not change dashboard/dist
+        if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'build/dist-')
+        run: |
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- dashboard/dist | head -20)"
+          if [ -n "$changed" ]; then
+            echo "::error::This PR changes dashboard/dist. Feature branches no longer commit the build: master rebuilds it after merge (dashboard-dist.yml)."
+            echo "Drop the dist changes with: git checkout origin/${{ github.base_ref }} -- dashboard/dist && git commit -m 'drop dist'"
+            echo "$changed"
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pick specs and shards
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            files="$(scripts/lib/changed-files.sh "origin/${{ github.base_ref }}")"
+            json="$(printf '%s\n' "$files" | node dashboard/scripts/affected.mjs --stdin --json)"
+          else
+            json='{"mode":"full","specs":[]}'
+          fi
+          echo "$json"
+          mode="$(node -p "JSON.parse(process.argv[1]).mode" "$json")"
+          specs="$(node -p "JSON.parse(process.argv[1]).specs.map(s => 'e2e/' + s).join(' ')" "$json")"
+          count="$(node -p "JSON.parse(process.argv[1]).specs.length" "$json")"
+          if [ "$mode" = full ]; then specs=""; shards='[1,2,3,4]'; total=4
+          elif [ "$mode" = none ]; then shards='[1]'; total=1
+          elif [ "$count" -ge 4 ]; then shards='[1,2]'; total=2
+          else shards='[1]'; total=1; fi
+          {
+            echo "run=$([ "$mode" = none ] && echo false || echo true)"
+            echo "specs=$specs"
+            echo "shards=$shards"
+            echo "total=$total"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### e2e plan"
+            echo "- mode: \`$mode\`"
+            echo "- specs: ${specs:-whole suite}"
+            echo "- shards: $total"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  check:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -23,16 +99,90 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci --no-audit --no-fund
         working-directory: dashboard
-      - run: npx playwright install --with-deps chromium
-        working-directory: dashboard
-      - run: npm run build
+      - run: npx astro sync && npm run check
         working-directory: dashboard
       - run: npm run test:i18n
         working-directory: dashboard
-      - run: npm run test:e2e
+      - run: npm run test:tooling
         working-directory: dashboard
+
+  browser:
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: dashboard
+      - name: Playwright version
+        id: pw
+        working-directory: dashboard
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+        working-directory: dashboard
+      - name: Install Chromium system packages
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: dashboard
+      - run: npm run build
+        working-directory: dashboard
+      - name: Run specs (shard ${{ matrix.shard }}/${{ needs.plan.outputs.total }})
+        working-directory: dashboard
+        env:
+          SPECS: ${{ needs.plan.outputs.specs }}
+        run: |
+          start=$(date +%s)
+          # shellcheck disable=SC2086
+          npx playwright test $SPECS --shard=${{ matrix.shard }}/${{ needs.plan.outputs.total }}
+          echo "shard ${{ matrix.shard }}: $(( $(date +%s) - start ))s" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: dashboard/blob-report
+          retention-days: 3
+          if-no-files-found: ignore
+
+  report:
+    needs: [plan, browser]
+    if: always() && needs.plan.outputs.run == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: dashboard
+      - uses: actions/download-artifact@v4
+        with:
+          path: dashboard/all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+      - name: Merge shard reports
+        working-directory: dashboard
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+      - uses: actions/upload-artifact@v4
+        if: needs.browser.result != 'success'
         with:
           name: dashboard-playwright-report
           path: dashboard/playwright-report/

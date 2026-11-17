@@ -84,6 +84,8 @@ export function ContentPanel() {
   }
 
   const available = Boolean(state?.latest && state.latest.sequence > state.sequence);
+  // The card appears when something is installable and stays for the result of an action.
+  if (!available && !result) return null;
   return (
     <Section
       id="content"

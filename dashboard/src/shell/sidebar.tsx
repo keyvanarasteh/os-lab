@@ -28,6 +28,8 @@ export interface SidebarLeaf {
   id: string;
   label: string;
   badge?: ReactNode;
+  /** Optional small glyph before the label. */
+  icon?: ReactNode;
   /** Only for admin accounts; hidden from everyone else's sidebar and Spotlight. */
   admin?: boolean;
 }
@@ -46,6 +48,10 @@ export interface SidebarItem {
 export interface SidebarGroup {
   label: string;
   items: SidebarItem[];
+  /** The label becomes a button that folds the group's items away. */
+  collapsible?: boolean;
+  /** For a collapsible group: open until the user folds it. Default false (closed). */
+  defaultOpen?: boolean;
 }
 
 export function cn(...classes: (string | false | null | undefined)[]) {
@@ -101,6 +107,26 @@ export function useSidebarCollapsed(
   return [collapsed, setCollapsed];
 }
 
+const GROUPS_KEY = "oslab.sidebar.groups";
+
+function readGroupState(): Record<string, boolean> {
+  try {
+    const raw = window.localStorage.getItem(GROUPS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeGroupState(state: Record<string, boolean>) {
+  try {
+    window.localStorage.setItem(GROUPS_KEY, JSON.stringify(state));
+  } catch {
+    // Storage unavailable: the choice lasts for this page view
+  }
+}
+
 interface AppSidebarProps {
   groups: SidebarGroup[];
   activeId: string;
@@ -138,6 +164,8 @@ export function AppSidebar({
   const collapsed = !isDrawer && collapsedProp;
   // Explicit open/closed choices; an item without one is open exactly when it holds the active page
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  // Collapsible groups (Help): the user's choice is remembered; a group holding the active page opens itself.
+  const [groupToggled, setGroupToggled] = useState<Record<string, boolean>>(readGroupState);
 
   const parentOf = useMemo(() => {
     const map = new Map<string, string>();
@@ -146,6 +174,25 @@ export function AppSidebar({
         for (const leaf of item.children ?? []) map.set(leaf.id, item.id);
     return map;
   }, [groups]);
+
+  const groupHoldsActive = (group: SidebarGroup) =>
+    group.items.some((item) => item.id === activeId || (item.children ?? []).some((leaf) => leaf.id === activeId));
+  const isGroupOpen = (group: SidebarGroup) =>
+    !group.collapsible || (groupToggled[group.label] ?? (group.defaultOpen ?? false));
+  const toggleGroup = (group: SidebarGroup) =>
+    setGroupToggled((prev) => {
+      const next = { ...prev, [group.label]: !isGroupOpen(group) };
+      writeGroupState(next);
+      return next;
+    });
+  // Landing on a page inside a folded group opens it (without overriding what is stored for later visits).
+  useEffect(() => {
+    for (const group of groups) {
+      if (group.collapsible && groupHoldsActive(group) && !isGroupOpen(group))
+        setGroupToggled((prev) => ({ ...prev, [group.label]: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, groups]);
 
   const isOpenItem = (id: string) =>
     toggled[id] ?? parentOf.get(activeId) === id;
@@ -229,11 +276,31 @@ export function AppSidebar({
               gi > 0 ? (
                 <hr className="mx-2 my-2 border-(--iux-border)" />
               ) : null
+            ) : group.collapsible ? (
+              <button
+                type="button"
+                aria-expanded={isGroupOpen(group)}
+                aria-controls={`sidebar-group-${gi}`}
+                onClick={() => toggleGroup(group)}
+                className="flex w-full items-center gap-1 rounded-md px-3 pt-3 pb-1 text-left text-xs font-medium text-(--iux-muted-foreground)/70 outline-none transition-colors hover:text-(--iux-foreground) focus-visible:ring-2 focus-visible:ring-(--iux-ring)"
+              >
+                <span>{group.label}</span>
+                {isGroupOpen(group) ? (
+                  <CaretDownIcon size={12} className="ml-auto shrink-0" />
+                ) : (
+                  <CaretRightIcon size={12} className="ml-auto shrink-0" />
+                )}
+              </button>
             ) : (
               <div className="px-3 pt-3 pb-1 text-xs font-medium text-(--iux-muted-foreground)/70">
                 {group.label}
               </div>
             )}
+            <div
+              id={`sidebar-group-${gi}`}
+              className="flex flex-col gap-0.5"
+              hidden={!collapsed && !isGroupOpen(group)}
+            >
             {group.items.map((item) => {
               const kids = item.children ?? [];
               const childActive = kids.some((c) => c.id === activeId);
@@ -310,6 +377,7 @@ export function AppSidebar({
                                 : rowIdle
                             )}
                           >
+                            {leaf.icon && <span className="shrink-0">{leaf.icon}</span>}
                             <span className="truncate">{leaf.label}</span>
                             {leaf.badge}
                           </button>
@@ -320,6 +388,7 @@ export function AppSidebar({
                 </div>
               );
             })}
+            </div>
           </div>
         ))}
       </nav>
