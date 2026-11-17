@@ -155,7 +155,55 @@ def cached_host():
         return HOST_CACHE["value"]
 
 
+class _CountingReader:
+    """Wraps the request stream and counts the bytes a handler really consumed."""
+
+    def __init__(self, raw):
+        self._raw = raw
+        self.count = 0
+
+    def read(self, size=-1):
+        data = self._raw.read(size)
+        self.count += len(data)
+        return data
+
+    def readline(self, size=-1):
+        data = self._raw.readline(size)
+        self.count += len(data)
+        return data
+
+    def __getattr__(self, name):
+        return getattr(self._raw, name)
+
+
 class LabHttpHandler(BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.rfile = _CountingReader(self.rfile)
+
+    def _drain_request_body(self):
+        """Read what a handler left unread before the connection closes.
+
+        A request refused early (403, 413, 501...) never reads its body. Closing a socket that still
+        holds unread bytes makes the OS send a reset, and the client can see "connection reset"
+        instead of the refusal. Small bodies are discarded; anything declared larger than the cap
+        just closes the connection.
+        """
+        try:
+            declared = int(self.headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            return
+        left = declared - getattr(self.rfile, "count", 0)
+        if left <= 0:
+            return
+        if left > 1_000_000:
+            self.close_connection = True
+            return
+        try:
+            self.rfile.read(left)
+        except OSError:
+            self.close_connection = True
+
     def log_message(self, fmt, *args):
         # Polling is frequent; keep the terminal for errors
         if not self.path.startswith(("/api/logs", "/api/jobs", "/api/health", "/api/host", "/api/labs/", "/api/capabilities", "/api/cleanup", "/api/web")):
@@ -334,6 +382,12 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._source_reply(400, {"error": "Invalid Source Lab request or unavailable private storage"})
 
     def do_DELETE(self):
+        try:
+            self._do_delete()
+        finally:
+            self._drain_request_body()
+
+    def _do_delete(self):
         if not self._host_ok():
             return
         if self.headers.get("X-OSLab") != "1":
@@ -493,6 +547,12 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Not found"})
 
     def do_POST(self):
+        try:
+            self._do_post()
+        finally:
+            self._drain_request_body()
+
+    def _do_post(self):
         if not self._host_ok():
             return
         # Browsers cannot add a custom header cross-site without a CORS preflight, which this
