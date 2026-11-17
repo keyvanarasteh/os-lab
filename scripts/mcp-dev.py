@@ -8,6 +8,8 @@
                                                          server with --dev and restart it when console/*.py changes,
                                                          replaying the client's handshake so the session survives
   scripts/mcp-dev.py config [--proxy] [--client NAME]    print the registration for claude, codex, agy, opencode, zcode
+  scripts/mcp-dev.py seed [--proxy] [--apply] [--out F]  build the qLar bundle (a mcp.json fragment); --apply merges it
+                                                         into ~/qlar/mcp/mcp.json (backup first), --out writes it to F
 
 Only the server runs here. Input tools still need the human to arm control mode from the dashboard, and a
 `--call` of an input tool is refused by the console unless it is armed. Requests in flight when the proxy
@@ -273,6 +275,82 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def qlar_entry(proxy: bool) -> dict:
+    script = os.path.join(REPO, "scripts", "mcp-dev.py") if proxy else SERVER
+    return {
+        "id": NAME,
+        "label": "os-lab macOS Lab",
+        "program": sys.executable,
+        "args": [script] + (["proxy"] if proxy else []),
+        "dir": ".",
+        "env": {},
+        "enabled": True,
+        "hint": "Guarded macOS computer-use tools. Read-only tools work; input tools need armed control from the os-lab dashboard.",
+    }
+
+
+def wheel_entry(root: str, write: bool) -> dict:
+    """The bundled form qLar's other wheel servers use: a folder under the mcp root holding the .whl, started with
+    `uvx --from ./<wheel> oslab-mcp` through the same node launcher (so a GUI-started qLar finds uv). The launcher
+    text is copied from an existing wheel entry in mcp.json; without one the entry calls uvx directly."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_mcp_wheel", os.path.join(REPO, "scripts", "build-mcp-wheel.py"))
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)  # type: ignore[union-attr]
+    folder = "os-lab-macos"
+    wheel = os.path.basename(builder.build(os.path.join(root, folder) if write else os.path.join(REPO, "dist")))
+    launcher = None
+    try:
+        with open(os.path.join(root, "mcp.json"), encoding="utf-8") as handle:
+            for server in json.load(handle).get("servers", []):
+                if server.get("program") == "node" and "--" in server.get("args", []) and "uvx" in server["args"]:
+                    launcher = server["args"][: server["args"].index("--") + 1]
+                    break
+    except (OSError, ValueError):
+        pass
+    tail = ["uvx", "--from", f"./{wheel}", "oslab-mcp"]
+    entry = qlar_entry(False)
+    entry.update({"label": "os-lab macOS Lab (wheel)", "dir": folder, "program": "node" if launcher else "uvx",
+                  "args": (launcher + tail) if launcher else tail[1:]})
+    return entry
+
+
+def cmd_seed(args: argparse.Namespace) -> int:
+    """The qLar bundle: the os-lab server entries in the shape of ~/qlar/mcp/mcp.json (`servers` list, keyed by id)."""
+    root = os.environ.get("QLAR_MCP_ROOT") or os.path.expanduser("~/qlar/mcp")
+    entry = qlar_entry(args.proxy)
+    if args.wheel:
+        entry = wheel_entry(root, args.apply)
+    bundle = {"servers": [entry]}
+    text = json.dumps(bundle, indent=2) + "\n"
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        print(f"wrote {args.out}")
+    if args.apply:
+        target = os.path.join(root, "mcp.json")
+        current: dict = {"servers": []}
+        if os.path.exists(target):
+            with open(target, encoding="utf-8") as handle:
+                current = json.load(handle)
+            backup = f"{target}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+            with open(backup, "w", encoding="utf-8") as handle:
+                json.dump(current, handle, indent=2)
+            print(f"backup {backup}")
+        servers = [s for s in current.get("servers", []) if s.get("id") != NAME]  # replace our own entry, keep the rest
+        current["servers"] = servers + bundle["servers"]
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w", encoding="utf-8") as handle:
+            json.dump(current, handle, indent=2)
+            handle.write("\n")
+        print(f"merged {NAME} into {target} ({len(current['servers'])} servers); restart qLar to pick it up")
+    if not args.out and not args.apply:
+        print(text, end="")
+        print("Dry run. --apply merges it into ~/qlar/mcp/mcp.json; --out FILE saves it.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -285,6 +363,12 @@ def main() -> int:
     config.add_argument("--proxy", action="store_true", help="point the client at the restart-on-change proxy")
     config.add_argument("--client", choices=("all",) + CLIENTS, default="all", help="print one client's entry (default all)")
     config.set_defaults(fn=cmd_config)
+    seed = sub.add_parser("seed", help="build the qLar mcp.json bundle")
+    seed.add_argument("--proxy", action="store_true", help="use the restart-on-change proxy")
+    seed.add_argument("--wheel", action="store_true", help="bundle the built wheel in its own folder, like the other wheel servers")
+    seed.add_argument("--apply", action="store_true", help="merge into ~/qlar/mcp/mcp.json (or $QLAR_MCP_ROOT/mcp.json)")
+    seed.add_argument("--out", help="write the bundle to this file")
+    seed.set_defaults(fn=cmd_seed)
     args = parser.parse_args()
     return args.fn(args)
 

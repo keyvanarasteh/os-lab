@@ -33,7 +33,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import oslab  # noqa: E402
 
-REPO_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+# OSLAB_ROOT points an installed copy (the wheel) at a real checkout so it shares the dashboard's armed state and audit log.
+REPO_ROOT = os.path.realpath(os.environ.get("OSLAB_ROOT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 PROTOCOL_VERSION = "2024-11-05"
 MAX_TASK_STEPS = 25
 

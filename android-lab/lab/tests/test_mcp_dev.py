@@ -88,3 +88,44 @@ def test_config_can_print_one_client_and_without_proxy_points_at_the_server():
     assert proc.returncode == 0
     assert "console/mcp_server.py" in proc.stdout and "mcp-dev.py" not in proc.stdout
     assert "claude mcp add" not in proc.stdout and "agy mcp add" not in proc.stdout
+
+
+def test_seed_builds_a_qlar_bundle_and_apply_merges_without_touching_other_servers(tmp_path):
+    out = subprocess.run([sys.executable, DEV, "seed"], capture_output=True, text=True, cwd=REPO_ROOT, timeout=30)
+    assert out.returncode == 0 and "Dry run" in out.stdout
+    root = tmp_path / "mcp"
+    root.mkdir()
+    (root / "mcp.json").write_text(json.dumps({"servers": [{"id": "other", "url": "https://x"}, {"id": "os-lab-macos", "program": "old"}]}))
+    env = {**os.environ, "QLAR_MCP_ROOT": str(root)}
+    for _ in range(2):  # idempotent
+        run = subprocess.run([sys.executable, DEV, "seed", "--apply"], capture_output=True, text=True, cwd=REPO_ROOT, timeout=30, env=env)
+        assert run.returncode == 0, run.stderr
+    servers = json.loads((root / "mcp.json").read_text())["servers"]
+    assert [s["id"] for s in servers] == ["other", "os-lab-macos"]
+    mine = servers[1]
+    assert mine["program"] == sys.executable and mine["args"] == [SERVER] and mine["enabled"] is True
+    assert len(list(root.glob("mcp.json.bak-*"))) >= 1
+
+
+def test_wheel_is_a_valid_zip_with_the_server_the_scripts_and_an_entry_point(tmp_path):
+    import zipfile
+    run = subprocess.run([sys.executable, os.path.join(REPO_ROOT, "scripts", "build-mcp-wheel.py"), "--out", str(tmp_path)],
+                         capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr
+    with zipfile.ZipFile(run.stdout.strip()) as wheel:
+        names = set(wheel.namelist())
+        assert {"oslab_mcp/console/mcp_server.py", "oslab_mcp/console/oslab.py", "oslab_mcp/cli.py"} <= names
+        assert "oslab_mcp/ios-lab/mac/macos-app.sh" in names
+        assert not any(n.endswith("config.env") or "/build/" in n for n in names)
+        assert "oslab-mcp = oslab_mcp.cli:main" in wheel.read("oslab_mcp-0.1.0.dist-info/entry_points.txt").decode()
+        assert wheel.testzip() is None
+
+
+def test_seed_wheel_puts_the_wheel_in_its_own_folder_and_starts_it_with_uvx(tmp_path):
+    (tmp_path / "mcp.json").write_text(json.dumps({"servers": []}))
+    run = subprocess.run([sys.executable, DEV, "seed", "--wheel", "--apply"], capture_output=True, text=True, cwd=REPO_ROOT,
+                         timeout=60, env={**os.environ, "QLAR_MCP_ROOT": str(tmp_path)})
+    assert run.returncode == 0, run.stderr
+    entry = json.loads((tmp_path / "mcp.json").read_text())["servers"][0]
+    assert entry["dir"] == "os-lab-macos" and (tmp_path / "os-lab-macos" / "oslab_mcp-0.1.0-py3-none-any.whl").exists()
+    assert entry["args"][-4:] == ["uvx", "--from", "./oslab_mcp-0.1.0-py3-none-any.whl", "oslab-mcp"] or entry["args"][-3:] == ["--from", "./oslab_mcp-0.1.0-py3-none-any.whl", "oslab-mcp"]
