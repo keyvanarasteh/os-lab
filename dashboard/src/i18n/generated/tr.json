@@ -1481,7 +1481,7 @@
   "Git": "Git",
   "Give each VLAN a distinct, non-overlapping block.": "Her VLAN'a ayrı, örtüşmeyen bir blok verin.",
   "Give R&D and software their own VLAN and rule set; R&D usually gets no direct internet.": "Ar-Ge ve yazılıma kendi VLAN'larını ve kural setlerini verin; Ar-Ge'ye genellikle doğrudan internet sağlanmaz.",
-  "Homebrew": "Ev yapımı bira",
+  "Homebrew": "Homebrew",
   "Host A": "Ana Bilgisayar A",
   "Host B": "Ana Bilgisayar B",
   "Hours of downtime; lost sales or lost lectures.": "Kesinti saatleri; satış kaybı veya ders kaybı.",

@@ -1481,7 +1481,7 @@
   "Git": "git",
   "Give each VLAN a distinct, non-overlapping block.": "Asigne a cada VLAN un bloque distinto y que no se superponga.",
   "Give R&D and software their own VLAN and rule set; R&D usually gets no direct internet.": "Dar a I+D y al software su propia VLAN y conjunto de reglas; La I+D normalmente no tiene acceso directo a Internet.",
-  "Homebrew": "cerveza casera",
+  "Homebrew": "Homebrew",
   "Host A": "Anfitrión A",
   "Host B": "Anfitrión B",
   "Hours of downtime; lost sales or lost lectures.": "Horas de inactividad; pérdida de ventas o pérdida de conferencias.",
