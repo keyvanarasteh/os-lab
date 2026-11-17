@@ -150,6 +150,23 @@ test("a lab that is missing requirements hides its runtime sections until they a
   await expect(page.getByRole("button", { name: "Attach simulator" })).toBeVisible();
 });
 
+test("the macOS Lab panic-stop App Intent reports success and failure", async ({ page }) => {
+  await mockApi(page, "macos");
+  let stops = 0;
+  await page.route("**/api/labs/macos/stop", (route) => {
+    stops += 1;
+    return route.fulfill({ json: { ok: true, disarmed: true, sessionsClosed: [] } });
+  });
+  await page.goto("/labs/macos/#intent=panic-stop");
+  await expect(page.getByRole("status")).toContainText("macOS Lab control stopped.");
+  expect(stops).toBe(1);
+  await expect(page).toHaveURL(/\/labs\/macos\/$/);
+
+  await page.route("**/api/labs/macos/stop", (route) => route.fulfill({ status: 500, json: { error: "Stop bridge unavailable" } }));
+  await page.goto("/labs/macos/#intent=panic-stop");
+  await expect(page.getByRole("alert")).toContainText("Could not stop macOS Lab control: Stop bridge unavailable");
+});
+
 test("the iOS actions card checks real devices and the frame captures a selected phone", async ({ page }) => {
   await mockApi(page, "macos");
   const udid = "C2AC1E99-DB20-5F29-BC57-4EE540DCFEBA";

@@ -2833,5 +2833,8 @@
   "Older than 6 months": "6 aydan eski",
   "Older than a year": "Bir yıldan eski",
   "Run a scan to see modification dates": "Değiştirilme tarihlerini görmek için tarama yapın",
-  "Preparing…": "Hazırlanıyor…"
+  "Preparing…": "Hazırlanıyor…",
+  "Stopping macOS Lab control…": "macOS Lab denetimi durduruluyor…",
+  "macOS Lab control stopped.": "macOS Lab denetimi durduruldu.",
+  "Could not stop macOS Lab control:": "macOS Lab denetimi durdurulamadı:"
 }

@@ -176,9 +176,12 @@ async fn console_start(app: AppHandle, state: State<'_, Console>) -> Result<Star
     let data = data_dir(&app)?;
     let version = app.package_info().version.to_string();
     let console = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || console.start(&root, source, &log, &data, &content, &version))
+    let mut started = tauri::async_runtime::spawn_blocking(move || console.start(&root, source, &log, &data, &content, &version))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+    started.route = widget::consume_pending_mac_lab_intent()
+        .map(|request| request.dashboard_route().to_string());
+    Ok(started)
 }
 
 #[tauri::command]
@@ -507,7 +510,12 @@ pub fn run() {
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
                     if url.scheme() == "oslab" {
-                        let route = url.path().trim_start_matches('/').to_string();
+                        // WidgetConfig emits oslab://route, where URL parsers put
+                        // the route in the host. Accept /route too for callers
+                        // using the path spelling.
+                        let route = url.host_str().filter(|host| !host.is_empty())
+                            .unwrap_or_else(|| url.path().trim_start_matches('/'))
+                            .to_string();
                         navigate_widget_route(&nav, &route);
                     }
                 }
@@ -530,6 +538,11 @@ pub fn run() {
                 if on_dashboard && widget::consume_pending_quick_clean() {
                     let _ = w.eval("window.__oslabQuickClean && window.__oslabQuickClean()");
                 }
+                if on_dashboard {
+                    if let Some(request) = widget::consume_pending_mac_lab_intent() {
+                        navigate_dashboard_path(handle, request.dashboard_route());
+                    }
+                }
             }
             widget::reload_timelines();
         }
@@ -544,6 +557,23 @@ const WIDGET_ROUTES: [&str; 10] = [
     "dashboard", "scan", "results", "leftovers", "history", "space",
     "cleanup-bookmarks", "cleanup-monitor", "cleanup-permissions", "cleanup-widgets",
 ];
+
+fn navigate_dashboard_path(app: &AppHandle, path: &str) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    let Some(base) = app.state::<Console>().running_url() else { return };
+    let path = w.url().ok().map(|current| localized_dashboard_path(&current, path))
+        .unwrap_or_else(|| path.trim_start_matches('/').to_string());
+    if let Ok(url) = url::Url::parse(&format!("{}/{}", base.trim_end_matches('/'), path)) {
+        let _ = w.navigate(url);
+    }
+}
+
+fn localized_dashboard_path(current: &url::Url, path: &str) -> String {
+    const LOCALES: [&str; 7] = ["tr", "de", "fr", "es", "it", "fa", "ar"];
+    let first = current.path_segments().and_then(|mut segments| segments.next()).unwrap_or_default();
+    let prefix = if LOCALES.contains(&first) { format!("{first}/") } else { String::new() };
+    format!("{prefix}{}", path.trim_start_matches('/'))
+}
 
 fn navigate_widget_route(app: &AppHandle, route: &str) {
     if !WIDGET_ROUTES.contains(&route) {
@@ -596,5 +626,14 @@ mod files_dir_tests {
         assert!(copy_files_dir(&from, &to).unwrap_err().contains("empty folder"));
         assert!(copy_files_dir(&from, &from.join("os-lab")).unwrap_err().contains("separate folder"));
         let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn app_intent_routes_preserve_the_dashboard_locale() {
+        let english = url::Url::parse("http://127.0.0.1:4330/cleanup/").unwrap();
+        let turkish = url::Url::parse("http://127.0.0.1:4330/tr/cleanup/").unwrap();
+        assert_eq!(localized_dashboard_path(&english, "labs/macos/"), "labs/macos/");
+        assert_eq!(localized_dashboard_path(&turkish, "labs/macos/#intent=panic-stop"),
+                   "tr/labs/macos/#intent=panic-stop");
     }
 }

@@ -2833,5 +2833,8 @@
   "Older than 6 months": "أقدم من 6 أشهر",
   "Older than a year": "أقدم من سنة",
   "Run a scan to see modification dates": "شغّل فحصًا لرؤية تواريخ التعديل",
-  "Preparing…": "جارٍ التحضير…"
+  "Preparing…": "جارٍ التحضير…",
+  "Stopping macOS Lab control…": "جارٍ إيقاف التحكم في مختبر macOS…",
+  "macOS Lab control stopped.": "تم إيقاف التحكم في مختبر macOS.",
+  "Could not stop macOS Lab control:": "تعذّر إيقاف التحكم في مختبر macOS:"
 }

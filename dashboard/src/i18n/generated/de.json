@@ -2833,5 +2833,8 @@
   "Older than 6 months": "Älter als 6 Monate",
   "Older than a year": "Älter als ein Jahr",
   "Run a scan to see modification dates": "Für Änderungsdaten einen Scan ausführen",
-  "Preparing…": "Wird vorbereitet …"
+  "Preparing…": "Wird vorbereitet …",
+  "Stopping macOS Lab control…": "Die macOS-Lab-Steuerung wird gestoppt…",
+  "macOS Lab control stopped.": "Die macOS-Lab-Steuerung wurde gestoppt.",
+  "Could not stop macOS Lab control:": "Die macOS-Lab-Steuerung konnte nicht gestoppt werden:"
 }

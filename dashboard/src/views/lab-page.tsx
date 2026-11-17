@@ -465,6 +465,7 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
   const [simOpen, setSimOpen] = useState(false);
   const [simTarget, setSimTarget] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [intentStatus, setIntentStatus] = useState<{ state: "pending" | "success" | "error"; message?: string; error?: string } | null>(null);
 
   const preview = async (action: string, extra: Partial<LabRequest> = {}) => {
     const req: LabRequest = { lab: labId, action, ...extra };
@@ -507,6 +508,25 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lab?.id, lab?.actions.length]);
 
+  // Native App Intents route the always-safe panic stop here. Arming is never
+  // available through a shortcut; it remains an explicit dashboard action.
+  useEffect(() => {
+    if (labId !== "macos") return;
+    const handleIntent = () => {
+      if (window.location.hash !== "#intent=panic-stop") return;
+      history.replaceState(null, "", window.location.pathname);
+      setIntentStatus({ state: "pending", message: "Stopping macOS Lab control…" });
+      void api.macosStop().then(() => {
+        setIntentStatus({ state: "success", message: "macOS Lab control stopped." });
+      }).catch((error) => {
+        setIntentStatus({ state: "error", error: message(error) });
+      });
+    };
+    handleIntent();
+    window.addEventListener("hashchange", handleIntent);
+    return () => window.removeEventListener("hashchange", handleIntent);
+  }, [labId]);
+
   // Re-detect the host when a job on this lab finishes (setup may have fixed a requirement)
   const runningCount = jobs.filter((j) => j.state === "running").length;
   useEffect(() => {
@@ -534,6 +554,17 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
         <TopBar title={labId === "android" ? "Android Lab · Runtime & Setup" : label} back={{ href: labId === "android" ? "/android/" : "/", label: labId === "android" ? "Android Lab" : "This computer" }} icon={LAB_ICON[labId](20)} />
         <div className={simulator && simOpen ? "lg:flex lg:w-full lg:items-start" : undefined}>
         <main className={`mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 ${simulator && simOpen ? "lg:mx-0 lg:min-w-0 lg:flex-1 lg:max-w-none" : ""}`}>
+          {intentStatus ? (
+            <p
+              role={intentStatus.state === "error" ? "alert" : "status"}
+              aria-live="polite"
+              className={`rounded-xl border border-(--iux-border) bg-(--iux-card) px-4 py-3 text-sm ${intentStatus.state === "error" ? "text-(--iux-danger)" : ""}`}
+            >
+              {intentStatus.state === "error" ? (
+                <><span>Could not stop macOS Lab control:</span> <span data-no-translate>{intentStatus.error}</span>. <span>Try again.</span></>
+              ) : intentStatus.message}
+            </p>
+          ) : null}
           {!lab ? (
             hostError ? <Empty>Could not reach the lab engine: {hostError}</Empty> : <Skeleton rows={5} />
           ) : (

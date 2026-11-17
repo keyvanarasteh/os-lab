@@ -235,7 +235,7 @@
     if (!consoleInfo) return;
     show(t.opening, false);
     if (track.on) setStep("open");
-    window.location.replace(consoleInfo.url + (language === "en" ? "" : language + "/"));
+    window.location.replace(consoleInfo.url + (language === "en" ? "" : language + "/") + (consoleInfo.route || ""));
   }
 
   function showContainerSetup(message, canDownload, canRecover) {

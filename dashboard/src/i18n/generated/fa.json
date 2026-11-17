@@ -2833,5 +2833,8 @@
   "Older than 6 months": "قدیمی‌تر از ۶ ماه",
   "Older than a year": "قدیمی‌تر از یک سال",
   "Run a scan to see modification dates": "برای دیدن تاریخ تغییرات، اسکن کنید",
-  "Preparing…": "در حال آماده‌سازی…"
+  "Preparing…": "در حال آماده‌سازی…",
+  "Stopping macOS Lab control…": "در حال توقف کنترل آزمایشگاه macOS…",
+  "macOS Lab control stopped.": "کنترل آزمایشگاه macOS متوقف شد.",
+  "Could not stop macOS Lab control:": "توقف کنترل آزمایشگاه macOS ممکن نشد:"
 }

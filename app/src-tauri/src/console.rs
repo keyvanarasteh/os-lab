@@ -68,6 +68,7 @@ pub struct Started {
     pub source: Source,
     pub python: String,
     pub log: String,
+    pub route: Option<String>,
 }
 
 impl Console {
@@ -96,6 +97,7 @@ impl Console {
                 source,
                 python: String::new(),
                 log: log.display().to_string(),
+                route: None,
             });
         }
         self.stop();
@@ -161,6 +163,7 @@ impl Console {
             source,
             python,
             log: log.display().to_string(),
+            route: None,
         })
     }
 
