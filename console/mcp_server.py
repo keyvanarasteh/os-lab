@@ -15,6 +15,11 @@ Claude, ChatGPT — can drive. The division of labour is deliberate:
   and the panic stop tool ends everything at once.
 
 Run: python3 console/mcp_server.py   (or `make -C ios-lab mac-mcp`)
+
+Dev mode: `--dev` (or OSLAB_MCP_DEV=1) logs every request and reply with its timing to stderr, answers
+malformed lines with a JSON-RPC parse error instead of dropping them, and appends a JSONL trace to
+test-results/mcp-dev/. stdout stays pure JSON-RPC. `scripts/mcp-dev.py` adds a smoke client, a
+restart-on-change proxy and a client-config printer (`make -C ios-lab mac-mcp-dev`).
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ import base64
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import oslab  # noqa: E402
@@ -375,12 +381,15 @@ def handle(message: dict) -> dict | None:
             "serverInfo": {"name": "os-lab-macos", "version": "0.1.0"}}}
     if method == "notifications/initialized":
         return None
+    if method == "ping":
+        return {"jsonrpc": "2.0", "id": message_id, "result": {}}
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": TOOLS}}
     if method == "tools/call":
         params = message.get("params") or {}
         try:
-            result = tool_call(str(params.get("name")), params.get("args") or {})
+            # MCP clients send `arguments`; `args` is kept for the hand-written callers that used it first.
+            result = tool_call(str(params.get("name")), params.get("arguments") or params.get("args") or {})
             return {"jsonrpc": "2.0", "id": message_id, "result": {**result, "isError": False}}
         except oslab.PlanError as e:
             payload: dict = {"error": str(e)}
@@ -395,7 +404,41 @@ def handle(message: dict) -> dict | None:
     return None
 
 
-def main() -> None:
+def _dev_enabled(argv: list[str]) -> bool:
+    return "--dev" in argv or os.environ.get("OSLAB_MCP_DEV") == "1"
+
+
+class DevTrace:
+    """Dev-mode logging: one stderr line per message and a JSONL trace file. Never touches stdout."""
+
+    def __init__(self) -> None:
+        folder = os.path.join(REPO_ROOT, "test-results", "mcp-dev")
+        os.makedirs(folder, exist_ok=True)
+        self.path = os.path.join(folder, time.strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}.jsonl")
+        self._file = open(self.path, "a", encoding="utf-8")
+        sys.stderr.write(f"[mcp-dev] os-lab MCP server pid {os.getpid()}, trace {self.path}\n")
+        sys.stderr.flush()
+
+    def record(self, direction: str, payload: object, ms: float | None = None) -> None:
+        row: dict = {"t": round(time.time(), 3), "dir": direction, "msg": payload}
+        if ms is not None:
+            row["ms"] = round(ms, 1)
+        self._file.write(json.dumps(row) + "\n")
+        self._file.flush()
+        if isinstance(payload, dict):
+            label = payload.get("method") or ("error" if "error" in payload else "reply")
+            tool = (payload.get("params") or {}).get("name") if payload.get("method") == "tools/call" else None
+            failed = "error" in payload or (payload.get("result") or {}).get("isError")
+        else:
+            label, tool, failed = str(payload)[:60], None, True
+        timing = f" {ms:.0f}ms" if ms is not None else ""
+        sys.stderr.write(f"[mcp-dev] {direction} {label}{' ' + str(tool) if tool else ''}{' FAILED' if failed else ''}{timing}\n")
+        sys.stderr.flush()
+
+
+def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    trace = DevTrace() if _dev_enabled(argv) else None
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -403,9 +446,20 @@ def main() -> None:
         try:
             message = json.loads(line)
         except ValueError:
+            if trace:
+                trace.record("in", f"unparseable line: {line[:80]}")
+                reply = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}
+                trace.record("out", reply)
+                sys.stdout.write(json.dumps(reply) + "\n")
+                sys.stdout.flush()
             continue
+        if trace:
+            trace.record("in", message)
+        started = time.monotonic()
         reply = handle(message)
         if reply is not None:
+            if trace:
+                trace.record("out", reply, (time.monotonic() - started) * 1000)
             sys.stdout.write(json.dumps(reply) + "\n")
             sys.stdout.flush()
 

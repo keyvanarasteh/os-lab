@@ -94,7 +94,13 @@ stop still ends everything.
 `oslab://mcp`, `oslab://mcp/status/<server>` and
 `oslab://mcp/connect/<server>[?client=<id>]` (see
 [[lat.md/cleanup-lab#Cleaner Widgets (CLW)#Command bridge (AGQ-01)]]) open this page or its connect dialog
-through the page's own `?connect=` query; the user confirms there.
+through the page's own `?connect=` query; the user confirms there. A link
+that starts the app waits for the first dashboard page load, like the bridge's
+actions. Before any change `connect` checks that the server command still
+exists, because replacing a CLI entry removes the old one first.
+
+The dev tools in [[ios-lab#Native macOS path#MCP dev mode]] print registrations
+for more clients and take the entry name from the same table.
 
 ## macOS engine panel
 

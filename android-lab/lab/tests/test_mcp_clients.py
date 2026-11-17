@@ -87,6 +87,20 @@ def test_a_broken_config_file_is_refused_not_overwritten(tmp_path):
     assert config.read_text() == "{not json"
 
 
+def test_a_missing_server_command_changes_nothing(tmp_path):
+    bin_dir = tmp_path / "bin"
+    log = fake_cli(bin_dir, "claude", registered=True)
+    env = env_for(tmp_path, str(bin_dir))
+    plan = mcp_clients.preview("macos", "claude-code", env)
+    assert plan["replaces"] is True
+    plan["argv"][-1] = str(tmp_path / "gone" / "mcp_server.py")
+    with pytest.raises(mcp_clients.McpError) as err:
+        mcp_clients.connect(plan, env)
+    assert err.value.status == 409
+    # The replace would remove the old entry first; it must not have run.
+    assert "remove" not in log.read_text() and "add" not in log.read_text()
+
+
 def test_claude_desktop_path_per_platform(tmp_path):
     env = env_for(tmp_path)
     mac = mcp_clients.config_path("claude-desktop", env, "darwin")

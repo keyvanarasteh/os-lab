@@ -230,8 +230,17 @@ def _write_json(path: Path, data: dict) -> None:
         raise
 
 
+def _check_command(plan: dict) -> None:
+    """The server command must exist before anything is touched: a replace removes the old entry first."""
+    command = plan["argv"][plan["argv"].index("--") + 1:] if plan["kind"] == "cli" else [plan["entry"]["command"], *plan["entry"]["args"]]
+    for part in command[:2]:
+        if not Path(part).is_file():
+            raise McpError(409, f"The server command is missing ({part}); nothing was changed")
+
+
 def connect(plan: dict, env: dict | None = None) -> dict:
     """Apply a plan that ``preview`` returned and the caller has verified against its token."""
+    _check_command(plan)
     if plan["kind"] == "cli":
         argv = list(plan["argv"])
         if plan.get("replaces"):

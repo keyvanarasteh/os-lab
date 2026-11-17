@@ -12,7 +12,7 @@ CONFIRM ?=
 PROFILE ?=
 INSTALL ?=
 
-.PHONY: help preflight setup prepare up up-gpu boot wait status monitor profiles logs shell web vnc restart update down backup restore install-service uninstall-service reset clean env mac-doctor mac-setup mac-profiles mac-profile mac-sim mac-stop mac-appium mac-appium-stop mac-idb-install mac-idb mac-idb-stop mac-xcuitest mac-app-doctor mac-app-smoke mac-app-repl mac-status mac-ax-helper mac-mcp
+.PHONY: help preflight setup prepare up up-gpu boot wait status monitor profiles logs shell web vnc restart update down backup restore install-service uninstall-service reset clean env mac-doctor mac-setup mac-profiles mac-profile mac-sim mac-stop mac-appium mac-appium-stop mac-idb-install mac-idb mac-idb-stop mac-xcuitest mac-app-doctor mac-app-smoke mac-app-repl mac-status mac-ax-helper mac-mcp mac-mcp-dev
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -157,6 +157,9 @@ mac-ax-helper: ## macOS host: compile the native AX helper for rich element read
 
 mac-mcp: ## macOS host: run the guarded MCP server for computer-use agents (MIR-12)
 	python3 ../console/mcp_server.py
+
+mac-mcp-dev: ## macOS host: MCP dev smoke check (handshake, tools, ping); see scripts/mcp-dev.py for proxy and config
+	python3 ../scripts/mcp-dev.py smoke
 
 mac-cleanup-verify: ## macOS host: audit the running app's Cleanup panel + scans (BOOKMARK=1 RECORD=1 PORT=)
 	bash mac/cleanup-panel-verify.sh
