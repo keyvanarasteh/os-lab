@@ -8,7 +8,8 @@ name: dashboard-dist
 # build/dist-<sha> PR and merges it. That needs one of:
 # - a DIST_PR_TOKEN secret (a fine-grained token with contents and pull-requests write), or
 # - Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests"
-#   plus read and write workflow permissions, so the default token can open the PR.
+#   (enabled 2026-11-17). The job's own `permissions:` block grants the write scopes, so the
+#   repo-wide default token permission can stay read-only.
 # A PR opened with the default token does not start other workflows, so this cannot loop.
 
 on:
@@ -64,7 +65,9 @@ jobs:
           git switch -c "$branch"
           git add -A dashboard/dist
           git commit -q -m "build: regenerate dashboard dist" -m "Built from master $sha by the dashboard-dist workflow."
-          git push -q origin "$branch"
+          # A failed earlier run (or a manual re-run) can leave this sha's branch behind; it is
+          # bot-owned and built from the same sources, so overwrite it.
+          git push -q --force origin "$branch"
           # Older dist PRs are superseded by this one.
           for old in $(gh pr list --state open --search "head:build/dist-" --json number,headRefName --jq '.[] | select(.headRefName != "'"$branch"'") | .number'); do
             gh pr close "$old" --delete-branch --comment "Superseded by the rebuild from $sha." || true
