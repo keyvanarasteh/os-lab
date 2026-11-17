@@ -95,3 +95,4 @@ web-lab/browser/target/
 
 # Local scratch files
 .temp/
+/dist/

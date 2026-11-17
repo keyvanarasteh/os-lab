@@ -235,6 +235,10 @@ The os-lab MCP server runs in a dev mode that logs every message and restarts on
 
 `console/mcp_server.py --dev` (or `OSLAB_MCP_DEV=1`) writes one stderr line per request and reply with its timing and a JSONL trace under `test-results/mcp-dev/`, answers malformed lines with a JSON-RPC parse error and keeps stdout pure JSON-RPC. [[scripts/mcp-dev.py]] adds `smoke` (handshake, tools/list, ping, an unknown-tool probe and an optional `--call`), `proxy` (a client config entry that runs the dev server and restarts it when `console/*.py` or `*.json` change, replaying the client's handshake) and `config [--client claude|codex|agy|opencode|zcode]` (prints how to register the server in each agent: `claude mcp add`, `codex mcp add`, `agy mcp add`, an OpenCode `mcp` entry and a ZCode `mcpServers` entry; nothing is written for you). `make -C ios-lab mac-mcp-dev` runs the smoke check.
 
+`seed [--proxy]` builds the qLar bundle, a `servers` fragment in the shape of `~/qlar/mcp/mcp.json` (the only os-lab MCP server today is `os-lab-macos`); it prints by default, `--out FILE` saves it and `--apply` merges it into `$QLAR_MCP_ROOT/mcp.json` after a timestamped backup, replacing only its own entry and leaving the other servers alone.
+
+[[scripts/build-mcp-wheel.py]] builds `oslab_mcp-<version>-py3-none-any.whl` with the standard library only. It bundles `console/` and `ios-lab/mac` (never `config.env` or `build/`) and installs an `oslab-mcp` stdio command. `OSLAB_ROOT` points an installed copy at a real checkout so it shares the dashboard's armed state and audit log.
+
 Tool calls read `arguments`, as MCP clients send them, and still accept the older `args`. Input tools still need armed control from the dashboard; dev mode adds no arm path.
 
 ## Research
