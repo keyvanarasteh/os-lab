@@ -88,3 +88,31 @@ def test_config_can_print_one_client_and_without_proxy_points_at_the_server():
     assert proc.returncode == 0
     assert "console/mcp_server.py" in proc.stdout and "mcp-dev.py" not in proc.stdout
     assert "claude mcp add" not in proc.stdout and "agy mcp add" not in proc.stdout
+
+
+def test_malformed_arguments_are_a_tool_error_and_the_server_keeps_running():
+    """A null or string windowId used to raise TypeError out of handle() and end the process, so the
+    client lost its whole session. No Mac access: the id check fails before any window is read."""
+    calls = [
+        {"name": "macos_click", "arguments": {"windowId": None, "x": 5, "y": 5}},
+        {"name": "macos_click", "arguments": {"windowId": "abc"}},
+        {"name": "macos_click", "arguments": {"windowId": True}},
+        {"name": "macos_apps", "arguments": [1]},
+    ]
+    lines = [json.dumps({"jsonrpc": "2.0", "id": i, "method": "tools/call", "params": p}) for i, p in enumerate(calls, 1)]
+    lines.append(json.dumps({"jsonrpc": "2.0", "id": 99, "method": "ping"}))
+    proc = run_server(lines)
+    assert proc.returncode == 0, proc.stderr
+    replies = [json.loads(line) for line in proc.stdout.splitlines()]
+    assert [r["id"] for r in replies] == [1, 2, 3, 4, 99]
+    for reply in replies[:4]:
+        assert reply["result"]["isError"] is True
+        assert json.loads(reply["result"]["content"][0]["text"])["code"] == "INVALID_ARGS"
+    assert replies[-1]["result"] == {}
+
+
+def test_an_unexpected_exception_answers_internal_error_instead_of_exiting(monkeypatch):
+    monkeypatch.setattr(mcp_server, "tool_call", lambda name, args: (_ for _ in ()).throw(KeyError("x")))
+    reply = mcp_server.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "t", "arguments": {}}})
+    assert reply["result"]["isError"] is True
+    assert json.loads(reply["result"]["content"][0]["text"])["code"] == "INVALID_ARGS"

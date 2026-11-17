@@ -264,7 +264,9 @@ TOOLS = [
 def _window_point(window_id: int, args: dict) -> tuple[int, int, dict]:
     """The screen point for a click/type/scroll: element centre when a path is given,
     otherwise the given window-relative point, resolved through the mirror's bounds."""
-    window = next((w for w in oslab.macos_windows()["windows"] if w["windowId"] == int(window_id)), None)
+    if isinstance(window_id, bool) or not isinstance(window_id, int):
+        raise oslab.PlanError("windowId must be an integer from macos_apps", code="INVALID_ARGS")
+    window = next((w for w in oslab.macos_windows()["windows"] if w["windowId"] == window_id), None)
     if window is None:
         raise oslab.PlanError("That window is not on screen anymore; read macos_apps again",
                               code="APP_QUIT", retry="reobserve")
@@ -387,9 +389,12 @@ def handle(message: dict) -> dict | None:
         return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": TOOLS}}
     if method == "tools/call":
         params = message.get("params") or {}
+        # MCP clients send `arguments`; `args` is kept for the hand-written callers that used it first.
+        args = params.get("arguments") or params.get("args") or {}
         try:
-            # MCP clients send `arguments`; `args` is kept for the hand-written callers that used it first.
-            result = tool_call(str(params.get("name")), params.get("arguments") or params.get("args") or {})
+            if not isinstance(args, dict):
+                raise oslab.PlanError("arguments must be a JSON object", code="INVALID_ARGS")
+            result = tool_call(str(params.get("name")), args)
             return {"jsonrpc": "2.0", "id": message_id, "result": {**result, "isError": False}}
         except oslab.PlanError as e:
             payload: dict = {"error": str(e)}
@@ -397,6 +402,11 @@ def handle(message: dict) -> dict | None:
                 payload["code"] = e.code
             if e.retry:
                 payload["retry"] = e.retry
+            return {"jsonrpc": "2.0", "id": message_id, "result": {
+                "content": [{"type": "text", "text": json.dumps(payload)}], "isError": True}}
+        except (TypeError, ValueError, KeyError, AttributeError) as e:
+            # A malformed argument is the caller's error, never a reason to end the session.
+            payload = {"error": f"Invalid arguments for {params.get('name')}: {e}", "code": "INVALID_ARGS"}
             return {"jsonrpc": "2.0", "id": message_id, "result": {
                 "content": [{"type": "text", "text": json.dumps(payload)}], "isError": True}}
     if message_id is not None:
@@ -456,7 +466,14 @@ def main(argv: list[str] | None = None) -> None:
         if trace:
             trace.record("in", message)
         started = time.monotonic()
-        reply = handle(message)
+        try:
+            reply = handle(message)
+        except Exception as exc:  # noqa: BLE001 - one bad message must not end the client's session
+            sys.stderr.write(f"[mcp] internal error: {exc!r}\n")
+            sys.stderr.flush()
+            reply = None
+            if isinstance(message, dict) and message.get("id") is not None:
+                reply = {"jsonrpc": "2.0", "id": message.get("id"), "error": {"code": -32603, "message": "Internal error"}}
         if reply is not None:
             if trace:
                 trace.record("out", reply, (time.monotonic() - started) * 1000)
