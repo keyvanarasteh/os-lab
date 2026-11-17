@@ -280,3 +280,29 @@ Bu görsel önceki audit çalıştırmalarıyla birleştirilmemelidir; sürüm v
 bağlamına göre toplamlar değişebilir. Görsel tek başına JSON çıktısının, canlı
 `apply` veya canlı `rollback` işlemlerinin doğrulandığını göstermez. Mock test
 sonuçları ve doğrulama sınırları için [VERIFY.md](os-30/VERIFY.md) dosyasına bakın.
+
+## Safe apt update/upgrade wrapper (OS-13)
+
+`linux-lab/scripts/os-13-apt-safe-wrapper.sh` runs one ordered pipeline inside
+the authorized guest: `apt-get update` → `apt-get -s upgrade` → `apt-get -y
+upgrade`. The upgrade step refuses to start unless the index refresh succeeded in
+the same run, and a partial index (`Some index files failed to download`) counts
+as a failure unless `--allow-partial` is given on purpose.
+
+```bash
+bash linux-lab/scripts/os-13-apt-safe-wrapper.sh                  # dry-run, the default
+sudo bash linux-lab/scripts/os-13-apt-safe-wrapper.sh --apply      # asks before upgrading
+sudo bash linux-lab/scripts/os-13-apt-safe-wrapper.sh --apply --yes --noninteractive
+```
+
+Dry-run is the default and needs no root: it prints the ordered commands and the
+simulated plan and changes nothing. Every apt call and its output land in a
+private per-user log, `${TMPDIR:-/tmp}/os-13-apt-last-<uid>.log` (override with
+`OS13_LOG`; created `0600`, never followed through a symlink), so the review and
+the PR can quote what actually ran. A plan that removes packages is listed and,
+with `--yes`, needs `--allow-removals`. The reviewed plan is re-simulated before
+it is applied. Offline tests drive the same order through a stub `apt-get` — no
+root, no network, no real upgrade:
+`python3 -m unittest discover -s linux-lab/tests -p 'test_os13*' -v`.
+See [os-13/VERIFY.md](os-13/VERIFY.md) for the expected output, the guard cases
+and the limits (no snap/flatpak, no autoremove, no reboot).

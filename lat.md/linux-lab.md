@@ -170,3 +170,41 @@ Validation and install steps, in order:
 
 Only install trusted `.deb` packages. Installation requires sudo
 permissions and may modify the operating system.
+
+## OS-13 apt update/upgrade Safe Wrapper
+
+`linux-lab/scripts/os-13-apt-safe-wrapper.sh` turns the taught
+update-then-upgrade sequence into one ordered pipeline, so a broken mirror,
+a dead resolver or a package lock cannot leave the guest half upgraded.
+
+The order is enforced in code: the upgrade step refuses to start unless
+`apt-get update` exited 0 in the same run. A partial index (`exit 0` plus
+"Some index files failed to download") is also a guard; `--allow-partial`
+is the deliberate override. There is no flag to skip the index refresh.
+
+Dry-run is the default: it prints the ordered commands and the simulated
+plan, needs no root and changes nothing. Every apt call and its output is
+logged to a private per-user file
+(`${TMPDIR:-/tmp}/os-13-apt-last-<uid>.log`, override with `OS13_LOG`, mode
+`0600`, never through a symlink); the run ends with a measured post-check
+instead of a claim. Before an apply, the shown plan is re-simulated so another
+apt run cannot swap the packages underneath it. A `Remv` plan is listed and,
+unattended, needs `--allow-removals`. Common failures (lock, DNS, disk, GPG
+key, 404) get a one-line hint pointing at OS-15, OS-25 and OS-37.
+
+```bash
+bash linux-lab/scripts/os-13-apt-safe-wrapper.sh                  # dry-run, the default
+sudo bash linux-lab/scripts/os-13-apt-safe-wrapper.sh --apply      # asks before upgrading
+sudo bash linux-lab/scripts/os-13-apt-safe-wrapper.sh --apply --yes --noninteractive
+```
+
+`--dist-upgrade` uses the wider plan (new packages and removals) after the
+same guard. `--noninteractive` keeps local config files so a dpkg conffile
+prompt cannot hang an unattended run.
+
+The offline tests in [[linux-lab/tests/test_os13_apt_safe_wrapper.py]] drive
+the wrapper through a stub `apt-get` on PATH: no root, no network and no real
+upgrade. They assert the call order and every guard case.
+
+See [[linux-lab/os-13/VERIFY.md]] for commands, expected output and the
+video scenario. [[linux-lab/os-13/REPORT.md]] records the scope of the work.
