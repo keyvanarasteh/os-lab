@@ -262,6 +262,13 @@ Tests: [[scripts/session_scribe/tests/test_session_scribe.py]] · Report: [[scri
 
 Contribution flow, coding conventions and the authorization stance.
 
+[[docs/contribution-pipeline.html]] is the visual reference for this section: eight
+phases from claim to deploy, how a pull request selects its own checks, the job
+graph of [[.github/workflows/dashboard-e2e.yml]], the four deploy surfaces after a
+merge, and a route matrix showing which routes the local console and GitHub Pages
+serve and in which locales. It is a standalone page, not part of the dashboard
+build.
+
 They are in [[CONTRIBUTING.md]], step by step from setup to pull request, and
 the [[dashboard]] renders the same file at `/contribute/`. Contributions must not
 add vendor binaries or proprietary media (see [[legal#Google platform-tools]]).
