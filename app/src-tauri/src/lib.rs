@@ -265,6 +265,7 @@ async fn container_get(app: AppHandle) -> Result<String, String> {
 }
 
 /// The app's own bundle: the .app that contains this executable, or None when run unbundled (dev).
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 fn own_bundle() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     exe.ancestors().find(|p| p.extension().map_or(false, |e| e == "app")).map(PathBuf::from)
@@ -280,11 +281,19 @@ fn app_relaunch(app: AppHandle) {
 /// Grant helper: start a native drag of this app's own icon so the page can offer drag-to-Settings.
 /// The dragged path is never supplied by the page; it is always this app's bundle.
 #[tauri::command]
+#[cfg(not(target_os = "linux"))]
 fn app_drag_self(window: tauri::WebviewWindow) -> Result<(), String> {
     let bundle = own_bundle().ok_or("Not running from an app bundle")?;
     let icon = drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec());
     drag::start_drag(&window, drag::DragItem::Files(vec![bundle]), icon, |_, _| {}, drag::Options::default())
         .map_err(|e| e.to_string())
+}
+
+/// Linux has no Full Disk Access grant to drag into, and the `drag` crate wants a GTK window there.
+#[tauri::command]
+#[cfg(target_os = "linux")]
+fn app_drag_self() -> Result<(), String> {
+    Err("Dragging the app is only available on macOS and Windows".into())
 }
 
 #[tauri::command]
