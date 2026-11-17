@@ -119,3 +119,13 @@ def test_wheel_is_a_valid_zip_with_the_server_the_scripts_and_an_entry_point(tmp
         assert not any(n.endswith("config.env") or "/build/" in n for n in names)
         assert "oslab-mcp = oslab_mcp.cli:main" in wheel.read("oslab_mcp-0.1.0.dist-info/entry_points.txt").decode()
         assert wheel.testzip() is None
+
+
+def test_seed_wheel_puts_the_wheel_in_its_own_folder_and_starts_it_with_uvx(tmp_path):
+    (tmp_path / "mcp.json").write_text(json.dumps({"servers": []}))
+    run = subprocess.run([sys.executable, DEV, "seed", "--wheel", "--apply"], capture_output=True, text=True, cwd=REPO_ROOT,
+                         timeout=60, env={**os.environ, "QLAR_MCP_ROOT": str(tmp_path)})
+    assert run.returncode == 0, run.stderr
+    entry = json.loads((tmp_path / "mcp.json").read_text())["servers"][0]
+    assert entry["dir"] == "os-lab-macos" and (tmp_path / "os-lab-macos" / "oslab_mcp-0.1.0-py3-none-any.whl").exists()
+    assert entry["args"][-4:] == ["uvx", "--from", "./oslab_mcp-0.1.0-py3-none-any.whl", "oslab-mcp"] or entry["args"][-3:] == ["--from", "./oslab_mcp-0.1.0-py3-none-any.whl", "oslab-mcp"]

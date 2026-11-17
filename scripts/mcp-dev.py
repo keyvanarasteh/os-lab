@@ -289,16 +289,47 @@ def qlar_entry(proxy: bool) -> dict:
     }
 
 
+def wheel_entry(root: str, write: bool) -> dict:
+    """The bundled form qLar's other wheel servers use: a folder under the mcp root holding the .whl, started with
+    `uvx --from ./<wheel> oslab-mcp` through the same node launcher (so a GUI-started qLar finds uv). The launcher
+    text is copied from an existing wheel entry in mcp.json; without one the entry calls uvx directly."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_mcp_wheel", os.path.join(REPO, "scripts", "build-mcp-wheel.py"))
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)  # type: ignore[union-attr]
+    folder = "os-lab-macos"
+    wheel = os.path.basename(builder.build(os.path.join(root, folder) if write else os.path.join(REPO, "dist")))
+    launcher = None
+    try:
+        with open(os.path.join(root, "mcp.json"), encoding="utf-8") as handle:
+            for server in json.load(handle).get("servers", []):
+                if server.get("program") == "node" and "--" in server.get("args", []) and "uvx" in server["args"]:
+                    launcher = server["args"][: server["args"].index("--") + 1]
+                    break
+    except (OSError, ValueError):
+        pass
+    tail = ["uvx", "--from", f"./{wheel}", "oslab-mcp"]
+    entry = qlar_entry(False)
+    entry.update({"label": "os-lab macOS Lab (wheel)", "dir": folder, "program": "node" if launcher else "uvx",
+                  "args": (launcher + tail) if launcher else tail[1:]})
+    return entry
+
+
 def cmd_seed(args: argparse.Namespace) -> int:
     """The qLar bundle: the os-lab server entries in the shape of ~/qlar/mcp/mcp.json (`servers` list, keyed by id)."""
-    bundle = {"servers": [qlar_entry(args.proxy)]}
+    root = os.environ.get("QLAR_MCP_ROOT") or os.path.expanduser("~/qlar/mcp")
+    entry = qlar_entry(args.proxy)
+    if args.wheel:
+        entry = wheel_entry(root, args.apply)
+    bundle = {"servers": [entry]}
     text = json.dumps(bundle, indent=2) + "\n"
     if args.out:
         with open(args.out, "w", encoding="utf-8") as handle:
             handle.write(text)
         print(f"wrote {args.out}")
     if args.apply:
-        target = os.path.join(os.environ.get("QLAR_MCP_ROOT") or os.path.expanduser("~/qlar/mcp"), "mcp.json")
+        target = os.path.join(root, "mcp.json")
         current: dict = {"servers": []}
         if os.path.exists(target):
             with open(target, encoding="utf-8") as handle:
@@ -334,6 +365,7 @@ def main() -> int:
     config.set_defaults(fn=cmd_config)
     seed = sub.add_parser("seed", help="build the qLar mcp.json bundle")
     seed.add_argument("--proxy", action="store_true", help="use the restart-on-change proxy")
+    seed.add_argument("--wheel", action="store_true", help="bundle the built wheel in its own folder, like the other wheel servers")
     seed.add_argument("--apply", action="store_true", help="merge into ~/qlar/mcp/mcp.json (or $QLAR_MCP_ROOT/mcp.json)")
     seed.add_argument("--out", help="write the bundle to this file")
     seed.set_defaults(fn=cmd_seed)
