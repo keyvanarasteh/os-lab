@@ -276,6 +276,11 @@ versus only a crawl, and what `npm run check` does and does not see. Its counts 
 timings were measured, not estimated; it also records the gaps — `console/**`
 selects no e2e spec, and five route families have no behaviour test.
 
+Its last section covers the MCP surface in [[console/mcp_server.py]]: stdio, so no
+TCP port and no collision with the e2e runner or the console, but also no unit
+test, no spec, and no pipeline step that even compiles it. That module can click
+and type into a host window, which makes it the largest untested surface here.
+
 They are in [[CONTRIBUTING.md]], step by step from setup to pull request, and
 the [[dashboard]] renders the same file at `/contribute/`. Contributions must not
 add vendor binaries or proprietary media (see [[legal#Google platform-tools]]).

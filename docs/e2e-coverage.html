@@ -589,7 +589,8 @@
     <h2>What each layer can and cannot catch</h2>
     <p class="sub">
       The three layers are complementary, but they are not interchangeable, and the gaps are
-      structural rather than accidental.
+      structural rather than accidental. Section 07 adds a fourth surface — the MCP actuator — that
+      none of them covers.
     </p>
 
     <div class="table-wrap">
@@ -650,6 +651,42 @@
     </div>
   </section>
 
+  <section>
+    <p class="sec-num">07 · the MCP surface</p>
+    <h2>A guarded actuator that no layer watches</h2>
+    <p class="sub">
+      <code>console/mcp_server.py</code> is on master: a stdio MCP server that lets an agent drive the
+      macOS Lab's observe → act → verify loop. It is the highest-consequence code in the repository and
+      it is covered by none of the three layers below.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Property</th><th>Value</th><th>Measured how</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Transport</td><td>stdio, JSON-RPC 2.0, one message per line — <strong>no TCP port</strong></td><td><code>console/mcp_server.py</code> module docstring</td></tr>
+          <tr><td>Start command</td><td><code>python3 console/mcp_server.py</code> or <code>make -C ios-lab mac-mcp</code></td><td><code>ios-lab/Makefile:158</code></td></tr>
+          <tr><td>Safety model</td><td>Read tools always work; input tools need the human to arm control mode; no arm tool exists in the server</td><td>module docstring</td></tr>
+          <tr><td>Unit tests</td><td class="no">none — no test file references <code>mcp_server</code> or <code>mcp_clients</code></td><td><code>grep -rln "mcp_server\|mcp_clients" --include='*test*'</code> → 0 hits</td></tr>
+          <tr><td>e2e specs</td><td class="no">none — <code>affected.mjs console/mcp_server.py</code> → <code>mode: none</code></td><td>measured on this branch</td></tr>
+          <tr><td>Unit stage selection</td><td><code>console/**</code> → <code>SHARED=1</code>, all stages — but no stage imports the MCP module</td><td><code>scripts/run-tests.sh:91</code></td></tr>
+          <tr><td>Syntax check</td><td class="yes">only implied by <code>python3 -m py_compile</code>, which no pipeline step runs</td><td>manual check on this branch</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <b>No port conflict, and that is the point.</b> Because the server speaks stdio, it cannot collide
+      with the e2e runner's port range (4330–4399) or the console on 5050 — worth stating explicitly,
+      since a port collision is the first thing to suspect when an agent-driven tool and a test runner
+      share a machine. The real risk is different: the module that can click, type and paste into a
+      host application has no automated test at all, so a refactor of <code>oslab.py</code> can break
+      it silently.
+    </div>
+  </section>
+
   <footer>
     os-lab · dashboard verification coverage · measured against the branch that adds this file
     <ul>
@@ -657,6 +694,7 @@
       <li>specs · <code>dashboard/e2e/*.spec.ts</code> (12 specs + <code>crawl.spec.ts</code>)</li>
       <li>typecheck · <code>dashboard/tsconfig.json</code>, <code>dashboard/package.json</code>, <code>tsc --listFilesOnly</code></li>
       <li>CI · <code>.github/workflows/dashboard-e2e.yml</code> (<code>plan</code> → <code>check</code> ∥ <code>browser</code> → <code>report</code>)</li>
+      <li>MCP · <code>console/mcp_server.py</code>, <code>ios-lab/Makefile</code>, <code>scripts/run-tests.sh</code></li>
     </ul>
   </footer>
 
