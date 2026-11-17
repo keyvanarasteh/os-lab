@@ -608,6 +608,17 @@ export interface WebOverview {
   eventCount: number; lastEventSeq: number;
 }
 
+export interface McpServer { id: string; name: string; label: string; description: string; command: string[] }
+export interface McpClient {
+  id: string; label: string; kind: "cli" | "json"; installed: boolean;
+  registered: Record<string, boolean | null>; binary?: string | null; config?: string | null; error?: string;
+}
+export interface McpStatus { servers: McpServer[]; clients: McpClient[] }
+export interface McpPlan {
+  server: string; client: string; name: string; kind: "cli" | "json"; replaces: boolean;
+  argv?: string[]; file?: string; entry?: Record<string, unknown>; existing?: unknown;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -666,6 +677,10 @@ export interface AppUpdateState {
 }
 
 export const api = {
+  mcpStatus: () => call<McpStatus>("/api/mcp"),
+  mcpPreview: (server: string, client: string) => post<{ plan: McpPlan; token: string }>("/api/mcp/preview", { server, client }),
+  mcpConnect: (server: string, client: string, token: string) =>
+    post<{ ok: boolean; file?: string; output?: string }>("/api/mcp/connect", { server, client, token }),
   cleanupStatus: () => call<CleanupStatus>("/api/cleanup/status"),
   cleanupCatalog: () => call<{ platform: string; entries: CleanupEntry[] }>("/api/cleanup/catalog"),
   cleanupHistory: () => call<CleanupHistory>("/api/cleanup/history"),

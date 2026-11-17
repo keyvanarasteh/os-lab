@@ -61,6 +61,10 @@ try:
     import winapps  # noqa: E402  (console/winapps.py: read-only native Windows app mirror)
 except ImportError:
     winapps = None
+try:
+    import mcp_clients  # noqa: E402  (console/mcp_clients.py: connect os-lab's MCP servers to a client)
+except ImportError:
+    mcp_clients = None
 ARTIFACTS_DIR = os.path.join(SCRIPT_DIR, "artifacts")
 SCRIPTS_DIR = os.path.join(SCRIPT_DIR, "scripts")
 
@@ -256,6 +260,9 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/app/update"):
             self._app_get(path)
+            return
+        if path == "/api/mcp":
+            self._mcp_get()
             return
         if path.startswith(("/api/host", "/api/labs", "/api/jobs", "/api/capabilities", "/api/scope")):
             if not oslab:
@@ -583,6 +590,9 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/web"):
             self._web_post(path)
             return
+        if path in ("/api/mcp/preview", "/api/mcp/connect"):
+            self._mcp_post(path)
+            return
         if path.startswith(("/api/labs", "/api/jobs")):
             if not oslab:
                 self._json(501, {"error": "The console module (console/oslab.py) is not installed"})
@@ -593,6 +603,33 @@ class LabHttpHandler(BaseHTTPRequestHandler):
                 self._json(400, {"error": str(e), "code": getattr(e, "code", None), "retry": getattr(e, "retry", None)})
             return
         self._android_post()
+
+    def _mcp_get(self):
+        """MCP-01: which os-lab MCP servers exist and which clients already have them (read-only)."""
+        if not mcp_clients:
+            self._json(501, {"error": "The MCP module (console/mcp_clients.py) is not installed"})
+            return
+        self._json(200, mcp_clients.status())
+
+    def _mcp_post(self, path: str):
+        """MCP-01: preview → token → connect. Connect runs only the change the preview showed."""
+        if not mcp_clients or not SIGNER:
+            self._json(501, {"error": "The MCP module (console/mcp_clients.py) is not installed"})
+            return
+        try:
+            data = self._read_json()
+            plan = mcp_clients.preview(data.get("server"), data.get("client"))
+            if path == "/api/mcp/preview":
+                self._json(200, {"plan": plan, "token": SIGNER.sign({"mcp": plan})})
+                return
+            if not SIGNER.verify({"mcp": plan}, data.get("token")):
+                self._json(409, {"error": "The client configuration changed since the preview; preview again"})
+                return
+            self._json(200, mcp_clients.connect(plan))
+        except mcp_clients.McpError as exc:
+            self._json(exc.status, {"error": str(exc)})
+        except ValueError as exc:
+            self._json(400, {"error": str(exc)})
 
     def _content_get(self, path: str, query: dict):
         """Content packs: what is installed, the companies, and the data files (see console/content.py)."""

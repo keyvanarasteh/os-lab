@@ -13,7 +13,7 @@
  */
 import { useEffect, useState } from "react";
 
-// @lat: [[cleanup-lab#Command bridge (AGQ-01)]]
+// @lat: [[lat.md/cleanup-lab#Cleaner Widgets (CLW)#Command bridge (AGQ-01)]]
 import { XIcon } from "@phosphor-icons/react";
 
 /** What the Rust bridge serialises (`bridge::Directive`). */
@@ -38,6 +38,7 @@ const ROUTE_TO_SECTION: Record<string, string> = {
   host: "host",
   jobs: "jobs",
   health: "health",
+  mcp: "mcp",
   contribute: "contribute",
   content: "content",
   feedback: "feedback",

@@ -15,7 +15,7 @@
 
 use url::Url;
 
-// @lat: [[cleanup-lab#Command bridge (AGQ-01)]]
+// @lat: [[lat.md/cleanup-lab#Cleaner Widgets (CLW)#Command bridge (AGQ-01)]]
 
 /// Cleanup routes a widget may open (CLW-03). Values match the overview card
 /// targets and the cleanup island's tab paths; the island router handles them
@@ -28,8 +28,8 @@ pub const CLEANUP_ROUTES: [&str; 10] = [
 /// Plain dashboard pages the bridge may open, as `/<route>/` paths. Each one
 /// is a static page the sidebar already links to; `labs/<id>` covers the labs
 /// that have a page of their own.
-pub const PAGE_ROUTES: [&str; 17] = [
-    "host", "jobs", "health", "contribute", "content", "feedback", "how-to-use",
+pub const PAGE_ROUTES: [&str; 18] = [
+    "host", "jobs", "health", "contribute", "content", "feedback", "how-to-use", "mcp",
     "labs/android", "labs/windows", "labs/winapps", "labs/linux", "labs/ios",
     "labs/macos", "labs/source", "labs/web", "firewall", "web-lab",
 ];
@@ -38,6 +38,11 @@ pub const PAGE_ROUTES: [&str; 17] = [
 /// `panic-stop` disarms and is idempotent (`macos_panic_stop`), and
 /// `quick-clean` only opens the dashboard's plan → confirm dialog.
 pub const ACTIONS: [&str; 2] = ["panic-stop", "quick-clean"];
+
+/// MCP servers os-lab offers (MCP-01), by the id `console/mcp_clients.py` uses.
+pub const MCP_SERVERS: [&str; 1] = ["macos"];
+/// MCP clients the dashboard can register a server with.
+pub const MCP_CLIENTS: [&str; 4] = ["claude-code", "codex", "claude-desktop", "cursor"];
 
 /// The console endpoint an action may reach, if it is one that calls one.
 /// Whitelisted exactly like the routes: a command name maps to at most one
@@ -57,6 +62,10 @@ pub enum Command {
     Navigate(String),
     /// Run a dashboard action: `oslab://panic-stop`, `oslab://quick-clean`.
     Action(&'static str),
+    /// Open the MCP page's connect dialog (MCP-01):
+    /// `oslab://mcp/connect/macos`, `oslab://mcp/connect/macos?client=cursor`.
+    /// It only opens the dialog; the user confirms the change there.
+    McpConnect { server: &'static str, client: Option<&'static str> },
     /// Refused: reported to the user instead of guessed at.
     Unknown,
 }
@@ -75,6 +84,37 @@ fn known_route(route: &str) -> Option<&str> {
     }
 }
 
+/// `oslab://mcp/...`: the MCP page, a server's status on it, or its connect
+/// dialog. Unlike the other commands this one reads a query key, so it is
+/// strict about it: `client` is the only key, its value must be a known
+/// client, and anything else refuses the whole URL instead of being ignored.
+fn parse_mcp(raw: &Url, path: &str) -> Command {
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    let server = |id: &str| MCP_SERVERS.iter().copied().find(|known| *known == id);
+    let mut client = None;
+    for (key, value) in raw.query_pairs() {
+        match (key.as_ref(), MCP_CLIENTS.iter().copied().find(|known| value.eq_ignore_ascii_case(known))) {
+            ("client", Some(known)) if client.is_none() => client = Some(known),
+            _ => return Command::Unknown,
+        }
+    }
+    match segments.as_slice() {
+        [] | ["status"] if client.is_none() => Command::Navigate("mcp".into()),
+        ["status", id] if client.is_none() => server(id).map(|_| Command::Navigate("mcp".into())).unwrap_or(Command::Unknown),
+        ["connect", id] => server(id).map(|server| Command::McpConnect { server, client }).unwrap_or(Command::Unknown),
+        _ => Command::Unknown,
+    }
+}
+
+/// The dashboard path an `McpConnect` opens. Built from the whitelisted ids
+/// only, so no URL text reaches the page.
+pub fn mcp_connect_path(server: &str, client: Option<&str>) -> String {
+    match client {
+        Some(client) => format!("mcp/?connect={server}&client={client}"),
+        None => format!("mcp/?connect={server}"),
+    }
+}
+
 /// Parse one `oslab://` URL. Parsing never navigates or executes anything;
 /// the caller decides what to do with the result, refusals included.
 pub fn parse_command(raw: &Url) -> Command {
@@ -84,6 +124,7 @@ pub fn parse_command(raw: &Url) -> Command {
     let path = normalize(raw.path());
     let path = path.trim_matches('/');
     match host.as_str() {
+        "mcp" => parse_mcp(raw, path),
         "open" | "show" | "goto" => match path {
             "" => Command::Navigate("dashboard".into()),
             route => known_route(route).map(|r| Command::Navigate(r.to_string())).unwrap_or(Command::Unknown),
@@ -173,6 +214,35 @@ mod tests {
         assert_eq!(parse("oslab://rm-rf"), Command::Unknown);
         assert_eq!(parse("oslab://"), Command::Unknown);
         assert_eq!(parse("oslab://open/../etc/passwd"), Command::Unknown);
+    }
+
+    #[test]
+    fn mcp_opens_the_page_or_the_connect_dialog_and_nothing_else() {
+        assert_eq!(parse("oslab://mcp"), Command::Navigate("mcp".into()));
+        assert_eq!(parse("oslab://mcp/status/macos"), Command::Navigate("mcp".into()));
+        assert_eq!(parse("oslab://open/mcp"), Command::Navigate("mcp".into()));
+        assert_eq!(parse("oslab://mcp/connect/macos"), Command::McpConnect { server: "macos", client: None });
+        assert_eq!(
+            parse("oslab://MCP/connect/MACOS/?client=Cursor"),
+            Command::McpConnect { server: "macos", client: Some("cursor") }
+        );
+        // Unknown servers, clients, keys and extra segments refuse the URL.
+        for refused in [
+            "oslab://mcp/connect/linux",
+            "oslab://mcp/connect",
+            "oslab://mcp/connect/macos?client=evil",
+            "oslab://mcp/connect/macos?client=cursor&client=codex",
+            "oslab://mcp/connect/macos?command=/bin/sh",
+            "oslab://mcp/connect/macos/extra",
+            "oslab://mcp/status/linux",
+            "oslab://mcp?client=cursor",
+            "oslab://mcp/run/macos_click",
+        ] {
+            assert_eq!(parse(refused), Command::Unknown, "{refused} must be refused");
+        }
+        assert_eq!(mcp_connect_path("macos", Some("cursor")), "mcp/?connect=macos&client=cursor");
+        assert_eq!(mcp_connect_path("macos", None), "mcp/?connect=macos");
+        assert_eq!(dashboard_path("mcp"), "mcp/");
     }
 
     #[test]

@@ -68,6 +68,34 @@ stdio MCP server — the model acts, the console guards, every step is
 audited. See [[ios-lab]] for permissions.
 
 
+## MCP servers (MCP-01)
+
+[[dashboard/src/views/mcp-page.tsx]] connects os-lab's stdio MCP servers to an
+MCP client — Claude Code, Codex, Claude Desktop or Cursor — by adding an entry to
+that client's own configuration.
+
+A client launches the server itself, so "connecting" is a config change, and it
+follows the console's preview → token → run rule. [[console/mcp_clients.py]]
+holds fixed tables of servers (today `macos` → `os-lab-macos`, this console's
+Python running `console/mcp_server.py`) and clients. `GET /api/mcp` is
+read-only status; `POST /api/mcp/preview {server, client}` returns the exact
+change — the CLI's own `mcp add` argv, or the JSON file and `mcpServers` entry —
+with a signed token; `POST /api/mcp/connect` recomputes the preview and applies
+it only when the token still matches, so a file that changed in between is
+refused with 409. JSON configs are merged (other entries kept), written
+atomically with a `.oslab.bak` copy, and a file that is not valid JSON is
+refused rather than overwritten.
+
+Requests carry only a server id and a client id; neither a page nor a URL can
+name a command, an argument or a path. Connecting gives an agent no control:
+the macOS server's input tools still need armed control mode, and the panic
+stop still ends everything.
+
+`oslab://mcp`, `oslab://mcp/status/<server>` and
+`oslab://mcp/connect/<server>[?client=<id>]` (see
+[[lat.md/cleanup-lab#Cleaner Widgets (CLW)#Command bridge (AGQ-01)]]) open this page or its connect dialog
+through the page's own `?connect=` query; the user confirms there.
+
 ## macOS engine panel
 
 [[dashboard/src/views/macos-engine-panel.tsx]] sits under the mirror and shows
