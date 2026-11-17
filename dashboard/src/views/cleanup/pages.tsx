@@ -19,6 +19,7 @@ import { SpaceExplorer } from "./space-explorer";
 import { RelocationCard } from "./relocation-card";
 import { WidgetsCard } from "./widgets-card";
 import { BookmarksSummaryCard, ReadyCard } from "./summary-cards";
+import { ContainersVmsCard, CustomEntriesCard, DeepScanCard, LeftoversCard, PackageReviewCard, PrivilegedCard, SimulatorsCard } from "./pro-cards";
 import { PermissionGuide } from "./permission-guide";
 import { CatalogPage } from "./catalog-page";
 import { CATALOG_GROUPS, groupIdOf } from "./groups";
@@ -668,6 +669,15 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                 onQuickClean={runQuickClean}
                 onRescan={() => void start(() => api.cleanupScan((bookmarks?.bookmarks ?? []).map((item) => item.entryId)))}
                 settingsHref={link("settings/")} />
+            </div>}
+            {!PUBLIC && status?.state === "ready" && <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              <PrivilegedCard locale={locale} now={now} />
+              <DeepScanCard locale={locale} now={now} />
+              <SimulatorsCard />
+              <PackageReviewCard />
+              <LeftoversCard locale={locale} now={now} />
+              <ContainersVmsCard locale={locale} now={now} />
+              <CustomEntriesCard settingsHref={link("settings/")} />
             </div>}
             {latestClean && <Section title="Latest clean report" description={`${latestClean.totals.trashed} moved to Trash · ${latestClean.totals.skipped} skipped · ${latestClean.totals.failed} failed`}>
               <div className="flex flex-wrap gap-2">

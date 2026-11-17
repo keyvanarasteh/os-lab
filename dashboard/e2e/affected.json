@@ -31,6 +31,7 @@
     { "paths": ["src/views/cleanup/relocation-card.tsx"], "specs": ["cleanup-relocation.spec.ts"], "routes": ["/cleanup/relocation/"] },
     { "paths": ["src/views/cleanup/space-explorer.tsx"], "specs": ["cleanup-space.spec.ts"], "routes": ["/cleanup/space/"] },
     { "paths": ["src/views/cleanup/widgets-card.tsx", "src/views/cleanup/monitor-card.tsx"], "specs": ["cleanup-widgets.spec.ts"], "routes": ["/cleanup/", "/cleanup/settings/"] },
+    { "paths": ["src/views/cleanup/pro-cards.tsx"], "specs": ["cleanup-pro.spec.ts"], "routes": ["/cleanup/"] },
     { "paths": ["src/views/cleanup/**", "src/views/cleanup-lab-tasks.tsx", "src/pages/cleanup/**"], "specs": ["cleanup*.spec.ts"], "routes": ["/cleanup/", "/cleanup/scan/", "/cleanup/settings/", "/cleanup/history/"] },
 
     { "paths": ["src/views/source/**", "src/views/source-bonus-tasks.tsx", "src/pages/source/**", "src/lib/source-*.ts"], "specs": ["source.spec.ts"], "routes": ["/source/", "/source/analyzer/", "/source/brain/", "/source/pipeline/"] },

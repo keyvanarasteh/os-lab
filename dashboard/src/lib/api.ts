@@ -447,9 +447,43 @@ export interface CleanupVMInventory {
   unavailable: { id: string; root: string | null; reason: string }[];
 }
 export interface CleanupAuxJob<T> {
-  id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "relocation-plan" | "relocation-run"; state: "running" | "done" | "cancelled" | "failed";
+  id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "privileged-run" | "deep-scan" | "packages" | "relocation-plan" | "relocation-run"; state: "running" | "done" | "cancelled" | "failed";
   progress: Record<string, string | number> | null;
   result: T | null; error: string | null;
+}
+/** GET /api/cleanup/privileged — typed system-maintenance actions offered by this host. */
+export interface CleanupPrivilegedStatus {
+  platform: string; applicable: boolean; elevation: string | null;
+  actions: { id: string; name: string; risk: string; impact: string; previewMode: string; previewArgv?: string[]; runArgv: string[] }[];
+  diskAccess: { applicable: boolean; granted: boolean | null; reason: string };
+}
+/** POST /api/cleanup/privileged/preview — a confirmed privileged-action preview. */
+export interface CleanupPrivilegedPreview {
+  previewId: string; actionId: string; engine: string; elevation: string;
+  risk: string; candidateCount: number; candidates: string[]; totalBytes: number | null;
+  command: string[]; expiresAt: number;
+}
+/** POST /api/cleanup/privileged/run — the audited privileged run result. */
+export interface CleanupPrivilegedRun {
+  actionId: string; engine: string; status: "completed" | "failed"; error?: string;
+  candidateCount?: number; command?: string[]; output?: string; bytesRemoved: number | null;
+}
+/** GET /api/cleanup/deep-roots — configured, available project sweep roots. */
+export interface CleanupDeepRoot { id: string; path: string | null; available: boolean; reason: string | null; }
+/** One sweep result from POST /api/cleanup/deep-scan. */
+export interface CleanupDeepScanItem {
+  id: string; rootId: string; path: string; project: string; ecosystem: string; regenerate: string;
+  idleDays: number; sizeBytes: number; sizeOnDiskBytes: number | null; files: number; folders: number;
+}
+/** GET /api/cleanup/simulators — Xcode simulator device inventory (report only). */
+export interface CleanupSimulators {
+  available: boolean; reason: string;
+  devices: { id: string | null; name: string | null; runtime: string | null; state: string | null; available: boolean; sizeBytes: number | null }[];
+}
+/** POST /api/cleanup/packages/scan — one package-review candidate (report only). */
+export interface CleanupPackageCandidate {
+  id: string; name: string; tool: string; version: string | null;
+  command: string[]; sizeBytes: number | null; reportOnly: boolean;
 }
 export interface CleanupCrossLeftovers {
   available: boolean; reason?: string; cancelled: boolean;
@@ -709,6 +743,17 @@ export const api = {
   /** CLNP-20: the raw path appears exactly once, here; afterwards ids only. */
   cleanupCustomAdd: (name: string, path: string) => post<{ entries: { id: string; name: string; risk: string; paths: Record<string, string[]> }[]; error: string | null }>("/api/cleanup/custom-entries", { name, path }),
   cleanupCustomRemove: (entryId: string) => post<{ entries: unknown[]; bookmarks?: BookmarkRecord[]; error: string | null }>("/api/cleanup/custom-entries/remove", { entryId }),
+  /** CLN-20: privileged system-maintenance actions offered by this host. */
+  cleanupPrivileged: () => call<CleanupPrivilegedStatus>("/api/cleanup/privileged"),
+  cleanupPrivilegedPreview: (actionId: string) => post<CleanupPrivilegedPreview>("/api/cleanup/privileged/preview", { actionId }),
+  cleanupPrivilegedRun: (previewId: string) => post<CleanupAuxJob<CleanupPrivilegedRun>>("/api/cleanup/privileged/run", { previewId }),
+  /** CLN-24: registered project sweep roots and the deep-scan job. */
+  cleanupDeepRoots: () => call<{ roots: CleanupDeepRoot[] }>("/api/cleanup/deep-roots"),
+  cleanupDeepScan: (entryIds: string[], minIdleDays?: number) => post<CleanupAuxJob<CleanupDeepScanItem[]>>("/api/cleanup/deep-scan", { entryIds, minIdleDays }),
+  /** CLN-09/10: Xcode simulator device inventory (report only). */
+  cleanupSimulators: () => call<CleanupSimulators>("/api/cleanup/simulators"),
+  /** CLN-11: Homebrew/pip/gem top-level package-review candidates (report only). */
+  cleanupPackagesScan: () => post<CleanupAuxJob<CleanupPackageCandidate[]>>("/api/cleanup/packages/scan"),
   /** CLNP-23: the Space Explorer (read-only size trees over registered roots). */
   cleanupExplorerRoots: () => call<{ roots: CleanupExplorerRoot[] }>("/api/cleanup/explorer/roots"),
   cleanupExplorerScan: (rootId: string) => post<CleanupExplorerJob>("/api/cleanup/explorer/scan", { rootId }),

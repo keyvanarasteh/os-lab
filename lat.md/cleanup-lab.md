@@ -459,7 +459,14 @@ card. The Bookmarks card counts bookmarked and quick-clean entries, their
 measured size and enabled hooks, bars the quick-clean share, and carries Quick
 clean (one confirmed Trash run over the flagged bookmarks, stating the reason
 when none are flagged) plus Rescan, which re-measures only the bookmarked
-entries; the bookmark manager stays on Settings. The Settings tab at
+entries; the bookmark manager stays on Settings. Below them, a grid of compact
+"pro" cards ([[dashboard/src/views/cleanup/pro-cards.tsx]]) exposes the
+remaining cleanup capabilities directly from the dashboard: Privileged actions,
+Projects deep scan, Simulators, Package review, Cross-platform leftovers,
+Containers & VMs and Custom entries. Each card loads real data from its typed
+engine endpoint, renders loading/empty/error states, and — for destructive
+actions — follows preview → confirm → run; report-only capabilities never offer
+a delete control. The Settings tab at
 `/cleanup/settings/` hosts the Bookmarks section, the Permissions card, the
 Monitor stats card
 ([[dashboard/src/views/cleanup/monitor-card.tsx]] exports `MonitorStatsCard`:
@@ -517,6 +524,31 @@ The Rescan icon action measures every catalog entry; the Clean icon action plans
 checked safe groups and opens the shared confirmation dialog.
 
 [[dashboard/src/views/cleanup/groups.ts]] classifies every catalog entry into a tool group by id. [[dashboard/src/views/cleanup/catalog-page.tsx]] is `/cleanup/catalog/`: the group list, and with `#<group>` that group's own view (search, Size and Modified filters, sort including oldest first, select, bookmark, Rescan). Modified is the newest file time under each entry, which the scan reports as `modifiedAt` per path and per entry. Review removal sends the selection to the existing plan and confirmation dialog; nothing is cleaned without it. The sidebar has a Catalogs group with one entry per tool group. [[dashboard/src/views/cleanup/group-icon.tsx]] gives each group one icon and tint, used in the sidebar, the plan rows and the group header, and carries the per-group measured bytes from the page to the sidebar badges through `localStorage` and a window event.
+
+### Pro cards
+
+Below the Ready and Bookmarks cards, compact "pro" cards expose the remaining
+cleanup capabilities from the dashboard. Each loads real engine data, renders
+loading/empty states, and — for destructive actions — follows preview →
+confirm → run.
+
+* **Privileged actions** (CLN-20): lists the system-maintenance actions this
+  host offers (risk and impact), previews the elevation command, candidate count
+  and bytes, then runs through the host's own elevation — never a free-form
+  command from the page. Dimmed when the host has no typed elevation mechanism.
+* **Projects deep scan** (CLN-24): pick available registered roots and an
+  idle-days floor; the sweep reports marker-verified build outputs grouped by
+  ecosystem with sizes, report only — never deletes.
+* **Simulators** (CLN-09): lists Xcode CoreSimulator devices with sizes, report
+  only — relocation moves a device store off the OS disk.
+* **Package review** (CLN-11): Homebrew/pip/gem top-level candidates with their
+  exact uninstall argv as a preview, report only — no execution.
+* **Cross-platform leftovers** (CLN-09/10): orphaned app data from OS package
+  inventories with confidence badges (likely/possible/uncertain), report only.
+* **Containers & VMs** (CLN-08): Docker/Podman prune preview → confirm → run,
+  plus a virtual-machine inventory, report only.
+* **Custom entries** (CLNP-20): lists user folders bookmarked as `custom.<slug>`
+  entries with remove; adding a folder goes through Settings → Bookmarks.
 
 The Permissions card in Settings opens with the Full Disk Access guide ([[dashboard/src/views/cleanup/permission-guide.tsx]]): the app that needs the grant as a tile, Open System Settings, Reveal app again, Reset permissions and, once the toggle is on, Quit & Reopen. The console names the app from its own process tree (`_host_app` in [[console/cleanup_api.py]]) and reveals or resets only that bundle; the page supplies no path.
 
