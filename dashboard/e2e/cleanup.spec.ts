@@ -61,7 +61,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   expect(calls.filter((call) => call.path === "/api/cleanup/clean")[0].body).toEqual({ planId: "plan-1" });
   // CLNP-21: the Space Explorer capability card moved to Settings and still navigates its tab in place.
   await page.goto("/cleanup/settings/");
-  await page.getByRole("button", { name: "Space Explorer" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Space Explorer" }).click();
   await expect(page).toHaveURL(/\/cleanup\/space\/$/);
   await expect(page.getByRole("heading", { name: "Space Explorer" })).toBeVisible();
   await expect(page.getByText("Pick a root and measure it to see its folders by size.")).toBeVisible();
