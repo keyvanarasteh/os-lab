@@ -98,7 +98,7 @@ const CARDS: { group: string; cards: OverviewCard[] }[] = [
   {
     group: "Storage & cleanup",
     cards: [
-      { id: "scan-now", title: "Quick cleanup", description: "Scan all safe categories and review a plan", icon: <BroomIcon size={18} />, target: "overview-review", onTab: false },
+      { id: "scan-now", title: "Quick cleanup", description: "Scan all safe categories and review a plan", icon: <BroomIcon size={18} />, target: "overview-ready", onTab: false },
       { id: "advanced-scan", title: "Advanced scan", description: "Choose individual items, modes and tools", icon: <MagnifyingGlassIcon size={18} />, target: "scan/", onTab: true },
       { id: "results", title: "Results", description: "The latest scan, by category and size", icon: <TrayIcon size={18} />, target: "results/", onTab: true },
       { id: "leftovers", title: "Leftovers", description: "Skipped, failed and unreadable items", icon: <BugIcon size={18} />, target: "leftovers/", onTab: true },

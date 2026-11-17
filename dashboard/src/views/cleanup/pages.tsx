@@ -18,7 +18,7 @@ import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
 import { RelocationCard } from "./relocation-card";
 import { WidgetsCard } from "./widgets-card";
-import { ScanCard } from "./scan-card";
+import { BookmarksSummaryCard, ReadyCard } from "./summary-cards";
 import { PermissionGuide } from "./permission-guide";
 import { CatalogPage } from "./catalog-page";
 import { CATALOG_GROUPS, groupIdOf } from "./groups";
@@ -32,10 +32,11 @@ import type { BookmarksPayload, CleanupVolume, CleanupWidgetSnapshot } from "../
  */
 const WIDGET_SECTIONS: Record<string, CleanupPageId> = {
   "cleanup-widgets": "settings",
-  "cleanup-monitor": "",
+  "cleanup-monitor": "settings",
   "cleanup-permissions": "settings",
   "cleanup-bookmarks": "settings",
-  "overview-review": "",
+  "overview-ready": "",
+  "overview-bookmarks": "",
   "overview-storage": ""
 };
 
@@ -256,39 +257,6 @@ function ConfirmDialog({
   </dialog>;
 }
 
-/**
- * The main dashboard's Quick clean card: the bookmarks flagged for quick
- * cleanup, one confirmed Trash run over them. Bookmarks are managed on the
- * Settings tab; without any quick-clean bookmark the card says so instead of
- * pretending the button would do something.
- */
-function QuickCleanCard({
-  bookmarks, busy, canWork, measured, refusals, onQuickClean, settingsHref
-}: {
-  bookmarks: BookmarksPayload | null; busy: boolean; canWork: boolean;
-  measured: Map<string, CleanupScan["entries"][number]>; refusals: string;
-  onQuickClean: () => void; settingsHref: string;
-}) {
-  const items = bookmarks?.bookmarks ?? [];
-  const quick = items.filter((item) => item.quickClean);
-  const quickBytes = quick.reduce((sum, item) => sum + (measured.get(item.entryId)?.sizeBytes ?? 0), 0);
-  const measuredQuick = quick.some((item) => measured.get(item.entryId)?.sizeBytes != null);
-  return <Section id="overview-quick-clean" title="Quick clean" description="One confirmed Trash run over the bookmarks marked for quick cleanup.">
-    <div className="flex items-baseline gap-2">
-      <span dir="ltr" className="text-3xl font-bold tabular-nums">{measuredQuick ? bytes(quickBytes) : "—"}</span>
-      <span className="text-sm text-(--iux-muted-foreground)">measured in quick-clean bookmarks</span>
-    </div>
-    <p className="text-sm text-(--iux-muted-foreground)">{quick.length} of {items.length} bookmarks included</p>
-    {refusals && <Status value={{ ok: false, text: refusals }} />}
-    <div className="mt-3 flex flex-wrap gap-2">
-      <button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !quick.length || busy} onClick={onQuickClean}>Quick clean</button>
-      <a className="iux-btn" href={settingsHref}>Manage bookmarks</a>
-    </div>
-    {items.length === 0 ? <p className="mt-2 text-xs text-(--iux-muted-foreground)">No bookmarks yet — bookmark entries on the Advanced scan page or add folders in Settings.</p>
-      : quick.length === 0 ? <p className="mt-2 text-xs text-(--iux-muted-foreground)">No bookmarks are marked for quick clean yet — enable quick clean in Settings.</p> : null}
-  </Section>;
-}
-
 export default function CleanupPage({ page: initialPage = "" }: { page?: CleanupPageId }) {
   // CLNP-06: the active page is live state, derived from the URL. The prop
   // stays as the SSR/deep-link seed; navigation updates the state in place.
@@ -312,6 +280,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const [confirm, setConfirm] = useState(false);
   const [bookmarkConfirm, setBookmarkConfirm] = useState(false);
   const [quickRefusals, setQuickRefusals] = useState("");
+  const [quickError, setQuickError] = useState("");
   const [order, setOrder] = useState<SortOrder>("size");
   const [now, setNow] = useState(Date.now() / 1000);
   const coreLoaded = useRef(false);
@@ -414,7 +383,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const bookmarkedIds = new Set((bookmarks?.bookmarks ?? []).map((item) => item.entryId));
 
   /** Sections that moved with the settings split, and the tab hosting each. */
-  const SECTION_PAGE: Record<string, CleanupPageId> = { "cleanup-monitor": "settings", "cleanup-permissions": "settings", "cleanup-widgets": "settings", "cleanup-bookmarks": "settings", "overview-review": "", "overview-storage": "" };
+  const SECTION_PAGE: Record<string, CleanupPageId> = { "cleanup-monitor": "settings", "cleanup-permissions": "settings", "cleanup-widgets": "settings", "cleanup-bookmarks": "settings", "overview-ready": "", "overview-bookmarks": "", "overview-storage": "" };
 
   /** CLNP-21: a capability card navigates a tab or its section, even when the section now lives on another tab. */
   function goCard(card: OverviewCard) {
@@ -442,7 +411,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
    * opens on the returned plan job, and refusals stay visible on the card.
    */
   function runQuickClean() {
-    setActionError(""); setQuickRefusals("");
+    setQuickError(""); setQuickRefusals("");
     void api.cleanupBookmarkQuickClean()
       .then((response) => {
         setQuickRefusals(response.refusals.map((item) => item.reason).join(" "));
@@ -450,7 +419,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
         setJobs((old) => [response.job, ...old.filter((row) => row.id !== response.job.id)]);
         setBookmarkConfirm(true);
       })
-      .catch((error) => setActionError(errorText(error)));
+      .catch((error) => setQuickError(errorText(error)));
   }
 
   // CLNP-07: live fetch per tab entry — jobs where results are shown, the
@@ -553,15 +522,29 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     if (active?.kind === "plan" && active.state === "done" && isPlan(active)) setConfirm(true);
   }, [active?.id, active?.kind, active?.state]);
 
+  // The widget snapshot folds history, monitor and bookmark state; a finished
+  // job changes that fold, so the summary cards refresh it instead of showing
+  // stale reclaimed bytes after a clean.
+  useEffect(() => {
+    if (!active || active.state === "running") return;
+    reloadWidget();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id, active?.state]);
+
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now() / 1000), 1000); return () => window.clearInterval(timer); }, []);
 
-  const latestScan = (active && isScan(active) ? active : jobs.find(isScan))?.result as CleanupScan | undefined;
+  const latestScanJob = active && isScan(active) ? active : jobs.find(isScan);
+  const latestScan = latestScanJob?.result as CleanupScan | undefined;
   const planJob = active && isPlan(active) ? active : jobs.find(isPlan);
   const latestPlan = planJob?.result as CleanupPlan | undefined;
   const latestClean = (active && isClean(active) ? active : jobs.find(isClean))?.result as CleanupResult | undefined;
   const planUsed = !!latestPlan && jobs.some((job) => isClean(job) && job.request.planId === latestPlan.planId);
   const busy = submitting || active?.state === "running";
   const canWork = status?.state === "ready" && !busy;
+  // The dashboard summary cards read the home volume's capacity directly; a
+  // volume that failed to report capacity is never shown as a measured one.
+  const measuredVolumes = (volumes ?? []).filter((volume) => !volume.error && volume.totalBytes && volume.freeBytes != null);
+  const homeVolume = measuredVolumes.find((volume) => volume.isHome) ?? measuredVolumes[0];
 
   // Quick-cleanup suggestions: measured, safe, non-privileged entries.
   const measured = useMemo(() => new Map(latestScan?.entries.map((item) => [item.id, item]) ?? []), [latestScan]);
@@ -672,15 +655,20 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           {page === "" && <>
             {!PUBLIC && status?.state === "ready" && <StorageHero volumes={volumes} onRefresh={reloadVolumes} />}
             {!PUBLIC && status?.state === "ready" && <div className="grid items-start gap-5 lg:grid-cols-2">
-              <QuickCleanCard bookmarks={bookmarks} busy={busy} canWork={canWork} measured={measured} refusals={quickRefusals}
-                onQuickClean={runQuickClean} settingsHref={link("settings/")} />
-              <ScanCard active={active} entries={entries} measured={sizes} checked={dashChecked ?? defaultChecked} setChecked={setDashChecked}
-                canWork={canWork} scanned={!!latestScan} error={actionError}
+              <ReadyCard scan={latestScan} scanFinishedAt={latestScanJob?.finishedAt} widget={widget} monitor={monitor}
+                bookmarks={bookmarks} active={active} entries={entries} measured={measured}
+                checked={dashChecked ?? defaultChecked} setChecked={setDashChecked}
+                diskFreeBytes={homeVolume?.freeBytes} diskUsedPercent={homeVolume?.usage != null ? Math.round(homeVolume.usage * 100) : null}
+                canWork={canWork} locale={locale} now={now} error={actionError}
                 onScan={() => void start(() => api.cleanupScan(entries.map((item) => item.id)))} onCancel={() => void cancel()}
                 onClean={(ids) => void start(() => api.cleanupPlan(ids, "trash"))}
                 groupHref={(id) => link(`catalog/#${id}`)} />
+              <BookmarksSummaryCard bookmarks={bookmarks} measured={measured} active={active} canWork={canWork}
+                locale={locale} now={now} refusals={quickRefusals} error={quickError}
+                onQuickClean={runQuickClean}
+                onRescan={() => void start(() => api.cleanupScan((bookmarks?.bookmarks ?? []).map((item) => item.entryId)))}
+                settingsHref={link("settings/")} />
             </div>}
-            {!PUBLIC && status?.state === "ready" && <MonitorStatsCard monitor={monitor} volumes={volumes} settingsHref={link("settings/")} />}
             {latestClean && <Section title="Latest clean report" description={`${latestClean.totals.trashed} moved to Trash · ${latestClean.totals.skipped} skipped · ${latestClean.totals.failed} failed`}>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={latestClean.totals.trashed ? "success" : undefined}>{itemStatusLabel("trashed")} {latestClean.totals.trashed}</Badge>
@@ -697,6 +685,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
               onQuickClean={(job) => { setActive(job); setJobs((old) => [job, ...old.filter((row) => row.id !== job.id)]); setBookmarkConfirm(true); }}
               onCatalogChanged={() => { void api.cleanupCatalog().then((catalog) => setEntries(catalog.entries)).catch(() => {}); }} />
             <PermissionsCard permissions={permissions} />
+            <MonitorStatsCard monitor={monitor} volumes={volumes} locale={locale} now={now} onReload={monitorReload} />
             <MonitorCard monitor={monitor} volumes={volumes} reload={monitorReload} />
             <WidgetsCard snapshot={widget} reload={reloadWidget} />
             <Section id="cleanup-tools" title="Tools & advanced" description="The detailed cleanup tools, one click away.">

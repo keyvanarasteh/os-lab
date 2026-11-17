@@ -42,16 +42,19 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await expect(page.getByText("50% used", { exact: false })).toBeVisible();
   await expect(page.getByText("232.8 GB", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("Purgeable space is managed by macOS", { exact: false })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Quick clean" })).toBeVisible();
+  // The summary cards: bookmarks on the right, the scan/clean summary on the left.
+  await expect(page.getByRole("heading", { name: "Bookmarks", exact: true })).toBeVisible();
   // No bookmarks in this fixture, so the honest disabled state with its reason shows.
   await expect(page.getByRole("main").getByRole("button", { name: "Quick clean", exact: true })).toBeDisabled();
-  await expect(page.getByRole("heading", { name: "Clean", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Scan now" }).click();
+  await expect(page.getByRole("heading", { name: "Ready to scan" })).toBeVisible();
+  // Rescan (icon action) measures every catalog entry.
+  await page.locator("#overview-ready").getByRole("button", { name: "Rescan" }).click();
   await expect(page.getByText("Last scan measured 142 B")).toBeVisible();
-  // The scan card now replaces the old suggested-plan row: a "Scan complete" summary whose Clean button
-  // (named with the selected size) builds the trash plan that opens the confirmation dialog.
-  await expect(page.getByRole("heading", { name: "Scan complete" })).toBeVisible();
-  await page.getByRole("main").getByRole("button", { name: /^Clean 42\b/ }).click();
+  // The card then states the reclaimable total and plans the checked safe groups: its Clean
+  // icon action builds the trash plan that opens the confirmation dialog.
+  await expect(page.getByRole("heading", { name: "Ready to clean" })).toBeVisible();
+  await expect(page.getByText("142 B").first()).toBeVisible();
+  await page.locator("#overview-ready").getByRole("button", { name: "Clean", exact: true }).click();
   expect(calls.find((call) => call.path === "/api/cleanup/scan")?.body).toEqual({ entryIds: ["system.caches", "browser.private"] });
   expect(calls.find((call) => call.path === "/api/cleanup/plan")?.body).toEqual({ entryIds: ["system.caches"], mode: "trash" });
   await expect(page.getByRole("dialog")).toContainText("1 items");

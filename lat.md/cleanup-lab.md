@@ -445,16 +445,28 @@ lists ready items with sizes and skipped items with their reasons.
 into a compact main view and a Settings tab.
 
 The main view keeps only the
-cleaning actions and the stats around them: the storage hero, the Quick clean
-card (one confirmed Trash run over the bookmarks flagged for quick clean,
-stating the reason when none are flagged), the Clean card (scan, the
-Recommended / More-safe presets, plan review, confirmation, progress) and the
-latest clean report, plus a compact read-only Monitor stats card
-([[dashboard/src/views/cleanup/monitor-card.tsx]] exports `MonitorStatsCard`;
-thresholds and volumes are configured in Settings). The Settings tab at
+cleaning actions and the stats around them: the storage hero, two summary cards
+in the reference widget's style ([[dashboard/src/views/cleanup/summary-cards.tsx]]
+exports `SummaryCard`, `ReadyCard` and `BookmarksSummaryCard`: an "os-lab"
+eyebrow with a state dot, one headline, a 2×2 number grid, a ratio bar and an
+icon footer) and the latest clean report. The Ready to clean card folds the
+latest scan (found items and reclaimable bytes), the home volume's free space
+and the widget snapshot's reclaimed total, last scan, last cleanup, monitor and
+bookmark lines, and carries Rescan and Clean as icon actions: Rescan measures
+every catalog entry, Clean plans the checked safe groups and opens the shared
+confirmation dialog, and the group plan with its checkboxes stays inside the
+card. The Bookmarks card counts bookmarked and quick-clean entries, their
+measured size and enabled hooks, bars the quick-clean share, and carries Quick
+clean (one confirmed Trash run over the flagged bookmarks, stating the reason
+when none are flagged) plus Rescan, which re-measures only the bookmarked
+entries; the bookmark manager stays on Settings. The Settings tab at
 `/cleanup/settings/` hosts the Bookmarks section, the Permissions card, the
-full Background monitor card, the Desktop widgets card and the capability
-card grid that links to the detail tools. The detail routes — Space Explorer,
+Monitor stats card
+([[dashboard/src/views/cleanup/monitor-card.tsx]] exports `MonitorStatsCard`:
+configured volumes, active warnings, check interval, next check, the home
+volume's used bar and the per-volume states, with Check now as its icon
+action), the full Background monitor configuration card, the Desktop widgets
+card and the capability card grid that links to the detail tools. The detail routes — Space Explorer,
 Advanced scan, Results, Leftovers, History, Relocation — keep their routes and
 behavior; the shared tab row renders on the Settings and detail pages, the
 local main page reaches Settings through the page-head action, and Public
@@ -495,9 +507,14 @@ The local app polls only while a job runs. Public Pages renders the routes witho
 engine calls or destructive controls. All eight route sets are built, including
 the seven translated locales.
 
-### Scan card and Catalogs
+### Ready card and Catalogs
 
-The dashboard scan card ([[dashboard/src/views/cleanup/scan-card.tsx]]) shows "Scanning your Mac" with the category being measured, percent, bar, current path and Stop while a scan runs. When it finishes it shows "Scan complete", the selected size, a Clean action and the plan by tool group.
+The Ready card ([[dashboard/src/views/cleanup/summary-cards.tsx]]) shows a running
+scan's category, percent, bar, current path and Stop, then the found items,
+reclaimable size and the cleanup plan by tool group inside the card.
+
+The Rescan icon action measures every catalog entry; the Clean icon action plans the
+checked safe groups and opens the shared confirmation dialog.
 
 [[dashboard/src/views/cleanup/groups.ts]] classifies every catalog entry into a tool group by id. [[dashboard/src/views/cleanup/catalog-page.tsx]] is `/cleanup/catalog/`: the group list, and with `#<group>` that group's own view (search, Size and Modified filters, sort including oldest first, select, bookmark, Rescan). Modified is the newest file time under each entry, which the scan reports as `modifiedAt` per path and per entry. Review removal sends the selection to the existing plan and confirmation dialog; nothing is cleaned without it. The sidebar has a Catalogs group with one entry per tool group. [[dashboard/src/views/cleanup/group-icon.tsx]] gives each group one icon and tint, used in the sidebar, the plan rows and the group header, and carries the per-group measured bytes from the page to the sidebar badges through `localStorage` and a window event.
 

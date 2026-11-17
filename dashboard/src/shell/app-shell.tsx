@@ -132,7 +132,7 @@ function cleanupNavItems(groupBytes: Record<string, number> = {}): SidebarItem[]
     children: [{ id: `cleanup-${page}`, label: "Overview" }, ...sections.map(([anchor, text]) => ({ id: `cleanup-${page}#${anchor}`, label: text }))]
   });
   return [
-    group("dashboard", "Dashboard", [["overview-storage", "Storage"], ["overview-quick-clean", "Quick clean"], ["overview-review", "Clean"], ["cleanup-monitor", "Monitor stats"]]),
+    group("dashboard", "Dashboard", [["overview-storage", "Storage"], ["overview-ready", "Ready to clean"], ["overview-bookmarks", "Bookmarks"]]),
     { id: "cleanup-space", label: "Space Explorer", icon },
     group("scan", "Advanced scan", [["scan-entries", "Catalog entries"], ["scan-plan", "Plan & confirm"], ["scan-containers", "Containers"], ["scan-vms", "Virtual machines"]]),
     {

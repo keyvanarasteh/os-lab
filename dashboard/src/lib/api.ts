@@ -400,9 +400,12 @@ export interface CleanupEntry {
 }
 export interface CleanupScan {
   cancelled: boolean;
+  /** finishedAt: epoch seconds the engine finished measuring; absent in older mocks. */
+  finishedAt?: number | null;
   /** modifiedAt: newest file mtime in epoch seconds; absent on older consoles. */
   entries: { id: string; name: string; category: string; risk: string; sizeBytes: number; files: number; folders: number; unreadable: string[]; modifiedAt?: number | null; paths: { path: string | null; reason: string; source?: string; sizeBytes: number; error: string | null; modifiedAt?: number | null }[] }[];
-  totals: { sizeBytes: number; files: number; folders: number; unreadable: number };
+  /** paths/entries: measured path and entry counts; absent on older consoles. */
+  totals: { sizeBytes: number; files: number; folders: number; unreadable: number; paths?: number; entries?: number };
 }
 export interface CleanupPlan {
   planId: string; mode: "trash" | "delete"; expiresAt: number;
@@ -420,6 +423,9 @@ export interface CleanupJob {
   progress: Record<string, string | number> | null;
   result: CleanupScan | CleanupPlan | CleanupResult | CleanupRelocationPlan | CleanupRelocationRun | null;
   error: string | null;
+  /** The console stamps every job with epoch seconds; older consoles/mocks may omit them. */
+  startedAt?: number;
+  finishedAt?: number | null;
 }
 export interface CleanupHistory { entries: { id: number; result: CleanupResult | CleanupRelocationRun; hmac: string }[]; total: number; verified: boolean }
 

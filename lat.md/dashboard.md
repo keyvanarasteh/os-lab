@@ -141,12 +141,14 @@ the lab. Lab starts require the token returned by the plan preview. See
 
 ## Source navigation
 
-Cleanup Lab navigation splits into the compact Dashboard (Quick clean, Clean
-and monitor stats) and a Settings tab, with the detail tabs keeping their
-routes ([[dashboard/src/views/cleanup/pages.tsx]]).
+Cleanup Lab navigation splits into the compact Dashboard (the storage hero and
+the Ready to clean and Bookmarks summary cards) and a Settings tab, with the
+detail tabs keeping their routes
+([[dashboard/src/views/cleanup/pages.tsx]]).
 
-Settings hosts bookmarks, permissions, the monitor configuration, widgets and
-the tools hub, and is the last item in the Cleanup Lab nav and tab strip.
+Settings hosts bookmarks, permissions, the monitor stats and configuration,
+widgets and the tools hub, and is the last item in the Cleanup Lab nav and tab
+strip.
 
 In the sidebar, Dashboard, Advanced scan, Results and Settings are collapsible
 groups, closed until their page is open. Each lists an Overview entry plus one
