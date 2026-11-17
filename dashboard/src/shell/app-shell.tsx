@@ -42,9 +42,10 @@ import { LabSwitcher, type LabSwitcherLab } from "./lab-switcher";
 import { labOfSection, useActiveLab, type ActiveLabId } from "./active-lab";
 import { toggleMode, useThemeMode } from "./theme";
 import { UpdateModal } from "../views/update-modal";
-import { androidLogsStore, healthStore, hostStore, jobsStore, type LabId, type LabStatus } from "../lib/api";
+import { androidLogsStore, formatBytes, healthStore, hostStore, jobsStore, type LabId, type LabStatus } from "../lib/api";
 import { copy, firewallPath, type FirewallLocale } from "../firewall/locale";
 import { CATALOG_GROUPS } from "../views/cleanup/groups";
+import { GROUP_BYTES_EVENT, GroupGlyph, readGroupBytes } from "../views/cleanup/group-icon";
 import { localeFromPath, localePath } from "../i18n/paths";
 
 export const REPO_URL = "https://github.com/keyvanarasteh/os-lab";
@@ -122,7 +123,7 @@ const HOW_TO_USE_ITEM: SidebarItem = {
 };
 
 /** Cleanup Lab pages with their cards as collapsible sub-navs (closed until their page is open); Settings stays last. */
-function cleanupNavItems(): SidebarItem[] {
+function cleanupNavItems(groupBytes: Record<string, number> = {}): SidebarItem[] {
   const icon = <BroomIcon size={16} />;
   const group = (page: string, label: string, sections: [string, string][]): SidebarItem => ({
     id: `cleanup-group-${page}`,
@@ -138,7 +139,10 @@ function cleanupNavItems(): SidebarItem[] {
       id: "cleanup-group-catalog",
       label: "Catalogs",
       icon,
-      children: [{ id: "cleanup-catalog", label: "All catalogs" }, ...CATALOG_GROUPS.filter((g) => g.id !== "other").map((g) => ({ id: `cleanup-catalog#${g.id}`, label: g.label }))]
+      children: [{ id: "cleanup-catalog", label: "All catalogs" }, ...CATALOG_GROUPS.filter((g) => g.id !== "other").map((g) => ({
+        id: `cleanup-catalog#${g.id}`, label: g.label, icon: <GroupGlyph groupId={g.id} size={14} />,
+        badge: groupBytes[g.id] ? <span dir="ltr" className="ml-auto shrink-0 rounded-md bg-(--iux-muted) px-1.5 py-px text-[10px] tabular-nums text-(--iux-muted-foreground)">{formatBytes(groupBytes[g.id]!)}</span> : undefined
+      }))]
     },
     group("results", "Results", [["results-categories", "By category"], ["results-clean", "Clean result"]]),
     { id: "cleanup-leftovers", label: "Leftovers", icon },
@@ -148,7 +152,7 @@ function cleanupNavItems(): SidebarItem[] {
   ];
 }
 
-function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androidRunning: boolean, locale: FirewallLocale, activeId: string, activeLab: ActiveLabId | null): SidebarGroup[] {
+function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androidRunning: boolean, locale: FirewallLocale, activeId: string, activeLab: ActiveLabId | null, groupBytes: Record<string, number> = {}): SidebarGroup[] {
   if (PUBLIC_PAGES) return [
     {
       label: "os-lab",
@@ -247,7 +251,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
   const focusedItem = activeLab ? labNav[activeLab] : null;
   const focusedItems: SidebarItem[] = focusedItem
     ? activeLab === "cleanup"
-      ? cleanupNavItems()
+      ? cleanupNavItems(groupBytes)
       : focusedItem.children?.length
       ? focusedItem.children.map((leaf) => ({ id: leaf.id, label: leaf.label, icon: focusedItem.icon, badge: leaf.badge }))
       : [focusedItem]
@@ -420,6 +424,14 @@ export function AppShell({
   const [sourceRecords, setSourceRecords] = useState<SpotlightRecord[]>([]);
   const [sourceSearchError, setSourceSearchError] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // Measured size per catalog group, published by the Cleanup Lab page after a scan.
+  const [groupBytes, setGroupBytes] = useState<Record<string, number>>({});
+  useEffect(() => {
+    setGroupBytes(readGroupBytes());
+    const onBytes = (event: Event) => setGroupBytes((event as CustomEvent<Record<string, number>>).detail ?? {});
+    window.addEventListener(GROUP_BYTES_EVENT, onBytes);
+    return () => window.removeEventListener(GROUP_BYTES_EVENT, onBytes);
+  }, []);
   const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [activeLab, chooseActiveLab] = useActiveLab(activeId);
@@ -472,8 +484,8 @@ export function AppShell({
   const androidRunning = Boolean(androidLogs?.running);
   // The sidebar focuses on the active lab; Spotlight keeps every lab listed.
   const navGroups = useMemo(
-    () => buildGroups(host?.labs, running, androidRunning, locale, activeId, activeLab),
-    [host?.labs, running, androidRunning, locale, activeId, activeLab]
+    () => buildGroups(host?.labs, running, androidRunning, locale, activeId, activeLab, groupBytes),
+    [host?.labs, running, androidRunning, locale, activeId, activeLab, groupBytes]
   );
   const spotlightGroups = useMemo(
     () => buildGroups(host?.labs, running, androidRunning, locale, activeId, null),

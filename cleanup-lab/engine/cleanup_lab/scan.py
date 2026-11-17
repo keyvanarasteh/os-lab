@@ -74,6 +74,12 @@ class _Progress:
         self.bytes_seen = 0
         self.files_seen = 0
         self.current = ""
+        self.current_entry = ""
+
+    def start_entry(self, name):
+        """Name the catalog entry a worker just started measuring (shown as the scan's category)."""
+        with self._lock:
+            self.current_entry = name or ""
 
     def tick(self, apparent_delta=0, files_delta=0, current=""):
         now = time.monotonic()
@@ -106,6 +112,7 @@ class _Progress:
             "bytesSeen": self.bytes_seen,
             "filesSeen": self.files_seen,
             "currentPath": self.current,
+            "currentEntry": self.current_entry,
         }
 
 
@@ -169,6 +176,7 @@ def _walk(root, *, cancel, seen_inodes, progress):
         "files": 0,
         "folders": 0,
         "unreadable": [],
+        "modifiedAt": None,
     }
     has_blocks = False
     poll = 0
@@ -217,6 +225,8 @@ def _walk(root, *, cancel, seen_inodes, progress):
                     counters["sizeOnDiskBytes"] = (counters["sizeOnDiskBytes"] or 0) + on_disk
                     has_blocks = True
                 counters["files"] += 1
+                if counters["modifiedAt"] is None or stat.st_mtime > counters["modifiedAt"]:
+                    counters["modifiedAt"] = stat.st_mtime
                 progress.tick(apparent_delta=apparent, files_delta=1, current=current)
     counters["sizeOnDiskBytes"] = counters["sizeOnDiskBytes"] if has_blocks else None
     return counters, False
@@ -240,6 +250,7 @@ def measure_path(path, *, cancel=None, seen_inodes=None, progress=None):
         "unreadable": [],
         "error": None,
         "measured": False,
+        "modifiedAt": None,
     }
     try:
         stat = os.lstat(path)
@@ -265,11 +276,13 @@ def measure_path(path, *, cancel=None, seen_inodes=None, progress=None):
             report["reason"] = "This file was already counted (hard link)."
             return report
         apparent, on_disk = _stat_size(stat)
-        report.update(measured=True, sizeBytes=apparent, files=1)
+        report.update(measured=True, sizeBytes=apparent, files=1, modifiedAt=stat.st_mtime)
         if on_disk is not None:
             report["sizeOnDiskBytes"] = on_disk
         return report
     counters, aborted = _walk(path, cancel=cancel, seen_inodes=seen_inodes, progress=progress)
+    if counters["modifiedAt"] is None:
+        counters["modifiedAt"] = stat.st_mtime  # an empty folder: its own change time
     report.update(counters, measured=not aborted)
     if aborted:
         report["reason"] = "The scan was cancelled while measuring this path."
@@ -291,6 +304,7 @@ def _path_report(template, path, reason, *, missing=False, symlink=False, source
         "unreadable": [],
         "error": None,
         "measured": False,
+        "modifiedAt": None,
     }
 
 
@@ -331,6 +345,7 @@ def scan_catalog(
 
     results = []
     pending = []  # reports a worker must fill in
+    entry_names = {}  # id(report) -> the entry name shown while that path is measured
     for entry in wanted:
         result = {field: entry.get(field) for field in _ENTRY_FIELDS}
         result["paths"] = []
@@ -349,12 +364,14 @@ def scan_catalog(
             report = _path_report(item["template"], item["path"], "", source=item.get("source", "catalog"))
             result["paths"].append(report)
             pending.append(report)
+            entry_names[id(report)] = entry.get("name") or entry["id"]
 
     progress = _Progress(len(pending), progress_callback)
     seen_inodes = _InodeSet()
     cancelled_seen = _cancelled(cancel)
 
     def run_one(report):
+        progress.start_entry(entry_names.get(id(report), ""))
         return measure_path(report["path"], cancel=cancel, seen_inodes=seen_inodes, progress=progress)
 
     if len(pending) == 1 or workers == 1:
@@ -388,6 +405,8 @@ def scan_catalog(
         result["folders"] = sum(p["folders"] for p in measured)
         result["unreadable"] = [item for p in measured for item in p["unreadable"]]
         result["missing"] = all(p["missing"] for p in result["paths"]) if result["paths"] else False
+        stamps = [p["modifiedAt"] for p in measured if p.get("modifiedAt") is not None]
+        result["modifiedAt"] = max(stamps) if stamps else None
 
     finished = time.time()
     cancelled = cancelled_seen or _cancelled(cancel)

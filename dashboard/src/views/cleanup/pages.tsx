@@ -22,6 +22,7 @@ import { ScanCard } from "./scan-card";
 import { PermissionGuide } from "./permission-guide";
 import { CatalogPage } from "./catalog-page";
 import { CATALOG_GROUPS, groupIdOf } from "./groups";
+import { publishGroupBytes } from "./group-icon";
 import type { BookmarksPayload, CleanupVolume, CleanupWidgetSnapshot } from "../../lib/api";
 
 /**
@@ -575,6 +576,14 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   // Advanced-scan card grid: sizes, sort order and cleanability ranking.
   const sizes = useMemo(() => new Map((latestScan?.entries ?? []).map((item) => [item.id, item.sizeBytes])), [latestScan]);
   const maxSize = useMemo(() => Math.max(0, ...sizes.values()), [sizes]);
+  const modified = useMemo(() => new Map((latestScan?.entries ?? []).filter((item) => item.modifiedAt != null).map((item) => [item.id, item.modifiedAt!])), [latestScan]);
+  // The sidebar's Catalogs badges: measured bytes per group from the latest scan.
+  useEffect(() => {
+    if (!latestScan) return;
+    const totals: Record<string, number> = {};
+    for (const item of latestScan.entries) { const id = groupIdOf(item.id); totals[id] = (totals[id] ?? 0) + (item.sizeBytes ?? 0); }
+    publishGroupBytes(totals);
+  }, [latestScan]);
   const [dashChecked, setDashChecked] = useState<string[] | null>(null);
   useEffect(() => { setDashChecked(null); }, [latestScan]);
   const defaultChecked = useMemo(() => entries.filter((item) => item.defaultSelected && (sizes.get(item.id) ?? 0) > 0).map((item) => item.id), [entries, sizes]);
@@ -805,7 +814,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
             </Section>}
             <CleanupExtraTools now={now} />
           </>}
-          {page === "catalog" && !PUBLIC && <CatalogPage entries={entries} sizes={sizes} groupId={catalogGroup} groupHref={(id) => link(id ? `catalog/#${id}` : "catalog/")}
+          {page === "catalog" && !PUBLIC && <CatalogPage entries={entries} sizes={sizes} modified={modified} groupId={catalogGroup} groupHref={(id) => link(id ? `catalog/#${id}` : "catalog/")}
             selected={selected} setSelected={(ids) => { setSelected(ids); setConfirm(false); }} busy={!!busy} canWork={canWork} isPublic={PUBLIC}
             bookmarkedIds={bookmarkedIds} onBookmark={toggleBookmark}
             onScan={(ids) => void start(() => api.cleanupScan(ids))}

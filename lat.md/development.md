@@ -15,7 +15,7 @@ One script starts the console API and the dashboard in either of two modes and r
 
 Open `http://localhost:4321` for dev and `http://127.0.0.1:5050` for run. `build:local` writes the git-ignored `dashboard/build`, which the console prefers when it is newer than the committed `dashboard/dist`; never commit `dist` (CI refuses it, see [[tooling#Parallel work]]).
 
-The desktop window is a third mode: `cd app && npm run dev` runs Tauri with the webview on the dashboard dev server. It compiles Rust and is the heaviest, so use it only for work that needs the native app, such as the widget actions in [[cleanup-lab#Cleaner Widgets (CLW)]].
+The desktop window is a third mode: `cd app && npm run dev` runs `tauri dev`, which starts its own console on a free port and shows the built dashboard (`dashboard/build` when newer than `dist`), not the Astro dev server, so it has Rust rebuilds but no dashboard hot reload. It compiles Rust and is the heaviest, so use it only for work that needs the native app, such as the widget actions in [[cleanup-lab#Cleaner Widgets (CLW)]].
 
 `OSLAB_API_PORT` and `OSLAB_UI_PORT` run a second stack beside the first; PID and log files are named per port. `astro dev` allows one server per project, so a second `dev` only reports where the first runs and the script adopts it. A server found on the port that this script did not start is used but never stopped, and `stop [console|dashboard|all]` kills only recorded PIDs, never by process name.
 
@@ -58,7 +58,7 @@ Suites are small modules in `scripts/ux/suites/` that export `name` and `run(ux)
 
 - `shell` ([[scripts/ux/suites/shell.mjs]]) checks the collapsible Help group, its remembered state, the lab switcher, Firewall Lab as a lab, the focused-lab navigation and the Cleanup Lab sub-navs (Settings last, groups closed, a link lands on its card).
 - `cleanup` ([[scripts/ux/suites/cleanup.mjs]]) checks the grouped volume cards, the sticky Advanced scan toolbar at desktop and phone width, the compact grid, the per-entry context menu and that Review & clean only builds a plan.
-- `catalogs` ([[scripts/ux/suites/catalogs.mjs]]) runs a real scan and checks the Scanning/Scan complete card, the classified plan rows, a catalog group page, Review removal opening the confirmation dialog, and that no clean is requested. It takes a few minutes.
+- `catalogs` ([[scripts/ux/suites/catalogs.mjs]]) runs a real scan and checks the Scanning/Scan complete card (with the category name), the classified plan rows, a catalog group page with its Size and Modified filters, the sidebar group icons and size badges, the permission guide, Review removal opening the confirmation dialog, and that no clean is requested. It takes a few minutes.
 
 A new suite is one file; use the exact visible text a user sees, wait for hydration with `goto(..., { waitFor })`, and check network side effects with `requestsTo`.
 

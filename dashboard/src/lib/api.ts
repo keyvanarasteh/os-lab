@@ -400,7 +400,8 @@ export interface CleanupEntry {
 }
 export interface CleanupScan {
   cancelled: boolean;
-  entries: { id: string; name: string; category: string; risk: string; sizeBytes: number; files: number; folders: number; unreadable: string[]; paths: { path: string | null; reason: string; source?: string; sizeBytes: number; error: string | null }[] }[];
+  /** modifiedAt: newest file mtime in epoch seconds; absent on older consoles. */
+  entries: { id: string; name: string; category: string; risk: string; sizeBytes: number; files: number; folders: number; unreadable: string[]; modifiedAt?: number | null; paths: { path: string | null; reason: string; source?: string; sizeBytes: number; error: string | null; modifiedAt?: number | null }[] }[];
   totals: { sizeBytes: number; files: number; folders: number; unreadable: number };
 }
 export interface CleanupPlan {

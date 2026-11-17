@@ -28,6 +28,8 @@ export interface SidebarLeaf {
   id: string;
   label: string;
   badge?: ReactNode;
+  /** Optional small glyph before the label. */
+  icon?: ReactNode;
   /** Only for admin accounts; hidden from everyone else's sidebar and Spotlight. */
   admin?: boolean;
 }
@@ -375,6 +377,7 @@ export function AppSidebar({
                                 : rowIdle
                             )}
                           >
+                            {leaf.icon && <span className="shrink-0">{leaf.icon}</span>}
                             <span className="truncate">{leaf.label}</span>
                             {leaf.badge}
                           </button>

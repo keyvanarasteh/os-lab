@@ -7,6 +7,7 @@
 import { BroomIcon, CaretRightIcon, TrashIcon } from "@phosphor-icons/react";
 import { formatBytes, type CleanupEntry, type CleanupJob } from "../../lib/api";
 import { CATALOG_GROUPS, groupIdOf } from "./groups";
+import { GroupTile } from "./group-icon";
 import { Section } from "../../components/ui";
 
 export type ScanCardProps = {
@@ -32,7 +33,7 @@ export function ScanCard(props: ScanCardProps) {
   const percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
   if (running) {
     return <Section id="overview-review" title="Scanning your Mac" action={<span dir="ltr" className="text-xl font-semibold tabular-nums" aria-live="polite">{percent}%</span>}
-      description={String(active?.progress?.currentEntry ?? "")}>
+      description={String(active?.progress?.currentEntry || "Preparing…")}>
       <div className="h-1.5 overflow-hidden rounded-full bg-(--iux-muted)" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
         <span className="block h-full rounded-full bg-[#2f9e91] transition-[width]" style={{ width: `${percent}%` }} />
       </div>
@@ -81,6 +82,7 @@ export function ScanCard(props: ScanCardProps) {
             ref={(el) => { if (el) el.indeterminate = on.length > 0 && on.length < ids.length; }}
             onChange={(event) => setChecked(event.target.checked ? [...new Set([...checked, ...ids])] : checked.filter((id) => !ids.includes(id)))} />
           <a href={groupHref(group.id)} className="flex min-w-0 flex-1 items-center gap-3 no-underline">
+            <GroupTile groupId={group.id} size={30} />
             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{group.label}</span>
               <span className="block text-xs text-(--iux-muted-foreground)">{on.length} of {ids.length} selected</span></span>
             <span dir="ltr" className="text-sm font-semibold tabular-nums">{formatBytes(bytes)}</span>
