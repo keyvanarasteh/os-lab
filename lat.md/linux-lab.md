@@ -140,33 +140,18 @@ reported as partial recovery. Legacy/incomplete evidence is not trusted.
 Rollback tests in [[linux-lab/tests/test_rollback.py]] use temporary files
 and fake commands.
 
-## OS-24 Local .deb Installer
+## OS-23 salt okunur dpkg envanteri
 
-The OS-24 script installs local Debian packages on Ubuntu.
+[[linux-lab/scripts/dpkg_inventory.py]], paket listesini, paket dosyalarını ve
+tam yoldan dosya sahipliğini sürümlü JSON olarak sunar.
 
-Script: `linux-lab/scripts/os-24-deb-installer.sh`
+Paket durumu ile kurulu paket sayısı ayrı tutulur. Mimari ekleri korunur;
+dpkg arama jokerleri kaçırılır ve sonuç tam yolla karşılaştırılır. Araç sembolik
+bağlantıları çözmez, paketleri değiştirmez, root veya ağ erişimi istemez.
+Alternatif yönetim veritabanı, kopyalar ve sentetik testler için kullanılabilir.
 
-### Usage
+[[android-lab/lab/tests/test_dpkg_inventory.py]], komut hataları, girdi doğrulama
+ve ayrıştırma davranışlarını çevrimdışı sınar. dpkg varsa geçici sentetik
+veritabanında gerçek komutla bütünleşme testi de çalışır. Canlı Ubuntu
+kanıtıyla sentetik testlerin ayrımı [[linux-lab/os-23/VERIFY.md]] içinde açıklanır.
 
-Install a local Debian package: the script validates it first, then hands
-it to apt.
-
-```bash
-./linux-lab/scripts/os-24-deb-installer.sh ./package.deb
-```
-
-### Behavior
-
-Validation and install steps, in order:
-
-- Requires exactly one package path.
-- Checks whether the file exists.
-- Requires a `.deb` file extension.
-- Validates the package using `dpkg-deb --info`.
-- Installs the package using `sudo apt install -y`.
-- Uses `realpath` to resolve the package's absolute path.
-
-### Safety
-
-Only install trusted `.deb` packages. Installation requires sudo
-permissions and may modify the operating system.

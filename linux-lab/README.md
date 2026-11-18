@@ -280,3 +280,37 @@ Bu görsel önceki audit çalıştırmalarıyla birleştirilmemelidir; sürüm v
 bağlamına göre toplamlar değişebilir. Görsel tek başına JSON çıktısının, canlı
 `apply` veya canlı `rollback` işlemlerinin doğrulandığını göstermez. Mock test
 sonuçları ve doğrulama sınırları için [VERIFY.md](os-30/VERIFY.md) dosyasına bakın.
+
+## OS-23: dpkg paket envanteri ve dosya sahipliği
+
+[dpkg envanter aracı](scripts/dpkg_inventory.py), Python 3.11+ ve Debian/Ubuntu
+`dpkg` komutunu kullanır. Salt okunur çalışır; sudo veya ağ erişimi gerektirmez.
+Depo kökünden çalıştırın:
+
+```bash
+python3 linux-lab/scripts/dpkg_inventory.py -l
+python3 linux-lab/scripts/dpkg_inventory.py -L bash
+python3 linux-lab/scripts/dpkg_inventory.py -S /usr/bin/dpkg
+```
+
+`-l` paketlerin adını, sürümünü, mimarisini, açıklamasını ve üç karakterli durumunu
+listeler. Kurulu paket sayısı ayrı hesaplanır; yalnızca yapılandırması kalan
+paketler kurulu sayılmaz. `-L PAKET` kayıtlı dosyaları, `-S /TAM/YOL` dosyanın
+sahibi olan paketleri gösterir. Çoklu sahipler ve mimari ekleri desteklenir.
+
+Başarılı sorgular sürüm 1 JSON döndürür. İşlem hataları `ok: false` ve çıkış 1,
+yanlış kullanım çıkış 2 üretir. Dosya yolundaki boşluk ve joker karakterleri
+korunur. Sembolik bağlantılar otomatik çözülmez: `/bin` ve `/usr/bin` farklı
+veritabanı kayıtları olabilir. `dpkg -L PAKET` çıktısındaki tam yolu kullanın.
+Sahiplik kaydı dosyanın mevcut veya değiştirilmemiş olduğunu kanıtlamaz.
+
+`--admindir /tam/veritabani/yolu`, sistem veritabanını değiştirmeden bir kopyayı
+veya sentetik test veritabanını okur. Çıktı yalnızca terminale yazılır.
+
+Çevrimdışı birim testleri ve dpkg mevcutsa geçici veritabanıyla bütünleşme testi:
+
+```bash
+python3 android-lab/lab/tests/test_dpkg_inventory.py
+```
+
+[Görev raporu](os-23/REPORT.md) · [Doğrulama sonuçları](os-23/VERIFY.md).
