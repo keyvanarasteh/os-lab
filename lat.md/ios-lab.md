@@ -242,6 +242,14 @@ the computer-use runtimes share, with the guardrails intact:
   plan → confirm flow. `RECORD=1` wraps the run in a `screencapture` video;
   [[ios-lab/mac/README-cleanup-verify.md]] documents the manual runbook.
 
+### MCP dev mode
+
+The os-lab MCP server runs in a dev mode that logs every message and restarts on code changes, so a client session can be debugged and iterated without hand-driving stdio.
+
+`console/mcp_server.py --dev` (or `OSLAB_MCP_DEV=1`) writes one stderr line per request and reply with its timing and a JSONL trace under `test-results/mcp-dev/`, answers malformed lines with a JSON-RPC parse error and keeps stdout pure JSON-RPC. [[scripts/mcp-dev.py]] adds `smoke` (handshake, tools/list, ping, an unknown-tool probe and an optional `--call`), `proxy` (a client config entry that runs the dev server and restarts it when `console/*.py` or `*.json` change, replaying the client's handshake) and `config [--client claude|codex|agy|opencode|zcode]` (prints how to register the server in each agent: `claude mcp add`, `codex mcp add`, `agy mcp add`, an OpenCode `mcp` entry and a ZCode `mcpServers` entry; nothing is written for you). `make -C ios-lab mac-mcp-dev` runs the smoke check.
+
+Tool calls read `arguments`, as MCP clients send them, and still accept the older `args`. A malformed argument (a null or string `windowId`, non-object `arguments`) answers an `INVALID_ARGS` tool error, and any other unexpected exception answers JSON-RPC `-32603`: one bad message never ends the client's session. Input tools still need armed control from the dashboard; dev mode adds no arm path.
+
 ## Research
 
 The top iOS-in-Docker options, networking and operational limits.

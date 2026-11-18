@@ -218,6 +218,7 @@ Run from the checkout root as `make -C ios-lab TARGET [VARIABLE=value ...]`.
 - `mac-status` — macOS host: show Xcode, booted simulators and Appium state
 - `mac-ax-helper` — macOS host: compile the native AX helper for rich element reads (MIR-09)
 - `mac-mcp` — macOS host: run the guarded MCP server for computer-use agents (MIR-12)
+- `mac-mcp-dev` — macOS host: MCP dev smoke check (handshake, tools, ping); see scripts/mcp-dev.py for proxy and config
 - `mac-cleanup-verify` — macOS host: audit the running app's Cleanup panel + scans (BOOKMARK=1 RECORD=1 PORT=)
 
 ## Make targets: `android-lab/lab/Makefile`

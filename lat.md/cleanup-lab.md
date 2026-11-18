@@ -434,7 +434,14 @@ answers with a typed command; nothing is navigated or executed while parsing.
 | `oslab://open/labs/macos`, `oslab://jobs`, … | open a plain page |
 | `oslab://panic-stop` | `POST /api/labs/macos/stop` — disarm, close sessions |
 | `oslab://quick-clean` | open Cleanup and run its quick-clean flow |
+| `oslab://mcp`, `oslab://mcp/status/macos` | open the MCP servers page |
+| `oslab://mcp/connect/macos[?client=cursor]` | open its connect dialog — nothing is written until the user confirms |
 | anything else | refused and shown as such |
+
+`oslab://mcp/...` is the one command that reads a query key. It is strict
+about it: `client` is the only key, its value must be a known client, and any
+other key, value or extra segment refuses the whole URL rather than being
+ignored. See [[dashboard#MCP servers (MCP-01)]].
 
 The bridge can do exactly three things, and two of them are the safe ones the
 dashboard already owns: navigation, the idempotent panic stop, and opening the

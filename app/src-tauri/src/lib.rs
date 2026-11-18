@@ -679,6 +679,19 @@ mod bridge {
                     return;
                 }
             },
+            deeplink::Command::McpConnect { server, client } => {
+                // The MCP page reads the dialog it should open from its own query,
+                // so nothing waits in the outbox for a page that is still loading.
+                // No directive follows: the page would navigate a second time.
+                // A button that started the app arrives before the console: wait
+                // for the first dashboard page load, like the actions do.
+                if console_port(app).is_none() {
+                    defer(app, raw);
+                    return;
+                }
+                open_path(app, &deeplink::mcp_connect_path(server, client));
+                return;
+            }
             deeplink::Command::Unknown => Directive::refused(&raw.to_string()),
         };
         deliver(app, directive);

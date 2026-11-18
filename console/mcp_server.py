@@ -15,6 +15,11 @@ Claude, ChatGPT — can drive. The division of labour is deliberate:
   and the panic stop tool ends everything at once.
 
 Run: python3 console/mcp_server.py   (or `make -C ios-lab mac-mcp`)
+
+Dev mode: `--dev` (or OSLAB_MCP_DEV=1) logs every request and reply with its timing to stderr, answers
+malformed lines with a JSON-RPC parse error instead of dropping them, and appends a JSONL trace to
+test-results/mcp-dev/. stdout stays pure JSON-RPC. `scripts/mcp-dev.py` adds a smoke client, a
+restart-on-change proxy and a client-config printer (`make -C ios-lab mac-mcp-dev`).
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ import base64
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import oslab  # noqa: E402
@@ -258,7 +264,9 @@ TOOLS = [
 def _window_point(window_id: int, args: dict) -> tuple[int, int, dict]:
     """The screen point for a click/type/scroll: element centre when a path is given,
     otherwise the given window-relative point, resolved through the mirror's bounds."""
-    window = next((w for w in oslab.macos_windows()["windows"] if w["windowId"] == int(window_id)), None)
+    if isinstance(window_id, bool) or not isinstance(window_id, int):
+        raise oslab.PlanError("windowId must be an integer from macos_apps", code="INVALID_ARGS")
+    window = next((w for w in oslab.macos_windows()["windows"] if w["windowId"] == window_id), None)
     if window is None:
         raise oslab.PlanError("That window is not on screen anymore; read macos_apps again",
                               code="APP_QUIT", retry="reobserve")
@@ -375,12 +383,18 @@ def handle(message: dict) -> dict | None:
             "serverInfo": {"name": "os-lab-macos", "version": "0.1.0"}}}
     if method == "notifications/initialized":
         return None
+    if method == "ping":
+        return {"jsonrpc": "2.0", "id": message_id, "result": {}}
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": TOOLS}}
     if method == "tools/call":
         params = message.get("params") or {}
+        # MCP clients send `arguments`; `args` is kept for the hand-written callers that used it first.
+        args = params.get("arguments") or params.get("args") or {}
         try:
-            result = tool_call(str(params.get("name")), params.get("args") or {})
+            if not isinstance(args, dict):
+                raise oslab.PlanError("arguments must be a JSON object", code="INVALID_ARGS")
+            result = tool_call(str(params.get("name")), args)
             return {"jsonrpc": "2.0", "id": message_id, "result": {**result, "isError": False}}
         except oslab.PlanError as e:
             payload: dict = {"error": str(e)}
@@ -390,12 +404,51 @@ def handle(message: dict) -> dict | None:
                 payload["retry"] = e.retry
             return {"jsonrpc": "2.0", "id": message_id, "result": {
                 "content": [{"type": "text", "text": json.dumps(payload)}], "isError": True}}
+        except (TypeError, ValueError, KeyError, AttributeError) as e:
+            # A malformed argument is the caller's error, never a reason to end the session.
+            payload = {"error": f"Invalid arguments for {params.get('name')}: {e}", "code": "INVALID_ARGS"}
+            return {"jsonrpc": "2.0", "id": message_id, "result": {
+                "content": [{"type": "text", "text": json.dumps(payload)}], "isError": True}}
     if message_id is not None:
         return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32601, "message": f"Unknown method {method}"}}
     return None
 
 
-def main() -> None:
+def _dev_enabled(argv: list[str]) -> bool:
+    return "--dev" in argv or os.environ.get("OSLAB_MCP_DEV") == "1"
+
+
+class DevTrace:
+    """Dev-mode logging: one stderr line per message and a JSONL trace file. Never touches stdout."""
+
+    def __init__(self) -> None:
+        folder = os.path.join(REPO_ROOT, "test-results", "mcp-dev")
+        os.makedirs(folder, exist_ok=True)
+        self.path = os.path.join(folder, time.strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}.jsonl")
+        self._file = open(self.path, "a", encoding="utf-8")
+        sys.stderr.write(f"[mcp-dev] os-lab MCP server pid {os.getpid()}, trace {self.path}\n")
+        sys.stderr.flush()
+
+    def record(self, direction: str, payload: object, ms: float | None = None) -> None:
+        row: dict = {"t": round(time.time(), 3), "dir": direction, "msg": payload}
+        if ms is not None:
+            row["ms"] = round(ms, 1)
+        self._file.write(json.dumps(row) + "\n")
+        self._file.flush()
+        if isinstance(payload, dict):
+            label = payload.get("method") or ("error" if "error" in payload else "reply")
+            tool = (payload.get("params") or {}).get("name") if payload.get("method") == "tools/call" else None
+            failed = "error" in payload or (payload.get("result") or {}).get("isError")
+        else:
+            label, tool, failed = str(payload)[:60], None, True
+        timing = f" {ms:.0f}ms" if ms is not None else ""
+        sys.stderr.write(f"[mcp-dev] {direction} {label}{' ' + str(tool) if tool else ''}{' FAILED' if failed else ''}{timing}\n")
+        sys.stderr.flush()
+
+
+def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    trace = DevTrace() if _dev_enabled(argv) else None
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -403,9 +456,27 @@ def main() -> None:
         try:
             message = json.loads(line)
         except ValueError:
+            if trace:
+                trace.record("in", f"unparseable line: {line[:80]}")
+                reply = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}
+                trace.record("out", reply)
+                sys.stdout.write(json.dumps(reply) + "\n")
+                sys.stdout.flush()
             continue
-        reply = handle(message)
+        if trace:
+            trace.record("in", message)
+        started = time.monotonic()
+        try:
+            reply = handle(message)
+        except Exception as exc:  # noqa: BLE001 - one bad message must not end the client's session
+            sys.stderr.write(f"[mcp] internal error: {exc!r}\n")
+            sys.stderr.flush()
+            reply = None
+            if isinstance(message, dict) and message.get("id") is not None:
+                reply = {"jsonrpc": "2.0", "id": message.get("id"), "error": {"code": -32603, "message": "Internal error"}}
         if reply is not None:
+            if trace:
+                trace.record("out", reply, (time.monotonic() - started) * 1000)
             sys.stdout.write(json.dumps(reply) + "\n")
             sys.stdout.flush()
 

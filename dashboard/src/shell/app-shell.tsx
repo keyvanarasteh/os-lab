@@ -21,6 +21,7 @@ import {
   GitPullRequestIcon,
   GlobeIcon,
   HeartbeatIcon,
+  PlugsConnectedIcon,
   ScalesIcon,
   LaptopIcon,
   ListChecksIcon,
@@ -70,6 +71,7 @@ export function sectionHref(id: string): string {
   if (id === "jobs") return localized("/jobs/");
   if (id === "repo") return REPO_URL;
   if (id === "health") return localized("/health/");
+  if (id === "mcp") return localized("/mcp/");
   if (id === "legal") return localized("/legal/");
   if (id === "contribute") return localized("/contribute/");
   if (id.startsWith("how-to-use")) return localized("/how-to-use/");
@@ -281,7 +283,8 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
           label: "Jobs",
           icon: <ListChecksIcon size={16} />,
           badge: running.size ? <SidebarBadge tone="warn">{running.size} running</SidebarBadge> : undefined
-        }
+        },
+        { id: "mcp", label: "MCP servers", icon: <PlugsConnectedIcon size={16} /> }
       ]
     },
     {
@@ -335,6 +338,7 @@ function buildMeta(): Record<string, SpotlightMeta> {
     "lab-web": { description: "Web Lab engine readiness: cargo, make and the built engine", aliases: ["web", "engine", "setup"] },
     firewall: { description: "BGT207 dream-company firewall designs — branches, segmentation, products and rule sets", aliases: ["firewall", "bgt207", "ufw", "rules", "vlan", "dmz", "company"] },
     health: { description: "GET /api/health", aliases: ["status", "api"] },
+    mcp: { description: "Connect os-lab's MCP servers to Claude Code, Codex, Claude Desktop or Cursor", aliases: ["mcp", "connector", "claude", "cursor", "codex", "agent"] },
     contribute: { description: "How to set up, test, rebuild, open a pull request and view roadmap TODOs", aliases: ["contribute", "contributing", "pull request", "pr", "development", "tests", "todos", "roadmap", "pentesting", "firewall", "tasks"] },
     "how-to-use": howToUse,
     "how-to-use-guide": howToUse,
