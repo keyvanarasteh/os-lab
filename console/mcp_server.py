@@ -14,6 +14,11 @@ Claude, ChatGPT — can drive. The division of labour is deliberate:
 - Submit-class actions (Enter/Return keys, pastes) need confirm:true even while armed,
   and the panic stop tool ends everything at once.
 
+On a Windows host the server also offers the Windows Apps Lab's read-only tools (winapps_*). They
+sit behind console/winapps_guard.py: an agent sees only apps on the allowlist
+(win-lab/winapps-policy.json, empty means none), restricted windows are never captured, and every
+call and refusal lands in the guard's audit log. There is no arm tool and no input tool.
+
 Run: python3 console/mcp_server.py   (or `make -C ios-lab mac-mcp`)
 """
 
@@ -26,6 +31,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import oslab  # noqa: E402
+import winapps  # noqa: E402
+import winapps_guard  # noqa: E402
 
 REPO_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 PROTOCOL_VERSION = "2024-11-05"
@@ -279,8 +286,76 @@ def _window_point(window_id: int, args: dict) -> tuple[int, int, dict]:
         raise oslab.PlanError("x and y must be integers", code="INVALID_ARGS") from None
 
 
+WIN_TOOLS = [
+    {
+        "name": "winapps_apps",
+        "description": "The on-screen Windows desktop windows this agent may see: only apps on the policy "
+                       "allowlist, never restricted windows. `withheld` counts the rest (read-only).",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "winapps_screenshot",
+        "description": "A PNG of one allowlisted, unrestricted Windows window from winapps_apps (read-only).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"windowId": {"type": "integer"}},
+            "required": ["windowId"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "winapps_capabilities",
+        "description": "Why you see what you see: allowlist and restriction counts, policy errors, and "
+                       "that this lab supports no input (read-only).",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "winapps_doctor",
+        "description": "Desktop session, this console's elevation and one capture probe (read-only).",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "winapps_audit",
+        "description": "The newest audit rows for this lab: agent calls and refusals, without titles (read-only).",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+]
+
+
+def _text(value: dict) -> dict:
+    return {"content": [{"type": "text", "text": json.dumps(value)}]}
+
+
+def win_tool_call(name: str, args: dict) -> dict:
+    """The Windows Apps Lab tools: every one is read-only and goes through the guard as the agent."""
+    if sys.platform != "win32":
+        raise winapps_guard.GuardError("The Windows Apps Lab needs a Windows host", "NOT_SUPPORTED")
+    if not isinstance(args, dict):
+        winapps_guard.audit(REPO_ROOT, "refused", audience="agent", code="INVALID_ARGS", tool=name)
+        raise winapps_guard.GuardError("Tool arguments must be a JSON object", "INVALID_ARGS")
+    if name == "winapps_apps":
+        return _text(winapps_guard.list_windows(REPO_ROOT, "agent", tool=name))
+    if name == "winapps_screenshot":
+        png = winapps_guard.screenshot(REPO_ROOT, args.get("windowId"), "agent", tool=name)
+        return {"content": [{"type": "image", "data": base64.b64encode(png).decode(), "mimeType": "image/png"}]}
+    if name == "winapps_capabilities":
+        summary = winapps_guard.policy_summary(REPO_ROOT)
+        winapps_guard.audit(REPO_ROOT, "capabilities", audience="agent", tool=name)
+        return _text({"allowedApps": summary["allowedApps"], "restrictedApps": summary["restrictedApps"],
+                      "restrictedTitles": summary["restrictedTitles"], "policyError": summary["policyError"],
+                      "exists": summary["exists"], "audience": "agent", "inputSupported": False})
+    if name == "winapps_doctor":
+        return _text(winapps_guard.doctor(REPO_ROOT, "agent", tool=name))
+    if name == "winapps_audit":
+        winapps_guard.audit(REPO_ROOT, "audit", audience="agent", tool=name)
+        return _text(winapps_guard.audit_rows(200, audience="agent"))
+    raise winapps_guard.GuardError(f"Unknown tool {name}", "UNKNOWN_TOOL")
+
+
 def tool_call(name: str, args: dict) -> dict:
     """One tool invocation against the same surface the panel drives. Returns MCP content."""
+    if name.startswith("winapps_"):
+        return win_tool_call(name, args)
     if name == "macos_apps":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_windows())}]}
     if name == "macos_get_app_state":
@@ -372,21 +447,30 @@ def handle(message: dict) -> dict | None:
         return {"jsonrpc": "2.0", "id": message_id, "result": {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "os-lab-macos", "version": "0.1.0"}}}
+            "serverInfo": {"name": "os-lab-windows" if sys.platform == "win32" else "os-lab-macos",
+                           "version": "0.1.0"}}}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":
-        return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": TOOLS}}
+        tools = TOOLS + WIN_TOOLS if sys.platform == "win32" else TOOLS
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": tools}}
     if method == "tools/call":
         params = message.get("params") or {}
         try:
-            result = tool_call(str(params.get("name")), params.get("args") or {})
+            # MCP clients send the tool arguments as `arguments`; `args` is kept for older callers.
+            raw_args = params["arguments"] if "arguments" in params else params.get("args")
+            # The Windows tools validate their arguments themselves, so a falsey non-object such as
+            # [] or 0 is refused instead of silently becoming {}; only a missing value means none.
+            args = {} if raw_args is None else raw_args
+            if not str(params.get("name")).startswith("winapps_"):
+                args = raw_args or {}
+            result = tool_call(str(params.get("name")), args)
             return {"jsonrpc": "2.0", "id": message_id, "result": {**result, "isError": False}}
-        except oslab.PlanError as e:
+        except (oslab.PlanError, winapps_guard.GuardError, winapps.WinAppError) as e:
             payload: dict = {"error": str(e)}
-            if e.code:
+            if getattr(e, "code", None):
                 payload["code"] = e.code
-            if e.retry:
+            if getattr(e, "retry", None):
                 payload["retry"] = e.retry
             return {"jsonrpc": "2.0", "id": message_id, "result": {
                 "content": [{"type": "text", "text": json.dumps(payload)}], "isError": True}}

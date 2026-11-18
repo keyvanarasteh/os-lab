@@ -117,3 +117,93 @@ test("non-Windows hosts never query the Windows app mirror", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Window mirror" })).toHaveCount(0);
   expect(requests).toEqual([]);
 });
+
+test("a restricted window is listed but disabled and never captured", async ({ page }) => {
+  await mockApi(page);
+  const captured: string[] = [];
+  await page.route("**/api/labs/winapps/apps", (route) => route.fulfill({
+    json: {
+      ...winapps,
+      windows: [
+        { ...winapps.windows[0], windowId: 200, app: "1Password", title: "(restricted)", restricted: true, reason: "password-manager" },
+        { ...winapps.windows[0], restricted: false, reason: null }
+      ]
+    }
+  }));
+  await page.route("**/api/labs/winapps/apps/*/screenshot", (route) => {
+    captured.push(new URL(route.request().url()).pathname);
+    return route.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 });
+  });
+
+  await page.goto("/labs/winapps/");
+  await expect(page.locator("select#winapps-window option", { hasText: "1Password" })).toBeDisabled();
+  await expect(page.getByText("Some windows are restricted and cannot be mirrored.")).toBeVisible();
+  await expect(page.locator("img[alt='Mirror of Notepad']")).toBeVisible();
+  expect(captured.length).toBeGreaterThan(0);
+  expect(captured.every((path) => path.includes("/100/"))).toBe(true);
+});
+
+test("when every window is restricted the panel explains it instead of spinning", async ({ page }) => {
+  await mockApi(page);
+  await page.route("**/api/labs/winapps/apps", (route) => route.fulfill({
+    json: {
+      ...winapps,
+      windows: [{ ...winapps.windows[0], windowId: 200, app: "1Password", title: "(restricted)", restricted: true, reason: "password-manager" }]
+    }
+  }));
+  await page.goto("/labs/winapps/");
+  await expect(page.getByText("Some windows are restricted and cannot be mirrored.")).toBeVisible();
+  await expect(page.locator("[aria-busy='true']")).toHaveCount(0);
+  await expect(page.locator("img[alt^='Mirror of']")).toHaveCount(0);
+});
+
+test("a window that turns restricted stops being shown and captured", async ({ page }) => {
+  await mockApi(page);
+  let inventoryCalls = 0;
+  const captured: string[] = [];
+  await page.route("**/api/labs/winapps/apps", (route) => {
+    inventoryCalls += 1;
+    const restricted = inventoryCalls > 1;
+    return route.fulfill({
+      json: { ...winapps, windows: [{ ...winapps.windows[0], restricted, reason: restricted ? "private-window" : null, title: restricted ? "(restricted)" : "Fixture - Notepad" }] }
+    });
+  });
+  await page.route("**/api/labs/winapps/apps/100/screenshot", (route) => {
+    captured.push("hit");
+    return route.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 });
+  });
+  await page.goto("/labs/winapps/");
+  await expect(page.locator("img[alt='Mirror of Notepad']")).toBeVisible();
+  await expect(page.locator("img[alt^='Mirror of']")).toHaveCount(0, { timeout: 10000 });
+  const settled = captured.length;
+  await page.waitForTimeout(4000);
+  expect(captured.length).toBe(settled);
+});
+
+test("switching away from a restricted window clears its image before the next capture arrives", async ({ page }) => {
+  await mockApi(page);
+  let inventoryCalls = 0;
+  await page.route("**/api/labs/winapps/apps", (route) => {
+    inventoryCalls += 1;
+    const flipped = inventoryCalls > 1;
+    return route.fulfill({
+      json: {
+        ...winapps,
+        windows: [
+          { ...winapps.windows[0], restricted: flipped, reason: flipped ? "private-window" : null, title: flipped ? "(restricted)" : "Fixture - Notepad" },
+          { ...winapps.windows[0], windowId: 101, app: "Calc", title: "Calculator" }
+        ]
+      }
+    });
+  });
+  await page.route("**/api/labs/winapps/apps/100/screenshot", (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }));
+  await page.route("**/api/labs/winapps/apps/101/screenshot", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+    await route.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }).catch(() => undefined);
+  });
+  await page.goto("/labs/winapps/");
+  await expect(page.locator("img[alt='Mirror of Notepad']")).toBeVisible();
+  await expect(page.locator("img[alt^='Mirror of']")).toHaveCount(0, { timeout: 10000 });
+  await expect(page.locator("img[alt='Mirror of Calc']")).toBeVisible({ timeout: 15000 });
+});

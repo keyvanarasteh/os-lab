@@ -145,6 +145,14 @@ def test_capability_catalog_uses_lab_provider_rules():
             assert (item["support"][platform]["level"] == "none") == (provider is None)
 
 
+def test_capabilities_include_the_windows_apps_lab():
+    items = {item["id"]: item for group in oslab.capability_catalog()["groups"] for item in group["items"]}
+    support = items["lab-winapps"]["support"]
+    assert items["lab-winapps"]["lab"] == "winapps"
+    assert support["windows"]["level"] == "full"
+    assert support["macos"]["level"] == "none" and support["linux"]["level"] == "none"
+
+
 def test_job_failure_before_process_start_is_reported(monkeypatch):
     def fail(_root):
         raise RuntimeError("cannot read configuration")

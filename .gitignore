@@ -84,6 +84,9 @@ hedef
 # Web Lab engine build artifacts (web-lab/browser)
 web-lab/browser/target/
 
+# Windows Apps Lab agent policy (local choice of which apps agents may see)
+win-lab/winapps-policy.json
+
 # Stage timings written by scripts/run-tests.sh (plan item S)
 /test-results/
 

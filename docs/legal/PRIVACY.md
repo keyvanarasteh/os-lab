@@ -27,6 +27,8 @@ requests of its own.
 | Lab jobs: command, output (configured credentials are redacted), exit status | Console memory; Source Lab also journals under private storage `control/jobs.json` | The 50 most recent; Source records remain until the operator removes them |
 | Android workbench log | Console memory | Last 1,000 lines, until cleared or the console stops |
 | Visible Windows desktop window inventory and selected window capture (current session: window id, PID, app name, window title, class name, bounds) | Console memory | Recomputed for each read-only polling request; the selected window capture is held only in browser memory, not written to disk |
+| Windows Apps Lab agent policy: app names you allow or restrict and title hints (`win-lab/winapps-policy.json`, or the file named by `OSLAB_WINAPPS_POLICY`) | A file you create on this machine | Until you delete it; never uploaded |
+| Windows Apps Lab audit log: time, audience (agent or person), action, app name, window id, refusal code and count; never window titles or images | Console memory (last 500 rows) and `win-lab/artifacts/winapps-audit-<date>.jsonl` (or the folder in `OSLAB_WINAPPS_AUDIT_DIR`) | Memory until the console stops; the daily file (at most 10,000 rows per process and day) until you delete it |
 | APKs you upload | `android-lab/lab/apks/` | Until you delete them |
 | Analysis results, reports, traffic captures | `android-lab/lab/artifacts/` and each lab's folders | Until you delete them (`make clean` for Android) |
 | Source Lab analysis reports, cloned workspaces, merged lab extensions and runtime sessions | `source-lab/storage/` by default, or the operator-configured storage root | Until you delete them; the project does not receive them |

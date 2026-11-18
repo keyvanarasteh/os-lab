@@ -52,6 +52,42 @@ window a standard-user console cannot capture is marked rather than hidden.
 `GET /api/labs/winapps/doctor` and `python console/winapps.py --doctor` report
 the desktop session, this console's own elevation and one live capture probe.
 
+### Agent safety gate
+
+Everything the web endpoints and the MCP server show of this lab passes through
+[[console/winapps_guard.py]]; an agent sees only allowlisted apps and nothing sensitive.
+
+The guard reads the policy file `win-lab/winapps-policy.json` (or `OSLAB_WINAPPS_POLICY`).
+An agent sees only windows of apps on `allowedApps`; an
+empty, missing or broken policy means it sees nothing and reports `policyError`.
+Windows that look sensitive (built-in password managers, private or incognito
+browsing, online-banking title hints, plus anything the policy adds) are never
+captured for anyone and are marked restricted in the panel. Restricted beats the
+allowlist, and the built-in restrictions cannot be removed. A capture is checked
+before and after the pixels are taken, against the policy as it is at that moment,
+because a title or the policy file can change meanwhile. The doctor probe goes
+through the same check. Unknown keys in the policy file are an error, and an
+invalid allowlist still keeps the restrictions that did parse. An agent capture
+is capped at 4K and every capture has a 15 second deadline, so a huge or hung
+window cannot exhaust memory or stall the MCP server.
+
+Every agent call and every refusal is audited without titles or images, in memory
+and in a daily JSONL file (capped at 10,000 rows per process and day); identical
+consecutive rows within a minute are counted, not repeated. The agent's own view of
+the audit hides other audiences' rows and the app name of any refusal.
+The MCP server adds read-only `winapps_*` tools on Windows and no arm or input tool.
+
+Honest limits: the filter reads process names and titles only, so it is a
+heuristic. The allowlist binds the MCP path; the local HTTP address serves the
+human panel, so an agent that can run commands on this machine can still request
+unrestricted windows there. It guards against agent mistakes, not a hostile local
+user; a secret the agent does not hold on that address is a later phase.
+
+The audit trail is per process: the HTTP console and each MCP server keep their own
+in-memory rows and `seq` numbers, all appending to the same daily file, and the file
+keeps a coalesced row's first count only. `GET /api/labs/winapps/policy` includes the
+policy file's path on purpose, so people know where to edit it.
+
 ## Research
 
 Windows-lab research and the command reference.

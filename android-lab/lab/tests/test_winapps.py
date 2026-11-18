@@ -247,3 +247,41 @@ def test_doctor_refuses_to_probe_without_an_interactive_desktop(host):
     result = winapps.doctor()
     assert result["desktop"] is False and result["available"] is False
     assert "interactive desktop" in result["reason"]
+
+
+# ── hooks used by the policy gate ────────────────────────────────────────────
+
+def test_errors_carry_codes(host):
+    assert winapps.WinAppError("x").code == "CAPTURE_FAILED"
+    with pytest.raises(winapps.WinAppError) as invalid:
+        winapps.winapps_window_screenshot("not-a-window")
+    assert invalid.value.code == "INVALID_WINDOW"
+    host.setattr(winapps, "_user32", FakeUser32(root=999))
+    with pytest.raises(winapps.WinAppError) as gone:
+        winapps.winapps_window_screenshot(1234)
+    assert gone.value.code == "WINDOW_GONE"
+
+
+def test_window_info_returns_the_window_and_none_for_a_stale_id(host):
+    assert winapps.window_info(1234)["app"] == "Example"
+    host.setattr(winapps, "_user32", FakeUser32(root=999))
+    assert winapps.window_info(1234) is None
+    assert winapps.window_info(0) is None and winapps.window_info(True) is None
+    assert winapps.window_info("1234") is None and winapps.window_info(2 ** 40) is None
+
+
+def test_doctor_honours_can_probe(host):
+    host.setattr(winapps, "_user32", type("U", (FakeUser32,), {"GetShellWindow": lambda self: 1})())
+    probed = []
+    host.setattr(winapps, "winapps_window_screenshot", lambda hwnd: probed.append(hwnd) or b"\x89PNG\r\n\x1a\n")
+    result = winapps.doctor(can_probe=lambda window: False)
+    assert probed == [] and result["capture"] is False and result["windows"] == 1
+    assert result["reason"] == "No on-screen window to probe"
+    assert winapps.doctor(can_probe=lambda window: True)["capture"] is True and probed == [1234]
+
+
+def test_doctor_uses_the_given_capture_function(host):
+    host.setattr(winapps, "_user32", type("U", (FakeUser32,), {"GetShellWindow": lambda self: 1})())
+    host.setattr(winapps, "winapps_window_screenshot", lambda hwnd: (_ for _ in ()).throw(AssertionError("raw")))
+    result = winapps.doctor(capture=lambda hwnd: b"\x89PNG\r\n\x1a\n")
+    assert result["capture"] is True
