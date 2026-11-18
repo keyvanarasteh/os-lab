@@ -42,6 +42,7 @@ concurrency:
 
 jobs:
   windows:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: windows-latest
     env:
       SIGN: ${{ github.event_name != 'pull_request' && vars.SIGNPATH_ORGANIZATION_ID != '' && secrets.SIGNPATH_API_TOKEN != '' }}

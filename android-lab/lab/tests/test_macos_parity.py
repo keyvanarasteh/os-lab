@@ -166,3 +166,8 @@ def test_events_stream_delivers_rows_and_ends_on_panic_stop(events_server):
         if chunk == b"" and response.isclosed():
             break
     assert response.isclosed() or response.read() == b""
+
+
+def test_a_py_stand_in_runs_through_this_interpreter_so_windows_can_start_it():
+    assert oslab._ax_command("/x/fake-ax-helper.py") == [sys.executable, "/x/fake-ax-helper.py"]
+    assert oslab._ax_command("/x/build/ax-helper") == ["/x/build/ax-helper"]

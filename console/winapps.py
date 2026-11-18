@@ -14,7 +14,7 @@ import time
 import zlib
 from ctypes import wintypes
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 PW_RENDERFULLCONTENT = 0x00000002
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = ctypes.c_void_p(-4)
@@ -22,6 +22,7 @@ GA_ROOT = 2
 WS_CAPTION = 0x00C00000
 WS_EX_TOOLWINDOW = 0x00000080
 DWMWA_CLOAKED = 14
+DESKTOP_SWITCHDESKTOP = 0x0100
 TOKEN_QUERY = 0x0008
 TOKEN_ELEVATION = 20  # TOKEN_INFORMATION_CLASS.TokenElevation
 MAX_TITLE_CHARS = 512
@@ -37,7 +38,15 @@ TOOL_CLASSES = {
 
 
 class WinAppError(Exception):
-    """A safe, user-presentable native window inventory/capture failure."""
+    """A safe, user-presentable native window inventory/capture failure.
+
+    `code` is stable for callers that must tell failures apart: INVALID_WINDOW, WINDOW_GONE or the
+    default CAPTURE_FAILED.
+    """
+
+    def __init__(self, message: str, code: str = "CAPTURE_FAILED") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 # Keep the Win32 data layout available to the offline tests on other hosts.
@@ -135,6 +144,10 @@ if sys.platform == "win32":
     _kernel32.ProcessIdToSessionId.restype = wintypes.BOOL
     _user32.GetShellWindow.argtypes = []
     _user32.GetShellWindow.restype = wintypes.HWND
+    _user32.OpenInputDesktop.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    _user32.OpenInputDesktop.restype = wintypes.HANDLE
+    _user32.CloseDesktop.argtypes = [wintypes.HANDLE]
+    _user32.CloseDesktop.restype = wintypes.BOOL
 
     _dwmapi.DwmGetWindowAttribute.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD]
     _dwmapi.DwmGetWindowAttribute.restype = ctypes.c_long  # HRESULT
@@ -326,6 +339,30 @@ def _png(width: int, height: int, bgra: bytes) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(bytes(raw), 3)) + chunk(b"IEND", b"")
 
 
+def window_info(window_id: int) -> dict[str, Any] | None:
+    """The current on-screen window for one id (same filters as the inventory), or None when gone."""
+    if sys.platform != "win32" or _user32 is None:
+        return None
+    if isinstance(window_id, bool) or not isinstance(window_id, int) or not 0 < window_id <= 0xFFFFFFFF:
+        return None
+    return _window(window_id) if _user32.GetAncestor(window_id, GA_ROOT) == window_id else None
+
+
+def desktop_locked() -> bool | None:
+    """True when this process cannot open the input desktop, i.e. the lock screen or a UAC prompt is up.
+
+    A process that is not allowed to ask also gets True, which is the safe answer for an input gate.
+    None means this is not a Windows host.
+    """
+    if sys.platform != "win32" or _user32 is None:
+        return None
+    desktop = _user32.OpenInputDesktop(0, False, DESKTOP_SWITCHDESKTOP)
+    if not desktop:
+        return True
+    _user32.CloseDesktop(desktop)
+    return False
+
+
 def winapps_window_screenshot(window_id: int) -> bytes:
     """A PNG of one on-screen window. Raises WinAppError when the id is stale or capture fails."""
     if sys.platform != "win32" or _user32 is None or _gdi32 is None:
@@ -333,16 +370,16 @@ def winapps_window_screenshot(window_id: int) -> bytes:
     try:
         hwnd = int(window_id)
     except (TypeError, ValueError):
-        raise WinAppError("Invalid window id") from None
+        raise WinAppError("Invalid window id", "INVALID_WINDOW") from None
     # An HWND carries 32 significant bits. Anything outside that range cannot be a window, and
     # handing it to ctypes would raise (an HTTP 500) instead of failing cleanly.
     if not 0 < hwnd <= 0xFFFFFFFF:
-        raise WinAppError("Invalid window id")
+        raise WinAppError("Invalid window id", "INVALID_WINDOW")
     # Re-check just this window (same filters as the inventory) instead of enumerating every
     # window and opening every process again for each screenshot.
-    window = _window(hwnd) if _user32.GetAncestor(hwnd, GA_ROOT) == hwnd else None
+    window = window_info(hwnd)
     if window is None:
-        raise WinAppError("That window is not on screen anymore; refresh the mirror")
+        raise WinAppError("That window is not on screen anymore; refresh the mirror", "WINDOW_GONE")
     width, height = window["width"], window["height"]
     if width * height > MAX_CAPTURE_PIXELS:
         raise WinAppError("That window is too large to capture")
@@ -381,7 +418,8 @@ def winapps_window_screenshot(window_id: int) -> bytes:
     return _png(width, height, bytes(pixels))
 
 
-def doctor() -> dict[str, Any]:
+def doctor(can_probe: Callable[[dict[str, Any]], bool] | None = None,
+           capture: Callable[[int], bytes] | None = None) -> dict[str, Any]:
     """Desktop session, this console's elevation and one live capture probe.
 
     `elevated` is None when Windows would not report this process's own token. A standard-user
@@ -412,9 +450,12 @@ def doctor() -> dict[str, Any]:
     result["windows"] = len(windows)
     result["available"] = bool(windows)
     reason: str | None = None
-    for window in windows[:8]:
+    # The caller may exclude windows that must never be captured, even for a probe.
+    candidates = [window for window in windows if can_probe is None or can_probe(window)]
+    for window in candidates[:8]:
         try:
-            result["capture"] = winapps_window_screenshot(window["windowId"]).startswith(b"\x89PNG")
+            grab = capture or winapps_window_screenshot  # the caller may supply a policy-checked capture
+            result["capture"] = grab(window["windowId"]).startswith(b"\x89PNG")
             break
         except WinAppError as exc:
             reason = str(exc)

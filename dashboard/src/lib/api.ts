@@ -362,6 +362,9 @@ export interface WinApp {
   app: string;
   /** Whether the owning process is elevated; null when Windows would not report it. */
   elevated: boolean | null;
+  /** Set by the policy gate: the window is never captured and its title is replaced. */
+  restricted?: boolean;
+  reason?: string | null;
   title: string;
   className: string;
   x: number;
@@ -373,6 +376,8 @@ export interface WinAppsInfo {
   available: boolean;
   reason: string | null;
   windows: WinApp[];
+  /** Only in the agent view: how many windows the policy withheld. */
+  withheld?: number;
 }
 export interface Report {
   name: string;

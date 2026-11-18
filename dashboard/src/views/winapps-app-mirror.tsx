@@ -11,6 +11,8 @@ import { api, message, usePoll, type WinApp, type WinAppsInfo } from "../lib/api
 const MIRROR_INTERVAL = 3000;
 
 function labelFor(app: WinApp): string {
+  // A lock instead of a word: option text is not translated, the hint below the picker is.
+  if (app.restricted) return `${app.app} \u{1F512}`;
   const title = app.title ? ` — ${app.title.slice(0, 40)}` : "";
   return `${app.app}${title}`;
 }
@@ -23,9 +25,14 @@ export function WinAppsPanel() {
   const shotRef = useRef<string | null>(null);
   // Only the newest capture may update the view; slower, older responses are dropped.
   const grabSeq = useRef(0);
+  // The seq of the capture still waiting for its response, so a slow capture is not superseded
+  // by a newer one on every tick and starved of ever being shown.
+  const inFlight = useRef(0);
 
   const windows = data?.windows ?? [];
-  const selected = windows.find((window) => window.windowId === windowId) ?? windows[0] ?? null;
+  // Restricted windows are listed so people know they exist, but are never selected or captured.
+  const usable = windows.filter((window) => !window.restricted);
+  const selected = usable.find((window) => window.windowId === windowId) ?? usable[0] ?? null;
 
   // Pick the first window when the selection disappears (window closed or minimized).
   useEffect(() => {
@@ -35,6 +42,7 @@ export function WinAppsPanel() {
   const grab = useCallback(async () => {
     if (!selected) return;
     const seq = ++grabSeq.current;
+    inFlight.current = seq;
     try {
       const res = await fetch(api.winappsAppScreenshotUrl(selected.windowId), { cache: "no-store" });
       if (!res.ok) {
@@ -52,6 +60,8 @@ export function WinAppsPanel() {
       if (seq !== grabSeq.current) return;
       setShot(null);
       setShotError(message(e));
+    } finally {
+      if (inFlight.current === seq) inFlight.current = 0;
     }
   }, [selected?.windowId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -59,14 +69,19 @@ export function WinAppsPanel() {
     if (shotRef.current) URL.revokeObjectURL(shotRef.current);
   }, []);
   useEffect(() => {
-    if (!selected) {
-      setShot(null);
-      setShotError(null);
-      return;
+    // A different window (or none) is now selected: whatever was captured or is still in flight
+    // belongs to the previous window, which may since have become restricted, so drop both.
+    grabSeq.current += 1;
+    if (shotRef.current) {
+      URL.revokeObjectURL(shotRef.current);
+      shotRef.current = null;
     }
+    setShot(null);
+    setShotError(null);
+    if (!selected) return;
     void grab();
     const timer = setInterval(() => {
-      if (!document.hidden) void grab();
+      if (!document.hidden && inFlight.current !== grabSeq.current) void grab();
     }, MIRROR_INTERVAL);
     return () => clearInterval(timer);
   }, [selected?.windowId, grab]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -90,6 +105,8 @@ export function WinAppsPanel() {
         <Empty>{data.reason ?? "The Windows app mirror is not available here."}</Empty>
       ) : windows.length === 0 ? (
         <Empty>No visible desktop application windows were found.</Empty>
+      ) : usable.length === 0 ? (
+        <Empty>Some windows are restricted and cannot be mirrored.</Empty>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -103,7 +120,7 @@ export function WinAppsPanel() {
               onChange={(e) => setWindowId(Number(e.target.value))}
             >
               {windows.map((window) => (
-                <option key={window.windowId} value={window.windowId}>
+                <option key={window.windowId} value={window.windowId} disabled={window.restricted}>
                   {labelFor(window)}
                 </option>
               ))}
@@ -115,6 +132,9 @@ export function WinAppsPanel() {
             ) : null}
             {selected?.elevated ? <Badge tone="warning">Elevated</Badge> : null}
           </div>
+          {usable.length < windows.length ? (
+            <p className="text-xs text-zinc-500">Some windows are restricted and cannot be mirrored.</p>
+          ) : null}
 
           <div
             className="relative w-full overflow-hidden rounded-xl border border-(--iux-border) bg-black"

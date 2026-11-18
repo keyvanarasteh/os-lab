@@ -382,7 +382,7 @@
           "support": {
             "windows": {
               "level": "full",
-              "note": "Uses the current Windows desktop; no input control"
+              "note": "Uses the current Windows desktop; no input control. Agents see only allowlisted apps and restricted windows are never captured"
             },
             "macos": {
               "level": "none",

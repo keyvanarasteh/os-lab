@@ -58,9 +58,10 @@ try:
 except ImportError:
     web_api = None
 try:
-    import winapps  # noqa: E402  (console/winapps.py: read-only native Windows app mirror)
+    import winapps_guard  # noqa: E402  (console/winapps_guard.py: policy gate in front of the Windows app mirror)
+    import winapps_input_gate  # noqa: E402  (console/winapps_input_gate.py: arm/panic gate for future input)
 except ImportError:
-    winapps = None
+    winapps_guard = winapps_input_gate = None
 ARTIFACTS_DIR = os.path.join(SCRIPT_DIR, "artifacts")
 SCRIPTS_DIR = os.path.join(SCRIPT_DIR, "scripts")
 
@@ -448,6 +449,30 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         body = open(not_found, "rb").read() if os.path.isfile(not_found) else b"Not found"
         self._send_bytes(404, body, "text/html; charset=utf-8")
 
+    def _winapps_get(self, parts: list):
+        """Read-only Windows app mirror endpoints, all served to the human audience through the guard."""
+        if winapps_guard is None or (parts[3] == "input" and winapps_input_gate is None):
+            self._json(501, {"error": "The Windows app mirror guard (console/winapps_guard.py, "
+                                      "winapps_input_gate.py) is not installed"})
+            return
+        try:
+            if parts[3] == "apps" and len(parts) == 4:
+                self._json(200, winapps_guard.list_windows(REPO_ROOT, "human"))
+            elif parts[3] == "doctor":
+                self._json(200, winapps_guard.doctor(REPO_ROOT, "human"))
+            elif parts[3] == "policy":
+                self._json(200, winapps_guard.policy_summary(REPO_ROOT))
+            elif parts[3] == "audit":
+                self._json(200, winapps_guard.audit_rows(200))
+            elif parts[3] == "input":
+                self._json(200, winapps_input_gate.state())
+            else:
+                self._send_bytes(200, winapps_guard.screenshot(REPO_ROOT, parts[4], "human"), "image/png",
+                                 cache="no-store")
+        except winapps_guard.GuardError as exc:
+            status = 403 if exc.code == "RESTRICTED_WINDOW" else 400
+            self._json(status, {"error": str(exc), "code": exc.code})
+
     def _lab_get(self, path: str):
         parts = [p for p in path.split("/") if p]
         if path == "/api/host":
@@ -523,25 +548,10 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(200, oslab.macos_ax_focused(REPO_ROOT, {"pid": parts[4]}))
         elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "session"] and parts[5] == "elements":
             self._json(200, oslab.macos_session_elements(REPO_ROOT, parts[4]))
-        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "winapps" and parts[3] == "apps":
-            # Native Windows app mirror is read-only and independent of the Windows VM lifecycle.
-            if winapps is None:
-                self._json(501, {"error": "The Windows app mirror module (console/winapps.py) is not installed"})
-                return
-            self._json(200, winapps.winapps_windows())
-        elif len(parts) == 4 and parts[:2] == ["api", "labs"] and parts[2] == "winapps" and parts[3] == "doctor":
-            if winapps is None:
-                self._json(501, {"error": "The Windows app mirror module (console/winapps.py) is not installed"})
-                return
-            self._json(200, winapps.doctor())
-        elif len(parts) == 6 and parts[:2] == ["api", "labs"] and parts[2] == "winapps" and parts[3] == "apps" and parts[5] == "screenshot":
-            if winapps is None:
-                self._json(501, {"error": "The Windows app mirror module (console/winapps.py) is not installed"})
-                return
-            try:
-                self._send_bytes(200, winapps.winapps_window_screenshot(parts[4]), "image/png", cache="no-store")
-            except winapps.WinAppError as exc:
-                self._json(400, {"error": str(exc)})
+        elif parts[:3] == ["api", "labs", "winapps"] and (
+                parts[3:] in (["apps"], ["doctor"], ["policy"], ["audit"], ["input"])
+                or (len(parts) == 6 and parts[3] == "apps" and parts[5] == "screenshot")):
+            self._winapps_get(parts)
         elif path == "/api/jobs":
             self._json(200, {"jobs": JOBS.list()})
         elif len(parts) == 3 and parts[:2] == ["api", "jobs"]:
@@ -721,9 +731,31 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         except (OSError, ValueError):
             pass  # the client hung up; nothing to clean up
 
+    def _winapps_input_post(self, action: str):
+        """Arm, disarm or panic-stop the Windows input gate (the POST guards already ran)."""
+        if winapps_input_gate is None:
+            self._json(501, {"error": "The Windows input gate (console/winapps_input_gate.py) is not installed"})
+            return
+        data = self._read_json()
+        try:
+            if action == "arm":
+                reply = winapps_input_gate.arm(REPO_ROOT, data.get("owner"),
+                                               data.get("ttl", winapps_input_gate.DEFAULT_TTL_SECONDS))
+            elif action == "disarm":
+                reply = winapps_input_gate.disarm(REPO_ROOT, data.get("owner"))
+            else:
+                reply = winapps_input_gate.panic_stop(REPO_ROOT)
+        except winapps_guard.GuardError as exc:
+            self._json(409 if exc.code == "INPUT_BUSY" else 400, {"error": str(exc), "code": exc.code})
+            return
+        self._json(200, reply)
+
     def _lab_post(self, path: str):
         parts = [p for p in path.split("/") if p]
-        if path == "/api/labs/macos/control":
+        if path in ("/api/labs/winapps/input/arm", "/api/labs/winapps/input/disarm",
+                    "/api/labs/winapps/input/panic"):
+            self._winapps_input_post(path.rsplit("/", 1)[1])
+        elif path == "/api/labs/macos/control":
             data = self._read_json()
             owner = data.get("owner") if isinstance(data.get("owner"), str) and len(data.get("owner")) <= 64 else None
             self._json(200, oslab.macos_control_arm(REPO_ROOT, data.get("armed") is True, owner))
