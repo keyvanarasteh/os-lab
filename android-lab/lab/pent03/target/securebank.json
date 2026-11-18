@@ -1,0 +1,15 @@
+{
+  "name": "SecureBank (lab target)",
+  "package": "com.securebank.mobile",
+  "description": "Fictional banking app used as the PENT-03 analysis target. It performs TLS with certificate pinning (OkHttp CertificatePinner + a Network Security Config) and basic root detection, so it exercises every stage of the pipeline: frida-server, system CA, proxy and the universal unpinning hook.",
+  "defenses": [
+    "OkHttp CertificatePinner (SHA-256 pin on the API host)",
+    "Network Security Config pin-set",
+    "root detection via su-path probes and RootBeer"
+  ],
+  "expected_endpoints": [
+    "https://api.securebank.local/v1/login",
+    "https://api.securebank.local/v1/accounts"
+  ],
+  "notes": "No APK is committed to this repo (os-lab rule: do not commit binaries you don't own). Build SecureBank from your own source, or point the pipeline at a public intentionally-vulnerable app for practice (see target/README.md) and widen scope with OSLAB_EXTRA_PACKAGES."
+}

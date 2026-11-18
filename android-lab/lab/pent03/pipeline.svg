@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" font-family="ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" role="img" aria-label="PENT-03 pipeline architecture">
+  <style>
+    .bg{fill:#ffffff}
+    .card{fill:#f1f5f9;stroke:#334155;stroke-width:1.5}
+    .ctrl{fill:#dbeafe;stroke:#1d4ed8}
+    .emu{fill:#dcfce7;stroke:#15803d}
+    .mitm{fill:#fef3c7;stroke:#b45309}
+    .t{fill:#0f172a;font-size:14px}
+    .tb{fill:#0f172a;font-size:15px;font-weight:700}
+    .ts{fill:#334155;font-size:12px}
+    .flow{fill:#1e293b;font-size:12px;font-weight:600}
+    .arrow{stroke:#475569;stroke-width:2;fill:none;marker-end:url(#a)}
+    .step{fill:#e2e8f0;stroke:#475569;stroke-width:1}
+    .stept{fill:#0f172a;font-size:12.5px;font-weight:600}
+    @media (prefers-color-scheme:dark){
+      .bg{fill:#0b1120}
+      .card{fill:#1e293b;stroke:#94a3b8}
+      .ctrl{fill:#1e3a8a;stroke:#60a5fa}
+      .emu{fill:#14532d;stroke:#4ade80}
+      .mitm{fill:#78350f;stroke:#fbbf24}
+      .t,.tb,.stept{fill:#e2e8f0}
+      .ts{fill:#cbd5e1}
+      .flow{fill:#e2e8f0}
+      .arrow{stroke:#94a3b8}
+      .step{fill:#334155;stroke:#94a3b8}
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="900" height="420"/>
+  <text class="tb" x="30" y="36" font-size="18">PENT-03 — Headless Android Analysis Pipeline</text>
+
+  <!-- controller -->
+  <rect class="card ctrl" x="30" y="70" width="220" height="110" rx="10"/>
+  <text class="tb" x="45" y="98">Controller (Alpine)</text>
+  <text class="ts" x="45" y="120">adb · python pipeline</text>
+  <text class="ts" x="45" y="138">frida-tools · objection</text>
+  <text class="ts" x="45" y="156">no KVM needed</text>
+
+  <!-- emulator -->
+  <rect class="card emu" x="640" y="70" width="230" height="110" rx="10"/>
+  <text class="tb" x="655" y="98">Android Emulator</text>
+  <text class="ts" x="655" y="120">-writable-system</text>
+  <text class="ts" x="655" y="138">adb tcp/5555</text>
+  <text class="ts" x="655" y="156">/dev/kvm (privileged)</text>
+
+  <!-- mitmproxy -->
+  <rect class="card mitm" x="340" y="250" width="230" height="100" rx="10"/>
+  <text class="tb" x="355" y="278">mitmproxy + addon</text>
+  <text class="ts" x="355" y="300">intercept :8080</text>
+  <text class="ts" x="355" y="318">generates system CA</text>
+  <text class="ts" x="355" y="336">logs flows → runs/</text>
+
+  <!-- arrows -->
+  <path class="arrow" d="M250 110 L640 110"/>
+  <text class="flow" x="360" y="100">adb: deploy frida · install CA · set proxy</text>
+  <path class="arrow" d="M720 180 L560 250"/>
+  <text class="flow" x="610" y="225">app traffic</text>
+  <path class="arrow" d="M340 300 L140 300 L140 180"/>
+  <text class="flow" x="150" y="330">CA via shared volume</text>
+
+  <!-- step strip -->
+  <g>
+    <rect class="step" x="30" y="378" width="120" height="28" rx="6"/>
+    <text class="stept" x="62" y="397">1 · scope</text>
+    <rect class="step" x="162" y="378" width="120" height="28" rx="6"/>
+    <text class="stept" x="196" y="397">2 · boot</text>
+    <rect class="step" x="294" y="378" width="120" height="28" rx="6"/>
+    <text class="stept" x="326" y="397">3 · frida</text>
+    <rect class="step" x="426" y="378" width="120" height="28" rx="6"/>
+    <text class="stept" x="462" y="397">4 · ca</text>
+    <rect class="step" x="558" y="378" width="120" height="28" rx="6"/>
+    <text class="stept" x="588" y="397">5 · proxy</text>
+    <rect class="step" x="690" y="378" width="120" height="28" rx="6"/>
+    <text class="stept" x="720" y="397">6 · unpin</text>
+  </g>
+</svg>

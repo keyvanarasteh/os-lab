@@ -1,0 +1,37 @@
+# PENT-03 controller image — Alpine, drives the emulator over adb.
+#
+# This lightweight Alpine image carries the analysis toolchain (adb, Python
+# pipeline, frida-tools, objection, mitmproxy client) and drives a separate
+# Android emulator container over adb. It never runs the emulator itself, so it
+# stays small and needs no KVM. No vendor binaries are baked in: frida-server is
+# downloaded at run time for the device ABI (see scripts/deploy_frida.py).
+FROM alpine:3.20
+
+# Build deps for frida/objection native wheels, then the runtime tools.
+# frida-tools is pinned so the client's frida matches the deployed frida-server
+# default (deploy_frida.DEFAULT_FRIDA_VERSION); keep the two in lock-step.
+RUN apk add --no-cache \
+        android-tools \
+        python3 py3-pip \
+        openssl \
+        bash curl xz \
+    && apk add --no-cache --virtual .build \
+        build-base python3-dev libffi-dev openssl-dev cargo \
+    && pip install --no-cache-dir --break-system-packages \
+        "frida==16.5.9" frida-tools objection mitmproxy \
+    && apk del .build
+
+# Build context is the pent03/ module root (see docker-compose.yml). Copy the
+# module's own layout: scripts/, hooks/, docker/.
+WORKDIR /opt/android-lab
+COPY scripts/ ./scripts/
+COPY hooks/ ./hooks/
+COPY docker/ ./docker/
+RUN chmod +x ./docker/entrypoint.sh
+
+# Shared with the mitmproxy sidecar so the controller can read the generated CA.
+VOLUME ["/root/.mitmproxy"]
+
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["bash", "/opt/android-lab/docker/entrypoint.sh"]
