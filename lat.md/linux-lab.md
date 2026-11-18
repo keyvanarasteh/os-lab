@@ -170,3 +170,17 @@ Validation and install steps, in order:
 
 Only install trusted `.deb` packages. Installation requires sudo
 permissions and may modify the operating system.
+## Shell basics exercise checker (OS-11)
+
+[[linux-lab/exercises/shell_basics_check.py]] checks a documented example
+directory exercise with per-path feedback and hints, without changing files.
+
+Each of ali, eda and aleyna contains odevler, sinavlar, sunumlar directories
+and a regular puan.txt file: 15 expected paths. Extra entries and empty files
+are allowed; content is not graded. This profile is not an official course mark.
+Child paths use directory descriptors and no-follow operations; symlinks and
+unreadable paths cannot pass. It is an observation, not an atomic tree snapshot.
+Text/JSON reports and interactive root entry are supported; exit 0 means all
+paths match, 1 means mismatches, 2 means invalid usage or an inaccessible root.
+[[android-lab/lab/tests/test_shell_basics_check.py]] exercises these contracts.
+[[linux-lab/docs/OS-11/VERIFY.md]] supplies reproducible lab commands.
