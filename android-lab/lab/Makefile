@@ -4,7 +4,7 @@ SHELL := /bin/bash
 FRIDA ?= $(if $(wildcard .venv/bin/frida),.venv/bin/frida,frida)
 LABCTL ?= ../../labctl
 
-.PHONY: pinning help setup setup-python platform-tools preflight pull up boot static-up static-down down status monitor profiles logs adb shell install wf1 wf2 hook report install-service uninstall-service clean
+.PHONY: pinning help setup setup-python platform-tools preflight pull up boot static-up static-down down status monitor profiles logs adb shell install wf1 wf2 hook trace report install-service uninstall-service clean
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -80,6 +80,11 @@ hook: ## Run a Frida hook against a running app: make hook PKG=com.example HOOK=
 	@test -n "$(PKG)" && test -n "$(HOOK)" || { echo "usage: make hook PKG=com.example HOOK=hooks/ssl-pinning-bypass.js"; exit 1; }
 	$(FRIDA) -U -f "$(PKG)" -l "$(HOOK)" --no-pause
 
+trace: export PKG
+trace: export GLOB
+trace: ## Trace functions with frida-trace into a JSON call map: make trace PKG=com.example [GLOB='*auth*']
+	python3 hooks/trace_runner.py --out artifacts/traces/call-map.json --session-log artifacts/traces/trace-session.md
+
 report: ## Collect logs, device status and flows into artifacts/
 	bash scripts/report.sh
 
@@ -90,4 +95,4 @@ uninstall-service: ## Remove the systemd unit
 	sudo bash scripts/uninstall-service.sh
 
 clean: ## Remove all artifacts (keeps the directory)
-	find artifacts -mindepth 1 ! -name .gitkeep -delete
+	python3 orchestrator.py clean
