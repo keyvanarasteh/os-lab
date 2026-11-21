@@ -1,0 +1,4 @@
+Nov 14 09:00:01 labvm sshd[900]: Accepted publickey for ubuntu from 192.0.2.99 port 50000 ssh2
+Nov 14 09:00:01 labvm sshd[900]: pam_unix(sshd:session): session opened for user ubuntu(uid=1000) by (uid=0)
+Nov 14 09:10:00 labvm sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/apt update
+Nov 14 09:10:00 labvm sudo: pam_unix(sudo:session): session opened for user root(uid=0) by ubuntu(uid=1000)
