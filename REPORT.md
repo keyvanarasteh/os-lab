@@ -1,51 +1,10 @@
-# OS-24 - Local .deb Installer Report
 
-## Project Information
-- Project: os-lab
-- Task: OS-24 Local .deb Installer
-- Operating System: Ubuntu Server 26.04.1 LTS
-- Language: Bash
+# OS-28 - File Search & Text-Grep Teaching Wrapper Raporu
 
-## Project Purpose
-The purpose of this project is to develop a Bash script that installs local Debian (.deb) packages on Ubuntu safely.
+## Uygulama Özeti
+Kullanıcıların belirlediği dizin ve dosya kalıplarında güvenli bir şekilde dosya araması yapmasını ve bu sonuçlar üzerinde metin (`grep`) taraması gerçekleştirerek eğitsel çıktılar üretmesini sağlayan Python tabanlı bir wrapper (`os-28-search-grep-wrapper.py`) geliştirilmiştir.
 
-## Implementation
-The installer is located at:
-`linux-lab/scripts/deb_install.sh`
-
-The script:
-1. Checks the provided package argument.
-2. Validates the .deb file.
-3. Creates a temporary copy of the package.
-4. Displays the installation plan.
-5. Requests user confirmation.
-6. Installs the package using apt-get.
-7. Verifies the installation using dpkg-query.
-
-A compatible script is also available at:
-`linux-lab/scripts/os-24-deb-installer.sh`
-
-## Testing
-The following tests were performed:
-- Bash syntax validation: PASS
-- Missing argument: PASS
-- Missing package file: PASS
-- Invalid .deb package: PASS
-- Real package installation (hello): PASS
-- Package installation verification: PASS
-
-The hello package was successfully installed and verified with:
-`dpkg -s hello | grep Status`
-
-Result: `Status: install ok installed`
-
-## Conclusion
-The OS-24 installer was implemented and tested successfully on Ubuntu Server. The script validates local Debian packages before installation and verifies the installation result.
-
-## What I Learned
-
-During this project, I learned how to fork an open-source repository,
-create a Git branch, commit changes, and push them to GitHub.
-
-I also learned how to create a Pull Request, test a Bash script,
-and document the results using VERIFY.md and REPORT.md.
+## Yapılan Güvenlik ve Mantık İyileştirmeleri
+* Komut enjeksiyonu (command injection) riskini önlemek için güvenli parametre işleme yöntemleri uygulandı.
+* Boşluk içeren dosya yolları ve adları için `-print0` ve `-0` parametreleri eklendi.
+* Tire (`-`) ile başlayan dizin veya arama terimlerinin parametre olarak algılanmasını önlemek için normalizasyon ve ayraçlar uygulandı.
