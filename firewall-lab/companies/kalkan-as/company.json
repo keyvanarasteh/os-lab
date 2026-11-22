@@ -1,0 +1,520 @@
+{
+  "schemaVersion": 1,
+  "name": "Kalkan A.Ş.",
+  "sector": "Cyber Security / Enterprise IT",
+  "author": {
+    "name": "Emre",
+    "course": "BGT207",
+    "github": "EMRE6664"
+  },
+  "summary": "Ankara, İstanbul ve Londra ofisleri, 10.000+ öğrencili akademik kampüs, yazılım ve ar-ge ekiplerini barındıran çok katmanlı kurumsal ağ mimarisi. Ubuntu UFW/iptables host-based güvenlik duvarları, VLAN segmentasyonu, Zero Trust erişim matrisi ve Telegram ufw-logger otomasyonu ile donatılmıştır.",
+  "branches": [
+    {
+      "id": "ankara-office",
+      "name": "Ankara Bölge Müdürlüğü (İdari & Satış)",
+      "role": "branch",
+      "location": "Ankara, Turkey",
+      "population": {
+        "students": 150,
+        "staff": 10
+      },
+      "network": {
+        "cidr": "10.1.10.0/24",
+        "dmz": false,
+        "vlans": [
+          {
+            "id": 10,
+            "name": "idari",
+            "cidr": "10.1.10.0/24",
+            "note": "İdari personel alt ağı, Gateway 10.1.10.1, interface ank0."
+          },
+          {
+            "id": 20,
+            "name": "satis",
+            "cidr": "10.1.20.0/24",
+            "note": "Satış ve müşteri temsilcileri alt ağı."
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 1000,
+        "upMbps": 1000,
+        "drivers": [
+          "erp queries",
+          "office o365 traffic",
+          "inter-branch traffic"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 200F with UFW Host-Based Layer",
+            "vendor": "Fortinet & Netfilter Project",
+            "reason": "Application-Aware SD-WAN, ASIC donanımsal şifreleme hızlandırma (SPU CP9) ve sunucu seviyesinde UFW/iptables default-drop stateful filtreleme."
+          },
+          "alternatives": [
+            {
+              "product": "Palo Alto PA-440",
+              "vendor": "Palo Alto Networks",
+              "reason": "Granüler uygulama kontrolü sağlar ancak idari ofis için bütçe maliyeti (CAPEX) yüksektir."
+            },
+            {
+              "product": "Sophos XGS 2100",
+              "vendor": "Sophos",
+              "reason": "Senkronize uç nokta koruması ve deep learning anomali tespiti sunar."
+            },
+            {
+              "product": "Check Point Quantum 3600",
+              "vendor": "Check Point",
+              "reason": "Kapsamlı Threat Extraction yetenekleriyle orta ölçekli ofis koruması."
+            },
+            {
+              "product": "Cisco Meraki MX100",
+              "vendor": "Cisco",
+              "reason": "Bulut tabanlı tek panelden yönetim kolaylığı."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Replies to established connections must pass or nothing works (stateful tracking)."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "445",
+              "from": "idari,satis",
+              "to": "local-fileserver",
+              "note": "İdari ve satış ekiplerinin yerel dosya sunucusuna SMB erişimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "sales",
+              "to": "executive-network",
+              "note": "Satış ekibi yönetim ağına erişemez."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default rule: everything else is logged and dropped."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "istanbul-office",
+      "name": "İstanbul Genel Merkez (HQ) ve Veri Merkezi",
+      "role": "headquarters",
+      "location": "Istanbul, Turkey",
+      "population": {
+        "students": 300,
+        "software": 20
+      },
+      "network": {
+        "cidr": "10.1.100.0/24",
+        "dmz": true,
+        "vlans": [
+          {
+            "id": 100,
+            "name": "executive",
+            "cidr": "10.1.100.0/24",
+            "note": "Yönetim kurulu ve üst düzey yöneticiler."
+          },
+          {
+            "id": 200,
+            "name": "dmz",
+            "cidr": "10.1.200.0/24",
+            "note": "İnternete açık web ve proxy sunucuları."
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 2000,
+        "upMbps": 2000,
+        "drivers": [
+          "central vpn hub",
+          "datacenter east-west traffic",
+          "ssl decryption inspection"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "Palo Alto PA-1410 High Availability Cluster",
+            "vendor": "Palo Alto Networks",
+            "reason": "Single-Pass mimarisi, User-ID Active Directory entegrasyonu ve Inline ML tabanlı Zero-Day tehdit önleme."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 400F",
+              "vendor": "Fortinet",
+              "reason": "Maliyet performans oranı yüksektir ancak Palo Alto kadar derin L7 App-ID analizi sunmaz."
+            },
+            {
+              "product": "Check Point Quantum 6200",
+              "vendor": "Check Point",
+              "reason": "SmartConsole ile güçlü yönetim sağlar."
+            },
+            {
+              "product": "Cisco Secure Firewall 3110",
+              "vendor": "Cisco",
+              "reason": "Snort 3 IPS motoru ve XDR entegrasyonu."
+            },
+            {
+              "product": "Sophos XGS 3300",
+              "vendor": "Sophos",
+              "reason": "Xstream mimarisiyle güçlü TLS şifre çözme."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Stateful tracking enabled for established sessions."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "internet",
+              "to": "dmz-servers",
+              "note": "DMZ sunucularına gelen web trafiği (SSL Inbound Inspection ile taranır)."
+            },
+            {
+              "action": "allow",
+              "direction": "in",
+              "proto": "tcp",
+              "port": "22",
+              "from": "it-soc",
+              "to": "dmz-servers",
+              "note": "Sadece IT ve SOC ekibinin güvenli ağından SSH erişimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default rule: everything else is logged and dropped."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "london-office",
+      "name": "Londra Uydu Şube",
+      "role": "branch",
+      "location": "London, United Kingdom",
+      "population": {
+        "students": 50,
+        "software": 2
+      },
+      "network": {
+        "cidr": "10.3.10.0/24",
+        "dmz": false,
+        "vlans": [
+          {
+            "id": 10,
+            "name": "london-corp",
+            "cidr": "10.3.10.0/24",
+            "note": "Londra çalışanları, Gateway 10.3.10.1"
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 500,
+        "upMbps": 500,
+        "drivers": [
+          "saas cloud services",
+          "auto-vpn to istanbul"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "Cisco Meraki MX68",
+            "vendor": "Cisco",
+            "reason": "Zero-Touch Provisioning (ZTP) ve bulut tabanlı tek panelden yönetim kolaylığı (Teknik uzmanın olmadığı uydu şube için ideal)."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 60F",
+              "vendor": "Fortinet",
+              "reason": "Güçlü donanımdır ancak CLI konfigürasyonu lokal uzman gerektirir."
+            },
+            {
+              "product": "Sophos XGS 116",
+              "vendor": "Sophos",
+              "reason": "Küçük şubeler için entegre switch portları."
+            },
+            {
+              "product": "Palo Alto PA-410",
+              "vendor": "Palo Alto Networks",
+              "reason": "Kurumsal düzeyde güvenlik ancak küçük ofis için maliyetlidir."
+            },
+            {
+              "product": "WatchGuard M290",
+              "vendor": "WatchGuard",
+              "reason": "Kompakt ve yönetimi kolay KOBİ cihazı."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Stateful packet inspection active."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "london-corp",
+              "to": "internet",
+              "note": "Doğrudan internet çıkışı (Split-Tunneling)."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default rule: all other traffic is dropped."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "academic-branch",
+      "name": "Üniversite Kampüsü (Akademik Şube)",
+      "role": "campus",
+      "location": "Ankara, Turkey",
+      "population": {
+        "students": 10000,
+        "software": 500
+      },
+      "network": {
+        "cidr": "10.20.0.0/16",
+        "dmz": false,
+        "vlans": [
+          {
+            "id": 100,
+            "name": "eduroam-students",
+            "cidr": "10.20.0.0/18",
+            "note": "10.000+ öğrenci için genişletilmiş BYOD alt ağı."
+          },
+          {
+            "id": 200,
+            "name": "faculty",
+            "cidr": "10.20.200.0/24",
+            "note": "Akademisyenler ve laboratuvarlar."
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 20000,
+        "upMbps": 20000,
+        "drivers": [
+          "student byod traffic",
+          "ddos mitigation",
+          "5651 logging compliance"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 4400F",
+            "vendor": "Fortinet",
+            "reason": "NP7 ASIC donanım işlemcileri sayesinde milyonlarca eşzamanlı oturumu ve hat hızında (line-rate) DDoS korumasını destekler."
+          },
+          "alternatives": [
+            {
+              "product": "Palo Alto PA-5450",
+              "vendor": "Palo Alto Networks",
+              "reason": "Çok güçlüdür ancak akademik bütçe için maliyeti çok yüksektir."
+            },
+            {
+              "product": "Cisco Firepower 9300",
+              "vendor": "Cisco",
+              "reason": "Carrier-grade telekom operatörü seviyesi şasi."
+            },
+            {
+              "product": "Check Point Quantum 16600",
+              "vendor": "Check Point",
+              "reason": "Veri merkezi ve hyperscale ağ güvenliği."
+            },
+            {
+              "product": "Juniper SRX4600",
+              "vendor": "Juniper Networks",
+              "reason": "Güçlü yönlendirme yetenekleri ancak UTM aktifken performans düşüşü yaşar."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Stateful connection tracking."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": "80,443",
+              "from": "eduroam-students",
+              "to": "internet",
+              "note": "Öğrenci web trafiği (Per-IP Bandwidth Shaping ile sınırlandırılmıştır)."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "eduroam-students",
+              "to": "internal",
+              "note": "Öğrencilerin akademik idari ağa ve sunuculara erişimi kesinlikle yasaktır."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default rule: traffic dropped."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "software-team",
+      "name": "Yazılım Geliştirme ve DevOps Şubesi",
+      "role": "branch",
+      "location": "Ankara, Turkey",
+      "population": {
+        "software": 140
+      },
+      "network": {
+        "cidr": "10.5.50.0/24",
+        "dmz": false,
+        "vlans": [
+          {
+            "id": 50,
+            "name": "dev-workstations",
+            "cidr": "10.5.50.0/24",
+            "note": "Yazılımcı çalışma istasyonları."
+          },
+          {
+            "id": 60,
+            "name": "staging-servers",
+            "cidr": "10.5.60.0/24",
+            "note": "Test ve staging ortamları."
+          }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 2000,
+        "upMbps": 2000,
+        "drivers": [
+          "github gitlab pushes",
+          "docker hub pulls",
+          "terraform automation"
+        ]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "Check Point Quantum 6400",
+            "vendor": "Check Point",
+            "reason": "SmartConsole ve REST API / Terraform entegrasyonu sayesinde CI/CD süreçlerinde otomatik kural oluşturma (IaC) desteği."
+          },
+          "alternatives": [
+            {
+              "product": "Palo Alto PA-1420",
+              "vendor": "Palo Alto Networks",
+              "reason": "Konteyner ve bulut entegrasyonlarında başarılıdır."
+            },
+            {
+              "product": "FortiGate 600F",
+              "vendor": "Fortinet",
+              "reason": "Yüksek donanım performansı."
+            },
+            {
+              "product": "Cisco Secure Firewall 3120",
+              "vendor": "Cisco",
+              "reason": "Ağ merkezli veri merkezi mimarisi."
+            },
+            {
+              "product": "Sophos XGS 4300",
+              "vendor": "Sophos",
+              "reason": "Senkronize güvenlik altyapısı."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Stateful packet tracking enabled."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "any",
+              "from": "dev-workstations",
+              "to": "staging-servers",
+              "note": "Yazılımcıların test sunucularına API ve SSH erişimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Default rule: all unhandled traffic is dropped."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "remoteAccess": {
+    "type": "bastion",
+    "note": "Güvenli geçiş noktası üzerinden erişim sağlanmaktadır."
+  },
+  "monitoring": {
+    "siem": "Merkezi Splunk ve QRadar entegrasyonu. Ubuntu sunucularda ufw-logger Python daemon ile systemd üzerinden eşzamanlı tail -f log takibi.",
+    "owner": "SOC L1/L2 Analists and Network Security Team",
+    "alertSink": "Telegram Bot API üzerinden SOC ekibine anlık JSON POST uyarıları (Örn: Brute-Force engelleme alarmları).",
+    "appVsSecurity": "Separated; bandwidth shaped via traffic shaper while security logs are processed through ufw/nftables kernel log prefixes."
+  },
+  "slug": "kalkan-as"
+}
