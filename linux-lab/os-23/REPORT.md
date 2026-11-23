@@ -3,7 +3,7 @@
 Öğrenci: Berat Kurşun (`Beratkursun`)  
 Son güncelleme: 18 Kasım 2026  
 Rezervasyon: https://github.com/keyvanarasteh/os-lab/pull/205  
-Uygulama PR’ı: https://github.com/Beratkursun/os-lab/pull/208
+Uygulama PR’ı: https://github.com/keyvanarasteh/os-lab/pull/208
 
 ## Problem ve çözüm
 

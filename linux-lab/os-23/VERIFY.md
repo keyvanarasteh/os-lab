@@ -71,7 +71,7 @@ Upstream `33d703fc` ile birleştirme sonrası ortak koşu: **3 süit başarılı
 ## Teslim durumu ve sınırlamalar
 
 - Uygulama, görev testleri ve raporlar GitHub’dadır. Video veya çalışma günlüğü bu depoda bulunmaz; harici teslim durumu doğrulanmamıştır.
-- [Pull Request #208](https://github.com/Beratkursun/os-lab/pull/208)
+- [Pull Request #208](https://github.com/keyvanarasteh/os-lab/pull/208)
 - Ubuntu ortak testlerinin tam günlüğü ve o koşunun commit kimliği mevcut değildir.
 - Öğretim üyesinin kabulü, PR’ın birleştirilmesi veya Blackboard gönderiminin tamamlandığı iddia edilmez.
 - Kod, test ve belgeler ChatGPT/Codex desteğiyle hazırlanmıştır.
