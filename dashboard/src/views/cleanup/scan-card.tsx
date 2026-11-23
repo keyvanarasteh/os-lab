@@ -19,14 +19,17 @@ export type ScanCardProps = {
   canWork: boolean;
   scanned: boolean;
   onScan: () => void;
+  /** CUX-01: scan, then build the recommended Trash plan and open its confirmation. */
+  onScanReview: () => void;
   onCancel: () => void;
   onClean: (ids: string[]) => void;
   groupHref: (groupId: string) => string;
   error?: string;
+  note?: string;
 };
 
 export function ScanCard(props: ScanCardProps) {
-  const { active, entries, measured, checked, setChecked, canWork, scanned, onScan, onCancel, onClean, groupHref, error } = props;
+  const { active, entries, measured, checked, setChecked, canWork, scanned, onScan, onScanReview, onCancel, onClean, groupHref, error, note } = props;
   const running = active?.state === "running" && active.kind === "scan";
   const done = Number(active?.progress?.pathsDone ?? active?.progress?.itemsDone ?? 0);
   const total = Number(active?.progress?.pathsTotal ?? active?.progress?.itemsTotal ?? 0);
@@ -49,12 +52,13 @@ export function ScanCard(props: ScanCardProps) {
     return { group, items, bytes: items.reduce((sum, entry) => sum + (measured.get(entry.id) ?? 0), 0) };
   }).filter((row) => row.items.length).sort((a, b) => b.bytes - a.bytes);
   if (!scanned || !rows.length) {
-    return <Section id="overview-review" title="Clean" description="Scan the safe categories, review the plan, then confirm. Nothing is removed during a scan.">
+    return <Section id="overview-review" title="Clean" description="One click scans the safe categories and opens the plan to confirm. Nothing is removed until you confirm.">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-(--iux-muted-foreground)">{canWork ? "Ready to scan" : "Scan unavailable until setup is complete"} · {entries.length} categories available</p>
-        <button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !entries.length} onClick={onScan}>{scanned ? "Scan again" : "Scan now"}</button>
+        <button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !entries.length} onClick={onScanReview}>Scan & review</button>
       </div>
       {error && <p role="alert" className="mt-3 text-sm text-(--iux-danger)">{error}</p>}
+      {note && !error && <p role="status" className="mt-3 text-sm text-(--iux-muted-foreground)">{note}</p>}
     </Section>;
   }
   const found = rows.reduce((sum, row) => sum + row.bytes, 0);

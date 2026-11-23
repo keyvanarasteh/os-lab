@@ -46,12 +46,9 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   // No bookmarks in this fixture, so the honest disabled state with its reason shows.
   await expect(page.getByRole("main").getByRole("button", { name: "Quick clean", exact: true })).toBeDisabled();
   await expect(page.getByRole("heading", { name: "Clean", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Scan now" }).click();
-  await expect(page.getByText("Last scan measured 142 B")).toBeVisible();
-  // The scan card now replaces the old suggested-plan row: a "Scan complete" summary whose Clean button
-  // (named with the selected size) builds the trash plan that opens the confirmation dialog.
-  await expect(page.getByRole("heading", { name: "Scan complete" })).toBeVisible();
-  await page.getByRole("main").getByRole("button", { name: /^Clean 42\b/ }).click();
+  // CUX-01: one click scans every entry, builds the recommended Trash plan and opens its confirmation.
+  await page.getByRole("button", { name: "Scan & review" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
   expect(calls.find((call) => call.path === "/api/cleanup/scan")?.body).toEqual({ entryIds: ["system.caches", "browser.private"] });
   expect(calls.find((call) => call.path === "/api/cleanup/plan")?.body).toEqual({ entryIds: ["system.caches"], mode: "trash" });
   await expect(page.getByRole("dialog")).toContainText("1 items");
@@ -202,7 +199,7 @@ test("public cleanup route has no engine controls", async ({ page }) => {
   await page.route("**/api/**", async (route) => { apiCalls++; await route.abort(); });
   await page.goto("/os-lab/tr/cleanup/");
   await expect(page.getByText("Temizleme Laboratuvarı yerel uygulamada çalışır.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Scan now" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Scan & review" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Sonuçlar" })).toHaveAttribute("href", "/os-lab/tr/cleanup/results/");
   expect(apiCalls).toBe(0);
 });

@@ -487,8 +487,10 @@ into a compact main view and a Settings tab.
 The main view keeps only the
 cleaning actions and the stats around them: the storage hero, the Quick clean
 card (one confirmed Trash run over the bookmarks flagged for quick clean,
-stating the reason when none are flagged), the Clean card (scan, the
-Recommended / More-safe presets, plan review, confirmation, progress) and the
+stating the reason when none are flagged), the Clean card (one **Scan & review**
+click scans every entry, then builds the recommended Trash plan and opens its
+confirmation, CUX-01; a stopped or empty scan builds no plan and says so; plan
+review, confirmation, progress) and the
 latest clean report, plus a compact read-only Monitor stats card
 ([[dashboard/src/views/cleanup/monitor-card.tsx]] exports `MonitorStatsCard`;
 thresholds and volumes are configured in Settings). The Settings tab at

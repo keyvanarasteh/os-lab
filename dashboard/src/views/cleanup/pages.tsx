@@ -312,6 +312,9 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const [confirm, setConfirm] = useState(false);
   const [bookmarkConfirm, setBookmarkConfirm] = useState(false);
   const [quickRefusals, setQuickRefusals] = useState("");
+  /** CUX-01: set by "Scan & review"; the finished scan then builds the recommended Trash plan by itself. */
+  const autoReview = useRef(false);
+  const [reviewNote, setReviewNote] = useState("");
   const [order, setOrder] = useState<SortOrder>("size");
   const [now, setNow] = useState(Date.now() / 1000);
   const coreLoaded = useRef(false);
@@ -569,6 +572,23 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const suggested = safeEntries.filter((item) => preset === "extended" || item.defaultSelected);
   const suggestedIds = suggested.map((item) => item.id);
   const suggestedBytes = suggested.reduce((sum, item) => sum + (measured.get(item.id)?.sizeBytes ?? 0), 0);
+  // CUX-01: a scan started with "Scan & review" continues into the recommended Trash plan, whose
+  // confirmation dialog then opens through the effect above. Only a completed, uncancelled scan continues.
+  useEffect(() => {
+    if (!autoReview.current || !active || !isScan(active) || active.state === "running") return;
+    autoReview.current = false;
+    const result = active.result as CleanupScan | undefined;
+    if (active.state !== "done" || !result) return;
+    if (result.cancelled) { setReviewNote("Scan stopped, so no plan was built. Scan again to review."); return; }
+    if (!suggestedIds.length) { setReviewNote("The scan found nothing in the recommended set to clean."); return; }
+    void start(() => api.cleanupPlan(suggestedIds, "trash"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id, active?.state]);
+  function scanAndReview() {
+    autoReview.current = true;
+    setReviewNote("");
+    void start(() => api.cleanupScan(entries.map((item) => item.id)));
+  }
   const planFollowsScan = !!planJob && jobs.findIndex((job) => job.id === planJob.id) <= jobs.findIndex(isScan);
   const planMatches = !!latestPlan && planFollowsScan && latestPlan.mode === "trash" && JSON.stringify([...(planJob?.request.entryIds ?? [])].sort()) === JSON.stringify([...suggestedIds].sort());
   const canConfirmSuggested = canWork && !!latestPlan && planMatches && !planUsed && latestPlan.expiresAt > now && latestPlan.totals.ready > 0;
@@ -675,8 +695,9 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
               <QuickCleanCard bookmarks={bookmarks} busy={busy} canWork={canWork} measured={measured} refusals={quickRefusals}
                 onQuickClean={runQuickClean} settingsHref={link("settings/")} />
               <ScanCard active={active} entries={entries} measured={sizes} checked={dashChecked ?? defaultChecked} setChecked={setDashChecked}
-                canWork={canWork} scanned={!!latestScan} error={actionError}
-                onScan={() => void start(() => api.cleanupScan(entries.map((item) => item.id)))} onCancel={() => void cancel()}
+                canWork={canWork} scanned={!!latestScan} error={actionError} note={reviewNote}
+                onScan={() => { autoReview.current = false; setReviewNote(""); void start(() => api.cleanupScan(entries.map((item) => item.id))); }}
+                onScanReview={scanAndReview} onCancel={() => void cancel()}
                 onClean={(ids) => void start(() => api.cleanupPlan(ids, "trash"))}
                 groupHref={(id) => link(`catalog/#${id}`)} />
             </div>}
