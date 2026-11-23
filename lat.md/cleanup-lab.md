@@ -562,11 +562,15 @@ Bookmarks the catalog stops listing are set aside in `retired` rather than delet
 
 ### Reveal and row actions (CUX-04)
 
-`POST /api/cleanup/entries/reveal {entryId}` shows a catalog entry's folder in the file manager through a fixed argv per OS; the page never sends a path. The Advanced scan row menu offers Reveal in file manager and Copy path; "never suggest" lives in the Suggestions row.
+The Advanced scan row menu offers Reveal in file manager and Copy path.
+
+`POST /api/cleanup/entries/reveal {entryId}` shows a catalog entry's folder in the file manager through a fixed argv per OS; the page never sends a path. "Never suggest" lives in the Suggestions row.
 
 ### MCP tools (CUX-10)
 
-[[console/mcp_cleanup.py]] adds the Cleanup Lab to the os-lab MCP server: read-only status, catalog, volumes, monitor, permissions, bookmarks, history, widget, preferences and job tools; `cleanup_scan`, `cleanup_suggest`, `cleanup_review` and `cleanup_quick_clean_plan`, which never apply anything; `cleanup_clean`, which needs `confirm: true` and is Trash only; and the settings tools for preferences, monitor, bookmarks and reveal.
+[[console/mcp_cleanup.py]] adds the Cleanup Lab to the os-lab MCP server, on the same engine and guards as the dashboard.
+
+Read-only tools: status, catalog, volumes, monitor, permissions, bookmarks, history, widget, preferences and job. Tools that never apply anything: `cleanup_scan`, `cleanup_suggest`, `cleanup_review` and `cleanup_quick_clean_plan`. `cleanup_clean` needs `confirm: true` and is Trash only. Settings tools cover preferences, monitor, bookmarks and reveal.
 
 The tools take catalog ids, never paths or commands, and are refused inside `macos_task`. Tests: `android-lab/lab/tests/test_mcp_cleanup.py`.
 
