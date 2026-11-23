@@ -13,7 +13,7 @@
  */
 import { useEffect, useState } from "react";
 
-// @lat: [[cleanup-lab#Command bridge (AGQ-01)]]
+// @lat: [[cleanup-lab#Cleaner Widgets (CLW)#Command bridge (AGQ-01)]]
 import { XIcon } from "@phosphor-icons/react";
 
 /** What the Rust bridge serialises (`bridge::Directive`). */

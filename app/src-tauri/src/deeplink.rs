@@ -15,7 +15,7 @@
 
 use url::Url;
 
-// @lat: [[cleanup-lab#Command bridge (AGQ-01)]]
+// @lat: [[cleanup-lab#Cleaner Widgets (CLW)#Command bridge (AGQ-01)]]
 
 /// Cleanup routes a widget may open (CLW-03). Values match the overview card
 /// targets and the cleanup island's tab paths; the island router handles them

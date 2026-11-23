@@ -295,6 +295,6 @@ limits/windows and bounded revision diff without a browser.
 
 [[scripts/analysis/dropper_detect.py]] and [[scripts/analysis/dropper_lab/README.md]]
 provide an offline static and loopback-rehearsal detector for two-stage "clean dropper"
-loaders (`PENT-15`), correlating remote stage fetch, deferred triggers, payload decoding
-and dynamic execution sinks while keeping benign utilities false-positive free.
+loaders (`PENT-15`), correlating remote fetch, deferred triggers, payload decoding and
+dynamic execution sinks without flagging benign utilities.
 
