@@ -47,7 +47,12 @@ DEFAULT_INTERVAL = 300
 #: One warning per volume per cooldown window, even after re-arm.
 DEFAULT_COOLDOWN = 3600
 
-KINDS = ("warning", "recovered", "error")
+#: A warning that is still true after this long is repeated (0 turns reminders off). A single
+#: warning on crossing used to stay silent for days on a disk that kept filling.
+DEFAULT_REMINDER = 86400
+MAX_REMINDER = 7 * 86400
+
+KINDS = ("warning", "critical", "reminder", "recovered", "error")
 
 
 class MonitorConfigError(ValueError):
@@ -60,10 +65,13 @@ def default_config():
         "enabled": False,
         "intervalSeconds": DEFAULT_INTERVAL,
         "cooldownSeconds": DEFAULT_COOLDOWN,
+        "reminderSeconds": DEFAULT_REMINDER,
+        "notify": True,
         "volumes": [{
             "mountPoint": "",  # "" means "the volume holding the home folder"
             "minFreeBytes": DEFAULT_MIN_FREE_BYTES,
             "minFreePercent": DEFAULT_MIN_FREE_PERCENT,
+            "criticalFreeBytes": None,  # None: half of the warning threshold
             "enabled": True,
         }],
     }
@@ -77,7 +85,7 @@ def validate_config(config):
     """
     if not isinstance(config, dict):
         raise MonitorConfigError("The monitor config must be an object")
-    unknown = set(config) - {"enabled", "intervalSeconds", "cooldownSeconds", "volumes"}
+    unknown = set(config) - {"enabled", "intervalSeconds", "cooldownSeconds", "reminderSeconds", "notify", "volumes"}
     if unknown:
         raise MonitorConfigError("Unknown key(s): {0}".format(", ".join(sorted(unknown))))
     enabled = config.get("enabled", False)
@@ -89,6 +97,12 @@ def validate_config(config):
     cooldown = config.get("cooldownSeconds", DEFAULT_COOLDOWN)
     if not isinstance(cooldown, int) or isinstance(cooldown, bool) or not 0 <= cooldown <= 86400:
         raise MonitorConfigError("cooldownSeconds must be between 0 and 86400")
+    reminder = config.get("reminderSeconds", DEFAULT_REMINDER)
+    if not isinstance(reminder, int) or isinstance(reminder, bool) or not 0 <= reminder <= MAX_REMINDER:
+        raise MonitorConfigError("reminderSeconds must be between 0 and {0}".format(MAX_REMINDER))
+    notify = config.get("notify", True)
+    if not isinstance(notify, bool):
+        raise MonitorConfigError("notify must be true or false")
     volumes = config.get("volumes")
     if not isinstance(volumes, list) or not volumes or len(volumes) > MAX_VOLUMES:
         raise MonitorConfigError("volumes must list between 1 and {0} volumes".format(MAX_VOLUMES))
@@ -96,7 +110,7 @@ def validate_config(config):
     for volume in volumes:
         if not isinstance(volume, dict):
             raise MonitorConfigError("each volume must be an object")
-        unknown = set(volume) - {"mountPoint", "minFreeBytes", "minFreePercent", "enabled"}
+        unknown = set(volume) - {"mountPoint", "minFreeBytes", "minFreePercent", "criticalFreeBytes", "enabled"}
         if unknown:
             raise MonitorConfigError("Unknown volume key(s): {0}".format(", ".join(sorted(unknown))))
         mount = volume.get("mountPoint", "")
@@ -111,6 +125,9 @@ def validate_config(config):
         percent = volume.get("minFreePercent", DEFAULT_MIN_FREE_PERCENT)
         if not isinstance(percent, (int, float)) or isinstance(percent, bool) or not 0 <= percent <= 100:
             raise MonitorConfigError("minFreePercent must be between 0 and 100")
+        critical = volume.get("criticalFreeBytes")
+        if critical is not None and (not isinstance(critical, int) or isinstance(critical, bool) or critical < 0):
+            raise MonitorConfigError("criticalFreeBytes must be a whole number of bytes or null")
         volume_enabled = volume.get("enabled", True)
         if not isinstance(volume_enabled, bool):
             raise MonitorConfigError("volume enabled must be true or false")
@@ -118,11 +135,14 @@ def validate_config(config):
         "enabled": enabled,
         "intervalSeconds": interval,
         "cooldownSeconds": cooldown,
+        "reminderSeconds": reminder,
+        "notify": notify,
         "volumes": [
             {
                 "mountPoint": volume.get("mountPoint", ""),
                 "minFreeBytes": volume.get("minFreeBytes", DEFAULT_MIN_FREE_BYTES),
                 "minFreePercent": volume.get("minFreePercent", DEFAULT_MIN_FREE_PERCENT),
+                "criticalFreeBytes": volume.get("criticalFreeBytes"),
                 "enabled": volume.get("enabled", True),
             }
             for volume in volumes
@@ -156,9 +176,11 @@ def load(env=None, platform=None):
     except (OSError, ValueError) as exc:
         return {"config": default_config(), "state": _fresh_state(),
                 "configError": "The monitor store is unreadable: {0}".format(exc)}
-    if not isinstance(raw, dict) or raw.get("version") != VERSION:
+    # A store from another version is read, not discarded: the config is validated like any other,
+    # so an app update can never silently reset the user's saved thresholds.
+    if not isinstance(raw, dict) or not isinstance(raw.get("version"), int) or raw["version"] < 1:
         return {"config": default_config(), "state": _fresh_state(),
-                "configError": "The monitor store has an unknown version; defaults apply."}
+                "configError": "The monitor store has an unknown shape; defaults apply."}
     try:
         config = validate_config(raw.get("config"))
     except MonitorConfigError as exc:
@@ -260,30 +282,55 @@ def evaluate(config, state, volumes, now, *, cooldown=None):
             continue
         threshold = max(entry["minFreeBytes"], int(round(total * entry["minFreePercent"] / 100.0)))
         margin = int(round(total * REARM_MARGIN))
+        critical_floor = entry.get("criticalFreeBytes")
+        critical_threshold = threshold // 2 if critical_floor is None else min(critical_floor, threshold)
         key = _volume_key(mount)
         previous = volume_state.get(key) or {}
         armed = previous.get("armed", True)
+        was_critical = bool(previous.get("critical", False))
         last_warning = previous.get("lastWarningAt")
+        last_notice = previous.get("lastNoticeAt", last_warning)
+        reminder = config.get("reminderSeconds", DEFAULT_REMINDER)
+        record = {"armed": armed, "lastWarningAt": last_warning, "lastNoticeAt": last_notice,
+                  "critical": was_critical, "state": "warning" if not armed else "ok"}
         if free < threshold and armed:
             on_cooldown = last_warning is not None and now - last_warning < cooldown
-            volume_state[key] = {"armed": False, "lastWarningAt": last_warning if on_cooldown else now,
-                                 "state": "warning"}
+            record.update(armed=False, lastWarningAt=last_warning if on_cooldown else now, state="warning")
             if not on_cooldown:
+                record["lastNoticeAt"] = now
                 events = _append_event(events, {
                     "at": now, "kind": "warning", "volume": mount,
                     "freeBytes": free, "thresholdBytes": threshold,
                     "message": "Free space is below the warning threshold.",
                 })
         elif free >= threshold + margin and not armed:
-            volume_state[key] = {"armed": True, "lastWarningAt": last_warning, "state": "ok"}
+            record.update(armed=True, critical=False, state="ok")
             events = _append_event(events, {
                 "at": now, "kind": "recovered", "volume": mount,
                 "freeBytes": free, "thresholdBytes": threshold,
                 "message": "Free space recovered above the threshold.",
             })
-        else:
-            volume_state[key] = {"armed": armed, "lastWarningAt": last_warning,
-                                 "state": "warning" if not armed else "ok"}
+        elif free < threshold and not armed and reminder and last_notice is not None and now - last_notice >= reminder:
+            # Still below the threshold long after the warning: say so again.
+            record["lastNoticeAt"] = now
+            events = _append_event(events, {
+                "at": now, "kind": "reminder", "volume": mount,
+                "freeBytes": free, "thresholdBytes": threshold,
+                "message": "Free space is still below the warning threshold.",
+            })
+        # Escalation: a second, deeper level so a disk that keeps filling is not silent after the first warning.
+        if critical_threshold > 0 and free < critical_threshold and not record["critical"] and free < threshold:
+            record.update(critical=True, lastNoticeAt=now)
+            events = _append_event(events, {
+                "at": now, "kind": "critical", "volume": mount,
+                "freeBytes": free, "thresholdBytes": critical_threshold,
+                "message": "Free space is critically low.",
+            })
+        elif record["critical"] and free >= critical_threshold + margin:
+            record["critical"] = False
+        if record["critical"] and free < threshold:
+            record["state"] = "critical"
+        volume_state[key] = record
     return {
         "volumes": volume_state,
         "events": events,
@@ -296,9 +343,10 @@ def active_warnings(state):
     """The volumes currently below their threshold, newest first."""
     warnings = []
     for key, volume in state.get("volumes", {}).items():
-        if volume.get("state") == "warning":
+        if volume.get("state") in ("warning", "critical"):
             warnings.append({"volume": key[len("volumes:"):] if key.startswith("volumes:") else key,
-                             "lastWarningAt": volume.get("lastWarningAt")})
+                             "lastWarningAt": volume.get("lastWarningAt"),
+                             "level": "critical" if volume.get("state") == "critical" else "warning"})
     return warnings
 
 
@@ -371,6 +419,8 @@ def status(*, env=None, platform=None, inventory=None, clock=time.time):
         "enabled": loaded["config"]["enabled"],
         "intervalSeconds": loaded["config"]["intervalSeconds"],
         "cooldownSeconds": loaded["config"]["cooldownSeconds"],
+        "reminderSeconds": loaded["config"]["reminderSeconds"],
+        "notify": loaded["config"]["notify"],
         "volumes": resolved,
         "state": loaded["state"],
         "activeWarnings": active_warnings(loaded["state"]),

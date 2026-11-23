@@ -862,10 +862,10 @@ def test_monitor_evaluate_runs_one_evaluation(monkeypatch):
     monkeypatch.setattr(monitor_module, "_inventory", lambda: snapshot)
     report = api.post("/api/cleanup/monitor/evaluate", {})
     assert report["enabled"] is True
-    assert len(report["state"]["events"]) == 1
-    assert report["state"]["events"][0]["kind"] == "warning"
+    # 100 B free of 1000 is below the 500 B warning level and below the default critical level (half of it).
+    assert [event["kind"] for event in report["state"]["events"]] == ["warning", "critical"]
     assert report["state"]["events"][0]["volume"] == "/Volumes/Fake"
-    assert report["activeWarnings"] == [{"volume": "/Volumes/Fake", "lastWarningAt": report["state"]["events"][0]["at"]}]
+    assert report["activeWarnings"] == [{"volume": "/Volumes/Fake", "lastWarningAt": report["state"]["events"][0]["at"], "level": "critical"}]
 
 
 def test_the_monitor_endpoints_take_no_query_parameters():
@@ -1199,3 +1199,88 @@ def test_grant_helpers_act_only_on_the_running_app_bundle(monkeypatch):
             api.post("/api/cleanup/permissions/" + route, {})
         assert caught.value.status == 409
     assert calls == []
+
+
+def test_reveal_names_a_catalog_entry_and_opens_only_its_folder(tmp_path, monkeypatch):
+    target = catalog_cache_target(tmp_path, monkeypatch)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    calls = []
+
+    class Done:
+        returncode = 0
+
+    monkeypatch.setattr(cleanup_api.subprocess, "run", lambda argv, **kw: calls.append(argv) or Done())
+    result = api.post("/api/cleanup/entries/reveal", {"entryId": "system.user-caches"})
+
+    assert result == {"revealed": target}
+    assert calls == [cleanup_api.reveal_command(target)]
+    assert target in calls[0]
+
+
+def test_reveal_refuses_paths_unknown_ids_and_missing_folders(tmp_path, monkeypatch):
+    catalog_cache_target(tmp_path, monkeypatch)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    monkeypatch.setattr(cleanup_api.subprocess, "run", lambda *a, **k: pytest.fail("must not run"))
+
+    for body, status in (
+        ({}, 400),
+        ({"entryId": "/etc"}, 400),
+        ({"entryId": "no.such-entry"}, 400),
+        ({"entryId": 5}, 400),
+    ):
+        with pytest.raises(cleanup_api.CleanupError) as raised:
+            api.post("/api/cleanup/entries/reveal", body)
+        assert raised.value.status == status
+
+
+def test_reveal_command_is_a_fixed_argv_per_platform(tmp_path):
+    folder = str(tmp_path)
+    assert cleanup_api.reveal_command(folder, "darwin") == ["open", "-R", folder]
+    assert cleanup_api.reveal_command(folder, "win32") == ["explorer", "/select," + folder]
+    assert cleanup_api.reveal_command(folder, "linux") == ["xdg-open", folder]
+
+
+def test_preferences_are_typed_stored_and_survive_a_new_console(tmp_path, monkeypatch):
+    catalog_cache_target(tmp_path, monkeypatch)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    assert api.get("/api/cleanup/preferences", {})["suggestion"]["mode"] == "auto"
+    saved = api.post("/api/cleanup/preferences", {"suggestion": {"mode": "extended", "include": ["developers.npm"], "exclude": ["system.user-caches"]}})
+    assert saved["suggestion"]["mode"] == "extended"
+    # A fresh API object (an app restart or update) reads the same file.
+    again = cleanup_api.CleanupAPI(REPO_ROOT).get("/api/cleanup/preferences", {})
+    assert again["suggestion"]["include"] == ["developers.npm"]
+    assert (tmp_path / "state" / "preferences.json").exists()
+    for bad in ({}, {"suggestion": {"mode": "wild"}}, {"suggestion": {"include": ["a"], "exclude": ["a"]}}, {"suggestion": "x"}):
+        with pytest.raises(cleanup_api.CleanupError) as caught:
+            api.post("/api/cleanup/preferences", bad)
+        assert caught.value.status == 400
+
+
+def test_suggest_works_from_a_finished_scan_and_refuses_anything_else(tmp_path, monkeypatch):
+    target = catalog_cache_target(tmp_path, monkeypatch)
+    with open(os.path.join(target, "one.bin"), "wb") as handle:
+        handle.write(b"x" * (2 * 1024 * 1024))
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    job = api.post("/api/cleanup/scan", {"entryIds": ["system.user-caches"], "workers": 1})
+    wait_for(job, "done")
+    result = api.post("/api/cleanup/suggest", {"jobId": job.id})
+    assert [item["id"] for item in result["items"]] == ["system.user-caches"]
+    assert result["items"][0]["reason"] == "recommended"
+    # The user's exclusion wins and is stored, not just applied once.
+    api.post("/api/cleanup/preferences", {"suggestion": {"exclude": ["system.user-caches"]}})
+    assert api.post("/api/cleanup/suggest", {"jobId": job.id})["items"] == []
+    for body, status in (({}, 404), ({"jobId": "nope"}, 404), ({"jobId": 3}, 404)):
+        with pytest.raises(cleanup_api.CleanupError) as caught:
+            api.post("/api/cleanup/suggest", body)
+        assert caught.value.status == status
+
+
+def test_monitor_config_round_trips_the_new_alert_keys(tmp_path, monkeypatch):
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    base = api.get("/api/cleanup/monitor", {})
+    config = {"enabled": False, "intervalSeconds": 300, "cooldownSeconds": 3600, "reminderSeconds": 7200, "notify": False,
+              "volumes": [{"mountPoint": "", "minFreeBytes": 1, "minFreePercent": 5, "criticalFreeBytes": 1, "enabled": True}]}
+    saved = api.post("/api/cleanup/monitor/config", config)
+    assert saved["reminderSeconds"] == 7200 and saved["notify"] is False
+    assert saved["volumes"][0]["criticalFreeBytes"] == 1
+    assert base["reminderSeconds"] == 86400 and base["notify"] is True

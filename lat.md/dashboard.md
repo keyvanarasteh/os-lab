@@ -65,7 +65,8 @@ submit-class confirms for Enter and pastes even while armed, a persistent
 panic Stop, single-owner arming, and read-only windows/menu-bar/focused
 endpoints. `console/mcp_server.py` exposes the same guarded surface as a
 stdio MCP server — the model acts, the console guards, every step is
-audited. See [[ios-lab]] for permissions.
+audited. See [[ios-lab]] for permissions. The same server carries the Cleanup
+Lab tools, described in [[cleanup-lab#Dashboard pages#MCP tools (CUX-10)]].
 
 
 ## macOS engine panel

@@ -59,7 +59,7 @@ export function WidgetsCard({ snapshot, reload }: { snapshot: CleanupWidgetSnaps
       <Status value={{ ok: false, text: snapshot.publish.reason }} />}
     {valid && snapshot.capable && snapshot.publish.published &&
       <Status value={{ ok: true, text: "Kept up to date automatically." }} />}
-    <details className="mt-3 text-sm">
+    <details className="mt-3 text-sm" open={valid && snapshot.capable}>
       <summary className="cursor-pointer text-(--iux-muted-foreground)">What the widget shows</summary>
     {valid && <div className="mt-3 rounded-md border border-(--iux-border) p-3">
       <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -483,24 +483,39 @@ export interface CleanupPermissions {
 }
 /** CLNP-09/10: one configured volume of the background monitor. */
 export interface CleanupMonitorVolumeConfig {
-  mountPoint: string; minFreeBytes: number; minFreePercent: number; enabled: boolean;
+  mountPoint: string; minFreeBytes: number; minFreePercent: number; criticalFreeBytes?: number | null; enabled: boolean;
   volume: { freeBytes: number | null; totalBytes: number | null; usage: number | null; kind: string | null } | null;
 }
 export interface CleanupMonitorStatus {
   enabled: boolean; running: boolean; intervalSeconds: number; cooldownSeconds: number;
+  /** CUX-07: repeat a standing warning after this long (0 = never) and notify outside the window. */
+  reminderSeconds?: number; notify?: boolean;
   volumes: CleanupMonitorVolumeConfig[];
   state: {
     volumes: Record<string, { armed: boolean; lastWarningAt: number | null; state: string }>;
     events: { at: number; kind: string; volume: string | null; freeBytes: number | null; thresholdBytes: number | null; message: string }[];
     lastEvaluationAt: number | null; lastError: string | null;
   };
-  activeWarnings: { volume: string; lastWarningAt: number | null }[];
+  activeWarnings: { volume: string; lastWarningAt: number | null; level?: "warning" | "critical" }[];
   configError: string | null;
   checkedAt: number;
 }
 export interface CleanupMonitorConfig {
-  enabled: boolean; intervalSeconds: number; cooldownSeconds: number;
-  volumes: { mountPoint: string; minFreeBytes: number; minFreePercent: number; enabled: boolean }[];
+  enabled: boolean; intervalSeconds: number; cooldownSeconds: number; reminderSeconds?: number; notify?: boolean;
+  volumes: { mountPoint: string; minFreeBytes: number; minFreePercent: number; criticalFreeBytes?: number | null; enabled: boolean }[];
+}
+/** CUX-08: the saved suggestion preferences and what a scan suggests under them. */
+export interface CleanupSuggestionPrefs {
+  mode: "auto" | "recommended" | "extended"; include: string[]; exclude: string[];
+  minEntryBytes: number; targetFreeBytes: number | null;
+}
+export interface CleanupPreferences { suggestion: CleanupSuggestionPrefs; configError: string | null }
+export interface CleanupSuggestion {
+  mode: CleanupSuggestionPrefs["mode"];
+  items: { id: string; name: string; bytes: number; risk: string; reason: string }[];
+  totalBytes: number;
+  pressure: { underPressure: boolean; freeBytes: number | null; targetFreeBytes: number | null; shortfallBytes: number; covers: boolean; remainingBytes: number };
+  skipped: { id: string; reason: string }[]; ignoredIds: string[]; configError: string | null;
 }
 /** CLNP-23: one registered Space Explorer root. */
 export interface CleanupExplorerRoot {
@@ -705,6 +720,10 @@ export const api = {
   cleanupResetPermission: () => post<{ reset: string }>("/api/cleanup/permissions/reset", {}),
   cleanupMonitor: () => call<CleanupMonitorStatus>("/api/cleanup/monitor"),
   cleanupMonitorConfig: (config: CleanupMonitorConfig) => post<CleanupMonitorStatus>("/api/cleanup/monitor/config", config),
+  cleanupPreferences: () => call<CleanupPreferences>("/api/cleanup/preferences"),
+  cleanupPreferencesSave: (suggestion: CleanupSuggestionPrefs) => post<CleanupPreferences>("/api/cleanup/preferences", { suggestion }),
+  cleanupSuggest: (jobId: string) => post<CleanupSuggestion>("/api/cleanup/suggest", { jobId }),
+  cleanupRevealEntry: (entryId: string) => post<{ revealed: string }>("/api/cleanup/entries/reveal", { entryId }),
   cleanupMonitorEvaluate: () => post<CleanupMonitorStatus>("/api/cleanup/monitor/evaluate"),
   cleanupVolumes: () => call<CleanupVolumes>("/api/cleanup/volumes"),
   /** CLN-27: relocatable entries and destination volumes, then plan → confirm → run. */

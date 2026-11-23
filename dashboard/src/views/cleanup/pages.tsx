@@ -18,6 +18,8 @@ import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
 import { RelocationCard } from "./relocation-card";
 import { WidgetsCard } from "./widgets-card";
+import { CareList, CareRow } from "./care-sections";
+import { SuggestionSettings } from "./suggestion-settings";
 import { ScanCard } from "./scan-card";
 import { PermissionGuide } from "./permission-guide";
 import { CatalogPage } from "./catalog-page";
@@ -263,8 +265,9 @@ function ConfirmDialog({
  * pretending the button would do something.
  */
 function QuickCleanCard({
-  bookmarks, busy, canWork, measured, refusals, onQuickClean, settingsHref
+  bookmarks, busy, canWork, measured, refusals, onQuickClean, settingsHref, bare
 }: {
+  bare?: boolean;
   bookmarks: BookmarksPayload | null; busy: boolean; canWork: boolean;
   measured: Map<string, CleanupScan["entries"][number]>; refusals: string;
   onQuickClean: () => void; settingsHref: string;
@@ -273,7 +276,9 @@ function QuickCleanCard({
   const quick = items.filter((item) => item.quickClean);
   const quickBytes = quick.reduce((sum, item) => sum + (measured.get(item.entryId)?.sizeBytes ?? 0), 0);
   const measuredQuick = quick.some((item) => measured.get(item.entryId)?.sizeBytes != null);
-  return <Section id="overview-quick-clean" title="Quick clean" description="One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.">
+  const frame = (children: React.ReactNode) => bare ? <div>{children}</div>
+    : <Section id="overview-quick-clean" title="Quick clean" description="One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.">{children}</Section>;
+  return frame(<>
     <div className="flex items-baseline gap-2">
       {quick.length ? <>
         <span dir="ltr" className="text-3xl font-bold tabular-nums">{measuredQuick ? bytes(quickBytes) : "—"}</span>
@@ -288,7 +293,7 @@ function QuickCleanCard({
     </div>
     {items.length === 0 ? <p className="mt-2 text-xs text-(--iux-muted-foreground)">Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.</p>
       : quick.length === 0 ? <p className="mt-2 text-xs text-(--iux-muted-foreground)">Enable quick clean on a bookmark in Settings to choose your own set.</p> : null}
-  </Section>;
+  </>);
 }
 
 export default function CleanupPage({ page: initialPage = "" }: { page?: CleanupPageId }) {
@@ -317,6 +322,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   /** CUX-01: set by "Scan & review"; the finished scan then builds the recommended Trash plan by itself. */
   const autoReview = useRef(false);
   const [reviewNote, setReviewNote] = useState("");
+  const [prefsSummary, setPrefsSummary] = useState("auto");
   const [order, setOrder] = useState<SortOrder>("size");
   // CUX-03: the Advanced scan filter bar.
   const [query, setQuery] = useState("");
@@ -588,10 +594,33 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     const result = active.result as CleanupScan | undefined;
     if (active.state !== "done" || !result) return;
     if (result.cancelled) { setReviewNote("Scan stopped, so no plan was built. Scan again to review."); return; }
-    if (!suggestedIds.length) { setReviewNote("The scan found nothing in the recommended set to clean."); return; }
-    void start(() => api.cleanupPlan(suggestedIds, "trash"));
+    // CUX-08: the server picks what to clean from this scan: catalog defaults, the disk's pressure,
+    // quick-clean bookmarks and the user's saved preferences.
+    const jobId = active.id;
+    void api.cleanupSuggest(jobId).then((suggestion) => {
+      if (!suggestion.items.length) { setReviewNote("The scan found nothing to suggest. Adjust the suggestion settings or open Advanced scan."); return; }
+      const need = suggestion.pressure.underPressure && !suggestion.pressure.covers
+        ? ` Safe items cover ${bytes(suggestion.totalBytes)} of the ${bytes(suggestion.pressure.shortfallBytes)} the disk needs; Space Explorer can find more.` : "";
+      setReviewNote(`Suggested ${bytes(suggestion.totalBytes)} from ${suggestion.items.length} items.${need}`);
+      void start(() => api.cleanupPlan(suggestion.items.map((item) => item.id), "trash"));
+    }).catch((error) => setActionError(errorText(error)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, active?.state]);
+  // CUX-06: "S" starts Scan & review on the dashboard when no field has focus.
+  useEffect(() => {
+    if (PUBLIC || page !== "") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "s" || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      if (status?.state !== "ready" || busy) return;
+      event.preventDefault();
+      scanAndReview();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
   function scanAndReview() {
     autoReview.current = true;
     setReviewNote("");
@@ -674,7 +703,13 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
       { id: "scan", label: "Scan this entry", disabledReason: notReady, onSelect: () => void start(() => api.cleanupScan([item.id])) },
       { id: "clean", label: mode === "delete" ? "Review & delete permanently…" : "Review & clean…", disabledReason: cleanBlock, tone: mode === "delete" ? "danger" : undefined,
         onSelect: () => { setSelected((old) => old.includes(item.id) ? old : [...old, item.id]); void start(() => api.cleanupPlan([item.id], mode)); } },
-      { id: "select", label: on ? "Deselect" : "Select", separatorBefore: true, onSelect: () => { setSelected((old) => on ? old.filter((id) => id !== item.id) : [...old, item.id]); setConfirm(false); } },
+      ...(!PUBLIC ? [
+        { id: "reveal", label: "Reveal in file manager", separatorBefore: true, disabledReason: item.paths.some((path) => path.path) ? undefined : "This entry has no folder on this computer.",
+          onSelect: () => void api.cleanupRevealEntry(item.id).catch((error) => setActionError(errorText(error))) },
+        { id: "copy", label: "Copy path", disabledReason: item.paths.some((path) => path.path) ? undefined : "This entry has no folder on this computer.",
+          onSelect: () => { const target = item.paths.find((path) => path.path)?.path ?? ""; void navigator.clipboard.writeText(target).catch(() => setActionError("Could not copy the path. Select it in the entry details instead.")); } }
+      ] : []),
+      { id: "select", label: on ? "Deselect" : "Select", onSelect: () => { setSelected((old) => on ? old.filter((id) => id !== item.id) : [...old, item.id]); setConfirm(false); } },
       { id: "only", label: "Select only this", onSelect: () => { setSelected([item.id]); setConfirm(false); } },
       ...(!PUBLIC ? [{ id: "bookmark", label: bookmarkedIds.has(item.id) ? "Remove bookmark" : "Add bookmark", separatorBefore: true, onSelect: () => toggleBookmark(item.id) }] : [])
     ];
@@ -714,17 +749,31 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           </Section>}
           {page === "" && <>
             {!PUBLIC && status?.state === "ready" && <StorageHero volumes={volumes} onRefresh={reloadVolumes} />}
-            {!PUBLIC && status?.state === "ready" && <div className="grid items-start gap-5 lg:grid-cols-2">
-              <QuickCleanCard bookmarks={bookmarks} busy={busy} canWork={canWork} measured={measured} refusals={quickRefusals}
-                onQuickClean={runQuickClean} settingsHref={link("settings/")} />
+            {!PUBLIC && status?.state === "ready" && <>
               <ScanCard active={active} entries={entries} measured={sizes} checked={dashChecked ?? defaultChecked} setChecked={setDashChecked}
                 canWork={canWork} scanned={!!latestScan} error={actionError} note={reviewNote}
                 onScan={() => { autoReview.current = false; setReviewNote(""); void start(() => api.cleanupScan(entries.map((item) => item.id))); }}
                 onScanReview={scanAndReview} onCancel={() => void cancel()}
                 onClean={(ids) => void start(() => api.cleanupPlan(ids, "trash"))}
                 groupHref={(id) => link(`catalog/#${id}`)} />
-            </div>}
-            {!PUBLIC && status?.state === "ready" && <MonitorStatsCard monitor={monitor} volumes={volumes} settingsHref={link("settings/")} />}
+              {/* CUX-09: everything else, collapsed, with a live one-line summary; nothing is removed from the app. */}
+              <CareList label="Cleanup options">
+                <CareRow id="overview-suggestions" title="Suggestions" summary={`${prefsSummary} · saved on this computer`}>
+                  <SuggestionSettings entries={entries} sizes={sizes} onSaved={(saved) => setPrefsSummary(saved.mode)} />
+                </CareRow>
+                <CareRow id="overview-quick-clean" title="Quick clean" summary={`${(bookmarks?.bookmarks ?? []).filter((item) => item.quickClean).length} bookmarked`}>
+                  <QuickCleanCard bare bookmarks={bookmarks} busy={busy} canWork={canWork} measured={measured} refusals={quickRefusals}
+                    onQuickClean={runQuickClean} settingsHref={link("settings/")} />
+                </CareRow>
+                <CareRow id="cleanup-monitor" title="Alerts" attention={!!monitor?.activeWarnings.length}
+                  summary={!monitor?.enabled ? "off" : monitor.activeWarnings.length ? `${monitor.activeWarnings.length} low-space ${monitor.activeWarnings.some((w) => w.level === "critical") ? "(critical)" : "warning"}` : "on, disk ok"}>
+                  <MonitorStatsCard bare monitor={monitor} volumes={volumes} settingsHref={link("settings/")} reload={monitorReload} />
+                </CareRow>
+                <CareRow id="cleanup-tools" title="All tools" summary="scan, explore, containers, packages, relocation, history and more">
+                  <OverviewCards go={goCard} />
+                </CareRow>
+              </CareList>
+            </>}
             {latestClean && <Section title="Latest clean report" description={`${latestClean.totals.trashed} moved to Trash · ${latestClean.totals.skipped} skipped · ${latestClean.totals.failed} failed`}>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={latestClean.totals.trashed ? "success" : undefined}>{itemStatusLabel("trashed")} {latestClean.totals.trashed}</Badge>

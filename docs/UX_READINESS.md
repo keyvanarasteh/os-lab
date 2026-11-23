@@ -31,6 +31,19 @@ The proposed extension and its tracked acceptance work are in the [UX guideline 
 - Keep standing guidance short when the nearby status and action already explain it. Preserve setup, security, download, privilege, cancellation, and evidence-limit warnings at the decision point.
 - Let long navigation collapse. The lab switcher (⌘L / Ctrl+L and the "Switch lab" sidebar card) focuses the sidebar on one lab with its live availability on each card; every lab stays reachable through Spotlight and direct links, and "All labs" restores the full list. Rarely used guides ("How to use") sit at the bottom of their group as collapsible entries, collapsed by default.
 
+## One-click standard
+
+Applies to every lab page; the rationale is in [`lat.md/ux-readiness.md`](../lat.md/ux-readiness.md) and the worked example is [Cleanup UX plan](CLEANUP_UX_PLAN.md). Copy this into the PR.
+
+- [ ] One primary action goes from nothing to a reviewed result; destructive steps end at the shared confirmation.
+- [ ] Everything else is a collapsed row with a one-line live summary; no ability was removed (add or keep a test that lists them all).
+- [ ] Defaults come from live state; user choices are stored on this computer, validated, and survive restart and app update (older/newer store versions are read, unknown ids are kept).
+- [ ] Limits are stated honestly (what is short, where to look next); safety classes are never bypassed.
+- [ ] Conditions that need action notify outside the window, escalate, repeat, and can be turned off.
+- [ ] An MCP tool exists for every new function (read-only tools, review that never applies, apply only with `confirm: true`, no raw paths or commands).
+- [ ] A shortcut for the primary action, visible focus, coarse-pointer targets, translations in every locale.
+- [ ] Unit, console and browser tests cover the logic, the endpoint, the one-click path and each collapsed row.
+
 ## Keep controls usable across devices
 
 - Shared buttons, icon actions, dialog close controls, and dense text actions need usable coarse-pointer targets (about 44×44 CSS pixels where space allows), without enlarging desktop layouts or making the page pan horizontally.

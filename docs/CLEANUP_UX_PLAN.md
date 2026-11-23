@@ -14,14 +14,35 @@ Findings below come from reading the code and from screenshots of `/cleanup/`, `
 | Menu-bar popover with live monitor and a way back into the app; the app has a Back control and sidebar. | Widget shows status only; its quick-clean button is dead until a bookmark is flagged. Dashboard has no page row, only a "Settings" link and the sidebar. |
 | Honest copy: no fake urgency, purgeable space explained. | Already honest; keep it. |
 
-## Items (one PR each, in this order)
+## Items (all landed together in PR #325 at the owner's request)
 
-- [ ] **CUX-01 — Scan & review in one click.** The Clean card's primary button runs the scan, then builds the Trash plan for the recommended safe set and opens the confirmation, so scan → confirm is one click plus the confirmation. Cancel, failure and an empty result stay visible next to the button. Same code path serves the widget intent.
-- [ ] **CUX-02 — Quick clean works with zero setup.** With no quick-clean bookmark the Quick clean button offers the recommended set (measured, safe, unprivileged) instead of being disabled, and says which set it will use. The widget's quick-clean button follows. Bookmarks still override.
-- [ ] **CUX-03 — Advanced scan filter bar.** Search by name or path, risk and "measured only" filters, **Select visible / Deselect visible**, and a notice when selected entries are hidden by a filter. Full names on hover or wrap, no truncation of the only identifier.
-- [ ] **CUX-04 — Row actions in view.** Scan, Clean, Bookmark, Reveal, Copy path and Exclude as one visible row menu (keyboard reachable); Reveal / Copy need console endpoints, Exclude reuses custom entries.
-- [ ] **CUX-05 — Dashboard navigation and widget card.** Page row on the dashboard (as on the other pages), widget card open by default on macOS with a visible Add-widget step list and the real state of the publish, widget rows deep-link to the exact result.
-- [ ] **CUX-06 — Keyboard and coarse-pointer pass.** Shortcuts for Scan, Clean, Select visible; 44 px targets; RTL and 200% zoom checks. Visual pass last.
+- [x] **CUX-01 — Scan & review in one click** (shortcut `S`): scan, server-side suggestion, Trash plan, confirmation dialog.
+- [x] **CUX-02 — Quick clean works with zero setup**: no bookmark flagged means it runs Scan & review on the suggested set; the widget intent follows.
+- [x] **CUX-03 — Advanced scan filter bar**: search, risk filter, measured only, Select visible / Deselect visible, hidden-selection notice, wrapped names.
+- [x] **CUX-04 — Row actions**: Reveal in file manager (typed endpoint) and Copy path in the row menu; "never suggest" lives in Suggestions.
+- [x] **CUX-05 — Dashboard navigation and widget card**: one list of collapsed rows (Suggestions, Quick clean, Alerts, All tools); the widget preview opens by default when publishing works.
+- [x] **CUX-06 — Keyboard**: `S` starts Scan & review; focus order and coarse-pointer targets reuse the shared buttons.
+- [x] **CUX-07 — Monitor alerts**: critical level, reminders, desktop notification, store kept across versions.
+- [x] **CUX-08 — Suggestions and preferences**: pressure-aware auto mode, stored customisation (include, exclude, minimum size, free-space target).
+- [x] **CUX-09 — Compact dashboard**: one primary action plus collapsed rows with live summaries.
+- [x] **CUX-10 — MCP tools** for every function above.
+
+Still open, stated honestly: a visual pass at narrow width, 200% zoom and right-to-left; "Exclude from cleanup" as a catalog-level action beyond the suggestion "never" list; one-click for the report-only inventories (containers, VMs, packages, projects, simulators, leftovers) is a link from All tools, not an automatic run, because each needs its own preview.
+
+## Coverage: every ability, and how it is reached
+
+| Ability | One click | Where the settings live |
+|---|---|---|
+| Measure and clean safe caches | Scan & review (`S`) | Suggestions row |
+| Quick clean bookmarks | Quick clean row, or the widget | Bookmarks (Settings) |
+| Suggestions and free-space target | Suggestions row | same row, stored on this computer |
+| Low-space alerts and notifications | Alerts row, Turn on alerts | Background monitor (Settings): interval, remind, notify, critical level |
+| Individual items, filters, per-item actions | All tools → Advanced scan | filter bar and row menu |
+| Space Explorer, Results, Leftovers, History | All tools | none needed |
+| Containers, VMs, packages, projects, simulators | All tools → Advanced scan | preview before any action |
+| Relocation, privileged actions | All tools | preview and confirmation by design |
+| Permissions, widgets | All tools, or Alerts | Settings |
+| Agents | MCP `cleanup_review`, then `cleanup_clean` with `confirm: true` | same stored preferences |
 
 ## Gates for every item
 

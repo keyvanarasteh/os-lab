@@ -14,6 +14,7 @@ import { Badge, Empty, Section, Status } from "../../components/ui";
 import { api, formatBytes, message, type CleanupMonitorConfig, type CleanupMonitorStatus, type CleanupVolume } from "../../lib/api";
 
 const INTERVALS = [60, 120, 300, 600, 1800, 3600];
+const REMINDERS = [0, 3600, 6 * 3600, 86400, 3 * 86400, 7 * 86400];
 
 function formatInterval(seconds: number): string {
   if (seconds % 3600 === 0) return `${seconds / 3600} h`;
@@ -58,8 +59,10 @@ export function MonitorCard({
       enabled: current.enabled,
       intervalSeconds: current.intervalSeconds,
       cooldownSeconds: current.cooldownSeconds,
-      volumes: current.volumes.map(({ mountPoint, minFreeBytes, minFreePercent, enabled }) => ({
-        mountPoint, minFreeBytes, minFreePercent, enabled,
+      reminderSeconds: current.reminderSeconds ?? 86400,
+      notify: current.notify ?? true,
+      volumes: current.volumes.map(({ mountPoint, minFreeBytes, minFreePercent, criticalFreeBytes, enabled }) => ({
+        mountPoint, minFreeBytes, minFreePercent, criticalFreeBytes: criticalFreeBytes ?? null, enabled,
       })),
     };
   }
@@ -80,6 +83,14 @@ export function MonitorCard({
           {INTERVALS.map((seconds) => <option key={seconds} value={seconds}>{formatInterval(seconds)}</option>)}
         </select>
       </label>
+      <label className="text-sm">Remind{" "}
+        <select className="iux-input ml-1" aria-label="Repeat a standing warning" value={monitor.reminderSeconds ?? 86400} disabled={busy || !monitor.enabled}
+          onChange={(event) => void save((current) => ({ ...configFrom(current), reminderSeconds: Number(event.target.value) }))}>
+          {REMINDERS.map((seconds) => <option key={seconds} value={seconds}>{seconds === 0 ? "never" : `every ${formatInterval(seconds)}`}</option>)}
+        </select>
+      </label>
+      <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" className="accent-[#f36c21]" checked={monitor.notify ?? true} disabled={busy || !monitor.enabled}
+        onChange={(event) => void save((current) => ({ ...configFrom(current), notify: event.target.checked }))} />Desktop notification</label>
       <span className="text-xs text-(--iux-muted-foreground)">
         {monitor.enabled ? (monitor.running ? "runner active" : "runner starting") : "off — no checks run"}
       </span>
@@ -103,9 +114,17 @@ export function MonitorCard({
           {entry.volume && <span dir="ltr" className="tabular-nums text-xs text-(--iux-muted-foreground)">
             {formatBytes(entry.volume.freeBytes)} free
           </span>}
-          <Badge tone={state?.state === "warning" ? "danger" : state?.state === "ok" ? "success" : undefined}>
-            {state?.state === "warning" ? "warning" : state?.state === "ok" ? "ok" : "no data"}
+          <Badge tone={state?.state === "warning" || state?.state === "critical" ? "danger" : state?.state === "ok" ? "success" : undefined}>
+            {state?.state === "critical" ? "critical" : state?.state === "warning" ? "warning" : state?.state === "ok" ? "ok" : "no data"}
           </Badge>
+          <label className="text-xs">critical under{" "}
+            <input type="number" className="iux-input w-16" min={0} dir="ltr" disabled={busy} aria-label="Critical free space (GiB, blank for half the warning level)"
+              placeholder="auto" defaultValue={entry.criticalFreeBytes ? Math.round(entry.criticalFreeBytes / (1024 * 1024 * 1024)) : ""}
+              onBlur={(event) => void save((current) => ({
+                ...configFrom(current),
+                volumes: current.volumes.map((row, rowIndex) => rowIndex === index ? { ...row, criticalFreeBytes: event.target.value === "" ? null : Math.max(0, Number(event.target.value)) * 1024 * 1024 * 1024 } : row),
+              }))} />{" "}GiB
+          </label>
           <label className="text-xs">warn under{" "}
             <input type="number" className="iux-input w-20" min={0} dir="ltr" disabled={busy} defaultValue={Math.round(entry.minFreeBytes / (1024 * 1024 * 1024))}
               onBlur={(event) => void save((current) => ({
@@ -157,10 +176,26 @@ export function MonitorCard({
  * thresholds stays on the Settings tab, one link away.
  */
 export function MonitorStatsCard({
-  monitor, volumes, settingsHref
+  monitor, volumes, settingsHref, bare, reload
 }: {
   monitor: CleanupMonitorStatus | null; volumes: CleanupVolume[] | null; settingsHref: string;
+  /** CUX-09: render inside a collapsed dashboard row (no card heading) and offer a one-click enable. */
+  bare?: boolean; reload?: () => void;
 }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function turnOn() {
+    if (!monitor) return;
+    setBusy(true); setError("");
+    try {
+      await api.cleanupMonitorConfig({
+        enabled: true, intervalSeconds: monitor.intervalSeconds, cooldownSeconds: monitor.cooldownSeconds,
+        reminderSeconds: monitor.reminderSeconds ?? 86400, notify: monitor.notify ?? true,
+        volumes: monitor.volumes.map(({ mountPoint, minFreeBytes, minFreePercent, criticalFreeBytes, enabled }) => ({ mountPoint, minFreeBytes, minFreePercent, criticalFreeBytes: criticalFreeBytes ?? null, enabled })),
+      });
+      reload?.();
+    } catch (e) { setError(message(e)); } finally { setBusy(false); }
+  }
   if (!monitor || !Array.isArray(monitor.volumes)) return null;
   const rows = monitor.volumes.length ? monitor.volumes.map((entry) => ({
     key: entry.mountPoint,
@@ -175,21 +210,25 @@ export function MonitorStatsCard({
     state: volume.pressure === "warning" ? "warning" : undefined,
     monitored: false,
   }));
-  return <Section id="cleanup-monitor" title="Monitor stats" description="Free-space checks while the console runs. Thresholds and volumes are configured in Settings.">
+  const wrap = (children: React.ReactNode) => bare ? <div id="cleanup-monitor">{children}</div>
+    : <Section id="cleanup-monitor" title="Monitor stats" description="Free-space checks while the console runs. Thresholds and volumes are configured in Settings.">{children}</Section>;
+  return wrap(<>
     <div className="flex flex-wrap items-center gap-2">
       <Badge tone={monitor.enabled ? "success" : undefined}>{monitor.enabled ? "Monitoring on" : "Monitoring off"}</Badge>
+      {!monitor.enabled && <button type="button" className="iux-btn" data-variant="primary" disabled={busy} onClick={() => void turnOn()}>Turn on alerts</button>}
       <span className="text-xs text-(--iux-muted-foreground)">
         {monitor.enabled ? (monitor.running ? "runner active" : "runner starting") : "no checks run"}
       </span>
       {monitor.activeWarnings.length > 0 && <Badge tone="danger">{monitor.activeWarnings.length} {monitor.activeWarnings.length === 1 ? "warning" : "warnings"}</Badge>}
       <a className="iux-btn ms-auto" href={settingsHref}>Configure</a>
     </div>
+    {error && <p role="alert" className="mt-2 text-xs text-(--iux-danger)">{error}</p>}
     <div className="mt-3 divide-y divide-(--iux-border)">
       {rows.map((row) => <div key={row.key} className="flex flex-wrap items-center gap-2 py-2 text-sm">
         <span className="min-w-0 flex-1 truncate" translate="no">{row.label}</span>
         {row.freeBytes != null && <span dir="ltr" className="tabular-nums text-xs text-(--iux-muted-foreground)">{formatBytes(row.freeBytes)} free</span>}
-        <Badge tone={row.state === "warning" ? "danger" : row.state === "ok" ? "success" : undefined}>
-          {row.state === "warning" ? "warning" : row.state === "ok" ? "ok" : row.monitored ? "no data" : "not monitored"}
+        <Badge tone={row.state === "warning" || row.state === "critical" ? "danger" : row.state === "ok" ? "success" : undefined}>
+          {row.state === "critical" ? "critical" : row.state === "warning" ? "warning" : row.state === "ok" ? "ok" : row.monitored ? "no data" : "not monitored"}
         </Badge>
       </div>)}
       {!rows.length && <Empty>No volumes measured yet.</Empty>}
@@ -203,5 +242,5 @@ export function MonitorStatsCard({
         </li>)}
       </ul>
     </details>}
-  </Section>;
+  </>);
 }

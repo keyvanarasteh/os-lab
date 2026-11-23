@@ -170,12 +170,85 @@ class Store(unittest.TestCase):
             self.assertIn("invalid", refused["configError"])
             self.assertFalse(refused["config"]["enabled"])
 
-    def test_unknown_version_is_reported(self):
+    def test_another_store_version_keeps_a_valid_config(self):
+        """An app update that bumps the store version must not reset the user's thresholds."""
+        with tempfile.TemporaryDirectory() as base:
+            saved = config(reminderSeconds=7200, notify=False)
+            with open(os.path.join(base, "monitor.json"), "w", encoding="utf-8") as handle:
+                json.dump({"version": 99, "config": saved, "state": {}}, handle)
+            loaded = monitor.load(env=env_state(base))
+            self.assertIsNone(loaded["configError"])
+            self.assertEqual(loaded["config"], saved)
+
+    def test_an_old_config_without_the_new_keys_loads_with_defaults(self):
+        with tempfile.TemporaryDirectory() as base:
+            old = {"enabled": True, "intervalSeconds": 120, "cooldownSeconds": 600,
+                   "volumes": [{"mountPoint": "/", "minFreeBytes": 5, "minFreePercent": 5, "enabled": True}]}
+            with open(os.path.join(base, "monitor.json"), "w", encoding="utf-8") as handle:
+                json.dump({"version": 1, "config": old, "state": {}}, handle)
+            loaded = monitor.load(env=env_state(base))
+            self.assertIsNone(loaded["configError"])
+            self.assertEqual(loaded["config"]["intervalSeconds"], 120)
+            self.assertEqual(loaded["config"]["reminderSeconds"], monitor.DEFAULT_REMINDER)
+            self.assertTrue(loaded["config"]["notify"])
+            self.assertIsNone(loaded["config"]["volumes"][0]["criticalFreeBytes"])
+
+    def test_a_garbage_store_still_falls_back_to_defaults(self):
         with tempfile.TemporaryDirectory() as base:
             with open(os.path.join(base, "monitor.json"), "w", encoding="utf-8") as handle:
-                json.dump({"version": 99, "config": {}, "state": {}}, handle)
-            loaded = monitor.load(env=env_state(base))
-            self.assertIn("unknown version", loaded["configError"])
+                json.dump({"version": "x"}, handle)
+            self.assertIn("unknown shape", monitor.load(env=env_state(base))["configError"])
+
+
+class Escalation(unittest.TestCase):
+    """A disk that keeps filling after the first warning must not stay silent."""
+
+    def test_a_deeper_crossing_raises_one_critical_event(self):
+        state = monitor.evaluate(config(), monitor._fresh_state(), [volume("/", free=150, total=1000, is_home=True)], now=1000)
+        self.assertEqual([event["kind"] for event in state["events"]], ["warning"])
+        deeper = monitor.evaluate(config(), state, [volume("/", free=40, total=1000, is_home=True)], now=2000)
+        self.assertEqual([event["kind"] for event in deeper["events"]], ["warning", "critical"])
+        self.assertEqual(deeper["events"][-1]["thresholdBytes"], 100)  # half of the 200 warning level
+        self.assertEqual(deeper["volumes"][monitor._volume_key("/")]["state"], "critical")
+        self.assertEqual(monitor.active_warnings(deeper)[0]["level"], "critical")
+        again = monitor.evaluate(config(), deeper, [volume("/", free=30, total=1000, is_home=True)], now=3000)
+        self.assertEqual(len(again["events"]), 2)
+
+    def test_critical_floor_is_configurable_and_never_above_the_warning_level(self):
+        cfg = config(volumes=[{"mountPoint": "", "minFreeBytes": 100, "minFreePercent": 20.0, "criticalFreeBytes": 9999, "enabled": True}])
+        state = monitor.evaluate(cfg, monitor._fresh_state(), [LOW], now=1000)
+        # Clamped to the warning level (200), so 100 free is already critical.
+        self.assertEqual([event["kind"] for event in state["events"]], ["warning", "critical"])
+
+    def test_critical_clears_after_recovery_past_the_margin(self):
+        state = monitor.evaluate(config(), monitor._fresh_state(), [volume("/", free=40, total=1000, is_home=True)], now=1000)
+        better = monitor.evaluate(config(), state, [volume("/", free=150, total=1000, is_home=True)], now=2000)
+        self.assertEqual(better["volumes"][monitor._volume_key("/")]["state"], "warning")
+        worse = monitor.evaluate(config(), better, [volume("/", free=40, total=1000, is_home=True)], now=3000)
+        self.assertEqual([event["kind"] for event in worse["events"]].count("critical"), 2)
+
+    def test_a_reminder_repeats_a_standing_warning_after_the_interval(self):
+        cfg = config(reminderSeconds=3600)
+        state = monitor.evaluate(cfg, monitor._fresh_state(), [volume("/", free=150, total=1000, is_home=True)], now=1000)
+        quiet = monitor.evaluate(cfg, state, [volume("/", free=150, total=1000, is_home=True)], now=1000 + 3599)
+        self.assertEqual([event["kind"] for event in quiet["events"]], ["warning"])
+        due = monitor.evaluate(cfg, quiet, [volume("/", free=150, total=1000, is_home=True)], now=1000 + 3600)
+        self.assertEqual([event["kind"] for event in due["events"]], ["warning", "reminder"])
+        next_one = monitor.evaluate(cfg, due, [volume("/", free=150, total=1000, is_home=True)], now=1000 + 3600 + 100)
+        self.assertEqual(len(next_one["events"]), 2)
+
+    def test_reminders_can_be_turned_off(self):
+        cfg = config(reminderSeconds=0)
+        state = monitor.evaluate(cfg, monitor._fresh_state(), [LOW], now=1000)
+        later = monitor.evaluate(cfg, state, [LOW], now=1000 + 10 * 86400)
+        self.assertEqual([event["kind"] for event in later["events"]], ["warning", "critical"][:len(later["events"])])
+        self.assertNotIn("reminder", [event["kind"] for event in later["events"]])
+
+    def test_bad_values_for_the_new_keys_are_refused(self):
+        for bad in ({"reminderSeconds": -1}, {"reminderSeconds": 10**9}, {"notify": "yes"},
+                    {"volumes": [{"mountPoint": "/", "criticalFreeBytes": -5}]}):
+            with self.assertRaises(monitor.MonitorConfigError):
+                monitor.validate_config(dict(monitor.default_config(), **bad))
 
 
 class RunEvaluation(unittest.TestCase):

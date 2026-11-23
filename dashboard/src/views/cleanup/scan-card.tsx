@@ -55,7 +55,7 @@ export function ScanCard(props: ScanCardProps) {
     return <Section id="overview-review" title="Clean" description="One click scans the safe categories and opens the plan to confirm. Nothing is removed until you confirm.">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-(--iux-muted-foreground)">{canWork ? "Ready to scan" : "Scan unavailable until setup is complete"} · {entries.length} categories available</p>
-        <button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !entries.length} onClick={onScanReview}>Scan & review</button>
+        <button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !entries.length} aria-keyshortcuts="S" title="Shortcut: S" onClick={onScanReview}>Scan & review</button>
       </div>
       {error && <p role="alert" className="mt-3 text-sm text-(--iux-danger)">{error}</p>}
       {note && !error && <p role="status" className="mt-3 text-sm text-(--iux-muted-foreground)">{note}</p>}
@@ -77,6 +77,7 @@ export function ScanCard(props: ScanCardProps) {
       <button type="button" className="iux-btn" data-variant="ghost" disabled={!canWork} onClick={onScan}><BroomIcon size={13} />Scan again</button>
     </div>
     {error && <p role="alert" className="mt-2 text-sm text-(--iux-danger)">{error}</p>}
+    {note && !error && <p role="status" className="mt-2 text-sm text-(--iux-muted-foreground)">{note}</p>}
     <ul className="mt-2 divide-y divide-(--iux-border) rounded-md border border-(--iux-border)">
       {rows.map(({ group, items, bytes }) => {
         const ids = items.map((entry) => entry.id);

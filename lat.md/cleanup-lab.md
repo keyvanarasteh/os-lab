@@ -538,6 +538,38 @@ The local app polls only while a job runs. Public Pages renders the routes witho
 engine calls or destructive controls. All eight route sets are built, including
 the seven translated locales.
 
+### One-click dashboard (CUX-01, 02, 09)
+
+The dashboard has one primary action, **Scan & review** (shortcut `S`): it scans every entry, asks the engine what to clean, builds the Trash plan and opens the confirmation.
+
+Below it, one bordered list of collapsed rows keeps every other ability reachable with a live summary: Suggestions, Quick clean, Alerts (with an attention dot while a low-space warning is active) and All tools, which lists all seventeen capability cards. [[dashboard/src/views/cleanup/care-sections.tsx]] renders the rows and opens one when its id is the URL hash. A stopped scan or an empty suggestion builds no plan and says so.
+
+### Suggestions and preferences (CUX-08)
+
+[[cleanup-lab/engine/cleanup_lab/suggest.py]] chooses what to clean from a finished scan; [[cleanup-lab/engine/cleanup_lab/preferences.py]] stores the user's choices.
+
+Modes: `recommended` (catalog defaults), `extended` (every safe measured entry) and `auto`, which is recommended on a healthy disk and adds the safest largest entries while free space is below the monitor's warning level until the shortfall is covered. When they cannot cover it the result says how much is still missing. `include`, `exclude`, `minEntryBytes` and `targetFreeBytes` customise it; quick-clean bookmarks count as `include`. High, privacy and credentials entries, privileged entries and measured-only entries are never suggested, even when included.
+
+The store is `preferences.json` in the private state folder, written atomically. A store from another version is read, and ids the current catalog lacks are kept and only ignored when suggesting. `GET/POST /api/cleanup/preferences` and `POST /api/cleanup/suggest {jobId}` serve it; [[dashboard/src/views/cleanup/suggestion-settings.tsx]] edits it.
+
+### Monitor alerts (CUX-07)
+
+The monitor escalates, repeats and notifies instead of warning once and going silent.
+
+[[cleanup-lab/engine/cleanup_lab/monitor.py]] adds a `critical` event when free space falls below half the warning level (or `criticalFreeBytes`; `0` turns it off) and a `reminder` while a warning stays true after `reminderSeconds` (default a day, `0` is never). Both re-arm after recovery past the margin. A store written by another version keeps its saved thresholds instead of resetting to defaults. [[cleanup-lab/engine/cleanup_lab/notify.py]] sends one native notification per warning, critical or reminder event when `notify` is on, with fixed argv and the text passed as arguments; the runner also arms the bookmark hook on critical events.
+
+Bookmarks the catalog stops listing are set aside in `retired` rather than deleted, and return when the entry does.
+
+### Reveal and row actions (CUX-04)
+
+`POST /api/cleanup/entries/reveal {entryId}` shows a catalog entry's folder in the file manager through a fixed argv per OS; the page never sends a path. The Advanced scan row menu offers Reveal in file manager and Copy path; "never suggest" lives in the Suggestions row.
+
+### MCP tools (CUX-10)
+
+[[console/mcp_cleanup.py]] adds the Cleanup Lab to the os-lab MCP server: read-only status, catalog, volumes, monitor, permissions, bookmarks, history, widget, preferences and job tools; `cleanup_scan`, `cleanup_suggest`, `cleanup_review` and `cleanup_quick_clean_plan`, which never apply anything; `cleanup_clean`, which needs `confirm: true` and is Trash only; and the settings tools for preferences, monitor, bookmarks and reveal.
+
+The tools take catalog ids, never paths or commands, and are refused inside `macos_task`. Tests: `android-lab/lab/tests/test_mcp_cleanup.py`.
+
 ### Advanced scan filter bar
 
 The Advanced scan grid has a filter bar (CUX-03): a search over entry name, id and path, a risk filter, a measured-only toggle and **Select visible / Deselect visible**.

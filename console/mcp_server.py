@@ -26,6 +26,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import oslab  # noqa: E402
+import mcp_cleanup  # noqa: E402
 
 REPO_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 PROTOCOL_VERSION = "2024-11-05"
@@ -255,6 +256,9 @@ TOOLS = [
 ]
 
 
+TOOLS += mcp_cleanup.TOOLS  # CUX-10: the Cleanup Lab tools share this server and its error shape
+
+
 def _window_point(window_id: int, args: dict) -> tuple[int, int, dict]:
     """The screen point for a click/type/scroll: element centre when a path is given,
     otherwise the given window-relative point, resolved through the mirror's bounds."""
@@ -281,6 +285,8 @@ def _window_point(window_id: int, args: dict) -> tuple[int, int, dict]:
 
 def tool_call(name: str, args: dict) -> dict:
     """One tool invocation against the same surface the panel drives. Returns MCP content."""
+    if name in mcp_cleanup.NAMES:
+        return mcp_cleanup.call(name, args, REPO_ROOT)
     if name == "macos_apps":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_windows())}]}
     if name == "macos_get_app_state":
@@ -351,6 +357,8 @@ def run_task(args: dict) -> dict:
         try:
             if tool == "macos_task":
                 raise oslab.PlanError("macos_task cannot nest", code="INVALID_ARGS")
+            if str(tool) in mcp_cleanup.NAMES:
+                raise oslab.PlanError("cleanup tools are not available inside macos_task", code="INVALID_ARGS")
             result = tool_call(str(tool), step_args if isinstance(step_args, dict) else {})
             row["ok"] = True
             row["result"] = result["content"][0]["text"][:2000]
@@ -372,7 +380,7 @@ def handle(message: dict) -> dict | None:
         return {"jsonrpc": "2.0", "id": message_id, "result": {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "os-lab-macos", "version": "0.1.0"}}}
+            "serverInfo": {"name": "os-lab-macos", "version": "0.2.0"}}}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":

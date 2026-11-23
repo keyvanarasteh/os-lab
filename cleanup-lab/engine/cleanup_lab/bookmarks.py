@@ -134,6 +134,23 @@ def _write_atomic(path, payload):
     os.replace(temporary, path)
 
 
+def _read_retired(env=None, platform=None):
+    """Rows set aside because the catalog stopped listing their entry (kept so an update never deletes them)."""
+    try:
+        with open(_store_path(env, platform), encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (OSError, ValueError):
+        return []
+    rows = raw.get("retired") if isinstance(raw, dict) else None
+    retired = []
+    for record in rows if isinstance(rows, list) else []:
+        try:
+            retired.append(validate_bookmark(record, catalog_ids=None))
+        except BookmarksError:
+            continue  # an unreadable retired row is skipped, never fatal
+    return retired
+
+
 def load(env=None, platform=None, catalog_ids=None):
     """The validated bookmarks, or an empty list plus the reason it cannot be read.
 
@@ -144,6 +161,11 @@ def load(env=None, platform=None, catalog_ids=None):
     request never mentioned. The healed list is persisted right here, so the
     drop is reported once and every later read is clean; without
     ``catalog_ids`` every stored row is kept as-is and nothing is written.
+
+    A dropped row is *set aside*, not deleted: it moves to ``retired`` in the store and comes
+    back by itself when a later catalog lists the entry again, so a catalog that renames or
+    removes an id during an update (or a dev build with a different catalog) can not erase a
+    user's favourites.
     """
     path = _store_path(env, platform)
     try:
@@ -171,18 +193,33 @@ def load(env=None, platform=None, catalog_ids=None):
     except BookmarksError as exc:
         return {"bookmarks": [], "error": "The bookmark store is invalid: {0}".format(exc)}
     error = None
+    restored = []
+    if catalog_ids is not None:
+        for row in _read_retired(env, platform):
+            if row["entryId"] in catalog_ids and row["entryId"] not in seen:
+                bookmarks.append(row)
+                seen.add(row["entryId"])
+                restored.append(row["entryId"])
     if dropped:
-        error = "Dropped {0} bookmark(s) the catalog no longer lists: {1}".format(
+        error = "Set aside {0} bookmark(s) the catalog no longer lists (kept, and restored if the entry returns): {1}".format(
             len(dropped), ", ".join(dropped))
+    if dropped or restored:
         try:
-            save(bookmarks, env=env, platform=platform, catalog_ids=catalog_ids)
+            retired = [row for row in _read_retired(env, platform) if row["entryId"] not in restored]
+            retired += [validate_bookmark(record, catalog_ids=None) for record in raw["bookmarks"]
+                        if isinstance(record, dict) and record.get("entryId") in dropped]
+            save(bookmarks, env=env, platform=platform, catalog_ids=catalog_ids, retired=retired)
         except (BookmarksError, OSError):
             pass  # an unwritable store degrades to the in-memory heal only
     return {"bookmarks": sorted(bookmarks, key=lambda item: (item["priority"], item["createdAt"])), "error": error}
 
 
-def save(bookmarks, *, env=None, platform=None, catalog_ids=None):
-    """Validate every record, then persist atomically. Raises BookmarksError."""
+def save(bookmarks, *, env=None, platform=None, catalog_ids=None, retired=None):
+    """Validate every record, then persist atomically. Raises BookmarksError.
+
+    Rows set aside by :func:`load` are carried over unchanged (``retired=None``) or replaced by the
+    caller; a row the user re-adds is dropped from ``retired`` so it can not come back twice.
+    """
     seen = set()
     validated = []
     for record in bookmarks:
@@ -193,9 +230,12 @@ def save(bookmarks, *, env=None, platform=None, catalog_ids=None):
         validated.append(item)
     if len(validated) > MAX_BOOKMARKS:
         raise BookmarksError("at most {0} bookmarks are kept".format(MAX_BOOKMARKS))
+    kept = _read_retired(env, platform) if retired is None else retired
+    kept = [row for row in kept if row["entryId"] not in seen][:MAX_BOOKMARKS]
     _write_atomic(_store_path(env, platform), {
         "version": VERSION,
         "bookmarks": sorted(validated, key=lambda item: (item["priority"], item["createdAt"])),
+        "retired": kept,
     })
     return {"bookmarks": sorted(validated, key=lambda item: (item["priority"], item["createdAt"])), "error": None}
 

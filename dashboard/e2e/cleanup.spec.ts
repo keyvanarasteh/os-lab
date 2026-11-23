@@ -20,6 +20,9 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
     else if (path === "/api/cleanup/catalog") data = { platform: "macos", entries: [{ id: "system.caches", name: "Caches", category: "system", risk: "low", hint: "Safe cache", impact: "", defaultSelected: true, needsPrivilege: false, paths: [{ template: "~/Caches", path: "/tmp/caches", reason: "" }] }, { id: "browser.private", name: "Private data", category: "browser", risk: "privacy", hint: "Sensitive", impact: "", defaultSelected: false, needsPrivilege: false, paths: [{ template: "~/Private", path: "/tmp/private", reason: "" }] }] };
     else if (path === "/api/cleanup/jobs") data = { jobs };
     else if (path === "/api/cleanup/history") data = { entries: [{ id: 1, result, hmac: "abc" }], total: 1, verified: true };
+    else if (path === "/api/cleanup/preferences" && route.request().method() === "GET") data = { suggestion: { mode: "auto", include: [], exclude: [], minEntryBytes: 1048576, targetFreeBytes: null }, configError: null };
+    else if (path === "/api/cleanup/preferences") data = { suggestion: (body as { suggestion: unknown }).suggestion, configError: null };
+    else if (path === "/api/cleanup/suggest") data = { mode: "auto", items: [{ id: "system.caches", name: "Caches", bytes: 42, risk: "low", reason: "recommended" }], totalBytes: 42, pressure: { underPressure: false, freeBytes: null, targetFreeBytes: null, shortfallBytes: 0, covers: true, remainingBytes: 0 }, skipped: [], ignoredIds: [], configError: null };
     else if (path === "/api/cleanup/scan" || path === "/api/cleanup/plan" || path === "/api/cleanup/clean") {
       const kind = path.split("/").at(-1);
       const job = { id: `job-${kind}`, kind, state: "running", request: body, progress: {}, result: null, error: null };
@@ -42,15 +45,31 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await expect(page.getByText("50% used", { exact: false })).toBeVisible();
   await expect(page.getByText("232.8 GB", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("Purgeable space is managed by macOS", { exact: false })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Quick clean" })).toBeVisible();
+  // CUX-09: the options are collapsed rows with live one-line summaries; one primary action stays visible.
+  const options = page.getByRole("region", { name: "Cleanup options" });
+  await expect(options.getByText("0 bookmarked")).toBeVisible();
+  await expect(options.getByText("auto · saved on this computer")).toBeVisible();
   // CUX-02: no bookmarks in this fixture, so Quick clean offers the recommended set instead of staying disabled.
-  await expect(page.getByRole("main").getByRole("button", { name: "Quick clean", exact: true })).toBeEnabled();
+  await options.locator("summary", { hasText: "Quick clean" }).click();
+  await expect(options.getByRole("button", { name: "Quick clean", exact: true })).toBeEnabled();
   await expect(page.getByText("scans and reviews the recommended safe set", { exact: false })).toBeVisible();
+  // CUX-08: preferences are edited in place and stored through the console.
+  await options.locator("summary", { hasText: "Suggestions" }).click();
+  await options.getByRole("button", { name: "Extended" }).click();
+  await options.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(options.getByText("Saved on this computer")).toBeVisible();
+  expect(calls.find((call) => call.path === "/api/cleanup/preferences")?.body).toMatchObject({ suggestion: { mode: "extended" } });
+  // Every ability stays one click away: the All tools row lists them all.
+  await options.locator("summary", { hasText: "All tools" }).click();
+  for (const tool of ["Quick cleanup", "Advanced scan", "Results", "Leftovers", "History", "Bookmarks", "Space Explorer", "Background monitor", "Desktop widgets", "Permissions", "Containers & VMs", "Package review", "Privileged actions", "Projects deep scan", "Simulators", "Relocation", "Volumes"]) {
+    await expect(options.getByRole("button", { name: new RegExp(`^${tool}`) })).toHaveCount(1);
+  }
   await expect(page.getByRole("heading", { name: "Clean", exact: true })).toBeVisible();
   // CUX-01: one click scans every entry, builds the recommended Trash plan and opens its confirmation.
   await page.getByRole("button", { name: "Scan & review" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   expect(calls.find((call) => call.path === "/api/cleanup/scan")?.body).toEqual({ entryIds: ["system.caches", "browser.private"] });
+  expect(calls.find((call) => call.path === "/api/cleanup/suggest")?.body).toEqual({ jobId: "job-scan" });
   expect(calls.find((call) => call.path === "/api/cleanup/plan")?.body).toEqual({ entryIds: ["system.caches"], mode: "trash" });
   await expect(page.getByRole("dialog")).toContainText("1 items");
   await expect(page.getByRole("dialog")).toContainText("Move to Trash");

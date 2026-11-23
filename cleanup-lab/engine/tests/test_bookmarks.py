@@ -89,6 +89,28 @@ class StoreRoundTrip(unittest.TestCase):
             self.assertEqual(duplicated["bookmarks"], [])
             self.assertIn("twice", duplicated["error"])
 
+    def test_a_set_aside_bookmark_returns_when_the_catalog_lists_it_again(self):
+        """An update that removes a catalog id must not delete the user's bookmark for good."""
+        with tempfile.TemporaryDirectory() as base:
+            env = env_state(base)
+            bookmarks.save([record("system.user-caches", 1), record("a", 2)], env=env, catalog_ids=None)
+            ids = {item["id"] for item in CATALOG}
+            first = bookmarks.load(env=env, catalog_ids=ids)
+            self.assertEqual([item["entryId"] for item in first["bookmarks"]], ["system.user-caches"])
+            with open(os.path.join(base, "bookmarks.json"), encoding="utf-8") as handle:
+                stored = json.load(handle)
+            self.assertEqual([item["entryId"] for item in stored["retired"]], ["a"])
+            # An ordinary save (add/update/remove) keeps the set-aside row.
+            bookmarks.save(first["bookmarks"], env=env, catalog_ids=ids)
+            with open(os.path.join(base, "bookmarks.json"), encoding="utf-8") as handle:
+                self.assertEqual([item["entryId"] for item in json.load(handle)["retired"]], ["a"])
+            # A later catalog lists "a" again: the bookmark is back with its settings.
+            back = bookmarks.load(env=env, catalog_ids=ids | {"a"})
+            self.assertEqual(sorted(item["entryId"] for item in back["bookmarks"]), ["a", "system.user-caches"])
+            self.assertIsNone(back["error"])
+            with open(os.path.join(base, "bookmarks.json"), encoding="utf-8") as handle:
+                self.assertEqual(json.load(handle)["retired"], [])
+
     def test_load_with_catalog_drops_unknown_rows_and_names_them(self):
         """A row the catalog no longer lists must not poison every later save.
 

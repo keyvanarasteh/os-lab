@@ -15,6 +15,21 @@ Optional Appium tooling has its own action. Lab actions go through a preview and
 
 The Jobs page reports cancellation failure beside the selected job and keeps its logs visible; the Android execution console reports log-clearing failure without clearing the displayed output. Both disable repeated requests while submitting. A successful follow-up refreshes server state.
 
+## One-click standard
+
+Every lab page follows one pattern so a person gets the result without learning the parts: one primary action, collapsed options with live summaries, saved choices, and the same abilities for agents.
+
+The rules come from the Cleanup Lab work (CUX-01…10, [[docs/CLEANUP_UX_PLAN.md]]) and apply to any lab. [[docs/UX_READINESS.md]] holds the checklist to copy into a PR.
+
+- **One primary action.** The page's main job is a single button that goes from nothing to a reviewed result (scan, suggest, plan, confirm) and states what it will do. A destructive step still ends at the shared confirmation dialog.
+- **Nothing is lost.** Every setting and ability stays reachable. What is secondary moves into collapsed rows of one bordered list, each with a one-line live summary and an attention dot when it needs action; a row opens by itself when a link, the sidebar or an alert targets it.
+- **Defaults that work, choices that stay.** Decide the default from live state (for example disk pressure), not a static flag. User choices are typed, validated, stored in the private state folder, and read back after restart and app update: a store from another version is read, not discarded, and ids the current catalog does not list are kept, never deleted.
+- **Be honest about limits.** When the safe result cannot cover the need, say how short it falls and where to look next. Safety classes (high risk, credentials, privileged, measured-only) are never bypassed by a preference, a shortcut or an agent.
+- **Signal outside the window.** A condition the user must act on is a desktop notification as well as a banner, escalates when it worsens, repeats while it stays true, and can be switched off.
+- **Agents get the same abilities.** Each new function ships with an MCP tool on the same engine and guards ([[console/mcp_cleanup.py]] is the pattern): read-only tools, one-call review that builds but never applies, apply only with `confirm: true`, no raw paths or commands, long work as a job.
+- **Compact and keyboard-first.** Short copy, no repeated explanations, a keyboard shortcut for the primary action, visible focus, coarse-pointer targets, every string in all locales.
+- **Prove it.** A unit test for the pure logic, a console test for the endpoint, a browser test for the one-click path and for each collapsed row, and a coverage assertion that every ability is still listed.
+
 ## Detail and endpoint status
 
 [[dashboard/src/views/lab-page.tsx]] lists only the missing requirements in the

@@ -57,7 +57,10 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "container-preview": CONTAINER_PREVIEW_KEYS, "container-prune": CONTAINER_PRUNE_KEYS,
               "privileged-preview": CONTAINER_PREVIEW_KEYS, "privileged-run": CONTAINER_PRUNE_KEYS,
               "relocation-plan": ("action", "entryId", "destination"), "relocation-run": ("previewId",),
-              "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "volumes"),
+              "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "reminderSeconds", "notify", "volumes"),
+              "entry-reveal": ("entryId",),
+              "preferences": ("suggestion",),
+              "suggest": ("jobId",),
               "monitor-evaluate": (),
               "permissions-open": ("permissionId",),
               "permissions-host": (),
@@ -132,6 +135,16 @@ def _module(root, name):
         return importlib.import_module("cleanup_lab." + name)
     except ImportError as exc:  # a lone console copy without the engine
         raise CleanupError(501, "The cleanup engine (cleanup-lab/engine) is not installed") from exc
+
+
+def reveal_command(target, platform=None):
+    """The fixed argv that shows one existing path in the system file manager (CUX-04)."""
+    platform = platform or sys.platform
+    if platform == "darwin":
+        return ["open", "-R", target]
+    if platform.startswith("win"):
+        return ["explorer", "/select," + target]
+    return ["xdg-open", target if os.path.isdir(target) else os.path.dirname(target) or "."]
 
 
 def _query(query):
@@ -931,8 +944,13 @@ class MonitorRunner:
                 if config["enabled"]:
                     result = monitor.run_evaluation()
                     # CLNP-16: a fresh free-space crossing arms the bookmark hook.
-                    if any(event["kind"] == "warning" for event in result.get("newEvents", [])):
+                    if any(event["kind"] in ("warning", "critical") for event in result.get("newEvents", [])):
                         run_hook_clean(self.root)
+                    # CUX-07: tell the user outside the window too; best effort, never fatal.
+                    try:
+                        _module(self.root, "notify").send_all(result.get("newEvents", []), enabled=config.get("notify", True))
+                    except Exception:
+                        pass
                     self._evaluate_bookmark_sizes()
                     publish_widget(self.root)  # CLW-04: monitor ticks refresh the widget
                     self.stop.wait(config["intervalSeconds"])
@@ -973,6 +991,22 @@ class CleanupAPI:
         # stays quiet (no probes) while its config is disabled.
         MONITOR.ensure_started(self.root)
 
+    def _home_pressure(self):
+        """(free bytes, warning threshold) of the home volume, or (None, None) when it can not be read."""
+        try:
+            snapshot = _module(self.root, "volumes").inventory()
+            home = next((item for item in snapshot["volumes"] if item.get("isHome")), None)
+            if home is None or not isinstance(home.get("freeBytes"), int) or not isinstance(home.get("totalBytes"), int):
+                return None, None
+            monitor = _module(self.root, "monitor")
+            config = monitor.load()["config"]
+            entry = next((item for item in config["volumes"] if item["enabled"] and item["mountPoint"] in ("", home["mountPoint"])), None)
+            entry = entry or monitor.default_config()["volumes"][0]
+            threshold = max(entry["minFreeBytes"], int(round(home["totalBytes"] * entry["minFreePercent"] / 100.0)))
+            return home["freeBytes"], threshold
+        except Exception:
+            return None, None
+
     def get(self, path, query):
         if path == "/api/cleanup/status":
             _query(query)
@@ -993,6 +1027,9 @@ class CleanupAPI:
         if path == "/api/cleanup/volumes":
             _query(query)
             return _module(self.root, "volumes").inventory()
+        if path == "/api/cleanup/preferences":
+            _query(query)
+            return _module(self.root, "preferences").load()
         if path == "/api/cleanup/monitor":
             _query(query)
             payload = _module(self.root, "monitor").status()
@@ -1148,6 +1185,32 @@ class CleanupAPI:
             if run.returncode != 0:
                 raise CleanupError(500, "Could not reset the permission: " + (run.stderr.strip() or "tccutil failed"))
             return {"reset": host["bundleId"]}
+        if path == "/api/cleanup/entries/reveal":
+            # CUX-04: the page names a catalog entry; the console resolves its folder from the
+            # catalog and shows it in the file manager. No path from the page is ever opened.
+            _object_body(body, "entry-reveal")
+            entry_id = body.get("entryId")
+            if not isinstance(entry_id, str) or not entry_id:
+                raise CleanupError(400, "entryId must name a catalog entry")
+            catalog = _module(self.root, "catalog")
+            try:
+                entries = {entry["id"]: entry for entry in catalog.report(self.root)["entries"]}
+            except catalog.CatalogError as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+            entry = entries.get(entry_id)
+            if entry is None:
+                raise CleanupError(400, "Unknown detector id: {0}".format(entry_id))
+            target = next((item["path"] for item in entry["paths"] if item.get("path") and os.path.exists(item["path"])), None)
+            if target is None:
+                raise CleanupError(409, "None of this entry's folders exists on this computer")
+            try:
+                run = subprocess.run(reveal_command(target), capture_output=True, timeout=10)
+            except (OSError, subprocess.SubprocessError) as exc:
+                raise CleanupError(500, "Could not open the file manager: {0}".format(exc)) from exc
+            # Explorer reports 1 even when it opened the window.
+            if run.returncode != 0 and not sys.platform.startswith("win"):
+                raise CleanupError(500, "Could not open the file manager")
+            return {"revealed": target}
         if path == "/api/cleanup/permissions/open-settings":
             # The grant deep link: the page can only name a permission; the
             # console opens the engine's fixed links (modern pane first, then
@@ -1173,6 +1236,42 @@ class CleanupAPI:
             if opened is None:
                 raise CleanupError(500, "Could not open System Settings; follow the guidance link instead")
             return {"permissionId": permission_id, "opened": opened}
+        if path == "/api/cleanup/preferences":
+            _object_body(body, "preferences")
+            preferences = _module(self.root, "preferences")
+            try:
+                return preferences.save(body.get("suggestion"))
+            except preferences.PreferencesError as exc:
+                raise CleanupError(400, str(exc)) from exc
+        if path == "/api/cleanup/suggest":
+            # CUX-08: what to clean from a finished scan job: the catalog, the disk's pressure and the
+            # saved preferences. Read-only; the page then plans exactly these ids (plan -> confirm).
+            _object_body(body, "suggest")
+            job_id = body.get("jobId")
+            job = JOBS.get(job_id) if isinstance(job_id, str) else None
+            if job is None or job.kind != "scan":
+                raise CleanupError(404, "No such scan job")
+            if job.state != "done" or not isinstance(job.result, dict) or job.result.get("cancelled"):
+                raise CleanupError(409, "The scan did not finish, so there is nothing to suggest from")
+            catalog = _module(self.root, "catalog")
+            try:
+                entries = catalog.report(self.root)["entries"]
+            except catalog.CatalogError as exc:
+                raise CleanupError(500, "The detector catalog is invalid: {0}".format(exc)) from exc
+            free, threshold = self._home_pressure()
+            loaded = _module(self.root, "preferences").load()
+            suggestion_prefs = dict(loaded["suggestion"])
+            # Bookmarks the user flagged for quick clean are "always" choices, unless they said "never".
+            try:
+                flagged = [item["entryId"] for item in _bookmark_book(self.root).load()["bookmarks"] if item.get("quickClean")]
+            except Exception:
+                flagged = []
+            suggestion_prefs["include"] = suggestion_prefs["include"] + [
+                item for item in flagged if item not in suggestion_prefs["include"] and item not in suggestion_prefs["exclude"]]
+            result = _module(self.root, "suggest").suggest(
+                entries, job.result.get("entries", []), suggestion_prefs, free_bytes=free, threshold_bytes=threshold)
+            result["configError"] = loaded["configError"]
+            return result
         if path == "/api/cleanup/monitor/config":
             _object_body(body, "monitor-config")
             monitor = _module(self.root, "monitor")

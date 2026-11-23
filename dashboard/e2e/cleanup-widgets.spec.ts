@@ -58,8 +58,7 @@ test("the widgets card renders the snapshot preview and republishes", async ({ p
   await expect(page.getByText("Kept up to date automatically.")).toBeVisible();
   expect(publishes.length).toBeGreaterThan(0);
   await expect(page.getByRole("button", { name: "Publish now" })).toHaveCount(0);
-  // The preview mirrors the widget's content, collapsed until asked for.
-  await page.getByText("What the widget shows", { exact: true }).click();
+  // CUX-05: the preview mirrors the widget's content and is open by default when the widget can be published.
   await expect(page.getByText("Ready to clean")).toBeVisible();
   await expect(page.getByText("18 items")).toBeVisible();
   await expect(page.getByText("3.9 GB")).toBeVisible();
