@@ -2854,5 +2854,10 @@
   "processes": "پردازه",
   "Show processes": "نمایش پردازه‌ها",
   "Could not list Frida targets:": "فهرست هدف‌های Frida دریافت نشد:",
-  "No Frida device found.": "هیچ دستگاه Frida پیدا نشد."
+  "No Frida device found.": "هیچ دستگاه Frida پیدا نشد.",
+  "Recommended set": "مجموعهٔ پیشنهادی",
+  "Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.": "برای انتخاب مجموعهٔ پاک‌سازی سریع خودتان، در صفحهٔ اسکن پیشرفته نشانک اضافه کنید یا در تنظیمات پوشه بیفزایید.",
+  "Enable quick clean on a bookmark in Settings to choose your own set.": "برای انتخاب مجموعهٔ خودتان، در تنظیمات پاک‌سازی سریع را روی یک نشانک فعال کنید.",
+  "One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.": "یک اجرای تأییدشده به سطل زباله روی نشانک‌های پاک‌سازی سریع شما، یا اگر هیچ‌کدام علامت نخورده باشد، روی مجموعهٔ امن پیشنهادی.",
+  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "هیچ نشانکی برای پاک‌سازی سریع علامت نخورده است، بنابراین مجموعهٔ امن پیشنهادی اسکن و بازبینی می‌شود."
 }

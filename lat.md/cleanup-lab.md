@@ -486,8 +486,9 @@ into a compact main view and a Settings tab.
 
 The main view keeps only the
 cleaning actions and the stats around them: the storage hero, the Quick clean
-card (one confirmed Trash run over the bookmarks flagged for quick clean,
-stating the reason when none are flagged), the Clean card (one **Scan & review**
+card (one confirmed Trash run over the bookmarks flagged for quick clean; with
+none flagged it runs the Clean card's Scan & review on the recommended set,
+CUX-02, which also serves the widget intent), the Clean card (one **Scan & review**
 click scans every entry, then builds the recommended Trash plan and opens its
 confirmation, CUX-01; a stopped or empty scan builds no plan and says so; plan
 review, confirmation, progress) and the

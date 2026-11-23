@@ -43,8 +43,9 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await expect(page.getByText("232.8 GB", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("Purgeable space is managed by macOS", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Quick clean" })).toBeVisible();
-  // No bookmarks in this fixture, so the honest disabled state with its reason shows.
-  await expect(page.getByRole("main").getByRole("button", { name: "Quick clean", exact: true })).toBeDisabled();
+  // CUX-02: no bookmarks in this fixture, so Quick clean offers the recommended set instead of staying disabled.
+  await expect(page.getByRole("main").getByRole("button", { name: "Quick clean", exact: true })).toBeEnabled();
+  await expect(page.getByText("scans and reviews the recommended safe set", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Clean", exact: true })).toBeVisible();
   // CUX-01: one click scans every entry, builds the recommended Trash plan and opens its confirmation.
   await page.getByRole("button", { name: "Scan & review" }).click();

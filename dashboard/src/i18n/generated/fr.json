@@ -2854,5 +2854,10 @@
   "processes": "processus",
   "Show processes": "Afficher les processus",
   "Could not list Frida targets:": "Impossible de lister les cibles Frida :",
-  "No Frida device found.": "Aucun appareil Frida trouvé."
+  "No Frida device found.": "Aucun appareil Frida trouvé.",
+  "Recommended set": "Ensemble recommandé",
+  "Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.": "Ajoutez des signets sur la page Analyse avancée ou des dossiers dans les Réglages pour choisir votre propre ensemble de nettoyage rapide.",
+  "Enable quick clean on a bookmark in Settings to choose your own set.": "Activez le nettoyage rapide sur un signet dans les Réglages pour choisir votre propre ensemble.",
+  "One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.": "Une passe confirmée vers la Corbeille sur vos signets de nettoyage rapide, ou sur l'ensemble sûr recommandé si aucun n'est marqué.",
+  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "Aucun signet n'est marqué pour le nettoyage rapide : l'ensemble sûr recommandé est donc analysé puis vérifié."
 }

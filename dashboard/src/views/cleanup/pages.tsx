@@ -273,19 +273,21 @@ function QuickCleanCard({
   const quick = items.filter((item) => item.quickClean);
   const quickBytes = quick.reduce((sum, item) => sum + (measured.get(item.entryId)?.sizeBytes ?? 0), 0);
   const measuredQuick = quick.some((item) => measured.get(item.entryId)?.sizeBytes != null);
-  return <Section id="overview-quick-clean" title="Quick clean" description="One confirmed Trash run over the bookmarks marked for quick cleanup.">
+  return <Section id="overview-quick-clean" title="Quick clean" description="One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.">
     <div className="flex items-baseline gap-2">
-      <span dir="ltr" className="text-3xl font-bold tabular-nums">{measuredQuick ? bytes(quickBytes) : "—"}</span>
-      <span className="text-sm text-(--iux-muted-foreground)">measured in quick-clean bookmarks</span>
+      {quick.length ? <>
+        <span dir="ltr" className="text-3xl font-bold tabular-nums">{measuredQuick ? bytes(quickBytes) : "—"}</span>
+        <span className="text-sm text-(--iux-muted-foreground)">measured in quick-clean bookmarks</span>
+      </> : <span className="text-sm font-medium">Recommended set</span>}
     </div>
-    <p className="text-sm text-(--iux-muted-foreground)">{quick.length} of {items.length} bookmarks included</p>
+    <p className="text-sm text-(--iux-muted-foreground)">{quick.length ? `${quick.length} of ${items.length} bookmarks included` : "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set."}</p>
     {refusals && <Status value={{ ok: false, text: refusals }} />}
     <div className="mt-3 flex flex-wrap gap-2">
-      <button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !quick.length || busy} onClick={onQuickClean}>Quick clean</button>
+      <button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || busy} onClick={onQuickClean}>Quick clean</button>
       <a className="iux-btn" href={settingsHref}>Manage bookmarks</a>
     </div>
-    {items.length === 0 ? <p className="mt-2 text-xs text-(--iux-muted-foreground)">No bookmarks yet — bookmark entries on the Advanced scan page or add folders in Settings.</p>
-      : quick.length === 0 ? <p className="mt-2 text-xs text-(--iux-muted-foreground)">No bookmarks are marked for quick clean yet — enable quick clean in Settings.</p> : null}
+    {items.length === 0 ? <p className="mt-2 text-xs text-(--iux-muted-foreground)">Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.</p>
+      : quick.length === 0 ? <p className="mt-2 text-xs text-(--iux-muted-foreground)">Enable quick clean on a bookmark in Settings to choose your own set.</p> : null}
   </Section>;
 }
 
@@ -446,6 +448,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
    */
   function runQuickClean() {
     setActionError(""); setQuickRefusals("");
+    // CUX-02: with no bookmark flagged for quick clean, fall back to the recommended set (scan, plan, confirm).
+    if (!(bookmarks?.bookmarks ?? []).some((item) => item.quickClean)) { scanAndReview(); return; }
     void api.cleanupBookmarkQuickClean()
       .then((response) => {
         setQuickRefusals(response.refusals.map((item) => item.reason).join(" "));

@@ -2854,5 +2854,10 @@
   "processes": "processi",
   "Show processes": "Mostra processi",
   "Could not list Frida targets:": "Impossibile elencare le destinazioni Frida:",
-  "No Frida device found.": "Nessun dispositivo Frida trovato."
+  "No Frida device found.": "Nessun dispositivo Frida trovato.",
+  "Recommended set": "Insieme consigliato",
+  "Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.": "Aggiungi segnalibri nella pagina Scansione avanzata o cartelle nelle Impostazioni per scegliere il tuo insieme di pulizia rapida.",
+  "Enable quick clean on a bookmark in Settings to choose your own set.": "Attiva la pulizia rapida su un segnalibro nelle Impostazioni per scegliere il tuo insieme.",
+  "One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.": "Un passaggio confermato nel Cestino sui tuoi segnalibri di pulizia rapida o, se nessuno è contrassegnato, sull'insieme sicuro consigliato.",
+  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "Nessun segnalibro è contrassegnato per la pulizia rapida, quindi viene analizzato e rivisto l'insieme sicuro consigliato."
 }
