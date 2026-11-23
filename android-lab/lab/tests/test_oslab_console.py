@@ -32,7 +32,7 @@ def states(host):
 
 def test_linux_kvm_host_runs_container_labs_but_not_native_mac():
     expected = {
-        "android": "ready", "windows": "ready", "linux": "ready", "ios": "ready", "macos": "unavailable", "source": "ready",
+        "android": "ready", "windows": "ready", "winapps": "unavailable", "linux": "ready", "ios": "ready", "macos": "unavailable", "source": "ready",
         # Web Lab follows the local engine build, not a VM provider: ready once
         # the engine binary exists, otherwise unavailable without cargo.
         "web": "ready" if os.path.isfile(os.path.join(REPO_ROOT, "web-lab", "browser", "target", "release", "weblab")) else "unavailable",
@@ -79,7 +79,7 @@ def test_macos_offers_native_simulator_and_static_android_only():
     for lab in ("ios", "macos"):
         status = oslab.lab_status(lab, host)
         assert status["state"] == "ready"
-        assert any("Appium automation needs" in note for note in status["notes"])
+        assert any("Appium" in note for note in status["notes"])
         assert all(not action["privileged"] for action in status["actions"])
 
 
@@ -88,10 +88,10 @@ def test_native_macos_needs_full_xcode_and_available_ios_simulator():
         xcode = {"installed": True, "iosRuntime": True, "iosDevice": True}
         xcode[missing] = False
         host = make_host(os_name="macos", kvm=False, tools=("xcrun", "brew"), xcode=xcode)
-        for lab in ("ios", "macos"):
-            status = oslab.lab_status(lab, host)
-            assert status["state"] == "needs-setup"
-            assert any(r["required"] and not r["found"] for r in status["requirements"])
+        status = oslab.lab_status("ios", host)
+        assert status["state"] == "needs-setup"
+        assert any(r["required"] and not r["found"] for r in status["requirements"])
+        assert oslab.lab_status("macos", host)["state"] == "ready"  # Appium mac2 needs no simulator.
 
 
 def test_container_engine_requires_reachable_api_and_compose(monkeypatch):
@@ -122,9 +122,9 @@ def test_only_unsupported_labs_are_unavailable_across_hosts():
     # on every host until the engine binary exists (as in the linux-kvm test).
     web_engine = os.path.isfile(os.path.join(REPO_ROOT, "web-lab", "browser", "target", "release", "weblab"))
     expected = {
-        "linux": {"macos"} | (set() if web_engine else {"web"}),
+        "linux": {"macos", "winapps"} | (set() if web_engine else {"web"}),
         "windows": {"macos"} | (set() if web_engine else {"web"}),
-        "macos": {"windows", "linux"} | (set() if web_engine else {"web"}),
+        "macos": {"windows", "winapps", "linux"} | (set() if web_engine else {"web"}),
     }
     for os_name, unavailable in expected.items():
         host = make_host(os_name=os_name, kvm=os_name == "linux", distros=("Ubuntu",) if os_name == "windows" else ())
@@ -199,6 +199,20 @@ def test_every_advertised_local_action_resolves_to_a_bundled_entry_point():
                     request["profile"] = "lightweight"
                 if action["id"] == "resize":
                     request["cpus"] = "2"
+                if action["id"] in ("macos-click", "macos-input", "macos-scroll"):
+                    request.update(clickPid=42, clickX=10, clickY=20)
+                if action["id"] == "macos-input":
+                    request["inputKind"] = "double"
+                if action["id"] == "macos-scroll":
+                    request.update(scrollDirection="down", scrollPages=1)
+                if action["id"] == "macos-element":
+                    request.update(elementSession="session123", elementId="element123", elementKind="click")
+                if action["id"] in ("macos-set-value", "macos-perform"):
+                    request.update(elementPid=42, elementPath="0.1", elementWindowId=7)
+                if action["id"] == "macos-set-value":
+                    request["elementValue"] = "sample"
+                if action["id"] == "macos-perform":
+                    request["axAction"] = "AXPress"
                 plan = oslab.plan(REPO_ROOT, request, host)
                 if plan["program"] == "bash":
                     assert os.path.isfile(plan["args"][0]), (lab, action["id"], plan["args"][0])
@@ -337,8 +351,9 @@ def test_native_macos_actions_follow_whether_appium_is_installed():
     present = oslab.lab_status("macos", make_host(os_name="macos", kvm=False, tools=("xcrun", "brew", "appium")))
     ids = {a["id"] for a in present["actions"]}
     assert {"appium-start", "appium-stop"} <= ids and "appium-install" not in ids
-    labels = {a["id"]: a["label"] for a in present["actions"]}
-    assert labels["start"] == "Start iOS Simulator" and labels["stop"] == "Stop iOS Simulator"
+    ios_labels = {a["id"]: a["label"] for a in oslab.lab_status(
+        "ios", make_host(os_name="macos", kvm=False, tools=("xcrun", "brew", "appium")))["actions"]}
+    assert ios_labels["start"] == "Start iOS Simulator" and ios_labels["stop"] == "Stop iOS Simulator"
     # Linux/container labs keep their own wording
     assert {a["id"]: a["label"] for a in oslab.lab_status("windows", make_host())["actions"]}["start"] == "Start"
 

@@ -60,6 +60,7 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "volumes"),
               "monitor-evaluate": (),
               "permissions-open": ("permissionId",),
+              "permissions-host": (),
               "bookmarks-add": ("entryId",),
               "bookmarks-update": ("entryId", "priority", "quickClean", "autoCleanHook", "sizeAlert"),
               "bookmarks-remove": ("entryId",),
@@ -69,6 +70,50 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "explorer-scan": ("rootId",),
               "explorer-subtree": ("rootId", "relative"),
               "leftovers": ()}
+
+
+
+def _host_app():
+    """The macOS app bundle whose process tree runs this console, or None.
+
+    Full Disk Access is granted to the *responsible app*, so the permission guide must name the
+    bundle that is actually running (os-lab.app, Terminal, an editor), not a guess. Walks the parent
+    chain and returns the outermost ancestor executable inside ``X.app/Contents/MacOS``: macOS
+    attributes the grant to the top-level app (Terminal, os-lab), not to a Python.app below it.
+    """
+    if sys.platform != "darwin":
+        return None
+    pid = os.getpid()
+    found = None
+    for _ in range(12):
+        try:
+            out = subprocess.run(["ps", "-o", "ppid=,comm=", "-p", str(pid)], capture_output=True, text=True, timeout=5).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if not out:
+            return found
+        ppid, _, comm = out.partition(" ")
+        marker = ".app/Contents/MacOS/"
+        if marker in comm:
+            bundle = comm[: comm.index(marker) + 4]
+            # the interpreter's own helper app (Python.framework) is never the app to grant
+            if "/Python.framework/" not in bundle:
+                import plistlib
+                try:
+                    with open(os.path.join(bundle, "Contents", "Info.plist"), "rb") as handle:
+                        info = plistlib.load(handle)
+                except (OSError, ValueError):
+                    info = {}
+                found = {"path": bundle,
+                         "name": info.get("CFBundleDisplayName") or info.get("CFBundleName") or os.path.basename(bundle)[:-4],
+                         "bundleId": info.get("CFBundleIdentifier")}
+        try:
+            pid = int(ppid)
+        except ValueError:
+            return found
+        if pid <= 1:
+            return found
+    return found
 
 
 class CleanupError(ValueError):
@@ -808,7 +853,6 @@ def run_hook_clean(root):
                 job.result = result
                 job.progress = result.get("progress", job.progress)
                 _module(root, "history").append(result)
-                job.state = "cancelled" if result["cancelled"] else "done"
                 loaded = bookmarks_mod.load()
                 now = time.time()
                 records = [
@@ -817,6 +861,7 @@ def run_hook_clean(root):
                     for item in loaded["bookmarks"]
                 ]
                 bookmarks_mod.save(records)
+                job.state = "cancelled" if result["cancelled"] else "done"
             except Exception as exc:
                 job.state = "failed"
                 job.error = "{0}: {1}".format(type(exc).__name__, exc)
@@ -953,6 +998,9 @@ class CleanupAPI:
             payload = _module(self.root, "monitor").status()
             payload["running"] = bool(payload["enabled"] and MONITOR.alive())
             return payload
+        if path == "/api/cleanup/permissions/host-app":
+            _query(query)
+            return {"app": _host_app()}
         if path == "/api/cleanup/permissions":
             # CLNP-03: read-only probes plus the reactive classification of the
             # latest scan's unreadable paths (deduplicated), when one exists.
@@ -1081,6 +1129,25 @@ class CleanupAPI:
         if path == "/api/cleanup/leftovers/scan":
             _object_body(body, "leftovers")
             return JOBS.start_leftovers(self.root)
+        if path in ("/api/cleanup/permissions/reveal-app", "/api/cleanup/permissions/reset"):
+            # The grant helpers: reveal the running app in Finder (to drag it into the Settings
+            # list) or reset its Full Disk Access record. Neither takes a path from the page:
+            # both act on the bundle the console itself runs under.
+            _object_body(body, "permissions-host")
+            host = _host_app()
+            if host is None:
+                raise CleanupError(409, "The console is not running inside a macOS app bundle")
+            if path.endswith("reveal-app"):
+                run = subprocess.run(["open", "-R", host["path"]], capture_output=True, timeout=10)
+                if run.returncode != 0:
+                    raise CleanupError(500, "Could not reveal the app in Finder")
+                return {"revealed": host["path"]}
+            if not host.get("bundleId"):
+                raise CleanupError(409, "The app bundle has no identifier to reset")
+            run = subprocess.run(["tccutil", "reset", "SystemPolicyAllFiles", host["bundleId"]], capture_output=True, text=True, timeout=10)
+            if run.returncode != 0:
+                raise CleanupError(500, "Could not reset the permission: " + (run.stderr.strip() or "tccutil failed"))
+            return {"reset": host["bundleId"]}
         if path == "/api/cleanup/permissions/open-settings":
             # The grant deep link: the page can only name a permission; the
             # console opens the engine's fixed links (modern pane first, then

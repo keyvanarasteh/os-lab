@@ -20,8 +20,16 @@ targets:
     platform: macOS
     sources:
       - path: Widget
+    # xcodegen regenerates this file from `properties` on every run (an entitlements entry with only a
+    # path is overwritten with an empty dict, which shipped the extension unsandboxed). macOS requires
+    # every app extension to be sandboxed; the group is shared with the host app (see
+    # ../src-tauri/entitlements-macos.plist).
     entitlements:
       path: entitlements-widget.plist
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - group.com.keyvanarasteh.oslab
     info:
       path: build-gen/OSLabWidgets-Info.plist
       properties:

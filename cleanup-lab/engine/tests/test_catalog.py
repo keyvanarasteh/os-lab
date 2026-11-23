@@ -104,12 +104,13 @@ class LoadTest(unittest.TestCase):
     def test_repository_catalog_loads(self):
         entries = catalog.load(ROOT, BASE_ENV)
         ids = [entry["id"] for entry in entries]
-        self.assertEqual(ids[:2], ["browser.chrome.cache", "browser.chrome.history"])
-        self.assertEqual(ids[-11], "simulators.coresimulator-devices")
-        self.assertEqual(ids[-10:], ['system.user-caches', 'system.user-logs', 'system.trash', 'system.temp', 'system.local-temp', 'system.shared-temp', 'system.crash-reports', 'system.font-caches', 'system.shared-font-caches', 'system.spotlight-index'])
-        self.assertEqual(len(ids), 67)
-        self.assertEqual({entry["family"] for entry in entries}, {"browser", "developers", "system", "simulators"})
-        self.assertEqual({entry["file"] for entry in entries}, {"browser.json", "developers.json", "system.json", "simulators.json"})
+        self.assertEqual(ids[:5], ["agents.gemini", "agents.codex", "agents.claude", "agents.opencode", "agents.zcode"])
+        self.assertEqual(ids[5:7], ["browser.chrome.cache", "browser.chrome.history"])
+        self.assertEqual(ids[-12], "simulators.coresimulator-devices")
+        self.assertEqual(ids[-11:], ['system.user-caches', 'system.user-logs', 'system.trash', 'system.temp', 'system.local-temp', 'system.shared-temp', 'system.crash-reports-system', 'system.crash-reports', 'system.font-caches', 'system.shared-font-caches', 'system.spotlight-index'])
+        self.assertEqual(len(ids), 87)
+        self.assertEqual({entry["family"] for entry in entries}, {"agents", "browser", "developers", "system", "simulators"})
+        self.assertEqual({entry["file"] for entry in entries}, {"agents.json", "browser.json", "developers.json", "system.json", "simulators.json"})
 
     def test_for_platform_filters_without_dropping_the_entry(self):
         with tempfile.TemporaryDirectory() as base:
@@ -216,3 +217,46 @@ class SchemaTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class P1P2EntriesTest(unittest.TestCase):
+    """CLN p1/p2: entries for what a real disk review found missing (see .temp/todo.p1-p2.md)."""
+
+    NEW = {
+        "developers.uv", "developers.vscode-extensions", "developers.vscode-insiders-extensions",
+        "developers.vscode-user-data", "developers.vscode-insiders-user-data", "developers.codex-runtimes",
+        "developers.rembg-models", "developers.oslab-cache", "developers.gopath", "developers.cargo-home",
+        "developers.homebrew-cellar", "agents.gemini", "agents.codex", "agents.claude", "agents.opencode",
+        "agents.zcode", "system.crash-reports-system",
+    }
+    MEASURED_ONLY = {
+        "developers.gopath", "developers.cargo-home", "developers.homebrew-cellar", "developers.oslab-cache",
+        "developers.vscode-user-data", "developers.vscode-insiders-user-data", "developers.codex-runtimes",
+        "agents.gemini", "agents.codex", "agents.claude", "agents.opencode", "agents.zcode",
+    }
+
+    def setUp(self):
+        self.entries = {entry["id"]: entry for entry in catalog.load(ROOT, BASE_ENV)}
+
+    def test_entries_exist_and_are_never_preselected(self):
+        self.assertTrue(self.NEW <= set(self.entries))
+        for entry_id in self.NEW:
+            self.assertFalse(self.entries[entry_id]["defaultSelected"], entry_id)
+
+    def test_agent_and_toolchain_data_is_measured_only(self):
+        for entry_id in self.MEASURED_ONLY:
+            self.assertIs(self.entries[entry_id].get("cleanable"), False, entry_id)
+
+    def test_agent_entries_are_credentials_risk(self):
+        for entry_id in self.NEW:
+            if entry_id.startswith("agents."):
+                self.assertEqual(self.entries[entry_id]["risk"], "credentials", entry_id)
+
+    def test_system_crash_reports_needs_privilege(self):
+        self.assertTrue(self.entries["system.crash-reports-system"]["needsPrivilege"])
+
+    def test_uv_uses_env_probe_and_lock_guard(self):
+        uv = self.entries["developers.uv"]
+        self.assertEqual(uv["cacheEnv"], ["UV_CACHE_DIR"])
+        self.assertEqual(uv["probeArgv"], ["uv", "cache", "dir"])
+        self.assertEqual(uv["owningProcesses"], ["uv"])

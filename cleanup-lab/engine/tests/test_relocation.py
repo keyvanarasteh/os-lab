@@ -147,7 +147,6 @@ class ResumeTest(TreeBase):
     def test_resume_before_the_rename_reverifies_and_continues(self):
         os.makedirs(self.home)
         os.makedirs(self.store)
-        os.makedirs(self.home + rl.ASIDE_SUFFIX)
         steps = rl.plan_resume(self.home, self.store)
         self.assertEqual([step.op for step in steps],
                          ["verify_copy", "rename", "symlink", "verify_link", "remove_tree"])
@@ -229,7 +228,7 @@ class ExecuteStepsTest(TreeBase):
 
     def test_a_failed_rename_stops_with_the_original_in_place(self):
         os.makedirs(self.home)
-        os.makedirs(self.home + rl.ASIDE_SUFFIX)  # the aside exists: rename must fail
+        os.makedirs(self.home + rl.ASIDE_SUFFIX)  # an empty aside is replaceable on POSIX without a guard
         self.write(os.path.join(self.home, "keep.bin"), 5)
         with self.assertRaises(rl.RelocationError):
             rl.execute_steps([rl.Step("rename", self.home, self.home + rl.ASIDE_SUFFIX)])
@@ -255,7 +254,8 @@ class FakeCatalogBase(TreeBase):
     def setUp(self):
         super().setUp()
         self.dest = os.path.join(os.path.dirname(os.path.dirname(self.store)), "volume")
-        self.env = {"LOCALAPPDATA": os.path.dirname(self.home), "PATH": ""}
+        self.platform = rl.paths.platform_id()
+        self.env = {"HOME": os.path.dirname(self.home), "USERPROFILE": os.path.dirname(self.home), "PATH": ""}
         self.catalog_root = os.path.join(self._tmp.name, "fake-root")
         catdir = os.path.join(self.catalog_root, "cleanup-lab", "catalog")
         os.makedirs(catdir)
@@ -263,7 +263,7 @@ class FakeCatalogBase(TreeBase):
             "id": self.ENTRY_ID, "name": "Test cache", "category": "developer",
             "risk": "low", "hint": "h", "impact": "i", "defaultSelected": False,
             "needsPrivilege": False, "owningProcesses": ["gradle.exe"], "detector": "paths",
-            "paths": {"windows": ["%LOCALAPPDATA%\\.npm"]},
+            "paths": {self.platform: [self.home]},
         }
         with open(os.path.join(catdir, "one.json"), "w", encoding="utf-8") as handle:
             json.dump({"version": 1, "family": "test", "entries": [entry]}, handle)
@@ -274,7 +274,7 @@ class FakeCatalogBase(TreeBase):
         )
         defaults.update(kwargs)
         return rl.build_plan(self.catalog_root, self.ENTRY_ID, self.dest, action,
-                             platform="windows", env=self.env, **defaults)
+                             platform=self.platform, env=self.env, **defaults)
 
 
 class BuildPlanTest(FakeCatalogBase):
@@ -299,10 +299,10 @@ class BuildPlanTest(FakeCatalogBase):
     def test_unknown_entry_and_action_and_busy_app_are_refused(self):
         with self.assertRaises(rl.RelocationError):
             rl.build_plan(self.catalog_root, "test.nope", self.dest, "move",
-                          platform="windows", env=self.env)
+                          platform=self.platform, env=self.env)
         with self.assertRaises(rl.RelocationError):
             rl.build_plan(self.catalog_root, self.ENTRY_ID, self.dest, "destroy",
-                          platform="windows", env=self.env)
+                          platform=self.platform, env=self.env)
         with self.assertRaises(rl.RelocationError) as raised:
             self.plan("move", process_list=["gradle.exe"])
         self.assertIn("owning application is running", str(raised.exception))
@@ -317,7 +317,7 @@ class BuildPlanTest(FakeCatalogBase):
         self.assertEqual(result["bytesRelocated"], 50)
         self.assertIsNone(result["bytesRemoved"])
         self.assertTrue(os.path.islink(self.home))
-        self.assertEqual(rl.tree_fingerprint(self.store), (1, 50))
+        self.assertEqual(rl.tree_fingerprint(record["storePath"]), (1, 50))
 
     def test_a_changed_folder_refuses_to_execute(self):
         record = self.plan("move")
@@ -330,7 +330,7 @@ class BuildPlanTest(FakeCatalogBase):
 class StatusTest(FakeCatalogBase):
     def test_status_lists_relocatable_entries_and_destinations(self):
         os.makedirs(self.home)
-        report = rl.status(self.catalog_root, platform="windows", env=self.env)
+        report = rl.status(self.catalog_root, platform=self.platform, env=self.env)
         ids = {entry["entryId"] for entry in report["entries"]}
         self.assertIn(self.ENTRY_ID, ids)
         row = next(entry for entry in report["entries"] if entry["entryId"] == self.ENTRY_ID)
@@ -343,7 +343,7 @@ class StatusTest(FakeCatalogBase):
     def test_an_interrupted_entry_is_flagged(self):
         os.makedirs(self.home)
         os.makedirs(self.home + rl.ASIDE_SUFFIX)
-        report = rl.status(self.catalog_root, platform="windows", env=self.env)
+        report = rl.status(self.catalog_root, platform=self.platform, env=self.env)
         row = next(entry for entry in report["entries"] if entry["entryId"] == self.ENTRY_ID)
         self.assertTrue(row["interrupted"])
         self.assertTrue(row["relocatable"], "the real folder is still there; resume decides")

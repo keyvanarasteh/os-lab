@@ -17,24 +17,123 @@ silent without them (see [app/RELEASE_CI.md](../app/RELEASE_CI.md)).
 environment (a `.venv-test` unless `--no-venv`), runs the pytest suite in
 [[android-lab/lab/tests]], runs a sample-analysis smoke test, checks every
 shell script with `bash -n`, runs `lat check` when `lat` is installed, and,
-when `dashboard/node_modules` exists, typechecks the [[dashboard]] and fails if
-the committed `dashboard/dist` differs from a fresh build.
+when `dashboard/node_modules` exists, typechecks the [[dashboard]], checks the
+translations and the e2e change map, and compares the committed `dashboard/dist`
+with a fresh build: a difference fails on master and only warns on a feature
+branch, because master rebuilds `dist` after each merge (see [[tooling#Parallel work]]).
+`--changed` runs only what the branch touches, `--dry-run` shows the selection,
+and stage times go to `test-results/timings.json`.
 The OS-30 standard-library suite in [[linux-lab/tests/test_hardening.py]],
 [[linux-lab/tests/test_harden_check.py]] and [[linux-lab/tests/test_rollback.py]]
 also runs in stage 1, using fake commands and temporary files rather than live
 security changes. `--quick` runs only the unit suites. The dormant workflow file
 [[.github/workflows/mobile-sec-scan.yml]] is kept for reference but is disabled.
 
+## Parallel work
+
+Several agents and contributors work in separate worktrees at once. The tooling
+keeps their runs isolated, small and conflict-free.
+
+On 2026-11-16 three parallel sessions overloaded a laptop (Playwright started
+one browser per core), tested each other's builds (every worktree used port
+4322 and reused whatever server was there), killed each other's runs with
+`pkill`, and conflicted on every rebase in `dashboard/dist` and the locale files.
+[[docs/PLAN-parallel-agents.md]] records the plan; the fixes are below.
+
+### Change detection
+
+[[scripts/lib/changed-files.sh]] lists what a branch changes since its merge
+base with `origin/master`, plus staged, unstaged and untracked files.
+
+[[scripts/run-tests.sh]] `--changed` maps those paths to stages (a lab's own
+suite, `cargo test` only for `qrust-scan`, `bash -n` only on changed scripts,
+the dashboard stage for `dashboard/**`). Shared files such as `console/**` and
+requirements files select everything. Inside a Python lab,
+[[scripts/lib/py_affected_tests.py]] picks the test files whose imports reach a
+changed module, and falls back to the whole suite when it cannot tell.
+[[dashboard/e2e/affected.json]] maps dashboard paths to e2e specs, routes and
+locales; [[dashboard/scripts/affected.mjs]] applies it, shared files get a smoke
+set, and its test fails when a spec is missing from the map.
+
+### E2e runs
+
+[[scripts/e2e.sh]] runs the specs a change touches on a free port with two
+browsers, behind a machine-wide lock.
+
+The lock is a `mkdir` folder holding the owner's PID (macOS has no `flock`), and a
+lock whose owner died is cleared. Tests serve their own build in
+`dashboard/.e2e-dist`, rebuilt when a hash of the sources changes, so a run never
+rewrites the committed `dist`. [[dashboard/playwright.config.ts]] reads every
+setting from `OSLAB_E2E_*` variables, defaults to two workers and reuses a server
+only with `OSLAB_E2E_REUSE=1`. `--crawl` runs [[dashboard/e2e/crawl.spec.ts]],
+which saves a full-page PNG per route, locale and width plus an `index.html`.
+`--no-lock` is refused with `--full` or `--crawl`.
+
+### Shared caches
+
+[[scripts/worktree.sh]] creates and removes worktrees with one shared copy of each
+dependency, under `OSLAB_CACHE_ROOT` (default `~/.cache/os-lab`).
+
+`dashboard/node_modules` links to an install keyed by the hash of
+`package-lock.json`, and `.venv-test` to a virtualenv keyed by the requirements
+files, so a branch that changes dependencies gets its own copy. npm, pip,
+Playwright and sccache caches live under the same root
+([[scripts/lib/cache-env.sh]]). Astro and Vite write their caches to the
+per-worktree `dashboard/.vite-cache`, never into the shared `node_modules`.
+`dist`, test output, lab `.env` files and `target/` folders are never shared.
+`doctor` relinks after a rebase, `rm` deletes only the worktree's own output, and
+`cache prune` asks before deleting unused entries.
+
+### Merges and CI
+
+The committed `dashboard/dist` is rebuilt on master, locale files merge by key,
+and CI runs only what a pull request touches.
+
+[[.github/workflows/dashboard-e2e.yml]] fails a pull request that changes
+`dashboard/dist`, runs the typecheck, translations and tooling tests, and runs
+the affected specs in shards with cached browsers (the whole suite on master).
+[[.github/workflows/dashboard-dist.yml]] rebuilds `dist` after a merge and lands
+it as a `build/dist-<sha>` pull request. [[scripts/lib/i18n-merge-driver.mjs]]
+merges `src/i18n/generated/*.json` key by key, so two branches that both append
+keys no longer conflict. Every workflow cancels superseded pull-request runs,
+and the release workflows build installers on pull requests only when packaging
+inputs change. [[scripts/hooks/pre-push]] runs the quick changed suites before a
+push; `OSLAB_SKIP_PREPUSH=1` skips it.
+
 ## Tests
 
 Android and Source Lab have independent automated test suites.
 
 It lives in [[android-lab/lab/tests]] (analyzer, reporter, MobSF client, secret
-scanner, patcher, flow parser, agentic engine, web UI, the host engine in
-[[console/oslab.py]] and the [[tooling#Scope guard]]). Shell scripts across the
+scanner, patcher, flow parser, agentic engine, `frida-trace` call-map builder,
+web UI, the host engine in [[console/oslab.py]] and the [[tooling#Scope guard]]). Shell scripts across the
 VM labs are kept `bash -n` clean and use `set -euo pipefail`.
 The [[source-lab]] engine tests run in their own process from
 [[source-lab/engine]] so their imports cannot collide with Android tests.
+
+## Extension scanner
+
+Static risk scanner for unpacked browser extensions (roadmap task PENT-02).
+
+[[scripts/analysis/ext_scan]] reads an MV2/MV3 `manifest.json` (permissions, host access,
+content-script matches, CSP) and scans every script after blanking comments, folding
+concatenated strings and masking string contents, so `eval` in a comment is ignored while
+`self['ev'+'al']` is found. A file that both makes network requests and runs text as code is
+reported as a two-stage payload. The score is capability (max 40) plus behaviour (max 60).
+Its tests run as their own stage of [[scripts/run-tests.sh]].
+
+## Native messaging audit
+
+[[scripts/analysis/ext_native_host.py]] audits owned unpacked extensions and
+explicitly supplied native host manifests offline (PENT-18).
+
+A declared lab root bounds all reads; the tool never executes a host or accesses
+a browser, registry or network. It reports lexical API clues, browser-specific caller
+allowlists and local binary metadata/mode risks. Computed calls, effective
+privileges, signatures and Windows ACLs remain unverified. See
+[[scripts/analysis/README.md]] for limits, exit codes and the inert fixture builder
+[[scripts/analysis/make_native_host_lab.py]]. Its regression tests live in
+[[android-lab/lab/tests/test_ext_native_host.py]] and run with the normal suite.
 
 ## Firewall rule renderer
 
@@ -49,6 +148,11 @@ in nft, one tcp and one udp command in UFW), never all traffic. A port on `icmp`
 is ignored by both backends. Items that are not ports or ascending ranges in
 1–65535 (`esp`, `80,,443`, `500:400`) are skipped with a comment and a stderr
 warning. Notes and names are flattened to one line before they go into comments.
+
+A multi-site company keeps one rule set per branch and is rendered one site at a time with
+`--branch`. `siber-guvenlik-sirketi` declares four sites (`istanbul-hq`, `sivas-soc`,
+`ankara-academy`, `dubai-field`) in [[firewall-lab/companies/siber-guvenlik-sirketi/company.json]];
+each renders on its own to UFW, nftables or the table form.
 [[.github/workflows/firewall-lab.yml]] renders every branch of every company and
 checks the output with `nft -c` and `bash -n`, and rejects duplicate branch ids.
 
@@ -143,6 +247,22 @@ serves it read-only. The command line checks one target and exits 0 in scope,
 1 refused and 2 for a usage or manifest error, with `--json` for agents and
 scripts. The tests are in [[android-lab/lab/tests/test_scope_guard.py]].
 
+## Session scribe
+
+PENT-20 runner and CLI in [[scripts/session_scribe/cli.py]]: a scoped, logged pentest subagent session.
+
+The parts:
+[[scripts/session_scribe/scope_guard.py#ScopeGuard]] enforces [[scripts/session_scribe/scope.json]] CIDRs/domains/ports/commands,
+[[scripts/session_scribe/prompt_guard.py#PromptInjectionGuard]] blocks jailbreaks/exfil payloads,
+[[scripts/session_scribe/circuit_breaker.py#SubagentCircuitBreaker]] locks offenders until human-token reset,
+[[scripts/session_scribe/redactor.py#SecretRedactor]] masks secrets pre-log, and
+[[scripts/session_scribe/mitre_mapper.py#MitreMapper]] adds MITRE ATT&CK tags and compliance scores.
+[[scripts/session_scribe/subagent.py#PentestSubagent]] enforces [[scripts/session_scribe/subagent.py#AIDisclosure]] via
+[[scripts/session_scribe/audit_logger.py#AuditLogger]] / [[scripts/session_scribe/audit_logger.py#verify_log_chain]];
+[[scripts/session_scribe/forensic_exporter.py#ForensicExporter]] writes Merkle roots, SARIF v2.1.0 and `EVIDENCE_MANIFEST.json`, while
+[[scripts/session_scribe/report_signer.py#sign_report]] and [[scripts/session_scribe/html_dashboard.py#HTMLDashboard]] export signed reports and 4-tab HTML dashboards.
+Tests: [[scripts/session_scribe/tests/test_session_scribe.py]] · Report: [[scripts/session_scribe/REPORT.md]] · Video: https://youtu.be/VFLu1myMy_o.
+
 ## Community and contribution
 
 Contribution flow, coding conventions and the authorization stance.
@@ -170,3 +290,11 @@ do not distribute OS media; users are responsible for valid licences.
 [[dashboard/scripts/source-brain-model.test.mjs]] validates provider paths, graph
 limits/windows and bounded revision diff without a browser.
 [[source-lab/RUNBOOK.md]] records the portable release/rollback workflow.
+
+## Two-stage dropper detection harness
+
+[[scripts/analysis/dropper_detect.py]] and [[scripts/analysis/dropper_lab/README.md]]
+provide an offline static and loopback-rehearsal detector for two-stage "clean dropper"
+loaders (`PENT-15`), correlating remote stage fetch, deferred triggers, payload decoding
+and dynamic execution sinks while keeping benign utilities false-positive free.
+

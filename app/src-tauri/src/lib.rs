@@ -12,12 +12,14 @@
 
 mod console;
 mod container_runtime;
+mod deeplink;
 mod python_runtime;
 mod runtime;
 mod widget;
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri::menu::{MenuBuilder, SubmenuBuilder};
@@ -113,6 +115,15 @@ fn chosen_root(app: &AppHandle) -> Option<PathBuf> {
 
 /// Env → chosen checkout → development checkout → the bundled runtime in the data folder.
 fn resolve_root(app: &AppHandle) -> Result<(PathBuf, Source), String> {
+    resolve_root_reporting(app, &mut |_| {})
+}
+
+/// `resolve_root`, reporting how far the bundled files are along (only the bundled copy has any
+/// work to report; a checkout or chosen folder is used as it is).
+fn resolve_root_reporting(
+    app: &AppHandle,
+    report: &mut dyn FnMut(runtime::SyncProgress),
+) -> Result<(PathBuf, Source), String> {
     if let Some(dir) = std::env::var_os("OSLAB_ROOT") {
         let dir = PathBuf::from(dir);
         return if runtime::is_root(&dir) {
@@ -133,13 +144,32 @@ fn resolve_root(app: &AppHandle) -> Result<(PathBuf, Source), String> {
         .map_err(|e| e.to_string())?
         .join("os-lab");
     let target = data_dir(app)?.join("os-lab");
-    runtime::sync_bundle(&bundle, &target, &app.package_info().version.to_string())?;
+    runtime::sync_bundle_reporting(&bundle, &target, &app.package_info().version.to_string(), report)?;
     Ok((target, Source::Bundled))
 }
 
 #[tauri::command]
 async fn console_start(app: AppHandle, state: State<'_, Console>) -> Result<Started, String> {
-    let (root, source) = resolve_root(&app)?;
+    // Preparing the files can take minutes on a busy disk, so it runs off the async workers and
+    // tells the launcher how far along it is (events: "console-progress").
+    let progress_app = app.clone();
+    let (root, source) = tauri::async_runtime::spawn_blocking(move || {
+        let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
+        resolve_root_reporting(&progress_app, &mut |p| {
+            // At most ~10 events a second, but never drop the first or the last of a phase.
+            let edge = p.done == 0 || (p.total > 0 && p.done >= p.total);
+            if edge || last.elapsed() >= std::time::Duration::from_millis(100) {
+                last = std::time::Instant::now();
+                let phase = match p.phase { runtime::SyncPhase::Check => "check", runtime::SyncPhase::Copy => "copy" };
+                let _ = progress_app.emit("console-progress", serde_json::json!({
+                    "step": "prepare", "phase": phase, "done": p.done, "total": p.total,
+                }));
+            }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    let _ = app.emit("console-progress", serde_json::json!({ "step": "console", "phase": "start", "done": 0, "total": 0 }));
     // Downloaded content packs (console/content.py) live in the app's data folder, beside but
     // never inside the bundled copy, so "reset" always returns to what shipped.
     let content = std::env::var_os("OSLAB_CONTENT_DIR").map(PathBuf::from)
@@ -148,9 +178,12 @@ async fn console_start(app: AppHandle, state: State<'_, Console>) -> Result<Star
     let data = data_dir(&app)?;
     let version = app.package_info().version.to_string();
     let console = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || console.start(&root, source, &log, &data, &content, &version))
+    let mut started = tauri::async_runtime::spawn_blocking(move || console.start(&root, source, &log, &data, &content, &version))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+    started.route = widget::consume_pending_mac_lab_intent()
+        .map(|request| request.dashboard_route().to_string());
+    Ok(started)
 }
 
 #[tauri::command]
@@ -234,6 +267,38 @@ async fn container_get(app: AppHandle) -> Result<String, String> {
     app.opener().open_path(path.to_string_lossy().into_owned(), None::<String>)
         .map_err(|e| format!("Docker Desktop was downloaded but could not be opened: {e}"))?;
     Ok(path.display().to_string())
+}
+
+/// The app's own bundle: the .app that contains this executable, or None when run unbundled (dev).
+#[cfg_attr(target_os = "linux", allow(dead_code))]
+fn own_bundle() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    exe.ancestors().find(|p| p.extension().map_or(false, |e| e == "app")).map(PathBuf::from)
+}
+
+/// Grant helper for the dashboard's Full Disk Access guide: relaunch this app so a fresh grant
+/// takes effect. Takes no argument from the page; it only restarts the app it is running in.
+#[tauri::command]
+fn app_relaunch(app: AppHandle) {
+    app.restart();
+}
+
+/// Grant helper: start a native drag of this app's own icon so the page can offer drag-to-Settings.
+/// The dragged path is never supplied by the page; it is always this app's bundle.
+#[tauri::command]
+#[cfg(not(target_os = "linux"))]
+fn app_drag_self(window: tauri::WebviewWindow) -> Result<(), String> {
+    let bundle = own_bundle().ok_or("Not running from an app bundle")?;
+    let icon = drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec());
+    drag::start_drag(&window, drag::DragItem::Files(vec![bundle]), icon, |_, _| {}, drag::Options::default())
+        .map_err(|e| e.to_string())
+}
+
+/// Linux has no Full Disk Access grant to drag into, and the `drag` crate wants a GTK window there.
+#[tauri::command]
+#[cfg(target_os = "linux")]
+fn app_drag_self() -> Result<(), String> {
+    Err("Dragging the app is only available on macOS and Windows".into())
 }
 
 #[tauri::command]
@@ -365,6 +430,13 @@ fn build_window(app: &AppHandle, settings: Option<&str>) -> tauri::Result<()> {
                 false
             }
         })
+        .on_page_load(|window, payload| {
+            // AGQ-01: once the dashboard page exists, replay any command that
+            // arrived before the console (or the page) was ready.
+            if window.label() == "main" && payload.event() == tauri::webview::PageLoadEvent::Finished {
+                bridge::resume(window.app_handle());
+            }
+        })
         .on_new_window(move |url, _features| {
             if is_internal(&url) {
                 // A new window for a console page (target=_blank): keep it in this window.
@@ -384,11 +456,20 @@ fn build_window(app: &AppHandle, settings: Option<&str>) -> tauri::Result<()> {
 pub fn run() {
     container_runtime::augment_path();
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        // AGQ-01: on Linux and Windows a command button starts a second instance
+        // whose only argument is the URL. The deep-link plugin is not built with
+        // its `deep-link` feature here, so nothing would forward that argument;
+        // this callback parses the URL itself.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.unminimize();
                 let _ = w.show();
                 let _ = w.set_focus();
+            }
+            for arg in argv.iter().skip(1) {
+                if let Ok(url) = url::Url::parse(arg) {
+                    bridge::route(app, &url);
+                }
             }
         }))
         .plugin(tauri_plugin_opener::init())
@@ -413,6 +494,8 @@ pub fn run() {
             console_start,
             console_status,
             console_restart,
+            app_relaunch,
+            app_drag_self,
             console_choose_root,
             console_reset_root,
             console_logs,
@@ -444,12 +527,16 @@ pub fn run() {
             let nav = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
-                    if url.scheme() == "oslab" {
-                        let route = url.path().trim_start_matches('/').to_string();
-                        navigate_widget_route(&nav, &route);
-                    }
+                    bridge::route(&nav, &url);
                 }
             });
+            // AGQ-01: a command button may have started the app. The console is
+            // not up yet, so the URLs wait for the first dashboard page load.
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                for url in urls {
+                    bridge::route(app.handle(), &url);
+                }
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -468,42 +555,243 @@ pub fn run() {
                 if on_dashboard && widget::consume_pending_quick_clean() {
                     let _ = w.eval("window.__oslabQuickClean && window.__oslabQuickClean()");
                 }
+                if on_dashboard {
+                    if let Some(request) = widget::consume_pending_mac_lab_intent() {
+                        bridge::open_path(handle, request.dashboard_route());
+                    }
+                }
             }
             widget::reload_timelines();
         }
     });
 }
 
-/// CLW-03: routes an oslab:// deep link into the dashboard in place. A known
-/// route only — unknown routes are refused rather than navigated blind. When
-/// the window still shows the launcher, the console URL hands it straight to
-/// the matching dashboard page.
-const WIDGET_ROUTES: [&str; 10] = [
-    "dashboard", "scan", "results", "leftovers", "history", "space",
-    "cleanup-bookmarks", "cleanup-monitor", "cleanup-permissions", "cleanup-widgets",
-];
+/// AGQ-01: the command bridge. One place decides what an `oslab://` URL does,
+/// whether it arrived from a second instance, a deep link, or the command line.
+///
+/// Two rules keep this honest:
+/// - Navigation is a whitelisted route; an unknown one is reported, never
+///   navigated blind.
+/// - `panic-stop` runs against the console's own endpoint, so its validation
+///   and reply are the only source of truth. Every outcome — including a
+///   refusal or a failure — reaches the page and is shown.
+///
+/// `quick-clean` is deliberately a page flow, not an endpoint call: the bridge
+/// opens Cleanup and the page's existing plan → confirm dialog runs, so a
+/// command button can never delete anything on its own.
+mod bridge {
+    use super::*;
 
-fn navigate_widget_route(app: &AppHandle, route: &str) {
-    if !WIDGET_ROUTES.contains(&route) {
-        return;
+    /// A command that arrived before the console answered: the first dashboard
+    /// page load replays it. One at a time; the newest wins.
+    static PENDING: Mutex<Option<url::Url>> = Mutex::new(None);
+    /// What the dashboard still has to be told.
+    static OUTBOX: Mutex<Vec<Directive>> = Mutex::new(Vec::new());
+
+    /// A request the page renders in the user's language.
+    #[derive(Clone, Default, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Directive {
+        /// `navigate`, `quick-clean`, `panic-stop`, or `refused`.
+        pub command: String,
+        /// Drawer route for `navigate` (a whitelisted widget route).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub route: Option<String>,
+        /// Whether the action succeeded; absent for navigation.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub ok: Option<bool>,
+        /// The console's own error text, or the closed-session count.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub detail: Option<String>,
+        /// The refused URL, verbatim.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub url: Option<String>,
     }
-    let Some(w) = app.get_webview_window("main") else { return };
-    let on_dashboard = w.url().map(|u| u.scheme() == "http" || u.scheme() == "https").unwrap_or(false);
-    if on_dashboard {
-        let _ = w.eval(format!(
-            "window.__oslabNavigate && window.__oslabNavigate({})",
-            serde_json::to_string(route).unwrap_or_default()
-        ));
-        return;
+
+    impl Directive {
+        fn navigate(route: &str) -> Self {
+            Directive { command: "navigate".into(), route: Some(route.into()), ..Default::default() }
+        }
+        fn quick_clean() -> Self {
+            Directive { command: "quick-clean".into(), ok: Some(true), ..Default::default() }
+        }
+        fn action(command: &str, result: Result<String, String>) -> Self {
+            match result {
+                Ok(body) => Directive {
+                    command: command.into(),
+                    ok: Some(true),
+                    detail: session_summary(&body),
+                    ..Default::default()
+                },
+                Err(message) => Directive {
+                    command: command.into(),
+                    ok: Some(false),
+                    detail: Some(message),
+                    ..Default::default()
+                },
+            }
+        }
+        fn refused(url: &str) -> Self {
+            Directive { command: "refused".into(), url: Some(url.to_string()), ..Default::default() }
+        }
     }
-    let Some(base) = app.state::<Console>().running_url() else { return };
-    let tab = match route {
-        "scan" | "results" | "leftovers" | "history" | "space" => format!("cleanup/{route}/"),
-        _ => "cleanup/".to_string(),
-    };
-    if let Ok(url) = url::Url::parse(&format!("{}/{}", base.trim_end_matches('/'), tab)) {
-        let _ = w.navigate(url);
+
+    /// Parse and act on one URL.
+    pub fn route(app: &AppHandle, raw: &url::Url) {
+        if raw.scheme() != "oslab" {
+            return;
+        }
+        // A command from another app must be visible, not a hidden state change.
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+        let directive = match deeplink::parse_command(raw) {
+            deeplink::Command::Navigate(route) => {
+                navigate(app, &route);
+                Directive::navigate(&route)
+            }
+            deeplink::Command::Action("quick-clean") => {
+                // The dashboard's Cleanup page owns the plan → confirm dialog, so
+                // the bridge opens it and the page's own flow takes over.
+                //
+                // Ordering matters: when this needs a page change, the directive
+                // waits in the outbox and `flush` delivers it on the page's own
+                // load event. The page, not a timer, decides when it is ready.
+                if on_cleanup_dashboard(app) {
+                    Directive::quick_clean()
+                } else {
+                    navigate(app, "dashboard");
+                    enqueue(Directive::quick_clean());
+                    return;
+                }
+            }
+            deeplink::Command::Action(action) => match deeplink::endpoint(action) {
+                Some(endpoint) if console_port(app).is_some() => {
+                    let port = console_port(app).expect("checked above");
+                    Directive::action(action, console::post_action(port, endpoint))
+                }
+                // The console is still starting: remember the request and report
+                // once the dashboard is up, rather than dropping the click.
+                _ => {
+                    defer(app, raw);
+                    return;
+                }
+            },
+            deeplink::Command::Unknown => Directive::refused(&raw.to_string()),
+        };
+        deliver(app, directive);
     }
+
+    /// Hand one directive to the page. `eval` (not an event) so a page that
+    /// mounted after the command still receives it exactly once.
+    fn deliver(app: &AppHandle, directive: Directive) {
+        let Some(w) = app.get_webview_window("main") else {
+            if let Ok(mut outbox) = OUTBOX.lock() {
+                outbox.push(directive);
+            }
+            return;
+        };
+        let payload = serde_json::to_string(&directive).unwrap_or_else(|_| "null".into());
+        if w.eval(format!("window.__oslabCommand && window.__oslabCommand({payload})")).is_err() {
+            if let Ok(mut outbox) = OUTBOX.lock() {
+                outbox.push(directive);
+            }
+        }
+    }
+
+    /// Send whatever an earlier command left behind. Called on each dashboard
+    /// page load, so the order is always: page exists, then directive.
+    pub fn flush(app: &AppHandle) {
+        let directives = OUTBOX.lock().map(|mut outbox| std::mem::take(&mut *outbox)).unwrap_or_default();
+        for directive in directives {
+            deliver(app, directive);
+        }
+    }
+
+    /// Is the window already on the Cleanup dashboard (in any locale)?
+    fn on_cleanup_dashboard(app: &AppHandle) -> bool {
+        let Some(w) = app.get_webview_window("main") else { return false };
+        let Ok(url) = w.url() else { return false };
+        if !matches!(url.scheme(), "http" | "https") {
+            return false;
+        }
+        url.path().split('/').rev().find(|part| !part.is_empty()).map(|part| part == "cleanup")
+            .unwrap_or(false)
+    }
+
+    fn enqueue(directive: Directive) {
+        if let Ok(mut outbox) = OUTBOX.lock() {
+            outbox.push(directive);
+        }
+    }
+
+    fn defer(app: &AppHandle, raw: &url::Url) {
+        let _ = app;
+        if let Ok(mut pending) = PENDING.lock() {
+            *pending = Some(raw.clone());
+        }
+    }
+
+    /// Replay the command that arrived before the console was ready.
+    pub fn resume(app: &AppHandle) {
+        flush(app);
+        let pending = PENDING.lock().ok().and_then(|mut pending| pending.take());
+        if let Some(url) = pending {
+            route(app, &url);
+        }
+    }
+
+    /// A path-free summary of the console's reply: how many deep-inspect
+    /// sessions the stop closed.
+    fn session_summary(body: &str) -> Option<String> {
+        let value = serde_json::from_str::<serde_json::Value>(body).ok()?;
+        let closed = value.get("sessionsClosed")?.as_array()?.len();
+        Some(closed.to_string())
+    }
+
+    /// Open a dashboard path that is not a widget route (the macOS Lab page the
+    /// App Intent targets), keeping the current locale prefix.
+    pub fn open_path(app: &AppHandle, path: &str) {
+        let Some(w) = app.get_webview_window("main") else { return };
+        let Some(base) = app.state::<Console>().running_url() else { return };
+        let path = w.url().ok().map(|current| localized_dashboard_path(&current, path))
+            .unwrap_or_else(|| path.trim_start_matches('/').to_string());
+        if let Ok(url) = url::Url::parse(&format!("{}/{path}", base.trim_end_matches('/'))) {
+            let _ = w.navigate(url);
+        }
+    }
+
+    fn console_port(app: &AppHandle) -> Option<u16> {
+        url::Url::parse(&app.state::<Console>().running_url()?).ok()?.port()
+    }
+
+    fn navigate(app: &AppHandle, route: &str) {
+        let Some(w) = app.get_webview_window("main") else { return };
+        let on_dashboard = w.url().map(|u| u.scheme() == "http" || u.scheme() == "https").unwrap_or(false);
+        if on_dashboard && deeplink::CLEANUP_ROUTES.contains(&route) {
+            // The island router handles cleanup routes in place, without a reload.
+            let _ = w.eval(format!(
+                "window.__oslabNavigate && window.__oslabNavigate({})",
+                serde_json::to_string(route).unwrap_or_default()
+            ));
+            return;
+        }
+        let Some(base) = app.state::<Console>().running_url() else { return };
+        let path = deeplink::dashboard_path(route);
+        let path = w.url().ok().map(|current| localized_dashboard_path(&current, &path)).unwrap_or(path);
+        if let Ok(url) = url::Url::parse(&format!("{}/{path}", base.trim_end_matches('/'))) {
+            let _ = w.navigate(url);
+        }
+    }
+}
+
+fn localized_dashboard_path(current: &url::Url, path: &str) -> String {
+    const LOCALES: [&str; 7] = ["tr", "de", "fr", "es", "it", "fa", "ar"];
+    let first = current.path_segments().and_then(|mut segments| segments.next()).unwrap_or_default();
+    let prefix = if LOCALES.contains(&first) { format!("{first}/") } else { String::new() };
+    format!("{prefix}{}", path.trim_start_matches('/'))
 }
 
 #[cfg(test)]
@@ -534,5 +822,16 @@ mod files_dir_tests {
         assert!(copy_files_dir(&from, &to).unwrap_err().contains("empty folder"));
         assert!(copy_files_dir(&from, &from.join("os-lab")).unwrap_err().contains("separate folder"));
         let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn app_intent_routes_preserve_the_dashboard_locale() {
+        let english = url::Url::parse("http://127.0.0.1:4330/cleanup/").unwrap();
+        let turkish = url::Url::parse("http://127.0.0.1:4330/tr/cleanup/").unwrap();
+        assert_eq!(localized_dashboard_path(&english, "labs/macos/"), "labs/macos/");
+        assert_eq!(localized_dashboard_path(&turkish, "labs/macos/#intent=panic-stop"),
+                   "tr/labs/macos/#intent=panic-stop");
+        assert_eq!(localized_dashboard_path(&turkish, "labs/macos/#intent=verify-submission"),
+                   "tr/labs/macos/#intent=verify-submission");
     }
 }

@@ -22,6 +22,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 pub const GROUP_ID: &str = "group.com.keyvanarasteh.oslab";
 pub const SNAPSHOT_FILE_NAME: &str = "widget-snapshot.json";
 pub const PENDING_QUICK_CLEAN_NAME: &str = "widget-pending-quick-clean.txt";
+pub const PENDING_MAC_LAB_INTENT_NAME: &str = "widget-pending-mac-lab-intent.txt";
 /// The widget intent's request expires like the reference app's: an old
 /// flag must never surprise the user with a cleanup plan hours later.
 pub const PENDING_MAX_AGE_SECS: u64 = 120;
@@ -51,6 +52,27 @@ fn pending_file_in(dir: &Path) -> PathBuf {
     dir.join(PENDING_QUICK_CLEAN_NAME)
 }
 
+fn pending_mac_lab_intent_file_in(dir: &Path) -> PathBuf {
+    dir.join(PENDING_MAC_LAB_INTENT_NAME)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MacLabIntentRequest {
+    Open,
+    VerifySubmission,
+    PanicStop,
+}
+
+impl MacLabIntentRequest {
+    pub fn dashboard_route(self) -> &'static str {
+        match self {
+            Self::Open => "labs/macos/",
+            Self::VerifySubmission => "labs/macos/#intent=verify-submission",
+            Self::PanicStop => "labs/macos/#intent=panic-stop",
+        }
+    }
+}
+
 pub fn snapshot_file_path() -> Option<PathBuf> {
     group_container_dir().map(|dir| snapshot_file_in(&dir))
 }
@@ -59,6 +81,32 @@ pub fn snapshot_file_path() -> Option<PathBuf> {
 /// and only while it is fresh. A missing, unreadable or stale file is "no".
 pub fn consume_pending_quick_clean() -> bool {
     consume_pending_in(group_container_dir().as_deref())
+}
+
+/// Consume a fresh App Intent handoff exactly once. Unknown actions, malformed
+/// timestamps and stale files fail closed after the request file is removed.
+pub fn consume_pending_mac_lab_intent() -> Option<MacLabIntentRequest> {
+    consume_pending_mac_lab_intent_in(group_container_dir().as_deref())
+}
+
+fn consume_pending_mac_lab_intent_in(dir: Option<&Path>) -> Option<MacLabIntentRequest> {
+    let path = dir.map(pending_mac_lab_intent_file_in)?;
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let _ = std::fs::remove_file(&path);
+    let mut fields = raw.split_whitespace();
+    let request = match fields.next()? {
+        "open" => MacLabIntentRequest::Open,
+        "verify-submission" => MacLabIntentRequest::VerifySubmission,
+        "panic-stop" => MacLabIntentRequest::PanicStop,
+        _ => return None,
+    };
+    let requested_at = fields.next()?.parse::<f64>().ok()?;
+    if fields.next().is_some() || !requested_at.is_finite() || requested_at <= 0.0 {
+        return None;
+    }
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs_f64();
+    let age = now - requested_at;
+    ((-5.0..=PENDING_MAX_AGE_SECS as f64).contains(&age)).then_some(request)
 }
 
 fn consume_pending_in(dir: Option<&Path>) -> bool {
@@ -164,6 +212,7 @@ mod tests {
         let base = temp_group("paths");
         assert_eq!(snapshot_file_in(&base), base.join(SNAPSHOT_FILE_NAME));
         assert_eq!(pending_file_in(&base), base.join(PENDING_QUICK_CLEAN_NAME));
+        assert_eq!(pending_mac_lab_intent_file_in(&base), base.join(PENDING_MAC_LAB_INTENT_NAME));
         let _ = std::fs::remove_dir_all(&base);
     }
 
@@ -201,6 +250,49 @@ mod tests {
         std::fs::write(pending_file_in(&base), "not a number").unwrap();
         assert!(!consume_pending_in(Some(&base)));
         assert!(!pending_file_in(&base).exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn mac_lab_requests_are_typed_fresh_and_consumed_once() {
+        let base = temp_group("mac-lab");
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64();
+        std::fs::write(pending_mac_lab_intent_file_in(&base), format!("panic-stop\n{now}")).unwrap();
+        assert_eq!(consume_pending_mac_lab_intent_in(Some(&base)), Some(MacLabIntentRequest::PanicStop));
+        assert_eq!(MacLabIntentRequest::PanicStop.dashboard_route(), "labs/macos/#intent=panic-stop");
+        assert_eq!(consume_pending_mac_lab_intent_in(Some(&base)), None);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn submission_verification_routes_to_the_guarded_review_workflow() {
+        let base = temp_group("submission-review");
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64();
+        std::fs::write(pending_mac_lab_intent_file_in(&base), format!("verify-submission\n{now}")).unwrap();
+        assert_eq!(
+            consume_pending_mac_lab_intent_in(Some(&base)),
+            Some(MacLabIntentRequest::VerifySubmission)
+        );
+        assert_eq!(
+            MacLabIntentRequest::VerifySubmission.dashboard_route(),
+            "labs/macos/#intent=verify-submission"
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn stale_or_unknown_mac_lab_requests_fail_closed() {
+        let base = temp_group("mac-lab-refuse");
+        let stale = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64() - 10_000.0;
+        std::fs::write(pending_mac_lab_intent_file_in(&base), format!("open\n{stale}")).unwrap();
+        assert_eq!(consume_pending_mac_lab_intent_in(Some(&base)), None);
+        assert!(!pending_mac_lab_intent_file_in(&base).exists());
+        std::fs::write(pending_mac_lab_intent_file_in(&base), "open\n99999999999").unwrap();
+        assert_eq!(consume_pending_mac_lab_intent_in(Some(&base)), None);
+        assert!(!pending_mac_lab_intent_file_in(&base).exists());
+        std::fs::write(pending_mac_lab_intent_file_in(&base), "arm\n99999999999").unwrap();
+        assert_eq!(consume_pending_mac_lab_intent_in(Some(&base)), None);
+        assert!(!pending_mac_lab_intent_file_in(&base).exists());
         let _ = std::fs::remove_dir_all(&base);
     }
 }

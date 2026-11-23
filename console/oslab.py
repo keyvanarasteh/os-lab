@@ -40,7 +40,7 @@ import uuid
 
 # ── Static lab model ─────────────────────────────────────────────────────────
 
-LAB_ORDER = ["android", "windows", "linux", "ios", "macos", "source", "web"]
+LAB_ORDER = ["android", "windows", "winapps", "linux", "ios", "macos", "source", "web"]
 
 LABS = {
     "source": {"label": "Source Lab", "dir": "source-lab", "labctl": "source", "containers": [],
@@ -61,6 +61,13 @@ LABS = {
         "containers": ["win-lab"],
         "disk_default": "64G",
         "summary": "Windows in Docker with KVM, a web desktop, RDP and shared storage.",
+    },
+    "winapps": {
+        "label": "Windows Apps Lab",
+        "dir": "console",  # the lab is console/winapps.py; there is no lab folder of its own
+        "labctl": None,
+        "containers": [],
+        "summary": "Read-only mirror of visible desktop applications on this Windows host.",
     },
     "linux": {
         "label": "Linux Lab",
@@ -122,7 +129,7 @@ def tools_for_host(os_name: str) -> list[tuple[str, str]]:
 
 
 LABCTL_ACTIONS = ["status", "doctor", "urls", "logs", "monitor", "start", "stop", "restart",
-                  "profile", "resize", "setup", "backup", "service-install", "service-uninstall"]
+                  "profile", "resize", "trace", "setup", "backup", "service-install", "service-uninstall"]
 # The iOS Lab's native path: simulator lifecycle plus optional Appium/idb device automation.
 MAC_ACTIONS = ["status", "doctor", "setup", "start", "stop", "appium-install", "appium-start", "appium-stop",
                "idb-install", "idb-start", "idb-stop", "xcuitest-smoke"]
@@ -148,6 +155,7 @@ ACTION_INFO = {
     "restart": ("Restart", "Recreate the stack from the current configuration."),
     "profile": ("Apply profile", "Write a profile preset (lightweight/development/performance) to .env."),
     "resize": ("Resize", "Change CPU/RAM (and disk for Windows) in .env; restart to apply."),
+    "trace": ("Trace functions", "Trace a lab target's functions with frida-trace and save a JSON call map and annotated session log."),
     "setup": ("Install dependencies", "Install the host prerequisites for this lab."),
     "backup": ("Backup", "Write a guest backup archive into the lab's backups/ folder."),
     "service-install": ("Install boot service", "Start this lab automatically at boot (systemd)."),
@@ -181,6 +189,11 @@ PRIVILEGED = {"setup", "service-install", "service-uninstall"}
 SECRET_PARTS = ("PASSWORD", "SECRET", "TOKEN", "API_KEY", "PRIVATE_KEY", "CREDENTIAL")
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+SAFE_GLOB = re.compile(r"^[A-Za-z0-9_.*?!:\[\]+\- ]{1,160}$")
+FORBIDDEN_TRACE_TARGETS = frozenset({
+    "init", "systemd", "sshd", "launchd", "kernel_task",
+    "csrss.exe", "lsass.exe", "wininit.exe", "services.exe", "smss.exe",
+})
 SIZE = re.compile(r"^[1-9][0-9]{0,5}[MmGgTt]?$")
 
 
@@ -651,9 +664,40 @@ def ios_resources() -> dict:
 # from `screencapture -l` and its accessibility tree from System Events. Control mode posts real
 # clicks through the same macos-app.sh click action the previewed flow uses.
 
+def _load_macos_config() -> dict:
+    """One config file with a clear precedence (QcU parity): environment > ios-lab/mac/mac-lab.json
+    > defaults. Missing or malformed files fall back to the defaults; values are clamped so a
+    typo cannot turn the safety timers off."""
+    limits = {"controlTimeout": (600, 30, 3600, "OSLAB_MAC_CONTROL_TIMEOUT"),
+              "auditMax": (500, 50, 5000, "OSLAB_MAC_AUDIT_MAX"),
+              "streamCap": (600, 30, 3600, "OSLAB_MAC_STREAM_CAP")}
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ios-lab", "mac", "mac-lab.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            stored = json.load(f)
+        if not isinstance(stored, dict):
+            stored = {}
+    except (OSError, ValueError):
+        stored = {}
+    config = {}
+    for key, (default, low, high, env) in limits.items():
+        value = default
+        for candidate in (os.environ.get(env), stored.get(key)):
+            try:
+                number = int(candidate)
+            except (TypeError, ValueError):
+                continue
+            value = min(high, max(low, number))
+            break
+        config[key] = value
+    return config
+
+
+_MACOS_CONFIG = _load_macos_config()
+
 _MACOS_CONTROL = {"armed": False, "armedAt": 0.0, "owner": None, "ownerAt": 0.0}
 _MACOS_CONTROL_LOCK = threading.Lock()
-_MACOS_CONTROL_TIMEOUT = 600  # control mode disarms itself after ten idle minutes
+_MACOS_CONTROL_TIMEOUT = _MACOS_CONFIG["controlTimeout"]  # control mode disarms itself after idle time (default ten minutes)
 _MACOS_STREAM_EPOCH = 0  # bumped by the panic stop; every stream loop checks it and exits
 
 # MIR-11 agent-safety layer: actions that can submit, send or overwrite get one more gate
@@ -800,6 +844,44 @@ def macos_windows() -> dict:
     return {"available": True, "reason": None, "screenRecording": any(w["title"] for w in windows), "windows": windows}
 
 
+# Each system prompt is asked for at most once per console process: macOS itself shows it only
+# once per app, and asking again would only reopen Settings behind the user's back.
+_MACOS_ASKED: set[str] = set()
+
+
+def _screen_capture_access(request: bool) -> bool | None:
+    """CGPreflightScreenCaptureAccess, or CGRequestScreenCaptureAccess (which shows the system
+    "allow screen recording" prompt for the app macOS holds responsible for this console).
+    None when the call is unavailable."""
+    if host_os() != "macos":
+        return None
+    try:
+        cg = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+        fn = cg.CGRequestScreenCaptureAccess if request else cg.CGPreflightScreenCaptureAccess
+        fn.restype = ctypes.c_bool
+        fn.argtypes = []
+        return bool(fn())
+    except (OSError, AttributeError):
+        return None
+
+
+def macos_auto_request(root: str | None, pane: str) -> bool:
+    """Ask macOS once for a missing permission, without opening Settings: the Screen Recording
+    prompt via CoreGraphics, the Accessibility prompt via the helper. True when a prompt was asked."""
+    if host_os() != "macos" or pane in _MACOS_ASKED:
+        return False
+    _MACOS_ASKED.add(pane)
+    if pane == "screen-recording":
+        asked = _screen_capture_access(request=True) is not None
+    elif pane == "accessibility" and root and _ax_helper(root):
+        asked = _capture([_ax_helper(root), "request-access"], timeout=20)[0] == 0
+    else:
+        asked = False
+    if asked:
+        _macos_audit(root, "permission-request", detail={"pane": pane, "auto": True})
+    return asked
+
+
 def macos_window_screenshot(window_id: int) -> bytes:
     """A PNG of one on-screen window. Raises PlanError when the id is stale or Screen Recording is missing."""
     if host_os() != "macos":
@@ -815,6 +897,11 @@ def macos_window_screenshot(window_id: int) -> bytes:
         with open(path, "rb") as f:
             png = f.read()
         if code != 0 or not png.startswith(b"\x89PNG"):
+            if _screen_capture_access(request=False) is False:
+                macos_auto_request(None, "screen-recording")
+                raise PlanError(f"Screen Recording is needed to capture windows. macOS has asked; allow "
+                                f"{macos_responsible_app() or 'the console'}, restart the console and retry.",
+                                code="PERMISSION_REQUIRED")
             raise PlanError("Could not capture that window. If this keeps failing, grant Screen Recording "
                             "to the console (System Settings > Privacy & Security) and retry.")
         return png
@@ -875,6 +962,11 @@ _AX_ELEMENT_CAP = 400
 
 
 def _ax_helper(root: str) -> str | None:
+    """The native helper binary. OSLAB_AX_HELPER points at a stand-in (the fake helper used by
+    tests and Linux CI) so the act/verify paths run without a Mac."""
+    override = os.environ.get("OSLAB_AX_HELPER")
+    if override:
+        return override if os.path.isfile(override) and os.access(override, os.X_OK) else None
     path = os.path.join(root, "ios-lab", "mac", "build", "ax-helper")
     return path if os.path.isfile(path) and os.access(path, os.X_OK) else None
 
@@ -1250,8 +1342,10 @@ def macos_control_arm(root: str, armed: bool, owner: str | None = None) -> dict:
     with _MACOS_CONTROL_LOCK:
         if armed and _MACOS_CONTROL["armed"] and _MACOS_CONTROL["owner"] \
                 and owner and owner != _MACOS_CONTROL["owner"]:
-            raise PlanError("Another client already holds armed control (single-owner input, MIR-11)",
-                            code="INPUT_BUSY", retry="never")
+            held = int(time.time() - _MACOS_CONTROL["armedAt"])
+            raise PlanError(f"{_MACOS_CONTROL['owner']} already holds armed control (armed {held}s ago); "
+                            "it must disarm or stop the session before another client can arm "
+                            "(single-owner input, MIR-11)", code="ARMED_BY_OTHER", retry="never")
         _MACOS_CONTROL["armed"] = armed
         _MACOS_CONTROL["armedAt"] = time.time()
         _MACOS_CONTROL["owner"] = owner if armed else None
@@ -1319,7 +1413,8 @@ def macos_control_click(root: str, data: dict) -> dict:
 # MIR-06: every host action the console performs for the app mirror lands in a bounded
 # in-memory ring and an append-only JSONL file under ios-lab/artifacts/. Rows carry a small
 # frame thumbnail at action time; nothing ever leaves this Mac.
-_MACOS_AUDIT_MAX = 500
+_MACOS_AUDIT_MAX = _MACOS_CONFIG["auditMax"]
+_MACOS_AUDIT_SEQ = 0  # monotonically increasing row number, for the live event feed
 _MACOS_AUDIT: list[dict] = []
 _MACOS_AUDIT_LOCK = threading.Lock()
 
@@ -1359,6 +1454,7 @@ def _macos_audit_thumbnail(window_id: int) -> str | None:
 def _macos_audit(root: str | None, kind: str, *, window: dict | None = None,
                  detail: dict | None = None, thumbnail: bool = False) -> None:
     """Record one audit row (MIR-06). Never raises: auditing must not break the action."""
+    global _MACOS_AUDIT_SEQ
     row: dict = {"time": time.time(), "kind": kind}
     if window:
         row.update({"app": window.get("app"), "windowId": window.get("windowId"),
@@ -1371,6 +1467,8 @@ def _macos_audit(root: str | None, kind: str, *, window: dict | None = None,
         except (OSError, ValueError):
             row["thumbnail"] = None
     with _MACOS_AUDIT_LOCK:
+        _MACOS_AUDIT_SEQ += 1
+        row["seq"] = _MACOS_AUDIT_SEQ
         _MACOS_AUDIT.append(row)
         del _MACOS_AUDIT[:-_MACOS_AUDIT_MAX]
     if root:
@@ -1395,6 +1493,155 @@ def macos_audit_download() -> bytes:
     with _MACOS_AUDIT_LOCK:
         payload = {"generatedAt": time.time(), "recording": True, "rows": list(_MACOS_AUDIT)}
     return json.dumps(payload).encode()
+
+
+# ── QcU parity: displays, capabilities, search, permissions, live events ─────
+# QcU is the mac-lab engine extracted as a standalone package; these are the engine-level
+# pieces it has that the console lacked. All read-only except the consent request.
+
+_MACOS_PANES = {
+    "accessibility": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+    "screen-recording": "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+}
+
+
+def macos_displays() -> dict:
+    """Displays as JSON (MIR-03 data): origin, size and backing scale of every active display,
+    so a remote client can reason about coordinates without running doctor."""
+    if host_os() != "macos":
+        return {"available": False, "reason": "The app mirror needs a Mac.", "displays": []}
+    try:
+        return {"available": True, "reason": None, "displays": _macos_cg().screens()}
+    except OSError as e:
+        return {"available": False, "reason": f"CoreGraphics is unavailable: {e}", "displays": []}
+
+
+def macos_search_elements(root: str, window_id: int, query: str) -> dict:
+    """Find elements of one window by label, value or placeholder substring (max 50) so an
+    agent does not need the whole tree. Reads the same tree as the mirror, so paths and the
+    revision are valid for the element actions."""
+    if not isinstance(query, str) or not query.strip():
+        raise PlanError("query must be a non-empty string", code="INVALID_ARGS")
+    needle = query.strip().lower()[:120]
+    state = macos_window_elements(root, window_id)
+    hits = []
+    for element in state["elements"]:
+        haystack = " ".join(str(element.get(key) or "") for key in ("label", "title", "value", "placeholder")).lower()
+        if needle in haystack:
+            hits.append(element)
+            if len(hits) >= 50:
+                break
+    return {"windowId": state["windowId"], "app": state["app"], "revision": state["revision"],
+            "engine": state["engine"], "query": query.strip(), "count": len(hits), "hits": hits}
+
+
+def macos_responsible_app() -> str | None:
+    """The app that macOS will ask for permissions on behalf of: the nearest ancestor of this
+    process that lives in an .app bundle (Terminal, an IDE, the os-lab app). Doctor names it so
+    the user grants Accessibility to the right entry, not to "the helper"."""
+    if host_os() != "macos":
+        return None
+    pid = os.getppid()  # start above this process: a Python.app interpreter is not the grantee
+    for _ in range(12):
+        code, output = _capture(["ps", "-o", "ppid=,comm=", "-p", str(pid)], timeout=5)
+        line = output.strip()
+        if code != 0 or not line:
+            return None
+        parent, _, command = line.partition(" ")
+        marker = ".app/Contents/"
+        if marker in command:
+            return os.path.basename(command.split(marker, 1)[0].rstrip("/")) + ".app"
+        try:
+            pid = int(parent)
+        except ValueError:
+            return None
+        if pid <= 1:
+            return None
+    return None
+
+
+def macos_permissions(root: str) -> dict:
+    """Accessibility and Screen Recording state, and which app each grant belongs to."""
+    app = macos_responsible_app()
+    named = app or "the app that launched the console"
+    trusted: bool | None = None
+    if host_os() == "macos" and _ax_helper(root):
+        code, output = _capture([_ax_helper(root), "trusted"], timeout=10)
+        if code == 0 and output.strip().startswith("{"):
+            try:
+                trusted = bool(json.loads(output).get("trusted"))
+            except ValueError:
+                trusted = None
+    recording = None
+    if host_os() == "macos":
+        recording = _screen_capture_access(request=False)
+        if recording is None:  # no preflight call: fall back to the window-title hint
+            recording = macos_windows().get("screenRecording")
+        # Missing grants are asked for once, automatically, instead of waiting for a click.
+        if recording is False:
+            macos_auto_request(root, "screen-recording")
+        if trusted is False:
+            macos_auto_request(root, "accessibility")
+    return {"accessibility": {"granted": trusted,
+                              "grantTo": named,
+                              "hint": None if trusted else f"Enable {named} in System Settings > Privacy & Security > Accessibility"},
+            "screenRecording": {"granted": recording,
+                                "grantTo": named,
+                                "hint": None if recording else f"Enable {named} in System Settings > Privacy & Security > Screen Recording"},
+            "responsibleApp": app}
+
+
+def macos_request_access(root: str, data: dict) -> dict:
+    """Ask macOS for a permission. Accessibility fires the consent dialog through the helper
+    when it is built; either pane can also be opened directly. Nothing else changes."""
+    if host_os() != "macos":
+        raise PlanError("The app mirror needs a Mac", code="UNSUPPORTED_PLATFORM")
+    pane = data.get("pane")
+    if pane not in _MACOS_PANES:
+        raise PlanError("pane must be accessibility or screen-recording", code="INVALID_ARGS")
+    prompted: bool | None = None
+    if pane == "screen-recording":
+        _MACOS_ASKED.add(pane)
+        prompted = _screen_capture_access(request=True)
+    if pane == "accessibility" and _ax_helper(root):
+        code, output = _capture([_ax_helper(root), "request-access"], timeout=20)
+        if code == 0 and output.strip().startswith("{"):
+            try:
+                prompted = bool(json.loads(output).get("trusted"))
+            except ValueError:
+                prompted = None
+    code, output = _capture(["open", _MACOS_PANES[pane]], timeout=10)
+    _macos_audit(root, "permission-request", detail={"pane": pane, "opened": code == 0})
+    return {"ok": code == 0, "pane": pane, "trusted": prompted, "openedPane": code == 0,
+            "grantTo": macos_responsible_app()}
+
+
+def macos_capabilities(root: str) -> dict:
+    """What this console can do right now (capability handshake): engine, input kinds, keys,
+    safety layer and permissions in one read-only answer, so a client adapts instead of probing."""
+    on_mac = host_os() == "macos"
+    helper = bool(_ax_helper(root))
+    return {"platform": host_os(), "available": on_mac,
+            "engine": "ax-helper" if helper else ("osascript" if on_mac else None),
+            "helperBuilt": helper,
+            "canObserve": ["apps", "windows", "displays", "elements", "search", "diff", "screenshot",
+                           "stream", "menubar", "focused", "audit", "events"] if on_mac else [],
+            "canAct": {"click": on_mac, "input": list(_MACOS_INPUT_KINDS) if on_mac else [],
+                       "keys": list(_MACOS_INPUT_KEYS), "setValue": helper, "perform": helper,
+                       "deepInspect": on_mac},
+            "safety": {"controlTimeoutSec": _MACOS_CONTROL_TIMEOUT, "submitKinds": sorted(_MACOS_CONFIRM_KINDS),
+                       "singleOwner": True, "panicStop": True, "auditMax": _MACOS_AUDIT_MAX,
+                       "streamCapSec": _MACOS_STREAM_CAP,
+                       "allowlist": os.path.isfile(os.path.join(root, "ios-lab", "mac", "agent-apps.json"))},
+            "control": macos_control_state()}
+
+
+def macos_audit_since(seq: int) -> tuple[list[dict], int]:
+    """Audit rows newer than seq (thumbnails dropped) and the latest sequence number, for the
+    live event feed."""
+    with _MACOS_AUDIT_LOCK:
+        rows = [dict(r, thumbnail=None) for r in _MACOS_AUDIT if r.get("seq", 0) > seq]
+        return rows, _MACOS_AUDIT_SEQ
 
 
 # The mirror actions that run through the preview → confirm → job pipeline; the armed halves of
@@ -1523,7 +1770,7 @@ def macos_control_input(root: str, data: dict) -> dict:
 
 
 # MIR-04: the streaming mirror — one multipart MJPEG response instead of a poll per frame.
-_MACOS_STREAM_CAP = 600  # a stream never outlives ten minutes, so handlers cannot dangle
+_MACOS_STREAM_CAP = _MACOS_CONFIG["streamCap"]  # a stream never outlives this many seconds, so handlers cannot dangle
 
 
 def macos_window_stream(window_id: int, fps: float, epoch: int | None = None):
@@ -1831,6 +2078,8 @@ def provider_for(lab: str, os_name: str) -> str | None:
         return "native-rust" if os_name in ("linux", "macos", "windows") else None
     if lab == "macos":
         return "native-macos" if os_name == "macos" else None
+    if lab == "winapps":
+        return "native-windows" if os_name == "windows" else None
     if os_name == "macos":
         if lab == "ios":
             return "native-macos"
@@ -1865,6 +2114,8 @@ def lab_status(lab: str, host: dict) -> dict:
     if provider is None:
         if lab == "macos":
             reasons.append("macOS application automation needs a Mac.")
+        elif lab == "winapps":
+            reasons.append("The Windows Apps Lab needs a Windows host.")
         else:
             reasons.append("This lab needs a Linux/KVM host (or Windows with WSL2). Use a remote Linux machine.")
         return {"id": lab, "label": meta["label"], "summary": meta["summary"], "state": "unavailable",
@@ -1899,6 +2150,17 @@ def lab_status(lab: str, host: dict) -> dict:
                 notes.append("Appium automation needs Appium and its XCUITest driver; the simulator can run without them.")
             if not idb_ready:
                 notes.append("idb device automation needs the idb companion and client; the simulator can run without them.")
+    elif provider == "native-windows" and lab == "winapps":
+        # The Windows Apps Lab reads the current desktop directly; no VM/container runtime is involved.
+        installed = os.path.isfile(os.path.join(host["root"], "console", "winapps.py"))
+        if not installed:
+            state = "unavailable"
+            reasons.append("The Windows Apps Lab is not installed on this host.")
+        else:
+            state = "ready"
+        return {"id": lab, "label": meta["label"], "summary": meta["summary"], "state": state,
+                "provider": provider, "reasons": reasons, "requirements": reqs, "notes": notes,
+                "actions": [], "installed": installed}
     elif provider == "wsl2":
         distros = host["wsl"]["distributions"]
         reqs += [
@@ -2000,7 +2262,7 @@ def actions_for(lab: str, provider: str | None) -> list[dict]:
     elif provider == "native-rust":
         names = ["status", "doctor", "setup", "start", "stop"]
     elif provider:
-        names = [a for a in LABCTL_ACTIONS if not (a == "backup" and lab == "android")]
+        names = [a for a in LABCTL_ACTIONS if not (a == "backup" and lab == "android") and not (a == "trace" and lab != "android")]
         if provider == "macos-containers":
             names = [a for a in names if a not in PRIVILEGED]
     else:
@@ -2208,7 +2470,8 @@ def plan(root: str, request: dict, host: dict | None = None) -> dict:
         import source_control
         return source_control.plan(root, request)
     allowed = {"lab", "action", "profile", "cpus", "ram", "disk", "device", "wslDistro", "backup",
-               "clickPid", "clickX", "clickY", "inputKind", "inputText", "inputKey",
+               "clickPid", "clickX", "clickY", "target", "glob",
+               "inputKind", "inputText", "inputKey",
                "elementId", "elementKind", "elementSession", "elementBundle",
                "elementPid", "elementPath", "elementIdentity", "axAction", "elementValue", "elementWindowId",
                "scrollDirection", "scrollPages"}
@@ -2256,6 +2519,11 @@ def plan(root: str, request: dict, host: dict | None = None) -> dict:
             except (TypeError, ValueError):
                 raise PlanError(f"click{name.capitalize()} must be a screen coordinate") from None
             click[name] = int(value)
+
+    for key in ("target", "glob"):
+        if request.get(key) not in (None, "") and action != "trace":
+            raise PlanError("Trace parameters are only accepted by trace")
+
     scroll_values: dict = {}
     if any(request.get(k) not in (None, "") for k in ("scrollDirection", "scrollPages")) and action != "macos-scroll":
         raise PlanError("Scroll parameters are only accepted by the app mirror scroll action")
@@ -2333,6 +2601,7 @@ def plan(root: str, request: dict, host: dict | None = None) -> dict:
                 raise PlanError("axAction must be an advertised AX action name (e.g. AXPress)",
                                 code="INVALID_ARGS", retry="never")
             ax_values["action"] = ax_action
+
     if request.get("backup"):
         raise PlanError("Restore is not available from the web console; use the lab's scripts/restore.sh")
 
@@ -2352,7 +2621,8 @@ def plan(root: str, request: dict, host: dict | None = None) -> dict:
                 "setup": ("appium.sh", "install"), "appium-install": ("appium.sh", "install"),
                 "appium-start": ("appium.sh", "start"), "appium-stop": ("appium.sh", "stop"),
                 "macos-smoke": ("macos-app.sh", "smoke"), "macos-click": ("macos-app.sh", "click"),
-                "macos-input": ("macos-app.sh", "input"), "macos-element": ("macos-app.sh", "element"),
+                "macos-input": ("macos-app.sh", "input"), "macos-scroll": ("macos-app.sh", "input"),
+                "macos-element": ("macos-app.sh", "element"),
                 "macos-set-value": ("macos-app.sh", "axset"), "macos-perform": ("macos-app.sh", "axperform"),
             }[action]
         else:
@@ -2488,6 +2758,32 @@ def plan(root: str, request: dict, host: dict | None = None) -> dict:
                 if len(args) == 3:
                     raise PlanError("Choose a resource to resize")
                 effects.append("Writes resource configuration to .env. Restart to apply; guest disks only grow.")
+            elif action == "trace":
+                args.append("trace")
+                trace_target = request.get("target")
+                if trace_target not in (None, ""):
+                    if (
+                        not isinstance(trace_target, str)
+                        or not SAFE_NAME.match(trace_target)
+                        or trace_target.startswith("-")
+                        or ".." in trace_target
+                        or trace_target.lower() in FORBIDDEN_TRACE_TARGETS
+                        or (trace_target.isdigit() and int(trace_target) <= 1)
+                    ):
+                        raise PlanError("Invalid trace target")
+                    args += ["--target", trace_target]
+                trace_glob = request.get("glob")
+                if trace_glob not in (None, ""):
+                    if (
+                        not isinstance(trace_glob, str)
+                        or not trace_glob.strip()
+                        or ".." in trace_glob
+                        or not SAFE_GLOB.match(trace_glob)
+                        or (trace_glob.startswith("-") and not trace_glob.startswith("-["))
+                    ):
+                        raise PlanError("Invalid symbol glob")
+                    args += ["--include", trace_glob]
+                effects.append("Traces target functions via frida-trace and saves a JSON call map and annotated session log in artifacts/traces/.")
             else:
                 args.append(action)
             if profile:
@@ -2855,3 +3151,28 @@ def monitor(root: str, lab: str, host: dict | None = None) -> dict:
             for n in names]
     overall = "running" if running and len(running) == len(rows) else "partial" if running else "stopped"
     return {"lab": lab, "state": overall, "runtime": runtime, "containers": rows, "checkedAt": time.time()}
+
+
+def dropper_audit(root: str, target: str | None = None, rehearse: bool = False) -> dict:
+    """Run the PENT-15 two-stage 'clean dropper' detector on a scoped path under root."""
+    rel_target = target if target is not None else os.path.join("scripts", "analysis", "dropper_lab")
+    real_root = os.path.realpath(root)
+    scoped_target = _scoped(root, rel_target)
+    if not os.path.exists(scoped_target):
+        raise PlanError("Dropper analysis target does not exist: " + rel_target)
+    if os.path.islink(os.path.join(root, rel_target)):
+        raise PlanError("Symlink targets are not allowed in dropper_audit: " + rel_target)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from scripts.analysis import dropper_detect
+
+    try:
+        report = dropper_detect.scan_path(scoped_target, scope_root=real_root)
+    except ValueError as exc:
+        raise PlanError(str(exc)) from exc
+    if rehearse:
+        from scripts.analysis.dropper_lab.stage2_server import run_lab_rehearsal
+
+        report["rehearsal"] = run_lab_rehearsal(allow_exec=True)
+    return report
+

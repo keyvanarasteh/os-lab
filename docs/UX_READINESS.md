@@ -29,6 +29,7 @@ The proposed extension and its tracked acceptance work are in the [UX guideline 
 - A Copy control reports success only after the clipboard write resolves. If it fails, keep the text available for manual selection. External release lookups must leave loading state after failure and retain an honest release-page fallback.
 - Label Source Lab evidence as live, imported, synthetic, or partial, and show its collection time where relevant. Missing tools, empty coverage, and an unavailable provider do not prove a clean live target. Keep private artifacts and secrets out of public Pages.
 - Keep standing guidance short when the nearby status and action already explain it. Preserve setup, security, download, privilege, cancellation, and evidence-limit warnings at the decision point.
+- Let long navigation collapse. The lab switcher (⌘L / Ctrl+L and the "Switch lab" sidebar card) focuses the sidebar on one lab with its live availability on each card; every lab stays reachable through Spotlight and direct links, and "All labs" restores the full list. Rarely used guides ("How to use") sit at the bottom of their group as collapsible entries, collapsed by default.
 
 ## Keep controls usable across devices
 

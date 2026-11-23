@@ -78,7 +78,7 @@ class DeveloperCacheTests(unittest.TestCase):
         self.assertEqual(calls[0][1]["timeout"], 5)
 
     def test_probe_allowlist_and_toolchains(self):
-        for key in ("npm", "pnpm", "yarn", "pip", "homebrew", "go-build", "go-mod"):
+        for key in ("npm", "pnpm", "yarn", "pip", "homebrew", "go-build", "go-mod", "uv"):
             entry = self.entries["developers." + key]
             self.assertEqual(tuple(entry["probeArgv"]), devcache.PROBE_ALLOWLIST[entry["id"]])
         for key in ("rustup", "nvm", "pyenv"):

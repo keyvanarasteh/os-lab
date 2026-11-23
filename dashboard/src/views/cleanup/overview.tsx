@@ -15,6 +15,7 @@ import {
   ArchiveIcon, PuzzlePieceIcon, PackageIcon
 } from "@phosphor-icons/react";
 import { Section } from "../../components/ui";
+import { OtherVolumes } from "./volume-cards";
 import { formatBytes, type CleanupStatus, type CleanupVolume } from "../../lib/api";
 
 /** The hero's big number keeps one decimal, like the reference layout. */
@@ -48,11 +49,13 @@ export function StorageHero({
   return <Section
     id="overview-storage"
     title={selected.isHome ? "This computer's storage" : "Storage"}
-    action={<button type="button" className="iux-btn" data-variant="ghost" title="Re-measure" onClick={onRefresh}>
-      <ArrowsClockwiseIcon size={16} />
-    </button>}
+    action={<span className="flex items-center gap-2">
+      {selected.usage != null && <span dir="ltr" className="text-sm tabular-nums text-(--iux-muted-foreground)">{Math.round(selected.usage * 100)}% used</span>}
+      <button type="button" className="iux-btn" data-variant="ghost" title="Re-measure" onClick={onRefresh}>
+        <ArrowsClockwiseIcon size={16} />
+      </button>
+    </span>}
     description={<span>
-      {selected.usage != null && <span dir="ltr">{Math.round(selected.usage * 100)}% used · </span>}
       <span translate="no">{selected.mountPoint}</span>
       {selected.pressure === "warning" && <span className="text-(--iux-danger)"> · running low</span>}
     </span>}>
@@ -75,17 +78,7 @@ export function StorageHero({
     {purgeable == null && <p className="mt-1 text-xs text-(--iux-muted-foreground)">
       Purgeable space is managed by macOS and is only shown when the system probe reports it.
     </p>}
-    {measured.length > 1 && <details className="mt-1 text-xs">
-      <summary className="cursor-pointer text-(--iux-muted-foreground)">Other volumes ({measured.length - 1})</summary>
-      <ul className="mt-1 space-y-1">
-        {measured.filter((volume) => volume.mountPoint !== selected.mountPoint).map((volume) => <li key={volume.mountPoint} className="flex gap-2" translate="no">
-          <span className="truncate">{volume.mountPoint}</span>
-          <span dir="ltr" className="ms-auto tabular-nums text-(--iux-muted-foreground)">
-            {formatBytes(volume.freeBytes)} free · {volume.kind}
-          </span>
-        </li>)}
-      </ul>
-    </details>}
+    {measured.length > 1 && <OtherVolumes volumes={measured.filter((volume) => volume.mountPoint !== selected.mountPoint)} />}
   </Section>;
 }
 

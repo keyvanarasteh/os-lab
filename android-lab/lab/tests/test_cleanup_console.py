@@ -984,8 +984,25 @@ def test_the_hook_clean_is_a_guarded_trash_only_automated_run(monkeypatch, tmp_p
     (Path(target) / "junk.bin").write_bytes(b"x" * 128)
     api.post("/api/cleanup/bookmarks", {"entryId": "system.user-caches"})
     api.post("/api/cleanup/bookmarks/update", {"entryId": "system.user-caches", "autoCleanHook": {"enabled": True}})
+    import cleanup_lab.bookmarks as bookmarks_module
+    original_save = bookmarks_module.save
+    saving = threading.Event()
+    finish_save = threading.Event()
+
+    def held_save(records):
+        if any(item["autoCleanHook"]["lastRunAt"] is not None for item in records):
+            saving.set()
+            assert finish_save.wait(10)
+        return original_save(records)
+
+    monkeypatch.setattr(bookmarks_module, "save", held_save)
     job = cleanup_api.run_hook_clean(REPO_ROOT)
     assert job is not None
+    try:
+        assert saving.wait(10)
+        assert job.state == "running"
+    finally:
+        finish_save.set()
     wait_for(job, "done")
     assert job.error is None
     assert job.result["automated"] is True
@@ -993,7 +1010,6 @@ def test_the_hook_clean_is_a_guarded_trash_only_automated_run(monkeypatch, tmp_p
     assert job.result["totals"]["trashed"] >= 1
     assert not (Path(target) / "junk.bin").exists()
     # The bookmark records the automated run.
-    import cleanup_lab.bookmarks as bookmarks_module
     loaded = bookmarks_module.load()
     assert loaded["bookmarks"][0]["autoCleanHook"]["lastRunAt"] is not None
     # The history store holds the automated record.
@@ -1151,3 +1167,35 @@ def test_the_widget_reflects_a_finished_scan_and_publishes_on_completion(tmp_pat
     assert payload["status"] in ("ready-to-clean", "up-to-date")
     fetched = api.get("/api/cleanup/widget", {})
     assert fetched["lastScan"]["foundBytes"] == 64
+
+
+def test_grant_helpers_act_only_on_the_running_app_bundle(monkeypatch):
+    """Reveal and reset take no path or id from the page: they act on the app bundle the console
+    runs under, and refuse when there is none (a plain terminal run)."""
+    import types
+
+    host = {"path": "/Applications/os-lab.app", "name": "os-lab", "bundleId": "com.keyvanarasteh.oslab"}
+    calls = []
+
+    def fake_run(args, capture_output=True, timeout=10, text=False):
+        calls.append(args)
+        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(cleanup_api, "_host_app", lambda: host)
+    monkeypatch.setattr(cleanup_api.subprocess, "run", fake_run)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    assert api.get("/api/cleanup/permissions/host-app", {}) == {"app": host}
+    assert api.post("/api/cleanup/permissions/reveal-app", {}) == {"revealed": host["path"]}
+    assert api.post("/api/cleanup/permissions/reset", {}) == {"reset": host["bundleId"]}
+    assert calls == [["open", "-R", host["path"]], ["tccutil", "reset", "SystemPolicyAllFiles", host["bundleId"]]]
+
+    calls.clear()
+    with pytest.raises(cleanup_api.CleanupError) as caught:
+        api.post("/api/cleanup/permissions/reveal-app", {"path": "/etc"})
+    assert caught.value.status == 400
+    monkeypatch.setattr(cleanup_api, "_host_app", lambda: None)
+    for route in ("reveal-app", "reset"):
+        with pytest.raises(cleanup_api.CleanupError) as caught:
+            api.post("/api/cleanup/permissions/" + route, {})
+        assert caught.value.status == 409
+    assert calls == []

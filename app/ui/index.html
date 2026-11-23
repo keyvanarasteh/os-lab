@@ -14,6 +14,14 @@
     <h1>os-lab</h1>
     <p id="status" role="status">Starting the console…</p>
     <div id="spinner" class="spinner" aria-hidden="true"></div>
+    <ol id="steps" class="steps" hidden>
+      <li data-step="prepare"></li>
+      <li data-step="console"></li>
+      <li data-step="open"></li>
+    </ol>
+    <div id="bar" class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" hidden><i></i></div>
+    <p id="progress" class="hint progress" hidden></p>
+    <p id="slow" class="slow" role="note" hidden></p>
     <section id="problem" hidden>
       <pre id="detail"></pre>
       <div class="row">

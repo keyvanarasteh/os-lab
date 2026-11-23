@@ -47,6 +47,15 @@ the same recipe, and the cleanup cards keep decisions (name, risk, size, selecti
 
 [[dashboard/src/shell/top-bar.tsx]] shows engine status only in the local app. [[dashboard/src/i18n/paths.ts]] handles locale and Pages base paths. [[dashboard/src/views/feedback-page.tsx]] provides issue, feature, discussion, and private security routes from both navigation modes.
 
+The lab switcher ([[dashboard/src/shell/lab-switcher.tsx]], ⌘L / Ctrl+L, also a
+"Switch lab" card at the foot of the sidebar) focuses the sidebar on one lab
+instead of listing every lab; [[dashboard/src/shell/active-lab.ts]] remembers
+the choice and a lab page reached by any route re-focuses the nav. Spotlight
+keeps every lab and lab action listed while the sidebar is focused, and "All
+labs" in the switcher restores the full list. "How to use" sits at the bottom
+of the Help group as a collapsible guide (collapsed by default); its
+"Task prompt" child opens the builder.
+
 Legal Markdown cross-links in [[dashboard/src/lib/legal.ts#rewriteLinks]] and
 legal tabs/cards in [[dashboard/src/views/legal-page.tsx]] preserve the current
 locale and Pages base path. Article links are localized at build time because
@@ -57,7 +66,7 @@ legal prose is excluded from client translation.
 [[dashboard/e2e/cleanup.spec.ts]] checks the typed scan → plan → confirm → clean
 flow and the public Turkish `/os-lab/tr/cleanup/` route without engine calls.
 
-[[dashboard/e2e/health-and-content.spec.ts]] covers dependency actions, advanced details, run failures, and hydration across page types. Dashboard type, translation, and static build checks complement browser tests. Public Pages links and locale switching are checked under `/os-lab/`.
+[[dashboard/e2e/health-and-content.spec.ts]] covers dependency actions, advanced details, run failures, and hydration across page types. [[dashboard/e2e/lab-switcher.spec.ts]] covers ⌘L, the sidebar card, focus following a direct link, the All-labs reset, and Spotlight keeping every lab. Dashboard type, translation, and static build checks complement browser tests. Public Pages links and locale switching are checked under `/os-lab/`.
 
 [[dashboard/scripts/source-pages-smoke.mjs]] checks every Source route and guide
 across all eight locales below `/os-lab/`, including query-preserving language

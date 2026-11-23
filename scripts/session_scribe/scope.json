@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "session_id": "pent20-lab-session",
+  "name": "os-lab Authorized Pentest Session Scope",
+  "authorization": "MYO062 Authorized Isolated Lab Assessment (Aydın Arda Demiralp)",
+  "expires": "2027-12-31",
+  "allowed_cidrs": [
+    "10.0.0.0/24",
+    "192.168.56.0/24",
+    "127.0.0.0/8",
+    "::1/128"
+  ],
+  "allowed_domains": [
+    "*.lab.local",
+    "lab.local",
+    "localhost",
+    "*.lab.internal"
+  ],
+  "allowed_ports": [
+    22,
+    80,
+    443,
+    3000,
+    5050,
+    5555,
+    6080,
+    8000,
+    8006,
+    8080,
+    8081,
+    8443
+  ],
+  "allowed_commands": [
+    "nmap",
+    "ping",
+    "curl",
+    "nc",
+    "netcat",
+    "frida-ps",
+    "frida-ls-devices",
+    "adb",
+    "nikto",
+    "gobuster",
+    "whatweb",
+    "dig",
+    "nslookup",
+    "echo",
+    "python",
+    "python3"
+  ],
+  "forbidden_flags": [
+    "--script=vuln",
+    "--script=exploit",
+    "--script=dos",
+    "--script=brute",
+    "-f",
+    "-D",
+    "--spoof-mac",
+    "-oG",
+    "--data-binary",
+    "rm -rf",
+    "mkfs",
+    "dd if=",
+    ":(){ :|:& };:"
+  ]
+}

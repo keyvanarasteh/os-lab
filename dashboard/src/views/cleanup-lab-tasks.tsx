@@ -482,6 +482,7 @@ const tasks: CleanupTask[] = [
     deliverables: [
       "Universal appex + framework built by xcodegen/xcodebuild; entitlements carry the App Group",
       "Rust bridge with 5 tests; oslab:// via tauri-plugin-deep-link",
+      "Command bridge (AGQ-01): oslab://<command> grammar, panic-stop and quick-clean on every page",
       "release-mac.sh embed + re-sign + re-notarize + updater rebuild; PR dry run compiles the targets",
     ],
     targetPaths: ["app/widget/", "app/src-tauri/", "app/scripts/"],

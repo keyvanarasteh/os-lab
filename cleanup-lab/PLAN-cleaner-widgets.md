@@ -129,6 +129,15 @@ review` mapping to dashboard island-router paths; Rust forwards to the
 webview event → `pages.tsx` router navigates in place (no reload, same as
 on-page cards).
 
+**Command bridge (AGQ-01, shipped).** URL parsers put `oslab://scan`'s route
+in the **host**, not the path, so the bridge parses both spellings in
+`app/src-tauri/src/deeplink.rs`: `oslab://<command>[/<route>]` with `open`,
+any whitelisted route, `panic-stop` (`POST /api/labs/macos/stop`) and
+`quick-clean` (the dashboard's plan → confirm flow). Everything else is
+refused and shown. `window.__oslabCommand` lives in the dashboard shell, so a
+command works from any page and reports its result in a banner. This is what
+lets an external command-button host (aBigQ) drive os-lab like the aQ family.
+
 ## Task 3 — Host-side publish + reload + consume (CLW-04, CLW-05)
 
 **CLW-04 Publish from the console, reload from the app.** The **console**

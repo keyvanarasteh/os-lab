@@ -1,0 +1,5 @@
+# Plan item D: the committed dashboard build is generated; hide it from diffs and language stats.
+dashboard/dist/** linguist-generated=true -diff
+# Plan item C: locale files merge key by key (scripts/lib/i18n-merge-driver.mjs; scripts/worktree.sh doctor
+# configures the driver). Without the local config git falls back to a normal text merge.
+dashboard/src/i18n/generated/*.json merge=oslab-i18n

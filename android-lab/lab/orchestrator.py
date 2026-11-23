@@ -170,6 +170,13 @@ def main():
     flows_parser = subparsers.add_parser("parse-flows", help="Parse mitmproxy flows")
     flows_parser.add_argument("--file", default=os.path.join(ARTIFACTS_DIR, "flows.mitm"), help="Path to flows.mitm")
 
+    trace_parser = subparsers.add_parser("trace", help="Trace target functions with frida-trace into a JSON call map")
+    trace_parser.add_argument("--target", default="com.testlab.vulnerable", help="Target package/process name or PID")
+    trace_parser.add_argument("--include", action="append", default=[], help="Symbol glob to trace (repeatable)")
+    trace_parser.add_argument("--simulate", action="store_true", help="Run offline against built-in 05.10 lab trace fixture")
+    trace_parser.add_argument("--out", default=os.path.join(ARTIFACTS_DIR, "traces", "call-map.json"), help="Output JSON call map")
+    trace_parser.add_argument("--session-log", default=os.path.join(ARTIFACTS_DIR, "traces", "trace-session.md"), help="Output session log")
+
     subparsers.add_parser("clean", help="Clean artifacts directory")
 
 
@@ -223,18 +230,35 @@ def main():
     elif args.command == "parse-flows":
         flow_parser = os.path.join(SCRIPTS_DIR, "mitm_flow_parser.py")
         subprocess.run([sys.executable, flow_parser, args.file])
+    elif args.command == "trace":
+        if SCRIPTS_DIR not in sys.path:
+            sys.path.insert(0, SCRIPTS_DIR)
+        import trace_runner
 
+        trace_argv = ["--target", args.target, "--out", args.out, "--session-log", args.session_log]
+        for pat in args.include:
+            trace_argv.extend(["-i", pat])
+        if args.simulate:
+            trace_argv.append("--simulate")
+        rc = trace_runner.main(trace_argv)
+        if rc != 0:
+            sys.exit(rc)
 
     elif args.command == "clean":
-        if os.path.exists(ARTIFACTS_DIR):
-            for item in os.listdir(ARTIFACTS_DIR):
-                if item != ".gitkeep":
-                    p = os.path.join(ARTIFACTS_DIR, item)
-                    if os.path.isdir(p):
-                        shutil.rmtree(p)
-                    else:
-                        os.remove(p)
-            print("Artifacts cleared.")
+        if SCRIPTS_DIR not in sys.path:
+            sys.path.insert(0, SCRIPTS_DIR)
+        import trace_runner
+
+        with trace_runner.artifact_lock():
+            if os.path.exists(ARTIFACTS_DIR):
+                for item in os.listdir(ARTIFACTS_DIR):
+                    if item != ".gitkeep":
+                        p = os.path.join(ARTIFACTS_DIR, item)
+                        if os.path.isdir(p):
+                            shutil.rmtree(p)
+                        else:
+                            os.remove(p)
+                print("Artifacts cleared.")
     else:
         parser.print_help()
 

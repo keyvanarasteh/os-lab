@@ -52,7 +52,7 @@ def build():
            "resize is also implemented for Linux/iOS VM paths; inspect their runbooks).", ""]
     for path in MAKEFILES:
         out += [f"## Make targets: `{path}`", "",
-                f"Run from the checkout root as `make -C {Path(path).parent} TARGET [VARIABLE=value ...]`.", ""]
+                f"Run from the checkout root as `make -C {Path(path).parent.as_posix()} TARGET [VARIABLE=value ...]`.", ""]
         for line in read(path).splitlines():
             match = re.match(r"^([\w -]+):(?!=)(.*)", line)
             if match:

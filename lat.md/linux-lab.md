@@ -36,6 +36,62 @@ expected, network containment is documented in
 [[linux-lab/knowledge/networking.md]] and worked workflows in
 [[linux-lab/knowledge/usecases.md]].
 
+## Server first-look diagnostics (OS-16)
+
+[[linux-lab/scripts/server_firstlook.py]] reports Linux guest facts without
+changing the system or requiring sudo.
+
+It runs fixed argument lists for uname, lsb_release, inxi (CPU only),
+free, local df and systemctl service listing, with locale-independent parsing and
+per-command timeouts. Each subprocess call has literal arguments and disables
+the shell; unknown command names are rejected. It needs only Python's standard
+library and no sudo.
+
+Readable text and JSON expose kernel/architecture, distro, CPU, memory bytes,
+local mount usage and loaded service states. An architecture note distinguishes
+kernel names from distribution package names. Missing tools, failed commands,
+unrecognized output and timeouts stay explicit; unavailable service data is null,
+not an empty healthy list. Exit 0 means report generation, not a health verdict.
+Empty or unknown service states and malformed distro/CPU fields produce partial
+reports. Zero-sized disks may have null usage percentages. ASCII-only stdout
+uses character escapes; JSON preserves the original values on decoding.
+Nothing is installed, changed, automatically saved or sent over the network.
+
+[[android-lab/lab/tests/test_server_firstlook.py]] covers normal output, missing
+tools, timeouts, malformed tables, failed/non-systemd services, empty/unknown
+service states, distro/CPU validation, zero-sized disks, ASCII stdout, fixed
+command execution, JSON and CLI errors.
+[[linux-lab/docs/OS-16/VERIFY.md]] describes lab reproduction and evidence capture.
+
+## Permission and ownership audit
+
+[[linux-lab/scripts/permission_audit.py]] audits an owned lab tree's Unix modes
+and UID/GID against configurable limits. It reports world-write, excess bits,
+privileged regular files and ownership drift as text or JSON without applying fixes.
+
+Directory-relative stats and `fwalk` do not follow symlinks. Other filesystems
+and special files are counted as skipped; access errors and the entry budget
+make coverage incomplete. Exit codes are 0 clean, 1 findings, 2 incomplete/usage.
+
+The mode masks default to 0644/0755 and owner to the current UID; group is opt-in.
+Directory sticky/setgid semantics are preserved in suggestions. ACLs and file
+contents are outside scope; the audit is not an atomic filesystem snapshot.
+
+Offline cases in [[android-lab/lab/tests/test_permission_audit.py]] cover rules,
+root changes, links, limits, failure reporting and read-only behavior.
+[[linux-lab/docs/OS-26/VERIFY.md]] supplies the reproducible lab and video steps.
+
+OS-26 review hardening normalizes byte paths with `fsdecode`, rejects filesystem
+root aliases by device/inode, and compares opened child directories with their
+previously observed identities before inspecting contents. Changed directories
+make coverage incomplete. Findings include device/inode and stale-path warnings;
+commands are manual examples, never race-safe remediation. Ownership commands
+precede chmod; setgid directory mode restoration is suggested after chown.
+At most 1000 combined finding/error records are retained, including a terminal
+limit error; reaching that budget stops the audit with exit 2. `fwalk` directory
+name lists remain a limitation for very wide directories; use small owned labs.
+
+
 ## Why qemux/qemu
 
 The engine was chosen to match the Windows and macOS labs' compose+web-viewer UX.
@@ -114,6 +170,21 @@ Validation and install steps, in order:
 
 Only install trusted `.deb` packages. Installation requires sudo
 permissions and may modify the operating system.
+
+## OS-23 salt okunur dpkg envanteri
+
+[[linux-lab/scripts/dpkg_inventory.py]], paket listesini, paket dosyalarını ve
+tam yoldan dosya sahipliğini sürümlü JSON olarak sunar.
+
+Paket durumu ile kurulu paket sayısı ayrı tutulur. Mimari ekleri korunur;
+dpkg arama jokerleri kaçırılır ve sonuç tam yolla karşılaştırılır. Araç sembolik
+bağlantıları çözmez, paketleri değiştirmez, root veya ağ erişimi istemez.
+Alternatif yönetim veritabanı, kopyalar ve sentetik testler için kullanılabilir.
+
+[[linux-lab/tests/test_dpkg_inventory.py]], komut hataları, girdi doğrulama
+ve ayrıştırma davranışlarını çevrimdışı sınar. dpkg varsa geçici sentetik
+veritabanında gerçek komutla bütünleşme testi de çalışır. Canlı Ubuntu
+kanıtıyla sentetik testlerin ayrımı [[linux-lab/os-23/VERIFY.md]] içinde açıklanır.
 
 ## PENT-05 Binary hardening and crash triage
 

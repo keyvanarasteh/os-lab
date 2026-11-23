@@ -8,6 +8,7 @@ public enum WidgetConfig {
     public static let appGroupID = "group.com.keyvanarasteh.oslab"
     public static let snapshotFileName = "widget-snapshot.json"
     public static let pendingQuickCleanFileName = "widget-pending-quick-clean.txt"
+    public static let pendingMacLabIntentFileName = "widget-pending-mac-lab-intent.txt"
     public static let statusKind = "com.keyvanarasteh.oslab.widget.StatusWidget"
     public static let urlScheme = "oslab"
 
@@ -17,6 +18,39 @@ public enum WidgetConfig {
         guard let url = pendingQuickCleanFileURL else { return }
         let timestamp = String(Date.now.timeIntervalSince1970)
         try? timestamp.data(using: .utf8)?.write(to: url, options: [.atomic])
+    }
+
+    /// A system shortcut opens the host app, which consumes this short-lived
+    /// handoff after its local console is ready. The intent never arms control
+    /// or launches submitted code; it can open the lab, enter its generic
+    /// review workflow, or invoke its always-safe panic stop.
+    public enum MacLabIntentRequest: String {
+        case open
+        case verifySubmission = "verify-submission"
+        case panicStop = "panic-stop"
+    }
+
+    public static func requestMacLab(_ request: MacLabIntentRequest) throws {
+        guard let url = pendingMacLabIntentFileURL else {
+            throw MacLabIntentHandoffError.containerUnavailable
+        }
+        let payload = "\(request.rawValue)\n\(Date.now.timeIntervalSince1970)"
+        guard let data = payload.data(using: .utf8) else {
+            throw MacLabIntentHandoffError.encodingFailed
+        }
+        try data.write(to: url, options: [.atomic])
+    }
+
+    public enum MacLabIntentHandoffError: LocalizedError {
+        case containerUnavailable
+        case encodingFailed
+
+        public var errorDescription: String? {
+            switch self {
+            case .containerUnavailable: "The os-lab App Group is unavailable. Open os-lab once, then try again."
+            case .encodingFailed: "The macOS Lab request could not be prepared."
+            }
+        }
     }
 
     /// Dashboard routes the widget opens. Values match the overview card
@@ -44,6 +78,10 @@ public enum WidgetConfig {
 
     public static var pendingQuickCleanFileURL: URL? {
         sharedContainerURL()?.appendingPathComponent(pendingQuickCleanFileName, isDirectory: false)
+    }
+
+    public static var pendingMacLabIntentFileURL: URL? {
+        sharedContainerURL()?.appendingPathComponent(pendingMacLabIntentFileName, isDirectory: false)
     }
 
     private static func sharedContainerURL() -> URL? {

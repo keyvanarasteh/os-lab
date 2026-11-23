@@ -113,7 +113,7 @@ def test_artifacts_cannot_escape_folder(web_server):
 def test_host_reports_every_lab(web_server):
     data = json.loads(urllib.request.urlopen(f"{web_server}/api/host").read().decode("utf-8"))
     assert data["host"]["os"]
-    assert [lab["id"] for lab in data["labs"]] == ["android", "windows", "linux", "ios", "macos", "source", "web"]
+    assert [lab["id"] for lab in data["labs"]] == ["android", "windows", "winapps", "linux", "ios", "macos", "source", "web"]
     for lab in data["labs"]:
         assert lab["state"] in ("ready", "needs-setup", "unavailable")
 
@@ -122,6 +122,55 @@ def test_health_capabilities_are_served_by_console(web_server):
     data = json.loads(urllib.request.urlopen(f"{web_server}/api/capabilities").read().decode("utf-8"))
     assert len(data["platforms"]) == 3
     assert any(item.get("lab") == "ios" for group in data["groups"] for item in group["items"])
+
+
+def test_winapps_endpoint_serves_the_read_only_inventory(web_server, monkeypatch):
+    import web_ui
+
+    fixture = {"available": True, "windows": [], "reason": None}
+    monkeypatch.setattr(web_ui.winapps, "winapps_windows", lambda: fixture)
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps").read().decode("utf-8"))
+    assert data == fixture
+
+    monkeypatch.setattr(web_ui, "winapps", None)
+    try:
+        status = urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps").status
+    except urllib.error.HTTPError as e:
+        status = e.code
+    assert status == 501
+
+
+def test_winapps_screenshot_serves_a_png_and_reports_stale_windows(web_server, monkeypatch):
+    import web_ui
+
+    png = b"\x89PNG\r\n\x1a\n"
+    monkeypatch.setattr(web_ui.winapps, "winapps_window_screenshot", lambda window_id: png)
+    reply = urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps/7/screenshot")
+    assert reply.status == 200 and reply.headers["Content-Type"] == "image/png"
+    assert reply.headers["Cache-Control"] == "no-store" and reply.read() == png
+
+    def stale(_window_id):
+        raise web_ui.winapps.WinAppError("That window is not on screen anymore; refresh the mirror")
+
+    monkeypatch.setattr(web_ui.winapps, "winapps_window_screenshot", stale)
+    with pytest.raises(urllib.error.HTTPError) as caught:
+        urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps/7/screenshot")
+    assert caught.value.code == 400
+    assert "not on screen" in json.loads(caught.value.read().decode("utf-8"))["error"]
+
+
+def test_winapps_doctor_endpoint_serves_the_probe_and_is_501_without_the_module(web_server, monkeypatch):
+    import web_ui
+
+    probe = {"available": True, "desktop": True, "elevated": False, "capture": True, "windows": 1}
+    monkeypatch.setattr(web_ui.winapps, "doctor", lambda: probe)
+    data = json.loads(urllib.request.urlopen(f"{web_server}/api/labs/winapps/doctor").read().decode("utf-8"))
+    assert data == probe
+
+    monkeypatch.setattr(web_ui, "winapps", None)
+    with pytest.raises(urllib.error.HTTPError) as caught:
+        urllib.request.urlopen(f"{web_server}/api/labs/winapps/doctor")
+    assert caught.value.code == 501
 
 
 def test_scope_endpoint_reports_the_declared_scope(web_server, tmp_path, monkeypatch):
@@ -136,7 +185,10 @@ def test_scope_endpoint_reports_the_declared_scope(web_server, tmp_path, monkeyp
     assert data["counts"] == {"hosts": 1, "packages": 0, "devices": 1, "paths": 0}
 
 
-def test_lab_start_requires_a_previewed_plan(web_server):
+def test_lab_start_requires_a_previewed_plan(web_server, monkeypatch):
+    # Test the preview-token guard independently of installed VM providers.
+    # A host without KVM/runtime support cannot build a real Android plan.
+    monkeypatch.setattr("web_ui.oslab.plan", lambda *args, **kwargs: {})
     status, data = _post(f"{web_server}/api/labs/start",
                          {"request": {"lab": "android", "action": "status"}, "token": "forged"},
                          {"X-OSLab": "1"})
@@ -188,3 +240,45 @@ def test_app_update_status_is_reported_without_network(web_server):
     assert "supported" in data and "updateAvailable" in data
     assert data["install"] is None
 
+
+class _FakeFrida:
+    name = "api"
+
+    def __init__(self):
+        self.calls = []
+
+    def devices(self):
+        self.calls.append("devices")
+        return [{"id": "local", "type": "local", "transport": "local", "name": "Local System", "os": None},
+                {"id": "socket", "type": "remote", "transport": "TCP", "name": "Local Socket", "os": None}]
+
+    def processes(self, device_id, host, apps):
+        self.calls.append(("processes", device_id, host))
+        return [{"pid": 10, "name": "sleep"}]
+
+
+def test_frida_inventory_lists_attachable_targets(web_server, monkeypatch):
+    import web_ui
+    fake = _FakeFrida()
+    monkeypatch.setattr(web_ui.frida_inventory, "pick_backend", lambda *args, **kwargs: fake)
+    data = json.load(urllib.request.urlopen(f"{web_server}/api/frida/inventory"))
+    assert data["schema"] == "oslab.frida-inventory/1" and data["readOnly"] is True
+    assert [d["id"] for d in data["devices"]] == ["local", "socket"]
+    assert data["devices"][0]["processes"] == [{"pid": 10, "name": "sleep"}]
+    assert data["devices"][1]["processes"] is None  # an unnamed remote entry is never probed
+
+    data = json.load(urllib.request.urlopen(f"{web_server}/api/frida/inventory?host=127.0.0.1:27042"))
+    assert [d["id"] for d in data["devices"]] == ["tcp@127.0.0.1:27042"]
+    assert fake.calls[-1] == ("processes", "tcp@127.0.0.1:27042", "127.0.0.1:27042")
+
+
+def test_frida_inventory_refuses_targets_outside_the_lab(web_server, monkeypatch):
+    import web_ui
+    fake = _FakeFrida()
+    monkeypatch.setattr(web_ui.frida_inventory, "pick_backend", lambda *args, **kwargs: fake)
+    for host in ("8.8.8.8", "example.com"):
+        with pytest.raises(urllib.error.HTTPError) as refused:
+            urllib.request.urlopen(f"{web_server}/api/frida/inventory?host={host}")
+        assert refused.value.code == 400
+        assert "error" in json.load(refused.value)
+    assert fake.calls == []

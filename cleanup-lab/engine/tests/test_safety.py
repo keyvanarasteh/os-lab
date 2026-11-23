@@ -140,7 +140,7 @@ class TargetTest(unittest.TestCase):
                 (tree.sibling, {}, "outside-root"),
                 (tree.escape, {}, "outside-root"),
                 (os.path.join(tree.inside, "gone"), {}, "missing"),
-                (tree.inside, {"entry": {"processes": ["Google Chrome"]}}, "app-running"),
+                (tree.inside, {"entry": {"processes": ["Google Chrome"]}, "names": ("Google Chrome",)}, "app-running"),
             ]
             for path, kwargs, code in cases:
                 with self.subTest(path=path, code=code):

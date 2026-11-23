@@ -28,6 +28,8 @@ import { Badge, Empty, EndpointList, Field, IconButton, Modal, PageHead, Section
 import { SimulatorDrawer } from "./ios-simulator";
 import { IosDeviceCards } from "./ios-real-devices";
 import { MacAppMirrorTeaser, MacAppPanel } from "./macos-app-mirror";
+import { MacEnginePanel } from "./macos-engine-panel";
+import { WinAppsPanel } from "./winapps-app-mirror";
 import { stateBadge } from "./host-page";
 import {
   ago,
@@ -47,6 +49,7 @@ import {
 const REFERENCE: Record<LabId, { check: string; setup: string; where: string }> = {
   android: { check: "./labctl android doctor", setup: "./labctl android start --wait", where: "android-lab/lab" },
   windows: { check: "./labctl win status", setup: "./labctl win profile use development\n./labctl win start --wait", where: "win-lab" },
+  winapps: { check: "python console/winapps.py", setup: "Run this panel on a Windows host.", where: "winapps" },
   linux: { check: "./labctl linux status", setup: "./labctl linux profile use development\n./labctl linux start --wait", where: "linux-lab" },
   ios: { check: "./labctl ios status", setup: "./labctl ios profile use development\n./labctl ios start --wait", where: "ios-lab" },
   source: { check: "./labctl source doctor", setup: "./labctl source setup", where: "source-lab" },
@@ -462,6 +465,7 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
   const [simOpen, setSimOpen] = useState(false);
   const [simTarget, setSimTarget] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [intentStatus, setIntentStatus] = useState<{ state: "pending" | "success" | "error"; message?: string; error?: string } | null>(null);
 
   const preview = async (action: string, extra: Partial<LabRequest> = {}) => {
     const req: LabRequest = { lab: labId, action, ...extra };
@@ -504,6 +508,34 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lab?.id, lab?.actions.length]);
 
+  // Native App Intents route guarded workflows here. Submission review only
+  // opens the existing mirror; panic stop is the sole action completed by the
+  // route. Arming is never available through a shortcut.
+  useEffect(() => {
+    if (labId !== "macos") return;
+    const handleIntent = () => {
+      const intent = window.location.hash;
+      if (intent !== "#intent=panic-stop" && intent !== "#intent=verify-submission") return;
+      history.replaceState(null, "", window.location.pathname);
+      if (intent === "#intent=verify-submission") {
+        setIntentStatus({
+          state: "success",
+          message: "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.",
+        });
+        return;
+      }
+      setIntentStatus({ state: "pending", message: "Stopping macOS Lab control…" });
+      void api.macosStop().then(() => {
+        setIntentStatus({ state: "success", message: "macOS Lab control stopped." });
+      }).catch((error) => {
+        setIntentStatus({ state: "error", error: message(error) });
+      });
+    };
+    handleIntent();
+    window.addEventListener("hashchange", handleIntent);
+    return () => window.removeEventListener("hashchange", handleIntent);
+  }, [labId]);
+
   // Re-detect the host when a job on this lab finishes (setup may have fixed a requirement)
   const runningCount = jobs.filter((j) => j.state === "running").length;
   useEffect(() => {
@@ -517,6 +549,9 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
   const simulator = labId === "ios" && lab?.provider === "native-macos" && lab.state === "ready";
   // The ready macOS Lab gets the floating app mirror for the windows on this Mac.
   const appMirror = labId === "macos" && lab?.provider === "native-macos" && lab.state === "ready";
+  // The Windows Apps Lab panel reads the desktop directly; it is mounted only locally on Windows hosts.
+  const showWinAppsPanel =
+    import.meta.env.PUBLIC_SITE_MODE !== "pages" && labId === "winapps";
   // Every tracked prerequisite is found: the card would only repeat success badges, so it yields
   // its half of the row to the actions. Anything missing keeps the full status list visible.
   const requirements = lab?.requirements ?? [];
@@ -528,6 +563,17 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
         <TopBar title={labId === "android" ? "Android Lab · Runtime & Setup" : label} back={{ href: labId === "android" ? "/android/" : "/", label: labId === "android" ? "Android Lab" : "This computer" }} icon={LAB_ICON[labId](20)} />
         <div className={simulator && simOpen ? "lg:flex lg:w-full lg:items-start" : undefined}>
         <main className={`mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 ${simulator && simOpen ? "lg:mx-0 lg:min-w-0 lg:flex-1 lg:max-w-none" : ""}`}>
+          {intentStatus ? (
+            <p
+              role={intentStatus.state === "error" ? "alert" : "status"}
+              aria-live="polite"
+              className={`rounded-xl border border-(--iux-border) bg-(--iux-card) px-4 py-3 text-sm ${intentStatus.state === "error" ? "text-(--iux-danger)" : ""}`}
+            >
+              {intentStatus.state === "error" ? (
+                <><span>Could not stop macOS Lab control:</span> <span data-no-translate>{intentStatus.error}</span>. <span>Try again.</span></>
+              ) : intentStatus.message}
+            </p>
+          ) : null}
           {!lab ? (
             hostError ? <Empty>Could not reach the lab engine: {hostError}</Empty> : <Skeleton rows={5} />
           ) : (
@@ -560,6 +606,8 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
                 </div>
               )}
 
+              {showWinAppsPanel ? <WinAppsPanel /> : null}
+
               {request ? (
                 <PlanPanel
                   title={`${actions.get(request.action)?.label ?? request.action} · ${label}`}
@@ -582,6 +630,7 @@ function LiveLabPage({ lab: labId }: { lab: LabId }) {
                 <MacAppPanel onPreview={(action, extra) => void preview(action, extra)} onHide={() => setMirrorHidden(true)} />
               ) : null}
               {appMirror && mirrorHidden ? <MacAppMirrorTeaser onOpen={() => setMirrorHidden(false)} /> : null}
+              {appMirror ? <MacEnginePanel /> : null}
 
               {lab.state === "unavailable" ? (
                 <Section title="Run it elsewhere" description={`On a supported host, these commands run from the os-lab checkout (${ref.where}).`}>

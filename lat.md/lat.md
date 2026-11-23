@@ -22,4 +22,5 @@ This is the main project documentation; start here when changing behavior.
 - [[content]] — signed content packs: data and hooks that update between releases
 - [[legal]] — terms, acceptable use, privacy and third-party notices
 - [[tooling]] — CI, tests and community process
+- [[development]] — running, watching and proving a change: dev stack, UX check library, screenshots
 - [[brand]] — the QS-Lab identity: marks, app icon and where they appear

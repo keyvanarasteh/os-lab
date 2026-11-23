@@ -1,0 +1,5 @@
+{
+  "controlTimeout": 600,
+  "auditMax": 500,
+  "streamCap": 600
+}

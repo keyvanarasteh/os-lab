@@ -54,17 +54,17 @@ test("the widgets card renders the snapshot preview and republishes", async ({ p
   });
   await page.goto("/cleanup/settings/");
   await expect(page.getByRole("heading", { name: "Desktop widgets" }).first()).toBeVisible();
-  // The preview mirrors the widget's content.
+  // Publishing is automatic: opening the page already built and published the snapshot.
+  await expect(page.getByText("Kept up to date automatically.")).toBeVisible();
+  expect(publishes.length).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "Publish now" })).toHaveCount(0);
+  // The preview mirrors the widget's content, collapsed until asked for.
+  await page.getByText("What the widget shows", { exact: true }).click();
   await expect(page.getByText("Ready to clean")).toBeVisible();
   await expect(page.getByText("18 items")).toBeVisible();
   await expect(page.getByText("3.9 GB")).toBeVisible();
   await expect(page.getByText("30 GB")).toBeVisible();
   await expect(page.getByText("FDA granted")).toBeVisible();
-  await expect(page.getByText(/^published ·/)).toBeVisible();
-  // Publish now refetches the snapshot endpoint.
-  const before = publishes.length;
-  await page.getByRole("button", { name: "Publish now" }).click();
-  await expect(publishes.length).toBeGreaterThan(before);
 });
 
 test("a not-capable machine states the honest reason", async ({ page }) => {
@@ -72,7 +72,6 @@ test("a not-capable machine states the honest reason", async ({ page }) => {
   await page.goto("/cleanup/settings/");
   await expect(page.getByRole("heading", { name: "Desktop widgets" }).first()).toBeVisible();
   await expect(page.getByText("Publishing is idle until the installed os-lab app creates its widget container.")).toBeVisible();
-  await expect(page.getByText("not published")).toBeVisible();
   // The absent-container case explains itself once; the engine's publish
   // refusal is redundant here and must not contradict the idle note.
   await expect(page.getByText("The widget container is not available here.")).toHaveCount(0);
@@ -90,7 +89,8 @@ test("the overview card scrolls to the widgets section", async ({ page }) => {
   // The capability grid moved to the Settings tab with the cards it navigates to.
   await page.goto("/cleanup/settings/");
   await expect(page.getByRole("heading", { name: "Desktop widgets" }).first()).toBeVisible();
-  await page.getByRole("button", { name: /Desktop widgets/ }).click();
+  // The sidebar sub-nav has a link of the same name, so scope to the page body.
+  await page.getByRole("main").getByRole("button", { name: /Desktop widgets/ }).click();
   await expect(page.locator("#cleanup-widgets")).toBeInViewport();
 });
 
@@ -111,4 +111,88 @@ test("the app globals drive deep links and the quick-clean review", async ({ pag
   await page.evaluate(() => (window as unknown as { __oslabQuickClean?: () => void }).__oslabQuickClean?.());
   await expect(page.getByRole("heading", { name: "Confirm cleanup" })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __e2eMarker?: number }).__e2eMarker)).toBe(7);
+});
+
+/**
+ * AGQ-01: the `oslab://` command bridge. The desktop app parses the URL and
+ * calls `window.__oslabCommand`; the shell owns that global on every page, so
+ * these tests drive it directly. They cover what the bridge may do — navigate,
+ * report the stop's own result, open the cleanup plan — and that a refusal
+ * says so instead of looking like a success.
+ */
+type CommandHost = { __oslabCommand?: (directive: object | null) => void };
+
+/**
+ * Wait until the shell has mounted its command entry point, then call it.
+ * The desktop app only sends a command to a page it already rendered, so
+ * waiting here matches the real order instead of racing hydration.
+ */
+async function command(page: import("@playwright/test").Page, directive: object) {
+  await page.waitForFunction(() => typeof (window as unknown as CommandHost).__oslabCommand === "function");
+  await page.evaluate((d) => (window as unknown as CommandHost).__oslabCommand?.(d), directive);
+}
+
+test("a command reports a successful stop from a page that is not the macOS Lab", async ({ page }) => {
+  await mockConsole(page);
+  // Jobs is an ordinary page: the bridge must not depend on Cleanup or the Mac Lab being mounted.
+  await page.goto("/jobs/");
+  // The Rust side already ran the stop and reports its own result here; the
+  // page only renders what it was told.
+  await command(page, { command: "panic-stop", ok: true, detail: "1" });
+  const banner = page.locator("[data-command-bridge]");
+  await expect(banner).toHaveAttribute("data-command-bridge", "ok");
+  await expect(banner).toContainText("macOS control stopped · 1 session closed");
+  await expect(banner).toHaveAttribute("role", "status");
+  // Plural form is not invented for one session.
+  await command(page, { command: "panic-stop", ok: true, detail: "2" });
+  await expect(banner).toContainText("2 sessions closed");
+});
+
+test("a failed stop shows the console's own error text", async ({ page }) => {
+  await mockConsole(page);
+  await page.goto("/jobs/");
+  await command(page, { command: "panic-stop", ok: false, detail: "Control mode is not available on this host" });
+  const banner = page.locator("[data-command-bridge]");
+  await expect(banner).toHaveAttribute("data-command-bridge", "error");
+  // A failure is assertive, and the diagnostic text is shown unchanged.
+  await expect(banner).toHaveAttribute("role", "alert");
+  await expect(banner).toContainText("Could not stop macOS control");
+  await expect(banner.locator("[data-no-translate]")).toHaveText("Control mode is not available on this host");
+});
+
+test("an unknown command is refused visibly, not silently ignored", async ({ page }) => {
+  await mockConsole(page);
+  await page.goto("/jobs/");
+  await command(page, { command: "refused", url: "oslab://clean" });
+  const banner = page.locator("[data-command-bridge]");
+  await expect(banner).toHaveAttribute("data-command-bridge", "error");
+  await expect(banner).toContainText("That command is not available");
+  await expect(banner.locator("[data-no-translate]")).toHaveText("oslab://clean");
+  // Dismissible: the bar is an overlay, not a permanent obstruction.
+  await banner.getByRole("button", { name: "Dismiss" }).click();
+  await expect(page.locator("[data-command-bridge]")).toHaveCount(0);
+});
+
+test("quick-clean command opens the cleanup review dialog without cleaning", async ({ page }) => {
+  await mockConsole(page);
+  let cleans = 0;
+  await page.route("**/api/cleanup/clean/**", async (route) => {
+    cleans += 1;
+    await route.fulfill({ json: {} });
+  });
+  await page.goto("/cleanup/");
+  await expect(page.getByRole("heading", { name: "Cleanup Lab" }).first()).toBeVisible();
+  await command(page, { command: "quick-clean", ok: true });
+  // The bridge opens the plan; the shared dialog takes it from there. Two
+  // entry points (bookmark + overview) can both hold a plan during the handoff,
+  // so target the visible dialog rather than counting headings.
+  const dialog = page.locator("dialog[open]", { hasText: "Confirm cleanup" }).first();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Confirm cleanup" })).toBeVisible();
+  // A command button never deletes on its own: no clean request was sent.
+  expect(cleans).toBe(0);
+  // Run clean is the only way through; the dialog offers it and its escape.
+  await expect(dialog.getByRole("button", { name: "Run clean" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Back" })).toBeVisible();
+  expect(cleans).toBe(0);
 });

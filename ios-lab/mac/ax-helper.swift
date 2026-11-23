@@ -190,7 +190,17 @@ func arg(_ name: String) -> String? {
 // ── Commands ─────────────────────────────────────────────────────────────────
 
 let arguments = CommandLine.arguments
-guard arguments.count >= 2 else { fail("INVALID_ARGS", "usage: ax-helper tree|windows|menubar|read|set|perform|focused --pid N …") }
+guard arguments.count >= 2 else { fail("INVALID_ARGS", "usage: ax-helper tree|windows|menubar|read|set|perform|focused --pid N … | trusted | request-access") }
+
+// Permission commands need no pid: `trusted` reports the Accessibility grant, `request-access`
+// fires the system consent dialog (the grant belongs to the app that launched this helper).
+if arguments[1] == "trusted" {
+    emit(["trusted": AXIsProcessTrusted()])
+}
+if arguments[1] == "request-access" {
+    let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+    emit(["trusted": AXIsProcessTrustedWithOptions(options)])
+}
 
 let pid = Int32(arg("--pid") ?? "") ?? -1
 guard pid > 0 else { fail("INVALID_ARGS", "--pid must be a process id") }

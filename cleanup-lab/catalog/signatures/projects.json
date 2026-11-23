@@ -7,7 +7,7 @@
     {"id":"projects.maven-target","names":["target"],"ecosystem":"Maven","regenerate":"mvn package","siblingMarkers":["pom.xml"]},
     {"id":"projects.gradle-cache","names":[".gradle"],"ecosystem":"Gradle","regenerate":"gradle build","siblingMarkers":["build.gradle","build.gradle.kts","settings.gradle","settings.gradle.kts"]},
     {"id":"projects.gradle-build","names":["build"],"ecosystem":"Gradle","regenerate":"gradle build","siblingMarkers":["build.gradle","build.gradle.kts"]},
-    {"id":"projects.python-venv","names":[".venv","venv"],"ecosystem":"Python","regenerate":"python -m venv and reinstall requirements","innerMarkers":["pyvenv.cfg"]},
+    {"id":"projects.python-venv","names":[".venv","venv",".venv-test","venv-test","env",".env","virtualenv"],"ecosystem":"Python","regenerate":"python -m venv and reinstall requirements","innerMarkers":["pyvenv.cfg"]},
     {"id":"projects.python-tox","names":[".tox"],"ecosystem":"Python","regenerate":"tox","siblingMarkers":["tox.ini","pyproject.toml","setup.cfg"]},
     {"id":"projects.python-pycache","names":["__pycache__"],"ecosystem":"Python","regenerate":"Recreated on import","siblingMarkers":["pyproject.toml","setup.py","setup.cfg"]},
     {"id":"projects.next-build","names":[".next"],"ecosystem":"Next.js","regenerate":"next build","siblingMarkers":["package.json"]},

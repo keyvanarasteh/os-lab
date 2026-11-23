@@ -674,6 +674,7 @@ Developer/maintainer commands; use only when relevant to the task.
 - `npm run check` — `tsc --noEmit`
 - `npm run test:e2e` — `playwright test`
 - `npm run test:i18n` — `node scripts/check-translations.mjs`
+- `npm run test:tooling` — `node --test scripts/affected.test.mjs scripts/i18n-merge.test.mjs`
 - `npm run test:source:model` — `node --test scripts/source-brain-model.test.mjs`
 - `npm run test:how-to-use:pages` — `node scripts/how-to-use-pages-smoke.mjs`
 - `npm run test:source:pages` — `node scripts/source-pages-smoke.mjs`

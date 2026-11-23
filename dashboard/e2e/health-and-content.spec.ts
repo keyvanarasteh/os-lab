@@ -19,7 +19,7 @@ const content = {
   checkedAt: Date.now() / 1000, offline: false, source: "bundled", updateAvailable: true
 };
 
-async function mockApi(page: Page, os: "macos" | "windows" | "linux" = "macos", labPatch: Record<string, Partial<LabStatus>> = {}) {
+async function mockApi(page: Page, os: "macos" | "windows" | "linux" = "macos", labPatch: Record<string, Partial<LabStatus>> = {}, contentOffer = false) {
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};
@@ -46,7 +46,7 @@ async function mockApi(page: Page, os: "macos" | "windows" | "linux" = "macos", 
     };
     else if (/^\/api\/labs\/[a-z]+\/config$/.test(path)) body = { lab: path.split("/")[3], path: "config.env", exists: true, fields: [], profiles: [], backups: [], endpoints: [{ label: "Appium", address: "http://127.0.0.1:4723/" }] };
     else if (/^\/api\/labs\/[a-z]+\/monitor$/.test(path)) body = { lab: path.split("/")[3], state: "stopped", containers: [] };
-    else if (path === "/api/content/status" || path === "/api/content/check") body = content;
+    else if (path === "/api/content/status" || path === "/api/content/check") body = contentOffer ? content : { ...content, latest: null, updateAvailable: false };
     else if (path === "/api/content/update") body = { ...content, installed: true, version: "content-149", sequence: 149, updateAvailable: false };
     else if (path === "/api/reports") body = { reports: [] };
     else if (path === "/api/apks") body = { apks: [] };
@@ -64,8 +64,9 @@ async function mockApi(page: Page, os: "macos" | "windows" | "linux" = "macos", 
 }
 
 test("content card checks and installs while keeping advanced options available", async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, "macos", {}, true);
   await page.goto("/");
+  await page.getByRole("dialog", { name: "Updates available" }).getByRole("button", { name: "Later", exact: true }).click();
   const card = page.locator("#content");
   await expect(card).toBeVisible();
   await expect(card.getByText("A newer content pack is available.").first()).toBeVisible();
@@ -76,7 +77,7 @@ test("content card checks and installs while keeping advanced options available"
 });
 
 test("Turkish page renders the content card without layout overflow", async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, "macos", {}, true);
   await page.goto("/tr/");
   await expect(page.locator("html")).toHaveAttribute("lang", "tr");
   await expect(page.locator("#content")).toBeVisible();
@@ -86,7 +87,7 @@ test("Turkish page renders the content card without layout overflow", async ({ p
 
 for (const locale of ["ar", "fa"] as const) {
   test(`${locale} content page keeps its right-to-left layout inside the viewport`, async ({ page }) => {
-    await mockApi(page);
+    await mockApi(page, "macos", {}, true);
     await page.goto(`/${locale}/`);
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
@@ -147,6 +148,37 @@ test("a lab that is missing requirements hides its runtime sections until they a
   await expect(page.getByRole("button", { name: "Attach simulator" })).toHaveCount(0);
   await page.getByRole("button", { name: "Simulator", exact: true }).click();
   await expect(page.getByRole("button", { name: "Attach simulator" })).toBeVisible();
+});
+
+test("the macOS Lab panic-stop App Intent reports success and failure", async ({ page }) => {
+  await mockApi(page, "macos");
+  let stops = 0;
+  await page.route("**/api/labs/macos/stop", (route) => {
+    stops += 1;
+    return route.fulfill({ json: { ok: true, disarmed: true, sessionsClosed: [] } });
+  });
+  await page.goto("/labs/macos/#intent=panic-stop");
+  await expect(page.getByRole("status")).toContainText("macOS Lab control stopped.");
+  expect(stops).toBe(1);
+  await expect(page).toHaveURL(/\/labs\/macos\/$/);
+
+  await page.route("**/api/labs/macos/stop", (route) => route.fulfill({ status: 500, json: { error: "Stop bridge unavailable" } }));
+  await page.goto("/labs/macos/#intent=panic-stop");
+  await expect(page.getByRole("alert")).toContainText("Could not stop macOS Lab control: Stop bridge unavailable");
+});
+
+test("the submission-review App Intent opens the guarded macOS Lab workflow", async ({ page }) => {
+  await mockApi(page, "macos");
+  let stops = 0;
+  await page.route("**/api/labs/macos/stop", (route) => {
+    stops += 1;
+    return route.fulfill({ json: { ok: true, disarmed: true, sessionsClosed: [] } });
+  });
+  await page.goto("/labs/macos/#intent=verify-submission");
+  await expect(page.getByRole("status")).toContainText("Submission review opened.");
+  await expect(page.getByRole("status")).toContainText("Control actions still require confirmation or armed mode.");
+  await expect(page).toHaveURL(/\/labs\/macos\/$/);
+  expect(stops).toBe(0);
 });
 
 test("the iOS actions card checks real devices and the frame captures a selected phone", async ({ page }) => {
@@ -445,6 +477,7 @@ test("Android run failures are shown next to the action", async ({ page }) => {
 });
 
 test("every local page type hydrates without a browser error", async ({ page }) => {
+  test.setTimeout(90_000); // This test navigates through 25 built pages.
   await mockApi(page);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -694,7 +727,7 @@ test("the app mirror previews mirror clicks and runs them directly while armed",
   } }));
 
   await page.goto("/labs/macos/");
-  await expect(page.getByLabel("Window")).toBeVisible();
+  await expect(page.getByLabel("Window", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Elements" }).click();
   const hotspot = page.getByRole("button", { name: "1: OK" });
   await expect(hotspot).toBeVisible();
@@ -710,4 +743,36 @@ test("the app mirror previews mirror clicks and runs them directly while armed",
   await expect(page.getByText("Armed — mirror clicks run immediately on this Mac.")).toBeVisible();
   await hotspot.click();
   await expect.poll(() => clicks).toBe(1);
+});
+
+test("jobs view lists the Frida targets and shows a refused address", async ({ page }) => {
+  await mockApi(page);
+  const asked: string[] = [];
+  await page.route("**/api/frida/inventory*", async (route) => {
+    const host = new URL(route.request().url()).searchParams.get("host") ?? "";
+    asked.push(host);
+    if (host === "8.8.8.8") {
+      await route.fulfill({ status: 400, json: { error: "8.8.8.8 is not a loopback or private lab address; refusing" } });
+      return;
+    }
+    const device = host
+      ? { id: `tcp@${host}`, type: "remote", transport: "TCP", name: host, os: null, processes: [{ pid: 1, name: "frida-server" }, { pid: 10, name: "sleep" }], processCount: 2, error: null }
+      : { id: "local", type: "local", transport: "local", name: "Local System", os: null, processes: [{ pid: 4, name: "init" }], processCount: 1, error: null };
+    await route.fulfill({ json: {
+      schema: "oslab.frida-inventory/1", generatedAt: "2026-11-13T00:00:00Z", backend: "api", devices: [device],
+      summary: { devices: 1, usb: 0, tcp: host ? 1 : 0, processes: device.processCount }, errors: []
+    } });
+  });
+  await page.goto("/jobs/");
+  const card = page.locator("#frida-targets");
+  await expect(card.getByText("Local System")).toBeVisible();
+  await card.getByLabel("Lab target address").fill("127.0.0.1:27042");
+  await card.getByRole("button", { name: "Check" }).click();
+  await expect(card.getByText("tcp@127.0.0.1:27042")).toBeVisible();
+  await card.getByText("Show processes").click();
+  await expect(card.getByText("frida-server", { exact: true })).toBeVisible();
+  await card.getByLabel("Lab target address").fill("8.8.8.8");
+  await card.getByRole("button", { name: "Check" }).click();
+  await expect(card.getByRole("alert")).toContainText("refusing");
+  expect(asked).toEqual(["", "127.0.0.1:27042", "8.8.8.8"]);
 });

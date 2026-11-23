@@ -96,8 +96,8 @@ class RootsTest(unittest.TestCase):
 class ExploreTest(unittest.TestCase):
     def test_explore_resolves_a_registered_root(self):
         with tempfile.TemporaryDirectory() as base:
-            os.makedirs(os.path.join(base, "projects", "demo"))
-            with open(os.path.join(base, "projects", "demo", "f.bin"), "wb") as handle:
+            os.makedirs(os.path.join(base, "Projects", "demo"))
+            with open(os.path.join(base, "Projects", "demo", "f.bin"), "wb") as handle:
                 handle.write(b"x" * 100)
             env = {"HOME": base, "USERPROFILE": base, "PATH": ""}
             root = tempfile.mkdtemp()
