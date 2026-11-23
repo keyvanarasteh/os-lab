@@ -57,7 +57,9 @@ verdict() {
 check_json() {
   local name="$1"; shift
   if [ -z "$JSON_CHECK" ]; then echo "skip $name (python3/jq yok)"; SKIPPED=$((SKIPPED + 1)); return; fi
-  if "$@" 2>/dev/null | eval "$JSON_CHECK"; then echo "ok   $name"; PASS=$((PASS + 1))
+  # The tool may exit non-zero on purpose (missing file -> 2); only the JSON is judged here,
+  # so pipefail must not turn that exit code into a failure.
+  if { "$@" 2>/dev/null || true; } | eval "$JSON_CHECK"; then echo "ok   $name"; PASS=$((PASS + 1))
   else echo "FAIL $name: geçersiz JSON"; FAIL=$((FAIL + 1)); fi
 }
 
