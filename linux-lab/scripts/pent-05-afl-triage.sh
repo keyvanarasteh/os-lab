@@ -106,6 +106,9 @@ classify() {
       } END { print (n ? s : "-") }' <<<"$text")"
   elif [ "$rc" -gt 128 ]; then
     # Kabuk, sinyalle ölen süreci 128+N ile bildirir (AFL/ASAN crash'leri sinyaldir).
+    # Sınırlama: kabuk, hedefin kendi döndürdüğü 129+ çıkış kodunu sinyalden ayıramaz; böyle
+    # bir kod da signal:* olarak görünür. Zaman aşımı ise işaret dosyasıyla ayrıldığı için
+    # hedefin kendi exit 124'ü hang sayılmaz.
     sig="$(kill -l $((rc - 128)) 2>/dev/null || echo $((rc - 128)))"
     C_KIND="signal:SIG${sig#SIG}"
   elif [ "$rc" -ne 0 ]; then
