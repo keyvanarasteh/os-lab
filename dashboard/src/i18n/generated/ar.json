@@ -2842,5 +2842,13 @@
   "macOS control stopped": "تم إيقاف التحكم في macOS",
   "Could not stop macOS control": "تعذّر إيقاف التحكم في macOS",
   "That command is not available": "هذا الأمر غير متاح",
-  "The console did not answer.": "لم تستجب وحدة التحكم."
+  "The console did not answer.": "لم تستجب وحدة التحكم.",
+  "Frida targets": "أهداف Frida",
+  "Devices and processes Frida can attach to right now. This card only lists them; nothing is attached or started.": "الأجهزة والعمليات التي يستطيع Frida الارتباط بها الآن. هذه البطاقة تسردها فقط؛ لا يتم الارتباط بأي شيء ولا تشغيل أي شيء.",
+  "Lab target address": "عنوان هدف المختبر",
+  "Optional. The loopback or private IP of a lab frida-server; any other address is refused.": "اختياري. عنوان IP الاسترجاعي أو الخاص لخادم frida-server في المختبر؛ يُرفض أي عنوان آخر.",
+  "processes": "عمليات",
+  "Show processes": "عرض العمليات",
+  "Could not list Frida targets:": "تعذّر سرد أهداف Frida:",
+  "No Frida device found.": "لم يُعثر على أي جهاز Frida."
 }

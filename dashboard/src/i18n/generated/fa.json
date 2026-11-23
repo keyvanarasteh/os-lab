@@ -2842,5 +2842,13 @@
   "macOS control stopped": "کنترل macOS متوقف شد",
   "Could not stop macOS control": "توقف کنترل macOS ممکن نشد",
   "That command is not available": "این فرمان در دسترس نیست",
-  "The console did not answer.": "کنسول پاسخ نداد."
+  "The console did not answer.": "کنسول پاسخ نداد.",
+  "Frida targets": "هدف‌های Frida",
+  "Devices and processes Frida can attach to right now. This card only lists them; nothing is attached or started.": "دستگاه‌ها و پردازه‌هایی که Frida هم‌اکنون می‌تواند به آن‌ها متصل شود. این کارت فقط آن‌ها را فهرست می‌کند؛ به چیزی متصل نمی‌شود و چیزی اجرا نمی‌شود.",
+  "Lab target address": "نشانی هدف آزمایشگاه",
+  "Optional. The loopback or private IP of a lab frida-server; any other address is refused.": "اختیاری. نشانی IP حلقهٔ بازگشتی یا خصوصیِ یک frida-server آزمایشگاه؛ هر نشانی دیگری رد می‌شود.",
+  "processes": "پردازه",
+  "Show processes": "نمایش پردازه‌ها",
+  "Could not list Frida targets:": "فهرست هدف‌های Frida دریافت نشد:",
+  "No Frida device found.": "هیچ دستگاه Frida پیدا نشد."
 }

@@ -5,6 +5,10 @@ import { AppShell, LAB_ICON, labHref } from "../shell/app-shell";
 import { TopBar } from "../shell/top-bar";
 import { Badge, Empty, PageHead, Section, Skeleton } from "../components/ui";
 import { ago, api, jobsStore, message, usePoll, type LabJob } from "../lib/api";
+import { FridaTargetsCard } from "./frida-targets-card";
+
+// Public Pages has no local engine to ask for Frida targets.
+const PUBLIC_PAGES = import.meta.env.PUBLIC_SITE_MODE === "pages";
 
 const TONE: Record<LabJob["state"], "success" | "warning" | "danger" | undefined> = {
   running: "warning",
@@ -136,6 +140,7 @@ export default function JobsPage() {
               </Section>
             </>
           )}
+          {PUBLIC_PAGES ? null : <FridaTargetsCard />}
         </main>
       </div>
     </AppShell>

@@ -838,6 +838,44 @@ def macos_windows() -> dict:
     return {"available": True, "reason": None, "screenRecording": any(w["title"] for w in windows), "windows": windows}
 
 
+# Each system prompt is asked for at most once per console process: macOS itself shows it only
+# once per app, and asking again would only reopen Settings behind the user's back.
+_MACOS_ASKED: set[str] = set()
+
+
+def _screen_capture_access(request: bool) -> bool | None:
+    """CGPreflightScreenCaptureAccess, or CGRequestScreenCaptureAccess (which shows the system
+    "allow screen recording" prompt for the app macOS holds responsible for this console).
+    None when the call is unavailable."""
+    if host_os() != "macos":
+        return None
+    try:
+        cg = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+        fn = cg.CGRequestScreenCaptureAccess if request else cg.CGPreflightScreenCaptureAccess
+        fn.restype = ctypes.c_bool
+        fn.argtypes = []
+        return bool(fn())
+    except (OSError, AttributeError):
+        return None
+
+
+def macos_auto_request(root: str | None, pane: str) -> bool:
+    """Ask macOS once for a missing permission, without opening Settings: the Screen Recording
+    prompt via CoreGraphics, the Accessibility prompt via the helper. True when a prompt was asked."""
+    if host_os() != "macos" or pane in _MACOS_ASKED:
+        return False
+    _MACOS_ASKED.add(pane)
+    if pane == "screen-recording":
+        asked = _screen_capture_access(request=True) is not None
+    elif pane == "accessibility" and root and _ax_helper(root):
+        asked = _capture([_ax_helper(root), "request-access"], timeout=20)[0] == 0
+    else:
+        asked = False
+    if asked:
+        _macos_audit(root, "permission-request", detail={"pane": pane, "auto": True})
+    return asked
+
+
 def macos_window_screenshot(window_id: int) -> bytes:
     """A PNG of one on-screen window. Raises PlanError when the id is stale or Screen Recording is missing."""
     if host_os() != "macos":
@@ -853,6 +891,11 @@ def macos_window_screenshot(window_id: int) -> bytes:
         with open(path, "rb") as f:
             png = f.read()
         if code != 0 or not png.startswith(b"\x89PNG"):
+            if _screen_capture_access(request=False) is False:
+                macos_auto_request(None, "screen-recording")
+                raise PlanError(f"Screen Recording is needed to capture windows. macOS has asked; allow "
+                                f"{macos_responsible_app() or 'the console'}, restart the console and retry.",
+                                code="PERMISSION_REQUIRED")
             raise PlanError("Could not capture that window. If this keeps failing, grant Screen Recording "
                             "to the console (System Settings > Privacy & Security) and retry.")
         return png
@@ -1523,7 +1566,16 @@ def macos_permissions(root: str) -> dict:
                 trusted = bool(json.loads(output).get("trusted"))
             except ValueError:
                 trusted = None
-    recording = macos_windows().get("screenRecording") if host_os() == "macos" else None
+    recording = None
+    if host_os() == "macos":
+        recording = _screen_capture_access(request=False)
+        if recording is None:  # no preflight call: fall back to the window-title hint
+            recording = macos_windows().get("screenRecording")
+        # Missing grants are asked for once, automatically, instead of waiting for a click.
+        if recording is False:
+            macos_auto_request(root, "screen-recording")
+        if trusted is False:
+            macos_auto_request(root, "accessibility")
     return {"accessibility": {"granted": trusted,
                               "grantTo": named,
                               "hint": None if trusted else f"Enable {named} in System Settings > Privacy & Security > Accessibility"},
@@ -1542,6 +1594,9 @@ def macos_request_access(root: str, data: dict) -> dict:
     if pane not in _MACOS_PANES:
         raise PlanError("pane must be accessibility or screen-recording", code="INVALID_ARGS")
     prompted: bool | None = None
+    if pane == "screen-recording":
+        _MACOS_ASKED.add(pane)
+        prompted = _screen_capture_access(request=True)
     if pane == "accessibility" and _ax_helper(root):
         code, output = _capture([_ax_helper(root), "request-access"], timeout=20)
         if code == 0 and output.strip().startswith("{"):
@@ -3057,3 +3112,28 @@ def monitor(root: str, lab: str, host: dict | None = None) -> dict:
             for n in names]
     overall = "running" if running and len(running) == len(rows) else "partial" if running else "stopped"
     return {"lab": lab, "state": overall, "runtime": runtime, "containers": rows, "checkedAt": time.time()}
+
+
+def dropper_audit(root: str, target: str | None = None, rehearse: bool = False) -> dict:
+    """Run the PENT-15 two-stage 'clean dropper' detector on a scoped path under root."""
+    rel_target = target if target is not None else os.path.join("scripts", "analysis", "dropper_lab")
+    real_root = os.path.realpath(root)
+    scoped_target = _scoped(root, rel_target)
+    if not os.path.exists(scoped_target):
+        raise PlanError("Dropper analysis target does not exist: " + rel_target)
+    if os.path.islink(os.path.join(root, rel_target)):
+        raise PlanError("Symlink targets are not allowed in dropper_audit: " + rel_target)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from scripts.analysis import dropper_detect
+
+    try:
+        report = dropper_detect.scan_path(scoped_target, scope_root=real_root)
+    except ValueError as exc:
+        raise PlanError(str(exc)) from exc
+    if rehearse:
+        from scripts.analysis.dropper_lab.stage2_server import run_lab_rehearsal
+
+        report["rehearsal"] = run_lab_rehearsal(allow_exec=True)
+    return report
+
