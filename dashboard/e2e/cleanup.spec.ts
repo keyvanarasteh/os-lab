@@ -57,7 +57,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await options.locator("summary", { hasText: "Suggestions" }).click();
   await options.getByRole("button", { name: "Extended" }).click();
   await options.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(options.getByText("Saved on this computer")).toBeVisible();
+  await expect(options.getByRole("status").filter({ hasText: "Saved on this computer" })).toBeVisible();
   expect(calls.find((call) => call.path === "/api/cleanup/preferences")?.body).toMatchObject({ suggestion: { mode: "extended" } });
   // Every ability stays one click away: the All tools row lists them all.
   await options.locator("summary", { hasText: "All tools" }).click();
