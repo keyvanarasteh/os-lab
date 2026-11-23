@@ -1,0 +1,10 @@
+{
+  "id": "OS-23",
+  "name": "Berat Kurşun",
+  "github": "Beratkursun",
+  "course": "MYO203",
+  "note": "MYO203 vize — dpkg package inventory and file reverse lookup; reservation #205",
+  "status": "pr-open",
+  "pr": "https://github.com/keyvanarasteh/os-lab/pull/208",
+  "date": "2026-11-14"
+}

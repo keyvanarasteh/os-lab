@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "Lab Clean Notes",
+  "version": "1.0.0",
+  "description": "PENT-02 lab sample: harmless note pad, only uses storage.",
+  "permissions": ["storage"],
+  "action": { "default_popup": "popup.html" }
+}

@@ -268,8 +268,20 @@ class ScanTests(unittest.TestCase):
         for payload in seen:
             self.assertEqual(
                 sorted(payload),
-                ["bytesSeen", "currentPath", "filesSeen", "pathsDone", "pathsTotal", "phase"],
+                ["bytesSeen", "currentEntry", "currentPath", "filesSeen", "pathsDone", "pathsTotal", "phase"],
             )
+        # the final snapshot names the entry measured last
+        self.assertIn(final["currentEntry"], {"system.caches", "system.logs"})
+
+    def test_modified_time_is_the_newest_file_per_path_and_entry(self):
+        old = self.write("Library/Caches/app/old.bin", 10)
+        new = self.write("Library/Caches/app/new.bin", 10)
+        os.utime(old, (1_000_000, 1_000_000))
+        os.utime(new, (2_000_000, 2_000_000))
+        entry = make_entry("system.caches", {"macos": ["~/Library/Caches"]})
+        result = self.result_for(entry)
+        self.assertEqual(result["entries"][0]["paths"][0]["modifiedAt"], 2_000_000)
+        self.assertEqual(result["entries"][0]["modifiedAt"], 2_000_000)
 
     def test_parallel_workers_agree_with_one_worker(self):
         self.write("Library/Caches/d1/f.bin", 100)

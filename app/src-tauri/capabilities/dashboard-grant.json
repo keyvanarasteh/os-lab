@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "dashboard-grant",
+  "description": "The dashboard served from the local console may call exactly two commands, both for the Full Disk Access guide: relaunch this app and drag this app's own icon. Nothing else is granted to that origin.",
+  "windows": ["main"],
+  "remote": { "urls": ["http://127.0.0.1:*/*", "http://localhost:*/*"] },
+  "permissions": ["allow-app-relaunch", "allow-app-drag-self"]
+}

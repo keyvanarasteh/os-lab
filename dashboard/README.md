@@ -20,7 +20,7 @@ not only the raw Astro output. Console-backed lab controls remain local.
 | Route | What it shows |
 |-------|---------------|
 | `/` | This computer: OS, CPU, memory, disk, KVM, container runtime, host tools, and which labs can run here (ready / needs setup / unavailable, with reasons) |
-| `/labs/<lab>/` | One lab (`android`, `windows`, `linux`, `ios`, `macos`): dependencies with **Install dependencies**, typed actions, plan preview → confirm → run, live job output, container monitor, endpoints, profiles and masked configuration |
+| `/labs/<lab>/` | One lab (`android`, `windows`, `winapps`, `linux`, `ios`, `macos`): dependencies with **Install dependencies**, typed actions, plan preview → confirm → run, live job output, container monitor, endpoints, profiles and masked configuration. `/labs/winapps/` is a local-only read-only mirror of visible Windows desktop windows |
 | `/jobs/` | Every lab job with its output; cancel running jobs |
 | `/firewall/` | Firewall Lab company directory and full manifest details |
 | `/firewall/<company>/` | One company's interactive branch composition, VLANs, firewall selections and rule counts |

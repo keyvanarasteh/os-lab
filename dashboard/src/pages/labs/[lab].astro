@@ -6,13 +6,15 @@ export function getStaticPaths() {
   return [
     { params: { lab: "android" }, props: { title: "Android Lab · Runtime & setup" } },
     { params: { lab: "windows" }, props: { title: "Windows Lab" } },
+    { params: { lab: "winapps" }, props: { title: "Windows Apps Lab" } },
     { params: { lab: "linux" }, props: { title: "Linux Lab" } },
     { params: { lab: "ios" }, props: { title: "iOS Lab" } },
     { params: { lab: "source" }, props: { title: "Source Lab" } },
-    { params: { lab: "macos" }, props: { title: "macOS Lab" } }
+    { params: { lab: "macos" }, props: { title: "macOS Lab" } },
+    { params: { lab: "web" }, props: { title: "Web Lab" } }
   ];
 }
-const { lab } = Astro.params as { lab: "android" | "windows" | "linux" | "ios" | "macos" | "source" };
+const { lab } = Astro.params as { lab: "android" | "windows" | "winapps" | "linux" | "ios" | "macos" | "source" | "web" };
 const { title } = Astro.props;
 ---
 <Base title={title}><LabPage lab={lab} client:only="react" /></Base>

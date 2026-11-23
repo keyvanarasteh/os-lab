@@ -105,10 +105,33 @@ say "staging the runtime and dashboard"
 node scripts/stage-runtime.mjs
 [ -n "${APPLE_SIGNING_IDENTITY:-}" ] || die "bundled Python helpers need a Developer ID identity in the keychain; import APPLE_CERTIFICATE before building"
 node scripts/stage-python-helper.mjs
+# The Web Lab engine ships as a nested resource binary (staged under
+# resources/os-lab/web-lab). `npx tauri build` below signs the app and
+# notarizes it in this environment, and notarization refuses unsigned nested
+# Mach-O binaries, so sign the staged engine before the build. Skipped
+# silently when the engine is not staged.
+ENGINE_BIN="$APP_DIR/src-tauri/resources/os-lab/web-lab/browser/target/release/weblab"
+if [ -f "$ENGINE_BIN" ]; then
+  say "signing the staged web-lab engine"
+  codesign --force --options runtime --timestamp \
+    --sign "$APPLE_SIGNING_IDENTITY" "$ENGINE_BIN" \
+    || die "signing the web-lab engine failed"
+fi
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ] && [ -f "$REPO/secrets/updater/os-lab.key" ]; then
   export TAURI_SIGNING_PRIVATE_KEY="$(cat "$REPO/secrets/updater/os-lab.key")"
 fi
 [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ] || die "updater signing key is missing (TAURI_SIGNING_PRIVATE_KEY)"
+# CLW-08: build the widget extension and reload bridge first (fast, fails early).
+# OSLAB_SKIP_WIDGETS=1 skips them for debugging — the app then ships without widgets.
+if [ "${OSLAB_SKIP_WIDGETS:-0}" != "1" ]; then
+  say "building the widget extension and reload bridge"
+  ( command -v xcodegen >/dev/null || brew install xcodegen >/dev/null ) || die "xcodegen is required for the widget targets"
+  WIDGET_ARCH="${TARGET%%-apple-darwin}"; [ "$WIDGET_ARCH" = "universal" ] && WIDGET_ARCH=""
+  bash "$APP_DIR/widget/build.sh" $WIDGET_ARCH || die "widget build failed"
+  [ -d "$APP_DIR/widget/build/OSLabWidgets.appex" ] && [ -d "$APP_DIR/widget/build/OSLabWidgetReloader.framework" ] \
+    || die "widget build produced no products"
+fi
+
 say "building ($TARGET) — Tauri signs the app with hardened runtime and notarizes it when the API key is set"
 npx tauri build --target "$TARGET" --bundles app
 
@@ -119,6 +142,70 @@ DMG="$BUNDLE/dmg/os-lab_${VERSION}_${ARCH_LABEL}.dmg"
 UPDATE="$BUNDLE/macos/os-lab.app.tar.gz"
 [ -d "$APP" ] && [ -f "$UPDATE" ] && [ -f "$UPDATE.sig" ] \
   || die "build produced no app or signed updater bundle"
+
+# ── 3b. Embed the widget extension, then re-sign and re-notarize ────────────────────────────────
+# Tauri signed and (optionally) notarized the app; embedding nested code
+# invalidates both, so the seal is rebuilt here: appex → framework → app.
+if [ -d "$APP_DIR/widget/build/OSLabWidgets.appex" ]; then
+  say "embedding the widget extension"
+  HOST_ENTITLEMENTS="$APP_DIR/src-tauri/entitlements-macos.plist"
+  WIDGET_ENTITLEMENTS="$APP_DIR/widget/entitlements-widget.plist"
+  [ -f "$HOST_ENTITLEMENTS" ] || die "host entitlements are missing"
+  # CI resolves APPLE_SIGNING_IDENTITY before calling this script; the local
+  # APPLE_CERTIFICATE-only path imports the P12 here, like the workflow does.
+  if [ -z "${APPLE_SIGNING_IDENTITY:-}" ] && [ -n "${APPLE_CERTIFICATE:-}" ]; then
+    say "importing APPLE_CERTIFICATE for the widget signing"
+    CERT_DIR="$(mktemp -d)"
+    printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_DIR/sign.p12"
+    KEYCHAIN="$CERT_DIR/oslab-sign.keychain-db"
+    security create-keychain -p "${APPLE_CERTIFICATE_PASSWORD:-oslab}" "$KEYCHAIN"
+    security import "$CERT_DIR/sign.p12" -k "$KEYCHAIN" -P "${APPLE_CERTIFICATE_PASSWORD:-oslab}" -T /usr/bin/codesign
+    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${APPLE_CERTIFICATE_PASSWORD:-oslab}" "$KEYCHAIN" >/dev/null
+    APPLE_SIGNING_IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)"
+  fi
+  [ -n "${APPLE_SIGNING_IDENTITY:-}" ] || die "no Developer ID Application identity for the widget embed"
+  mkdir -p "$APP/Contents/PlugIns" "$APP/Contents/Frameworks"
+  rm -rf "$APP/Contents/PlugIns/OSLabWidgets.appex" "$APP/Contents/Frameworks/OSLabWidgetReloader.framework"
+  cp -R "$APP_DIR/widget/build/OSLabWidgets.appex" "$APP/Contents/PlugIns/"
+  cp -R "$APP_DIR/widget/build/OSLabWidgetReloader.framework" "$APP/Contents/Frameworks/"
+  # widget/build.sh runs xcodegen, which regenerates this file from widget/project.yml. Refuse to sign
+  # with an empty one: the extension would ship unsandboxed and macOS would never load the widget.
+  grep -q "com.apple.security.app-sandbox" "$WIDGET_ENTITLEMENTS" && grep -q "group.com.keyvanarasteh.oslab" "$WIDGET_ENTITLEMENTS" \
+    || die "widget entitlements are empty after the build; declare them under entitlements.properties in app/widget/project.yml"
+  codesign --force --options runtime --timestamp --entitlements "$WIDGET_ENTITLEMENTS" \
+    --sign "$APPLE_SIGNING_IDENTITY" "$APP/Contents/PlugIns/OSLabWidgets.appex" \
+    || die "signing the widget extension failed"
+  # Read the entitlements back right away: if they are already empty here the signing step lost them;
+  # if they only vanish later, the host re-sign or notarization step did. The verify step below says which.
+  say "widget extension entitlements straight after signing:"
+  codesign -d --entitlements - "$APP/Contents/PlugIns/OSLabWidgets.appex" 2>&1 | sed 's/^/    /' || true
+  codesign --force --options runtime --timestamp \
+    --sign "$APPLE_SIGNING_IDENTITY" "$APP/Contents/Frameworks/OSLabWidgetReloader.framework" \
+    || die "signing the reloader framework failed"
+  say "re-signing the app with the widget contents"
+  codesign --force --options runtime --timestamp --entitlements "$HOST_ENTITLEMENTS" \
+    --sign "$APPLE_SIGNING_IDENTITY" "$APP" \
+    || die "re-signing the app failed"
+  say "widget extension entitlements after the app re-sign:"
+  codesign -d --entitlements - "$APP/Contents/PlugIns/OSLabWidgets.appex" 2>&1 | sed 's/^/    /' || true
+  # The updater bundle is built from the pre-embed app: rebuild it from the
+  # re-signed app and re-sign it for the updater feed.
+  say "rebuilding the updater bundle"
+  rm -f "$UPDATE" "$UPDATE.sig"
+  tar -czf "$UPDATE" -C "$BUNDLE/macos" os-lab.app
+  npx tauri signer sign --app-version "$VERSION" "$UPDATE" >/dev/null
+  [ -f "$UPDATE.sig" ] || die "updater bundle signature is missing"
+  if [ "$NOTARIZE" = 1 ]; then
+    say "re-notarizing the app (waits for Apple)"
+    APP_ZIP="$(mktemp -d)/os-lab.app.zip"
+    # --keepParent keeps os-lab.app as the archive's root entry, which notarytool expects.
+    ditto -c -k --keepParent "$APP" "$APP_ZIP"
+    xcrun notarytool submit "$APP_ZIP" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait
+    xcrun stapler staple "$APP"
+  else
+    say "app notarization skipped (--no-notarize)"
+  fi
+fi
 
 # Package the DMG ourselves. Tauri's bundle_dmg.sh mounts a read-write volume and runs
 # Finder to lay out icons, then frequently cannot unmount it ("hdiutil: Resource busy"),
@@ -147,6 +234,22 @@ fi
 # ── 5. Verify what will ship ────────────────────────────────────────────────────────────────────
 say "verifying"
 codesign --verify --deep --strict --verbose=1 "$APP"
+if [ -d "$APP/Contents/PlugIns/OSLabWidgets.appex" ]; then
+  codesign --verify --strict "$APP/Contents/PlugIns/OSLabWidgets.appex"
+  codesign --verify --strict "$APP/Contents/Frameworks/OSLabWidgetReloader.framework"
+  # codesign -d --entitlements - prints XML on some codesign builds and a DER
+  # blob on others (macOS 15+): DER carries boolean keys as OIDs, so a grep for
+  # the key name finds nothing even though the entitlement is present. Grep the
+  # raw display AND the DER-decoded XML (":-") so the check is format-proof.
+  host_ents="$( { codesign -d --entitlements - "$APP" 2>/dev/null; codesign -d --entitlements :- "$APP" 2>/dev/null; } || true)"
+  appex_ents="$( { codesign -d --entitlements - "$APP/Contents/PlugIns/OSLabWidgets.appex" 2>/dev/null; codesign -d --entitlements :- "$APP/Contents/PlugIns/OSLabWidgets.appex" 2>/dev/null; } || true)"
+  echo "$host_ents" | grep -q "group.com.keyvanarasteh.oslab" \
+    || { echo "the app signature is missing the widget App Group entitlement; entitlements output:"; echo "$host_ents"; die "the app signature is missing the widget App Group entitlement"; }
+  echo "$appex_ents" | grep -q "com.apple.security.app-sandbox" \
+    || { echo "the widget extension signature is missing the App Sandbox entitlement; entitlements output:"; echo "$appex_ents"; die "the widget extension signature is missing the App Sandbox entitlement"; }
+  echo "$appex_ents" | grep -q "group.com.keyvanarasteh.oslab" \
+    || { echo "the widget extension signature is missing the widget App Group entitlement; entitlements output:"; echo "$appex_ents"; die "the widget extension signature is missing the widget App Group entitlement"; }
+fi
 codesign --verify --verbose=1 "$DMG"
 if [ "$NOTARIZE" = 1 ]; then
   xcrun stapler validate "$APP"

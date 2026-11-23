@@ -21,6 +21,7 @@ PROBE_ALLOWLIST = {
     "developers.homebrew": ("brew", "--cache"),
     "developers.go-build": ("go", "env", "GOCACHE"),
     "developers.go-mod": ("go", "env", "GOMODCACHE"),
+    "developers.uv": ("uv", "cache", "dir"),
 }
 BAD_PREFIXES = ("undefined", "usage error", "error", "unknown", "not found")
 

@@ -67,8 +67,10 @@ They include the deep analyzer [[android-lab/lab/scripts/app_analyzer.py]], the
 report generator [[android-lab/lab/scripts/app_reporter.py]], the MobSF client
 [[android-lab/lab/scripts/mobsf_client.py]], the secret scanner
 [[android-lab/lab/scripts/secret_scanner.py]], the agentic Frida-hook generator
-[[android-lab/lab/scripts/agentic_engine.py]] and the APK patcher
-[[android-lab/lab/scripts/apk_patcher.py]]. Prebuilt Frida hooks are in
+[[android-lab/lab/scripts/agentic_engine.py]], the APK patcher
+[[android-lab/lab/scripts/apk_patcher.py]] and the `frida-trace` auto-tracer and
+call-map builder [[android-lab/lab/scripts/trace_runner.py]]. Prebuilt Frida hooks
+and the `frida-trace` hook runner [[android-lab/lab/hooks/trace_runner.py]] are in
 [[android-lab/lab/hooks]].
 
 ### Pinning detector
@@ -76,18 +78,60 @@ report generator [[android-lab/lab/scripts/app_reporter.py]], the MobSF client
 [[android-lab/lab/scripts/pinning_detector.py]] (PENT-11) classifies how an APK or decompiled
 tree pins TLS, statically, before any dynamic work.
 
-It decodes binary manifest and `res/xml` Network Security Config files itself, then scores OkHttp
-pin literals, custom TrustManager key checks, TrustKit and cross-platform plugins, Flutter,
-native `.so` verification and bundled certificates. Output is a ranked method list with
-evidence, a `pinned` / `likely_pinned` / `possible` / `none_detected` status, weak-validation
-flags and the matching lab hook as next step. Library-only class presence stays `low`
-confidence. It reads local files only (`make pinning APK=`); tests are in
+It decodes binary manifest and `res/xml` Network Security Config files itself (counting `<pin-set>`
+configs as strong evidence only when matched to a manifest `@xml/<name>` resource path, and
+deduplicating identical copies), then scores OkHttp `sha256/` and `sha1/` pin literals, custom
+TrustManager key checks, TrustKit and cross-platform plugins, Flutter, native `.so` verification and
+bundled certificates. Generic TLS API usage and library-only class presence stay `low` confidence.
+Scans enforce per-file and aggregate file/byte limits, expose coverage metadata (`scan_complete`,
+`skipped`, `skipped_count`, `scan_truncated`), return `incomplete_scan` instead of `none_detected`
+when inputs were skipped, escape untrusted paths in Markdown, and publish JSON + Markdown report
+pairs atomically with output-directory exclusion in non-`--json` runs. Output is a ranked method
+list with evidence, a `pinned` / `likely_pinned` / `possible` / `none_detected` /
+`incomplete_scan` status, weak-validation flags and the matching lab hook as next step. It reads
+local files only (`make pinning APK=`); tests are in
 [[android-lab/lab/tests/test_pinning_detector.py]].
+
+### Policy-driven Interceptor runner
+
+[[android-lab/lab/hooks/tamper_policy.js]] and [[android-lab/lab/scripts/tamper_runner.py]]
+(PENT-07) drive policy-based Frida `Interceptor` hooks (`onEnter` argument inspection
+and tampering, `onLeave` return-value inspection and `retval.replace`) against the
+deterministic lab authentication harness [[android-lab/lab/tests/targets/hedef.c]].
+
+A fail-closed scope guard refuses external targets, symlink escapes, and unauthorized
+functions before any instrumentation runs. The runner supports both live Frida injection
+and an offline deterministic mode for headless CI, verified against golden-file fixtures
+in [[android-lab/lab/tests/test_tamper_runner.py]].
+
+## Frida inventory
+
+[[console/frida_inventory.py]] answers "what can Frida attach to right now?" as one JSON document.
+
+It covers what `frida-ls-devices` and `frida-ps` report, labels each device
+with its transport (local, USB or TCP) and lists processes for local and USB
+devices, or for one named target. It lists through the `frida` Python module
+when that is importable and falls back to the two command-line tools otherwise,
+because `frida-ls-devices` draws an interactive table that needs a console. It
+is read-only: it only enumerates, passes only listing flags to the tools and
+never attaches, spawns or starts a frida-server. A TCP target must be a literal
+loopback, private or link-local address; hostnames and public addresses are
+refused before any tool runs. A missing tool or a failed listing is recorded in
+the document's `errors` (exit code 1) instead of raising, and a command that
+times out is stopped together with its child processes.
+
+The web console serves the same document at `GET /api/frida/inventory`, with an
+optional `host` query that goes through the same scope guard (an out-of-scope
+address answers 400). The jobs view renders it in
+[[dashboard/src/views/frida-targets-card.tsx]]: each device with its transport
+and process count, and its process list on demand. The card only lists, and it
+is left out of the public Pages build, which has no local engine.
 
 ## Tests
 
 The lab ships a pytest suite in [[android-lab/lab/tests]].
 
 It covers the analyzer, reporter, MobSF client, secret scanner, pinning detector, patcher, flow
-parser, agentic engine and web UI, and runs in CI — see
+parser, agentic engine, `frida-trace` call-map builder
+([[android-lab/lab/tests/test_trace_runner.py]]), web UI and the Frida inventory, and runs in CI — see
 [[tooling#Local test runner]].

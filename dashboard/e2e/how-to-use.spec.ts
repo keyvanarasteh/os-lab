@@ -24,7 +24,9 @@ test("Workspace prompt includes task, shipped support and workflow limits withou
     configurable: true, value: { writeText: async (value: string) => { (window as any).copiedPrompt = value; } }
   }));
   await page.goto("/how-to-use/");
-  await expect(page.getByRole("button", { name: "How to use", exact: true })).toHaveAttribute("aria-current", "page");
+  // "How to use" is a collapsible guide at the bottom of Help; its "Task prompt" child opens the builder
+  await expect(page.getByRole("button", { name: "How to use", exact: true })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "Task prompt", exact: true })).toHaveAttribute("aria-current", "page");
   const submit = page.getByRole("button", { name: "Generate and copy prompt" });
   await expect(submit).toBeDisabled();
   await page.getByLabel("What do you want to do?").fill("   ");
@@ -71,7 +73,9 @@ test("mobile Workspace drawer reaches the prompt page", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/feedback/");
   await page.getByRole("button", { name: "Open navigation" }).click();
-  await page.getByRole("dialog", { name: "Navigation" }).getByRole("button", { name: "How to use", exact: true }).click();
+  const nav = page.getByRole("dialog", { name: "Navigation" });
+  await nav.getByRole("button", { name: "How to use", exact: true }).click();
+  await nav.getByRole("button", { name: "Task prompt", exact: true }).click();
   await expect(page).toHaveURL(/\/how-to-use\/$/);
   await expect(page.getByLabel("What do you want to do?")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);

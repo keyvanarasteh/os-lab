@@ -11,6 +11,7 @@
     "check": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:i18n": "node scripts/check-translations.mjs",
+    "test:tooling": "node --test scripts/affected.test.mjs scripts/i18n-merge.test.mjs",
     "test:source:model": "node --test scripts/source-brain-model.test.mjs",
     "test:how-to-use:pages": "node scripts/how-to-use-pages-smoke.mjs",
     "test:source:pages": "node scripts/source-pages-smoke.mjs"

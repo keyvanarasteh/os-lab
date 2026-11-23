@@ -20,14 +20,21 @@ Source Lab dispatches directly to [[source-lab/run.py#main]] through
 `source` or `source-lab`. It is included in `all status`, `all doctor` and
 `all monitor`, but not in VM start/stop/restart/profile fan-out.
 
+Web Lab dispatches through `web` or `web-lab` to
+`make -C web-lab` ([[web-lab/Makefile]]): doctor, setup, up/start, stop,
+status, monitor, open, events, test and clean. It is not part of `all`
+fan-out, and it has no profiles, resize or service verbs.
+
 ## Commands
 
 The CLI exposes profiles, config, lifecycle, status/monitor, logs, shell, urls,
-resize and service management.
+resize, trace and service management.
 
 Profiles are applied by writing a preset from the lab's `profiles/` into its
 `.env`, or overlaid one-shot with `--profile`. `doctor` runs the lab's
-`scripts/preflight.sh`; `service install|uninstall` manages the systemd unit.
+`scripts/preflight.sh`; `service install|uninstall` manages the systemd unit;
+`trace` runs [[android-lab/lab/hooks/trace_runner.py]] to capture a JSON call map
+and annotated session log under `artifacts/traces/`.
 `./labctl ui [--port N]` opens the [[dashboard]] (it runs
 [[android-lab/lab/web_ui.py]], preferring the checkout's `.venv`).
 

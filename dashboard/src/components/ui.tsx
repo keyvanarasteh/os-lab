@@ -11,6 +11,7 @@ export function Section({
   description,
   action,
   className,
+  compact = false,
   children
 }: {
   id?: string;
@@ -19,21 +20,22 @@ export function Section({
   description?: ReactNode;
   action?: ReactNode;
   className?: string;
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section id={id} className={"iux-card gap-4 py-5" + (className ? ` ${className}` : "")}>
-      <div className="flex flex-wrap items-start gap-3 px-5">
+    <section id={id} className={`iux-card ${compact ? "gap-3 py-4" : "gap-4 py-5"}` + (className ? ` ${className}` : "")}>
+      <div className={`flex flex-wrap items-start gap-3 ${compact ? "px-4" : "px-5"}`}>
         <div className="min-w-0 flex-1">
           <h2 className="flex items-center gap-2 text-sm leading-none font-semibold">
             {icon ? <span className="text-[#f36c21]">{icon}</span> : null}
             {title}
           </h2>
-          {description && <p className="mt-1.5 text-sm text-(--iux-muted-foreground)">{description}</p>}
+          {description && <p className={`${compact ? "mt-1 text-xs" : "mt-1.5 text-sm"} text-(--iux-muted-foreground)`}>{description}</p>}
         </div>
         {action}
       </div>
-      <div className="px-5">{children}</div>
+      <div className={compact ? "px-4" : "px-5"}>{children}</div>
     </section>
   );
 }
@@ -90,7 +92,8 @@ export function Badge({ tone, children, title }: { tone?: Tone; children: ReactN
 }
 
 /** Page heading row used under the top bar: icon + title + one-line description, actions on the right. */
-export function PageHead({ icon, title, description, actions }: { icon: ReactNode; title: string; description: ReactNode; actions?: ReactNode }) {
+export function PageHead({ icon, title, description, actions, toolbarOnly = false }: { icon: ReactNode; title: string; description: ReactNode; actions?: ReactNode; toolbarOnly?: boolean }) {
+  if (toolbarOnly) return actions ? <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div> : null;
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 space-y-1">
@@ -155,15 +158,18 @@ export function keepModalFocus(event: KeyboardEvent<HTMLDialogElement>) {
 }
 
 /** A small square icon button with a tooltip: toggles panels and modals like Advanced settings. */
-export function IconButton({ label, onClick, className, children }: { label: string; onClick: () => void; className?: string; children: ReactNode }) {
+export function IconButton({ label, onClick, disabled, expanded, className, children }: { label: string; onClick: () => void; disabled?: boolean; expanded?: boolean; className?: string; children: ReactNode }) {
   return (
     <button
       type="button"
       aria-label={label}
+      aria-expanded={expanded}
       title={label}
-      onClick={onClick}
+      disabled={disabled}
+      onClick={disabled ? undefined : onClick}
       className={
         "iux-touch-target flex size-7 items-center justify-center rounded-md border border-(--iux-border)/80 text-(--iux-muted-foreground) transition-colors hover:bg-(--iux-muted) hover:text-(--iux-foreground)" +
+        (disabled ? " opacity-50 cursor-not-allowed" : "") +
         (className ? ` ${className}` : "")
       }
     >

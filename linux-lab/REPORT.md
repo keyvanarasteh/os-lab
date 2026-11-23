@@ -1,12 +1,21 @@
-# OS-21 Vize Projesi Raporu — Boot-Time Python Service Starter (systemd)
+## Ne Yapıldı?
+OS-10 görevi kapsamında Linux dosya sistemindeki temel dizinleri (/, /home, /etc, /opt, /root) tanıtan, içeriklerini listeleyen ve gizli dosya yapısını örnekleyen "os-10-filesystem-explorer.sh" Bash aracı geliştirildi.
 
-## 1. Projede Ne Yaptim?
-Bu calismada OS-21 (Boot-Time Python Service Starter) gorevi kapsaminda Linux sistem acilisinda (boot) otomatik olarak baslayan bir Python arka plan servisi hazirladim:
-- linux-lab/scripts/loop.py: Belirli araliklarla (time.sleep(5)) standart ciktiya (stdout / flush=True) calisma durumu logu basan dongusel bir Python betigi yazdim.
-- linux-lab/scripts/os-21-service-starter.sh: loop.py betigini calistiracak minimal .service (systemd unit) dosyasini ureten, --install parametresi verildiginde servisi /etc/systemd/system/ altina kopyalayip systemctl daemon-reload ve systemctl enable --now ile aktif eden, ardindan systemctl is-enabled, systemctl status ve journalctl -u komutlariyla servisin calistigini dogrulayan bir Bash araci gelistirdim.
+## Neler Öğrenildi?
+- Linux temel dizinlerinin sistemdeki görevleri ve /root dizininin erişim kısıtlamaları öğrenildi.
+- Nokta (.) ile başlayan gizli dosyaların kullanım amacı ve ls -a komutu ile görüntülenmesi öğrenildi.
+- Script oluşturma, chmod +x ile çalıştırma izni verme,echo ve ls ile script yazma öğrenildi.
+- GitHub üzerinde fork, branch oluşturma, git status / add / commit / push ve Pull Request açma iş akışı deneyimlendi.
 
-## 2. Git ve Pull Request (PR) Surecinde Ne Ogrendim?
-- Acik kaynak bir projeyi kendi hesabima fork etmeyi ve yerel gelistirme ortamima git clone ile indirmeyi ogrendim.
-- Ana dali (master) bozmadan izole bir sekilde calismak icin gorev ozelinde yeni bir branch (dal) (os-21-systemd-service) olusturmanin onemini kavradim.
-- Degisiklikleri gondermeden once yerel dogrulama testlerini (./scripts/run-tests.sh --quick) calistirarak kod kalitesini ve kabuk sozdizimini (bash -n) kontrol etmeyi deneyimledim.
-- Anlamli commit mesajlari yazarak degisiklikleri kendi fork depoma (git push) aktarmayi ve ana projeye Pull Request (PR) acarak acik kaynak katkisi sunma is akisini uygulamali olarak ogrendim.
+---
+
+# OS-10 Proje Raporu
+
+## Ne Yapıldı?
+OS-10 görevi kapsamında Linux dosya sistemindeki temel dizinleri (/, /home, /etc, /opt, /root) tanıtan, içeriklerini listeleyen ve gizli dosya yapısını örnekleyen "os-10-filesystem-explorer.sh" Bash aracı geliştirildi.
+
+## Neler Öğrenildi?
+- Linux temel dizinlerinin sistemdeki görevleri ve /root dizininin erişim kısıtlamaları öğrenildi.
+- Nokta (.) ile başlayan gizli dosyaların kullanım amacı ve ls -a komutu ile görüntülenmesi öğrenildi.
+- Script oluşturma, chmod +x ile çalıştırma izni verme, echo ve ls ile script yazma öğrenildi.
+- GitHub üzerinde fork, branch oluşturma, git status / add / commit / push ve Pull Request açma iş akışı deneyimlendi.

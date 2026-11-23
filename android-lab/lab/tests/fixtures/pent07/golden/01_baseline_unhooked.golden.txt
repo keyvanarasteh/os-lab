@@ -1,0 +1,9 @@
+[PENT-07] policy=01_baseline_unhooked | target=android-lab/lab/tests/targets/hedef.c | fn=parola_kontrol | scope=VERIFIED
+[PENT-07] schedule=3x2000ms | inputs=parola:"deneme123",yetki_seviyesi:1 | hook_active=false
+[t=0ms] [HEDEF] native parola_kontrol("deneme123", 1) -> 0
+[t=0ms] [HEDEF] iter=1/3 | girilen="deneme123" | seviye=1 | sonuc=0 | durum=REDDEDILDI
+[t=2000ms] [HEDEF] native parola_kontrol("deneme123", 1) -> 0
+[t=2000ms] [HEDEF] iter=2/3 | girilen="deneme123" | seviye=1 | sonuc=0 | durum=REDDEDILDI
+[t=4000ms] [HEDEF] native parola_kontrol("deneme123", 1) -> 0
+[t=4000ms] [HEDEF] iter=3/3 | girilen="deneme123" | seviye=1 | sonuc=0 | durum=REDDEDILDI
+[SUMMARY] calls=3 | approved=0 | rejected=3 | arg_tampers=0 | retval_replacements=0 | final=REDDEDILDI

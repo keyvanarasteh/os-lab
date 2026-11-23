@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- CLW-03: the host app shares the widget's App Group container. The app
+     itself stays unsandboxed (it spawns the console runtime), so the group
+     entitlement is the only grant here. -->
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.keyvanarasteh.oslab</string>
+	</array>
+</dict>
+</plist>

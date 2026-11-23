@@ -1,0 +1,689 @@
+{
+  "schemaVersion": 1,
+  "slug": "vanguard-holding",
+  "name": "Vanguard Holding & Academy",
+  "sector": "Education & Enterprise",
+  "author": {
+    "name": "Aydın Arda Demiralp",
+    "course": "BGT207",
+    "github": "aardademiralp"
+  },
+  "summary": "10.000 öğrencili akademik kampüs, Londra finans ofisi, Ankara genel merkez ve Ar-Ge birimlerini kapsayan, Palo Alto PA-5410 ve FortiGate 3200F hibrit Zero-Trust yeni nesil güvenlik mimarisi.",
+  "branches": [
+    {
+      "id": "hq",
+      "name": "Ankara Headquarters",
+      "role": "headquarters",
+      "location": "Ankara, Turkey",
+      "population": {
+        "staff": 300,
+        "students": 0,
+        "rnd": 0,
+        "software": 0
+      },
+      "network": {
+        "cidr": "10.10.0.0/16",
+        "dmz": true,
+        "vlans": [
+          { "id": 10, "name": "management", "cidr": "10.10.10.0/24", "note": "Executive management endpoints." },
+          { "id": 20, "name": "finance", "cidr": "10.10.20.0/24", "note": "Isolated finance and treasury." },
+          { "id": 30, "name": "operations", "cidr": "10.10.30.0/24", "note": "Admin and operations staff." },
+          { "id": 99, "name": "oobm", "cidr": "10.10.99.0/24", "note": "Out-of-band management console." },
+          { "id": 100, "name": "dc_services", "cidr": "10.10.100.0/24", "note": "Active Directory, DNS and NTP." },
+          { "id": 105, "name": "erp_cluster", "cidr": "10.10.105.0/24", "note": "SAP S/4HANA core database cluster." }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 10000,
+        "upMbps": 10000,
+        "drivers": ["SAP S/4HANA ERP", "SWIFT Net", "Active Directory", "VoIP", "SIEM"]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "Palo Alto PA-5410",
+            "vendor": "Palo Alto Networks",
+            "throughputGbps": 28.0,
+            "priceUsd": 58500,
+            "reason": "Single-Pass (SP3) architecture, 28 Gbps Threat throughput & 18.5 Gbps SSL decryption, wire-speed 10G inspection for SAP HANA & SWIFT."
+          },
+          "alternatives": [
+            {
+              "product": "PA-3410",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 4.3,
+              "priceUsd": 25000,
+              "reason": "Insufficient 4.3G threat throughput bottlenecks 10G planned traffic."
+            },
+            {
+              "product": "FortiGate 1800F",
+              "vendor": "Fortinet",
+              "throughputGbps": 36.0,
+              "priceUsd": 20000,
+              "reason": "High throughput but lacks Single-Pass zero-pipeline latency for sensitive finance."
+            },
+            {
+              "product": "Quantum 6600",
+              "vendor": "Check Point",
+              "throughputGbps": 3.7,
+              "priceUsd": 22000,
+              "reason": "Throughput bottleneck under 10G full line rate inspection."
+            },
+            {
+              "product": "FPR-3130",
+              "vendor": "Cisco",
+              "throughputGbps": 3.0,
+              "priceUsd": 18000,
+              "reason": "Legacy Snort engine overhead under full TLS 1.3 decryption."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 53,
+              "from": "10.10.0.0/16",
+              "to": "10.10.100.10/32",
+              "note": "Merkez kurumsal ic agindaki (10.10.0.0/16) istemcilerin Active Directory DNS ve NTP sorgulari."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.10.20.10/32",
+              "to": "194.107.240.0/24",
+              "note": "Finans ve hazine biriminin izole HSM terminali uzerinden SWIFT bankacilik transferleri."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.10.20.0/24",
+              "to": "10.10.105.10/32",
+              "note": "Finans departmaninin SAP S/4HANA ERP modullerine DLP teftisi altinda kontrollu erisimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "10.10.20.0/24",
+              "to": "any",
+              "note": "Finans is istasyonlarinin dogrudan internete cikisini engelleyerek veri sizintisini onlemek."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.10.10.0/24",
+              "to": "10.10.99.0/24",
+              "note": "Ag yoneticilerinin kritik donanimlarin OOBM konsollarina guvenli yonetim VLAN'indan erisimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Ankara Genel Merkez omurgasinda tanimlanmamis tum paketleri sifir toleransla engellemek."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Catch-all default deny outbound for host traffic."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "istanbul",
+      "name": "Istanbul Branch",
+      "role": "branch",
+      "location": "Istanbul, Turkey",
+      "population": {
+        "staff": 150,
+        "students": 0,
+        "rnd": 0,
+        "software": 0
+      },
+      "network": {
+        "cidr": "10.20.0.0/16",
+        "dmz": false,
+        "vlans": [
+          { "id": 110, "name": "office", "cidr": "10.20.10.0/24", "note": "Corporate sales and marketing." },
+          { "id": 120, "name": "guest", "cidr": "172.16.20.0/24", "note": "Isolated guest Wi-Fi." }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 500,
+        "upMbps": 500,
+        "drivers": ["M365 DIA", "Salesforce", "IPsec to HQ", "Zoom"]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 100F",
+            "vendor": "Fortinet",
+            "throughputGbps": 1.0,
+            "priceUsd": 3200,
+            "reason": "Built-in SOC4 SD-WAN ASIC, 1 Gbps Threat Protection, efficient M365 DIA local breakout."
+          },
+          "alternatives": [
+            {
+              "product": "PA-440",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 1.0,
+              "priceUsd": 2800,
+              "reason": "Higher price for SD-WAN subscription features."
+            },
+            {
+              "product": "Quantum 3600",
+              "vendor": "Check Point",
+              "throughputGbps": 1.5,
+              "priceUsd": 4500,
+              "reason": "Higher cost and lacks integrated SD-WAN ASIC."
+            },
+            {
+              "product": "FPR-1010",
+              "vendor": "Cisco",
+              "throughputGbps": 0.65,
+              "priceUsd": 2200,
+              "reason": "Lower throughput and complex licensing."
+            },
+            {
+              "product": "TZ470",
+              "vendor": "SonicWall",
+              "throughputGbps": 1.5,
+              "priceUsd": 2500,
+              "reason": "Limited SD-WAN path steering intelligence."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.20.10.0/24",
+              "to": "any",
+              "note": "Istanbul satis ekiplerinin bulut SaaS uygulamalarina yerel DIA cikisindan erisimi."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.20.10.0/24",
+              "to": "10.10.100.0/24",
+              "note": "Istanbul subesinin genel merkez intranet portalina ve dosya sunucusuna IPsec VPN erisimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "172.16.20.0/24",
+              "to": "10.0.0.0/8",
+              "note": "Misafir kablosuz aginin sirket ici kurumsal aglara ve sunuculara erisimini engellemek."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "172.16.20.0/24",
+              "to": "any",
+              "note": "Misafir kullanicilarin dogrudan izole yerel fiber cikisindan internete erisimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Istanbul sube guvenlik duvarinda eslesmeyen tum paketleri engellemek."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Catch-all default deny outbound for host traffic."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "london",
+      "name": "London Office",
+      "role": "branch",
+      "location": "London, United Kingdom",
+      "population": {
+        "staff": 50,
+        "students": 0,
+        "rnd": 0,
+        "software": 0
+      },
+      "network": {
+        "cidr": "10.30.0.0/16",
+        "dmz": false,
+        "vlans": [
+          { "id": 310, "name": "legal", "cidr": "10.30.10.0/24", "note": "International trade and legal." },
+          { "id": 399, "name": "oobm", "cidr": "10.30.99.0/24", "note": "Branch OOBM management." }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 200,
+        "upMbps": 200,
+        "drivers": ["Cloud ERP", "GDPR compliance reporting", "IPsec to HQ", "Zoom"]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "Palo Alto PA-440",
+            "vendor": "Palo Alto Networks",
+            "throughputGbps": 1.0,
+            "priceUsd": 2800,
+            "reason": "0 dB Fanless silent desktop design, enterprise PAN-OS, strict GDPR DLP inspection."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 60F",
+              "vendor": "Fortinet",
+              "throughputGbps": 0.7,
+              "priceUsd": 1200,
+              "reason": "Lacks the granular DLP policy templates required for international trade."
+            },
+            {
+              "product": "Quantum 1600",
+              "vendor": "Check Point",
+              "throughputGbps": 1.0,
+              "priceUsd": 3200,
+              "reason": "Higher power consumption and fan noise in small office."
+            },
+            {
+              "product": "FPR-1010",
+              "vendor": "Cisco",
+              "throughputGbps": 0.65,
+              "priceUsd": 2200,
+              "reason": "Lower throughput and lacks fanless design."
+            },
+            {
+              "product": "TZ370",
+              "vendor": "SonicWall",
+              "throughputGbps": 0.75,
+              "priceUsd": 1500,
+              "reason": "Insufficient enterprise reporting for GDPR."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.30.10.0/24",
+              "to": "any",
+              "note": "Londra hukuk biriminin uluslararasi denetim portallarina TLS 1.3 DLP teftisiyle erisimi."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.30.10.0/24",
+              "to": "10.10.105.10/32",
+              "note": "Londra ofisinden Ankara merkezdeki SAP sunucusuna IPsec tuneli ile guvenli erisim."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 22,
+              "from": "10.30.99.0/24",
+              "to": "10.10.99.10/32",
+              "note": "Londra ekipmanlarinin Ankara merkez Bastion uzerinden guvenli bant disi yonetimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Londra aginda eslesmeyen yetkisiz paketleri GDPR uyumu geregi sessizce dusurmek."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Catch-all default deny outbound for host traffic."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "campus",
+      "name": "Academic Campus",
+      "role": "campus",
+      "location": "Istanbul, Turkey",
+      "population": {
+        "staff": 700,
+        "students": 10000,
+        "rnd": 0,
+        "software": 0
+      },
+      "network": {
+        "cidr": "10.100.0.0/16",
+        "dmz": true,
+        "vlans": [
+          { "id": 100, "name": "students", "cidr": "10.100.0.0/17", "note": "BYOD student Eduroam pool." },
+          { "id": 101, "name": "academic", "cidr": "10.101.10.0/24", "note": "Academic staff & faculty." },
+          { "id": 102, "name": "admin_staff", "cidr": "10.101.20.0/24", "note": "Campus administration & student registry." },
+          { "id": 103, "name": "lms_db", "cidr": "10.100.200.0/24", "note": "LMS database cluster." },
+          { "id": 104, "name": "lms_web", "cidr": "10.101.30.0/24", "note": "LMS web portal." },
+          { "id": 105, "name": "hpc", "cidr": "10.101.40.0/24", "note": "Academic HPC computing cluster." }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 50000,
+        "upMbps": 50000,
+        "drivers": ["10k Students Eduroam", "LMS exams", "Zoom & streaming", "HPC research", "ULAKBIM + TT ECMP"]
+      },
+      "firewalls": [
+        {
+          "segment": "perimeter",
+          "chosen": {
+            "product": "FortiGate 3200F",
+            "vendor": "Fortinet",
+            "throughputGbps": 47.0,
+            "priceUsd": 89500,
+            "reason": "NP7 ASIC with 47 Gbps Threat throughput, 158 Gbps FW throughput, 380M concurrent sessions, 1.2M CPS for 10.000 students without bottleneck."
+          },
+          "alternatives": [
+            {
+              "product": "FortiGate 1800F",
+              "vendor": "Fortinet",
+              "throughputGbps": 17.0,
+              "priceUsd": 20000,
+              "reason": "Insufficient 17G threat throughput bottlenecks 23.34G planned traffic."
+            },
+            {
+              "product": "PA-5410",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 28.0,
+              "priceUsd": 58500,
+              "reason": "Adequate threat inspection but lower concurrent sessions (5M vs 380M) for campus BYOD bursts."
+            },
+            {
+              "product": "Quantum 15600",
+              "vendor": "Check Point",
+              "throughputGbps": 22.0,
+              "priceUsd": 65000,
+              "reason": "Lacks NP7 ASIC hardware acceleration for line-rate NAT/DoS defense."
+            },
+            {
+              "product": "FPR-4145",
+              "vendor": "Cisco",
+              "throughputGbps": 24.0,
+              "priceUsd": 70000,
+              "reason": "Higher latency and lower CPS for high-density Wi-Fi."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.100.0.0/17",
+              "to": "any",
+              "note": "10.000 kampus ogrencisinin yuksek hizli internet ve uzaktan egitim kaynaklarina erisimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "10.100.0.0/17",
+              "to": "10.101.20.0/24",
+              "note": "[CRITICAL ZERO-TRUST] Ogrenci agindan (10.100.0.0/17) idari sistemlere yetkisiz erisimi engellemek."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "10.100.0.0/17",
+              "to": "10.100.200.0/24",
+              "note": "[CRITICAL ZERO-TRUST] Ogrenci agindan (10.100.0.0/17) LMS veri tabanina (10.100.200.0/24) erisimi engellemek."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.100.0.0/17",
+              "to": "10.101.30.10/32",
+              "note": "Ogrencilerin sinav ve ders iceriklerine yalnizca DMZ uzerindeki WAF korumali LMS Web arayuzunden erismesi."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 22,
+              "from": "10.101.10.0/24",
+              "to": "10.101.40.0/24",
+              "note": "Akademik personelin simulasoyn ve arastirmalar icin HPC hesaplama kumesine guvenli erisimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Kampus omurgasinda tanimlanmamis tum paketleri dusurmek ve SIEM telemetrisi uretmek."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Catch-all default deny outbound for host traffic."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rnd",
+      "name": "Software Dev & AI Enclave",
+      "role": "branch",
+      "location": "Ankara, Turkey",
+      "population": {
+        "staff": 0,
+        "students": 0,
+        "rnd": 20,
+        "software": 80
+      },
+      "network": {
+        "cidr": "10.40.0.0/15",
+        "dmz": true,
+        "vlans": [
+          { "id": 410, "name": "dev", "cidr": "10.40.10.0/24", "note": "Software engineer workstations." },
+          { "id": 420, "name": "staging", "cidr": "10.40.20.0/24", "note": "Staging test environment." },
+          { "id": 430, "name": "prod_mgmt", "cidr": "10.40.30.0/24", "note": "Production management." },
+          { "id": 440, "name": "cicd", "cidr": "10.40.40.0/24", "note": "GitLab CI and Harbor registry." },
+          { "id": 510, "name": "ai_research", "cidr": "10.50.10.0/24", "note": "Senior AI researcher lab." },
+          { "id": 520, "name": "gpu_cluster", "cidr": "10.50.20.0/24", "note": "NVIDIA DGX H100 GPU cluster." },
+          { "id": 530, "name": "nvme_storage", "cidr": "10.50.30.0/24", "note": "NVMe RoCE v2 high-speed storage." }
+        ]
+      },
+      "bandwidth": {
+        "downMbps": 10000,
+        "upMbps": 10000,
+        "drivers": ["CI/CD pipeline", "Container images", "RoCE v2 NVMe storage", "No internet for AI Enclave"]
+      },
+      "firewalls": [
+        {
+          "segment": "software",
+          "chosen": {
+            "product": "Quantum 6600",
+            "vendor": "Check Point",
+            "throughputGbps": 3.7,
+            "priceUsd": 18500,
+            "reason": "SandBlast zero-day emulation and extraction engine for CI/CD package dependencies."
+          },
+          "alternatives": [
+            {
+              "product": "PA-3410",
+              "vendor": "Palo Alto Networks",
+              "throughputGbps": 4.3,
+              "priceUsd": 25000,
+              "reason": "Higher price for specialized CI/CD sandboxing requirements."
+            },
+            {
+              "product": "FortiGate 200F",
+              "vendor": "Fortinet",
+              "throughputGbps": 3.0,
+              "priceUsd": 7500,
+              "reason": "Lacks deep container package SandBlast inspection."
+            },
+            {
+              "product": "FPR-2130",
+              "vendor": "Cisco",
+              "throughputGbps": 2.5,
+              "priceUsd": 12000,
+              "reason": "Higher latency in CI/CD pipeline webhooks."
+            },
+            {
+              "product": "NSA 3700",
+              "vendor": "SonicWall",
+              "throughputGbps": 3.5,
+              "priceUsd": 9000,
+              "reason": "Limited container registry integration."
+            }
+          ],
+          "rules": [
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.40.10.0/24",
+              "to": "10.40.40.0/24",
+              "note": "Yazilim muhendislerinin GitLab ve Harbor sistemlerine SSH/HTTPS ile guvenli erisimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "10.40.20.0/24",
+              "to": "10.40.30.0/24",
+              "note": "[SUPPLY-CHAIN ISOLATION] Staging ortamindan canli uretim ortamina dogrudan gecisi engellemek."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 443,
+              "from": "10.40.40.0/24",
+              "to": "any",
+              "note": "CI/CD yapim sunucularinin paket bagimliliklarini SandBlast teftisi altinda indirmesi."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "tcp",
+              "port": 8888,
+              "from": "10.50.10.0/24",
+              "to": "10.50.20.0/24",
+              "note": "Arastirmacilarin NVIDIA DGX H100 kumesinde JupyterLab ve Slurm denetleyicisine erisimi."
+            },
+            {
+              "action": "allow",
+              "direction": "forward",
+              "proto": "udp",
+              "port": 4791,
+              "from": "10.50.20.0/24",
+              "to": "10.50.30.0/24",
+              "note": "H100 GPU kumesinin veri setlerini okumasi icin NVMe-oF ve RoCE v2 (UDP 4791) erisimi."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "10.50.0.0/16",
+              "to": "any",
+              "note": "[AIR-GAPPED DEFENSE] Model agirliklarinin bulundugu arastirma kumesinin internete cikisini mutlak engellemek."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Holding genelinde eslesmeyen tum transit paketleri engellemek."
+            },
+            {
+              "action": "deny",
+              "direction": "forward",
+              "proto": "any",
+              "port": "any",
+              "from": "10.0.0.0/8",
+              "to": "any",
+              "note": "[EGRESS DEFENSE] Kurumsal aglardan dis internete cikan eslesmeyen paketleri engellemek."
+            },
+            {
+              "action": "deny",
+              "direction": "out",
+              "proto": "any",
+              "port": "any",
+              "from": "any",
+              "to": "any",
+              "note": "Catch-all default deny outbound for host traffic."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "remoteAccess": {
+    "type": "role-based-vpn",
+    "note": "IPsec for branch-to-HQ. ZTNA for remote staff connecting to ERP with mTLS and EDR health checks."
+  },
+  "monitoring": {
+    "siem": "Splunk Enterprise Security for centralized log aggregation.",
+    "owner": "DevSecOps and L2 SOC Analysts.",
+    "alertSink": "Critical alerts to Telegram/PagerDuty, standard logs to Splunk.",
+    "appVsSecurity": "Application metrics go to Prometheus/Grafana, perimeter security drops go to SIEM."
+  },
+  "cveWatch": []
+}

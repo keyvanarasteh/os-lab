@@ -1,22 +1,20 @@
-# OS-21 Dogrulama (Verification) — Boot-Time Python Service Starter (systemd)
+./linux-lab/scripts/os-10-filesystem-explorer.sh
 
-## 1. Calistirma Komutlari
+## Beklenen Çıktı
+Script çalıştırıldığında ekrana ---OS-10 Linux Filesystem Hierarchy Explorer & Teaching Map--- başlığıyla birlikte sırasıyla şu çıktıları verir:
+1. /, /home, /etc, /opt ve /root dizinlerinin ne işe yaradığını açıklar ve ls ile içeriklerini listeler.
+2. Normal kullanıcı yetkisiyle çalıştırıldığında /root dizini için "Permission denied" uyarısı verir (güvenlik amaçlı normal kullanıcılara açılmaz).
+3. ---Gizli Dosyalar--- başlığı altında nokta (.) ile başlayan dosyaların mantığını açıklar ve ls -a $HOME ile kullanıcı ev dizinindeki gizli dosyaları listeler.
 
-Servis birim dosyasini (.service) uretmek ve onizlemek icin:
-    ./linux-lab/scripts/os-21-service-starter.sh
+---
 
-Servisi systemd altina kurmak, acilista otomatik baslayacak sekilde etkinlestirmek (enable) ve status / journalctl ciktilariyla dogrulamak icin:
-    sudo ./linux-lab/scripts/os-21-service-starter.sh --install
+# OS-10 Doğrulama (Verification)
 
-## 2. Beklenen Cikti
+## Çalıştırma Komutu
+./linux-lab/scripts/os-10-filesystem-explorer.sh
 
-    === [1/4] loop.py dosyasi kontrol ediliyor ===
-    === [2/4] Systemd .service birim dosyasi olusturuluyor ===
-    === [3/4] Servis sisteme kuruluyor ve etkinlestiriliyor (enable & start) ===
-    === [4/4] Dogrulama: enable / status / journalctl ===
-    -> Enabled durumu:
-    enabled
-    -> Servis durumu (status):
-    Active: active (running)
-    -> Servis loglari (journalctl):
-    [OS-21] Python systemd servisi aktif! Sayac: 1
+## Beklenen Çıktı
+Script çalıştırıldığında ekrana ---OS-10 Linux Filesystem Hierarchy Explorer & Teaching Map--- başlığıyla birlikte sırasıyla şu çıktıları verir:
+1. /, /home, /etc, /opt ve /root dizinlerinin ne işe yaradığını açıklar ve ls ile içeriklerini listeler.
+2. Normal kullanıcı yetkisiyle çalıştırıldığında /root dizini için "Permission denied" uyarısı verir (güvenlik amaçlı normal kullanıcılara açılmaz).
+3. ---Gizli Dosyalar--- başlığı altında nokta (.) ile başlayan dosyaların mantığını açıklar ve ls -a $HOME ile kullanıcı ev dizinindeki gizli dosyaları listeler.

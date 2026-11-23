@@ -51,3 +51,46 @@ jobs:
           else
             node scripts/publish-app-update.mjs --detect-latest --allow-none --mark-latest --verify
           fi
+
+  notify:
+    # Optional Telegram report: define the TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID
+    # repository secrets to enable it. Without them the send step skips silently.
+    # The 20-minute scheduled safety-net runs stay quiet; only manual runs and
+    # release events report, so the feed work itself stays out of the chat.
+    if: ${{ always() && github.event_name != 'schedule' }}
+    needs: [publish]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Send the Telegram report
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NAMES: publish
+          RESULTS: ${{ needs.publish.result }}
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        run: |
+          set -euo pipefail
+          read -ra names <<< "$NAMES"
+          read -ra results <<< "$RESULTS"
+          overall="✅"
+          lines=""
+          for index in "${!names[@]}"; do
+            result="${results[index]}"
+            if [ "$result" = skipped ]; then continue; fi
+            case "$result" in
+              success) icon="✅" ;;
+              *) icon="❌"; overall="❌" ;;
+            esac
+            lines="${lines}${icon} ${names[index]} (${result})
+          "
+          done
+          if [ -z "$lines" ]; then exit 0; fi
+          text="${overall} ${GITHUB_WORKFLOW} — ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}
+          ${lines}
+          ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          payload="$(jq -nc --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$text" \
+            '{chat_id:$chat_id, text:$text, disable_web_page_preview:true}')"
+          curl -fsS --max-time 20 -H 'Content-Type: application/json' \
+            -d "$payload" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" > /dev/null

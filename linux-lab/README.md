@@ -134,6 +134,34 @@ linux-lab/
 └── backups/                # archives (gitignored)
 ```
 
+## OS-16: server first-look report
+
+Inside an owned Linux lab/VM, from the repository root (Python 3.11+, no pip
+dependencies or sudo required):
+
+```bash
+python3 linux-lab/scripts/server_firstlook.py
+python3 linux-lab/scripts/server_firstlook.py --json
+```
+
+The read-only script collects kernel/architecture (`uname`), distribution
+(`lsb_release`), CPU (`inxi -C`), RAM (`free -b`), local filesystems (`df -P -k -l`)
+and loaded services (`systemctl list-units`). JSON contains byte counts, failed
+services and per-command status/exit code. The package architecture note explains
+`x86_64`/`amd64` and `aarch64`/`arm64`, including the kernel/userspace distinction.
+
+Missing tools, permission errors, unsupported output and timeouts produce a
+partial report, never a fabricated healthy result. Each command has a five-second
+timeout (`--timeout` changes it, up to 60 seconds). Exit 0 means a report was
+generated, not that the machine is healthy; invalid arguments/platform exit 2.
+The tool only prints to stdout: no automatic files, package installation, service
+changes or network requests. Mount paths, CPU details and service names may be
+host-specific; review output before sharing. `df` lists local mounts separately;
+service scope is loaded units, not every installed unit file. `inxi` is optional.
+
+See [VERIFY.md](docs/OS-16/VERIFY.md) for expected results and the video walkthrough,
+and [REPORT.md](docs/OS-16/REPORT.md) for the project report.
+
 ## Readiness model
 
 - Container `Up`: QEMU started. Not enough to use the guest.
@@ -154,6 +182,28 @@ Everything is environment-driven; edit `.env` and `make restart`:
 For a local ISO, bind `./boot.iso:/boot.iso` in compose. See
 [`knowledge/setup.md`](knowledge/setup.md) for host setup and
 [`knowledge/operations.md`](knowledge/operations.md) for day-to-day use.
+
+## OS-26: file permission and ownership auditor
+
+Run the read-only [`permission_audit.py`](scripts/permission_audit.py) in an owned
+Linux lab directory (Python 3.11+, standard library only):
+
+```bash
+python3 linux-lab/scripts/permission_audit.py /path/to/lab
+python3 linux-lab/scripts/permission_audit.py /path/to/lab --json --owner "$(id -u)" --group "$(id -g)"
+```
+
+These commands run from the repository root. The default policy allows at most
+`0644` for files and `0755` for directories, with the current user's UID expected;
+group drift is checked only with `--group`. Choose `--file-mode 0755` for a lab
+that intentionally contains executable files. World-write and setuid/setgid
+regular files are reported separately. Suggested fixes are never executed.
+
+Exit codes: **0** no findings, **1** findings, **2** usage/error/incomplete scan.
+Symlinks, special files and other filesystems are skipped and counted. Unix
+mode bits are not a complete ACL/capability audit. A small, rootless fixture,
+expected output and the offline tests are in
+[`OS-26/VERIFY.md`](docs/OS-26/VERIFY.md); see also [`REPORT.md`](docs/OS-26/REPORT.md).
 
 ## Agent brief (compact)
 
@@ -230,3 +280,37 @@ Bu görsel önceki audit çalıştırmalarıyla birleştirilmemelidir; sürüm v
 bağlamına göre toplamlar değişebilir. Görsel tek başına JSON çıktısının, canlı
 `apply` veya canlı `rollback` işlemlerinin doğrulandığını göstermez. Mock test
 sonuçları ve doğrulama sınırları için [VERIFY.md](os-30/VERIFY.md) dosyasına bakın.
+
+## OS-23: dpkg paket envanteri ve dosya sahipliği
+
+[dpkg envanter aracı](scripts/dpkg_inventory.py), Python 3.11+ ve Debian/Ubuntu
+`dpkg` komutunu kullanır. Salt okunur çalışır; sudo veya ağ erişimi gerektirmez.
+Depo kökünden çalıştırın:
+
+```bash
+python3 linux-lab/scripts/dpkg_inventory.py -l
+python3 linux-lab/scripts/dpkg_inventory.py -L bash
+python3 linux-lab/scripts/dpkg_inventory.py -S /usr/bin/dpkg
+```
+
+`-l` paketlerin adını, sürümünü, mimarisini, açıklamasını ve üç karakterli durumunu
+listeler. Kurulu paket sayısı ayrı hesaplanır; yalnızca yapılandırması kalan
+paketler kurulu sayılmaz. `-L PAKET` kayıtlı dosyaları, `-S /TAM/YOL` dosyanın
+sahibi olan paketleri gösterir. Çoklu sahipler ve mimari ekleri desteklenir.
+
+Başarılı sorgular sürüm 1 JSON döndürür. İşlem hataları `ok: false` ve çıkış 1,
+yanlış kullanım çıkış 2 üretir. Dosya yolundaki boşluk ve joker karakterleri
+korunur. Sembolik bağlantılar otomatik çözülmez: `/bin` ve `/usr/bin` farklı
+veritabanı kayıtları olabilir. `dpkg -L PAKET` çıktısındaki tam yolu kullanın.
+Sahiplik kaydı dosyanın mevcut veya değiştirilmemiş olduğunu kanıtlamaz.
+
+`--admindir /tam/veritabani/yolu`, sistem veritabanını değiştirmeden bir kopyayı
+veya sentetik test veritabanını okur. Çıktı yalnızca terminale yazılır.
+
+Çevrimdışı birim testleri ve dpkg mevcutsa geçici veritabanıyla bütünleşme testi:
+
+```bash
+python3 android-lab/lab/tests/test_dpkg_inventory.py
+```
+
+[Görev raporu](os-23/REPORT.md) · [Doğrulama sonuçları](os-23/VERIFY.md).

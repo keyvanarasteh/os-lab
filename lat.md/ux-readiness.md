@@ -21,6 +21,12 @@ The Jobs page reports cancellation failure beside the selected job and keeps its
 Dependencies card — a badge reports how many are found — and hides the card once
 every tracked requirement is found, so actions take the whole row.
 
+Lab titles live in the app bar on runtime, Android, Web and Cleanup pages; the
+page body keeps only status and tool controls. The iOS Actions card holds compact, automatically checked real-device
+status and booted simulator cards, with secondary identifiers behind details.
+Action groups use visible Start/Stop labels and a compact grid. Its screen panel docks beside
+the page at desktop widths and overlays it on narrow screens.
+
 Advanced settings, Host tools and Providers open as [[dashboard/src/components/ui.tsx#Modal]]
 dialogs behind header icon buttons; the iOS simulator mirror is a right-side
 [[dashboard/src/views/ios-simulator.tsx#SimulatorDrawer]] panel toggled from the lab header.
@@ -32,11 +38,23 @@ An address from configuration describes where a service would answer; it does no
 
 [[dashboard/src/components/ui.tsx#CopyButton]], the Contribute task list, and public-home setup commands report clipboard success only after the write resolves; failures offer manual selection. Public-home release lookup leaves the checking state on failure and points to the release page.
 
-[[dashboard/src/views/contribute-modal.tsx]] and [[dashboard/src/views/gap-modal.tsx]] use native modal dialogs for focus containment and Escape handling. The Cleanup Lab confirmation dialog in [[dashboard/src/views/cleanup/pages.tsx]] follows the same recipe, and the cleanup cards keep decisions (name, risk, size, selection) on the card while hints, impacts, paths, sources and privilege notes live in the hover/focus popover from [[dashboard/src/views/cleanup/info-popover.tsx]]. [[dashboard/src/views/health-page.tsx#PlatformTabs]] and [[dashboard/src/views/firewall-company-page.tsx]] connect selected tabs to panels and support arrow keys. Shared `.iux-btn` controls and marked exceptions gain larger targets on coarse pointers.
+[[dashboard/src/views/contribute-modal.tsx]] and [[dashboard/src/views/gap-modal.tsx]] use native modal dialogs for focus containment and Escape handling. The Cleanup Lab dashboard keeps a compact Quick clean / Clean main view and
+moves the cards and the tools hub to a Settings tab
+([[dashboard/src/views/cleanup/pages.tsx]]). Its confirmation dialog follows
+the same recipe, and the cleanup cards keep decisions (name, risk, size, selection) on the card while hints, impacts, paths, sources and privilege notes live in the hover/focus popover from [[dashboard/src/views/cleanup/info-popover.tsx]]. [[dashboard/src/views/health-page.tsx#PlatformTabs]] and [[dashboard/src/views/firewall-company-page.tsx]] connect selected tabs to panels and support arrow keys. Shared `.iux-btn` controls and marked exceptions gain larger targets on coarse pointers.
 
 ## Public and local navigation
 
 [[dashboard/src/shell/top-bar.tsx]] shows engine status only in the local app. [[dashboard/src/i18n/paths.ts]] handles locale and Pages base paths. [[dashboard/src/views/feedback-page.tsx]] provides issue, feature, discussion, and private security routes from both navigation modes.
+
+The lab switcher ([[dashboard/src/shell/lab-switcher.tsx]], ⌘L / Ctrl+L, also a
+"Switch lab" card at the foot of the sidebar) focuses the sidebar on one lab
+instead of listing every lab; [[dashboard/src/shell/active-lab.ts]] remembers
+the choice and a lab page reached by any route re-focuses the nav. Spotlight
+keeps every lab and lab action listed while the sidebar is focused, and "All
+labs" in the switcher restores the full list. "How to use" sits at the bottom
+of the Help group as a collapsible guide (collapsed by default); its
+"Task prompt" child opens the builder.
 
 Legal Markdown cross-links in [[dashboard/src/lib/legal.ts#rewriteLinks]] and
 legal tabs/cards in [[dashboard/src/views/legal-page.tsx]] preserve the current
@@ -48,7 +66,7 @@ legal prose is excluded from client translation.
 [[dashboard/e2e/cleanup.spec.ts]] checks the typed scan → plan → confirm → clean
 flow and the public Turkish `/os-lab/tr/cleanup/` route without engine calls.
 
-[[dashboard/e2e/health-and-content.spec.ts]] covers dependency actions, advanced details, run failures, and hydration across page types. Dashboard type, translation, and static build checks complement browser tests. Public Pages links and locale switching are checked under `/os-lab/`.
+[[dashboard/e2e/health-and-content.spec.ts]] covers dependency actions, advanced details, run failures, and hydration across page types. [[dashboard/e2e/lab-switcher.spec.ts]] covers ⌘L, the sidebar card, focus following a direct link, the All-labs reset, and Spotlight keeping every lab. Dashboard type, translation, and static build checks complement browser tests. Public Pages links and locale switching are checked under `/os-lab/`.
 
 [[dashboard/scripts/source-pages-smoke.mjs]] checks every Source route and guide
 across all eight locales below `/os-lab/`, including query-preserving language

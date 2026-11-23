@@ -23,6 +23,19 @@ def test_jadx_decompiler_on_real_dex(sample_apk, tmp_path):
         if jdk_bin not in env.get("PATH", ""):
             env["PATH"] = jdk_bin + os.pathsep + env.get("PATH", "")
 
+    # Homebrew's jadx wrapper defaults JAVA_HOME to /opt/homebrew/opt/openjdk, which is gone when only
+    # a versioned JDK is installed. Without a bundled JDK, hand jadx a JAVA_HOME that exists.
+    if not os.path.isdir(jdk_dir):
+        home = env.get("JAVA_HOME")
+        if not home or not os.path.isdir(home):
+            env.pop("JAVA_HOME", None)
+            probe = subprocess.run(["/usr/libexec/java_home"], capture_output=True, text=True) if os.path.exists("/usr/libexec/java_home") else None
+            found = probe.stdout.strip() if probe and probe.returncode == 0 else ""
+            if found and os.path.isdir(found):
+                env["JAVA_HOME"] = found
+            elif not shutil.which("java", path=env.get("PATH")):
+                pytest.skip("No Java runtime for JADX")
+
     out_dir = str(tmp_path / "jadx_test_out")
     res = subprocess.run([jadx, "-d", out_dir, sample_apk], capture_output=True, text=True, env=env)
     assert res.returncode == 0, f"JADX failed: {res.stderr}\n{res.stdout}"

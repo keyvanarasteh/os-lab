@@ -86,15 +86,15 @@
               "support": {
                 "macos": {
                   "level": "full",
-                  "note": "English, T\u00fcrk\u00e7e, Deutsch, Fran\u00e7ais, Espa\u00f1ol, Italiano, \u0641\u0627\u0631\u0633\u06cc, \u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+                  "note": "English, Türkçe, Deutsch, Français, Español, Italiano, فارسی, العربية"
                 },
                 "windows": {
                   "level": "full",
-                  "note": "English, T\u00fcrk\u00e7e, Deutsch, Fran\u00e7ais, Espa\u00f1ol, Italiano, \u0641\u0627\u0631\u0633\u06cc, \u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+                  "note": "English, Türkçe, Deutsch, Français, Español, Italiano, فارسی, العربية"
                 },
                 "linux": {
                   "level": "full",
-                  "note": "English, T\u00fcrk\u00e7e, Deutsch, Fran\u00e7ais, Espa\u00f1ol, Italiano, \u0641\u0627\u0631\u0633\u06cc, \u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+                  "note": "English, Türkçe, Deutsch, Français, Español, Italiano, فارسی, العربية"
                 }
               }
             }
@@ -375,6 +375,26 @@
           }
         },
         {
+          "id": "lab-winapps",
+          "lab": "winapps",
+          "title": "Windows Apps Lab",
+          "summary": "Read-only mirror of visible desktop applications on this Windows host.",
+          "support": {
+            "windows": {
+              "level": "full",
+              "note": "Uses the current Windows desktop; no input control"
+            },
+            "macos": {
+              "level": "none",
+              "note": "Needs a Windows host"
+            },
+            "linux": {
+              "level": "none",
+              "note": "Needs a Windows host"
+            }
+          }
+        },
+        {
           "id": "lab-linux",
           "lab": "linux",
           "title": "Linux Lab",
@@ -391,6 +411,26 @@
             "macos": {
               "level": "none",
               "note": "Needs a Linux/KVM host or Windows with WSL2. Use a remote Linux machine."
+            }
+          }
+        },
+        {
+          "id": "web-embedded",
+          "lab": "web",
+          "title": "Web Lab",
+          "summary": "Embedded in-app browser with JavaScript injection; builds from source with Cargo.",
+          "support": {
+            "linux": {
+              "level": "full",
+              "note": "WebKitGTK 4.1 packages required for the engine's webviews."
+            },
+            "macos": {
+              "level": "full",
+              "note": "WKWebView is a system framework; only Cargo is required."
+            },
+            "windows": {
+              "level": "full",
+              "note": "WebView2 ships with Windows 10/11; only Cargo is required."
             }
           }
         }

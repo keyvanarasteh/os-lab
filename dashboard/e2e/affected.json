@@ -1,0 +1,56 @@
+{
+  "$comment": "Plan item G: which e2e specs and routes cover each dashboard source path. Paths are relative to dashboard/; ../ names a file outside it (the legal pages render ../docs/legal). For each changed file the first matching rule wins, so specific rules come before general ones. `smoke` replaces a rule's specs when the rule says \"smoke\": true. Files under `full` run the whole suite. A file that matches no rule runs the smoke set and is listed as unmapped. scripts/affected.test.mjs checks that every spec appears here. Used by scripts/e2e.sh --changed and by CI on pull requests.",
+  "full": [
+    "package.json",
+    "package-lock.json",
+    "playwright.config.ts",
+    "tsconfig.json",
+    "e2e/affected.json"
+  ],
+  "ignore": [
+    "dist/**",
+    "README.md",
+    "TRANSLATION_TODO.md",
+    "scripts/**",
+    "public/screenshots/**",
+    "e2e/crawl.spec.ts"
+  ],
+  "smoke": {
+    "specs": [
+      "health-and-content.spec.ts",
+      "lab-switcher.spec.ts",
+      "cleanup.spec.ts",
+      "source.spec.ts"
+    ],
+    "routes": ["/", "/health/", "/cleanup/", "/source/", "/labs/ios/"]
+  },
+  "rules": [
+    { "paths": ["e2e/*.spec.ts"], "self": true },
+
+    { "paths": ["src/views/cleanup/bookmarks-card.tsx"], "specs": ["cleanup-bookmarks.spec.ts"], "routes": ["/cleanup/scan/", "/cleanup/settings/"] },
+    { "paths": ["src/views/cleanup/relocation-card.tsx"], "specs": ["cleanup-relocation.spec.ts"], "routes": ["/cleanup/relocation/"] },
+    { "paths": ["src/views/cleanup/space-explorer.tsx"], "specs": ["cleanup-space.spec.ts"], "routes": ["/cleanup/space/"] },
+    { "paths": ["src/views/cleanup/widgets-card.tsx", "src/views/cleanup/monitor-card.tsx"], "specs": ["cleanup-widgets.spec.ts"], "routes": ["/cleanup/", "/cleanup/settings/"] },
+    { "paths": ["src/views/cleanup/**", "src/views/cleanup-lab-tasks.tsx", "src/pages/cleanup/**"], "specs": ["cleanup*.spec.ts"], "routes": ["/cleanup/", "/cleanup/scan/", "/cleanup/settings/", "/cleanup/history/"] },
+
+    { "paths": ["src/views/source/**", "src/views/source-bonus-tasks.tsx", "src/pages/source/**", "src/lib/source-*.ts"], "specs": ["source.spec.ts"], "routes": ["/source/", "/source/analyzer/", "/source/brain/", "/source/pipeline/"] },
+    { "paths": ["src/views/web-lab/**", "src/pages/web-lab/**"], "specs": ["web-lab.spec.ts"], "routes": ["/web-lab/"] },
+    { "paths": ["src/views/winapps-app-mirror.tsx"], "specs": ["winapps.spec.ts"], "routes": ["/labs/winapps/"] },
+    { "paths": ["src/views/how-to-use-page.tsx", "src/lib/how-to-use.ts", "src/pages/how-to-use.astro"], "specs": ["how-to-use.spec.ts"], "routes": ["/how-to-use/"] },
+    { "paths": ["src/views/feedback-page.tsx", "src/pages/feedback.astro"], "specs": ["how-to-use.spec.ts", "health-and-content.spec.ts"], "routes": ["/feedback/"] },
+    { "paths": ["src/shell/lab-switcher.tsx", "src/shell/active-lab.ts"], "specs": ["lab-switcher.spec.ts"], "routes": ["/", "/labs/ios/"] },
+
+    { "paths": ["src/views/android/**", "src/pages/android/**", "src/apk-lab/**", "src/styles/apk-lab.css"], "specs": ["health-and-content.spec.ts"], "routes": ["/android/", "/android/console/", "/android/workflows/"] },
+    { "paths": ["src/firewall/**", "src/views/firewall-*.tsx", "src/views/gap-modal.tsx", "src/pages/firewall/**", "src/pages/[locale]/firewall/**", "src/styles/firewall-*.css"], "specs": ["health-and-content.spec.ts"], "routes": ["/firewall/", "/firewall/acme-academy/"] },
+    { "paths": ["src/views/health-page.tsx", "src/views/host-page.tsx", "src/health/**", "src/pages/health.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/health/"] },
+    { "paths": ["src/views/jobs-page.tsx", "src/pages/jobs.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/jobs/"] },
+    { "paths": ["src/views/content-*.tsx", "src/pages/content.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/content/"] },
+    { "paths": ["src/views/contribute-*.tsx", "src/pages/contribute.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/contribute/"] },
+    { "paths": ["src/views/legal-page.tsx", "src/lib/legal.ts", "src/pages/legal/**", "../docs/legal/**"], "specs": ["health-and-content.spec.ts"], "routes": ["/legal/privacy/", "/legal/terms/"] },
+    { "paths": ["src/views/ios-*.tsx", "src/views/macos-*.tsx", "src/views/lab-page.tsx", "src/views/modal-focus.ts", "src/views/update-modal.tsx", "src/views/app-update-panel.tsx", "src/pages/labs/**"], "specs": ["health-and-content.spec.ts", "lab-switcher.spec.ts"], "routes": ["/labs/ios/", "/labs/macos/", "/labs/android/"] },
+    { "paths": ["src/views/public-home.tsx", "src/views/not-found-page.tsx", "src/pages/index.astro", "src/pages/404.astro"], "specs": ["health-and-content.spec.ts", "lab-switcher.spec.ts"], "routes": ["/"] },
+
+    { "paths": ["src/i18n/generated/*.json"], "smoke": true, "locales": "from-file-name" },
+    { "paths": ["src/shell/**", "src/components/**", "src/styles/**", "src/layouts/**", "src/lib/api.ts", "src/i18n/**", "src/pages/[locale]/**", "src/pages/tr/**", "astro.config.mjs", "public/**", "e2e/*.ts"], "smoke": true }
+  ]
+}

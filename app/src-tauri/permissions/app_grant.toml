@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-app-relaunch"
+description = "Allows the Full Disk Access guide to relaunch this app after a grant. Takes no argument."
+commands.allow = ["app_relaunch"]
+
+[[permission]]
+identifier = "allow-app-drag-self"
+description = "Allows the Full Disk Access guide to drag this app's own icon into System Settings. The path is never supplied by the page."
+commands.allow = ["app_drag_self"]

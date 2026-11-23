@@ -3,7 +3,7 @@ import type { FirewallLocale } from "../firewall/locale";
 
 type Dictionary = Record<string, string>;
 const dictionaries = import.meta.glob<{ default: Dictionary }>("./generated/*.json");
-const ROUTE = /^\/(?:$|(?:jobs|contribute|how-to-use|feedback|content|health|legal|labs|android|source|cleanup|firewall)(?:\/|$))/;
+const ROUTE = /^\/(?:$|(?:jobs|contribute|how-to-use|feedback|content|health|legal|labs|android|source|cleanup|firewall|web-lab)(?:\/|$))/;
 const SKIP = "script, style, pre, code, kbd, samp, textarea, [translate='no'], [data-no-translate]";
 
 function localizeLink(anchor: HTMLAnchorElement, locale: FirewallLocale) {

@@ -16,6 +16,12 @@ ios-lab/mac/config.env
 ios-lab/mac/.sim-device
 ios-lab/mac/.appium.pid
 
+# MPT-07 lab-target build output, per-session pentest artifacts and the
+# operator-owned local target allowlist (never commit)
+ios-lab/mac/pentest/lab-target/build/
+ios-lab/artifacts/pentest-frida/
+ios-lab/mac/pentest/targets.local.json
+
 # Lat build cache
 .lat-build
 
@@ -41,13 +47,14 @@ __pycache__/
 .venv/
 .pytest_cache/
 lat.md/.cache/
-.venv-test/
+.venv-test
 
 # Private, off-the-record local notes (never committed)
 *.local.md
 .private/
 teached/**/*
-dashboard/node_modules/
+# A symlink into the shared cache in worktrees made by scripts/worktree.sh, so no trailing slash
+dashboard/node_modules
 dashboard/.check-source-pages/
 dashboard/test-results/
 dashboard/playwright-report/
@@ -56,9 +63,35 @@ secrets/*
 !secrets/README.md
 app/out/
 app/src-tauri/resources/tools/uv-*
+# CLW-06/08: generated widget build products and Xcode project
+app/widget/build/
+app/widget/build-gen/
+app/widget/OSLabWidgets.xcodeproj/
 app/**/*.p8
 app/**/*.p12
 app/**/*.pfx
 
 # Built content pack (scripts/build-content.py)
 dist-content/
+
+# Compiled lab C targets & binaries (PENT-07)
+*.exe
+*.out
+*.o
+*.obj
+hedef
+
+# Web Lab engine build artifacts (web-lab/browser)
+web-lab/browser/target/
+
+# Stage timings written by scripts/run-tests.sh (plan item S)
+/test-results/
+
+# Written by scripts/worktree.sh: cache settings and the .venv-test link (plan item I)
+.oslab-env
+
+# Linked worktrees kept inside the checkout
+.worktrees/
+
+# Local scratch files
+.temp/

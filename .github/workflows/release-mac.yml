@@ -7,7 +7,9 @@ on:
     paths:
       - '.github/workflows/release-mac.yml'
       - 'app/**'
-      - 'dashboard/**'
+      - 'dashboard/package.json'
+      - 'dashboard/package-lock.json'
+      - 'dashboard/astro.config.mjs'
       - 'console/**'
   workflow_dispatch:
     inputs:
@@ -18,6 +20,12 @@ on:
 
 permissions:
   contents: read
+
+# Plan item M: a newer push to the same PR cancels the older run. Pushes to master,
+# tags and manual runs are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   macos-pr:
@@ -31,6 +39,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          key: ${{ github.job }}
       - run: brew install minisign
       - name: Build unsigned universal test bundle
         env:
@@ -41,6 +53,9 @@ jobs:
           npm ci --no-audit --no-fund --prefix app
           node app/scripts/stage-runtime.mjs
           node app/scripts/stage-python-helper.mjs
+          # CLW-09: the widget targets compile in the dry run too (no signing).
+          command -v xcodegen >/dev/null || brew install xcodegen
+          bash app/widget/build.sh
           (cd app && npx tauri build --target universal-apple-darwin --bundles app,dmg)
           test -d app/src-tauri/target/universal-apple-darwin/release/bundle/macos/os-lab.app
           version="$(node -p "require('./app/src-tauri/tauri.conf.json').version")"
@@ -66,6 +81,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          key: ${{ github.job }}
       - name: Check release version
         shell: bash
         run: |
@@ -123,3 +142,45 @@ jobs:
           name: os-lab-macos-universal
           path: app/out/*/os-lab_*_macos_universal.*
           if-no-files-found: error
+
+  notify:
+    # Optional Telegram report for real builds: define the TELEGRAM_BOT_TOKEN and
+    # TELEGRAM_CHAT_ID repository secrets to enable it. Without them the send step
+    # skips silently; pull-request dry runs never report.
+    if: ${{ always() && github.event_name != 'pull_request' }}
+    needs: [macos-pr, macos]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Send the Telegram report
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NAMES: macos-pr macos
+          RESULTS: ${{ needs.macos-pr.result }} ${{ needs.macos.result }}
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        run: |
+          set -euo pipefail
+          read -ra names <<< "$NAMES"
+          read -ra results <<< "$RESULTS"
+          overall="✅"
+          lines=""
+          for index in "${!names[@]}"; do
+            result="${results[index]}"
+            if [ "$result" = skipped ]; then continue; fi
+            case "$result" in
+              success) icon="✅" ;;
+              *) icon="❌"; overall="❌" ;;
+            esac
+            lines="${lines}${icon} ${names[index]} (${result})
+          "
+          done
+          if [ -z "$lines" ]; then exit 0; fi
+          text="${overall} ${GITHUB_WORKFLOW} — ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}
+          ${lines}
+          ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          payload="$(jq -nc --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$text" \
+            '{chat_id:$chat_id, text:$text, disable_web_page_preview:true}')"
+          curl -fsS --max-time 20 -H 'Content-Type: application/json' \
+            -d "$payload" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" > /dev/null

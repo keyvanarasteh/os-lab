@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ master, main ]
 
+# Plan item M: a newer push to the same PR cancels the older run. Pushes to master,
+# tags and manual runs are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   security-audit:
     name: APK Security Analysis & Report
@@ -19,6 +25,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: android-lab/lab/requirements.txt
 
       - name: Install Dependencies & Test Runner
         run: |

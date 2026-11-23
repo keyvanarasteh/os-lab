@@ -1,0 +1,123 @@
+{
+  "$schema": "./schema.json",
+  "version": 1,
+  "family": "agents",
+  "entries": [
+    {
+      "id": "agents.gemini",
+      "name": "Gemini / Antigravity data",
+      "category": "developer",
+      "risk": "credentials",
+      "hint": "AI agent and editor data under this account: sessions, settings and sign-in state. Measured only.",
+      "impact": "Cleaning would lose sessions, settings and sign-ins.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.gemini"
+        ],
+        "linux": [
+          "~/.gemini"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.gemini"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only."
+    },
+    {
+      "id": "agents.codex",
+      "name": "Codex data",
+      "category": "developer",
+      "risk": "credentials",
+      "hint": "AI agent and editor data under this account: sessions, settings and sign-in state. Measured only.",
+      "impact": "Cleaning would lose sessions, settings and sign-ins.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.codex"
+        ],
+        "linux": [
+          "~/.codex"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.codex"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only."
+    },
+    {
+      "id": "agents.claude",
+      "name": "Claude Code data",
+      "category": "developer",
+      "risk": "credentials",
+      "hint": "AI agent and editor data under this account: sessions, settings and sign-in state. Measured only.",
+      "impact": "Cleaning would lose sessions, settings and sign-ins.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.claude",
+          "~/.local/share/claude"
+        ],
+        "linux": [
+          "~/.claude",
+          "~/.local/share/claude"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.claude"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only."
+    },
+    {
+      "id": "agents.opencode",
+      "name": "OpenCode data",
+      "category": "developer",
+      "risk": "credentials",
+      "hint": "AI agent and editor data under this account: sessions, settings and sign-in state. Measured only.",
+      "impact": "Cleaning would lose sessions, settings and sign-ins.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.opencode",
+          "~/.local/share/opencode"
+        ],
+        "linux": [
+          "~/.opencode",
+          "~/.local/share/opencode"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only."
+    },
+    {
+      "id": "agents.zcode",
+      "name": "ZCode data",
+      "category": "developer",
+      "risk": "credentials",
+      "hint": "AI agent and editor data under this account: sessions, settings and sign-in state. Measured only.",
+      "impact": "Cleaning would lose sessions, settings and sign-ins.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.zcode"
+        ],
+        "linux": [
+          "~/.zcode"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.zcode"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only."
+    }
+  ]
+}

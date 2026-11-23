@@ -21,6 +21,8 @@ def feed(version="0.2.8", url=ASSET):
 @pytest.fixture
 def store(monkeypatch, tmp_path):
     monkeypatch.setenv("OSLAB_APP_KIND", "appimage")
+    # the asset names below are amd64; do not depend on the machine running the tests (arm64 Macs)
+    monkeypatch.setattr(app_update, "_machine", lambda: "x86_64")
     payload = b"new-appimage"
     digest = hashlib.sha256(payload).hexdigest()
     served = {

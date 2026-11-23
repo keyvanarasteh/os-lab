@@ -31,9 +31,13 @@ def states(host):
 
 
 def test_linux_kvm_host_runs_container_labs_but_not_native_mac():
-    assert states(make_host()) == {
-        "android": "ready", "windows": "ready", "linux": "ready", "ios": "ready", "macos": "unavailable", "source": "ready",
+    expected = {
+        "android": "ready", "windows": "ready", "winapps": "unavailable", "linux": "ready", "ios": "ready", "macos": "unavailable", "source": "ready",
+        # Web Lab follows the local engine build, not a VM provider: ready once
+        # the engine binary exists, otherwise unavailable without cargo.
+        "web": "ready" if os.path.isfile(os.path.join(REPO_ROOT, "web-lab", "browser", "target", "release", "weblab")) else "unavailable",
     }
+    assert states(make_host()) == expected
 
 
 def test_scope_status_comes_from_the_scope_guard(tmp_path, monkeypatch):
@@ -75,7 +79,7 @@ def test_macos_offers_native_simulator_and_static_android_only():
     for lab in ("ios", "macos"):
         status = oslab.lab_status(lab, host)
         assert status["state"] == "ready"
-        assert any("Appium automation needs" in note for note in status["notes"])
+        assert any("Appium" in note for note in status["notes"])
         assert all(not action["privileged"] for action in status["actions"])
 
 
@@ -84,10 +88,10 @@ def test_native_macos_needs_full_xcode_and_available_ios_simulator():
         xcode = {"installed": True, "iosRuntime": True, "iosDevice": True}
         xcode[missing] = False
         host = make_host(os_name="macos", kvm=False, tools=("xcrun", "brew"), xcode=xcode)
-        for lab in ("ios", "macos"):
-            status = oslab.lab_status(lab, host)
-            assert status["state"] == "needs-setup"
-            assert any(r["required"] and not r["found"] for r in status["requirements"])
+        status = oslab.lab_status("ios", host)
+        assert status["state"] == "needs-setup"
+        assert any(r["required"] and not r["found"] for r in status["requirements"])
+        assert oslab.lab_status("macos", host)["state"] == "ready"  # Appium mac2 needs no simulator.
 
 
 def test_container_engine_requires_reachable_api_and_compose(monkeypatch):
@@ -114,10 +118,13 @@ def test_windows_host_uses_wsl2():
 
 
 def test_only_unsupported_labs_are_unavailable_across_hosts():
+    # Web Lab follows the local engine build, not a VM provider: unavailable
+    # on every host until the engine binary exists (as in the linux-kvm test).
+    web_engine = os.path.isfile(os.path.join(REPO_ROOT, "web-lab", "browser", "target", "release", "weblab"))
     expected = {
-        "linux": {"macos"},
-        "windows": {"macos"},
-        "macos": {"windows", "linux"},
+        "linux": {"macos", "winapps"} | (set() if web_engine else {"web"}),
+        "windows": {"macos"} | (set() if web_engine else {"web"}),
+        "macos": {"windows", "winapps", "linux"} | (set() if web_engine else {"web"}),
     }
     for os_name, unavailable in expected.items():
         host = make_host(os_name=os_name, kvm=os_name == "linux", distros=("Ubuntu",) if os_name == "windows" else ())
@@ -192,6 +199,20 @@ def test_every_advertised_local_action_resolves_to_a_bundled_entry_point():
                     request["profile"] = "lightweight"
                 if action["id"] == "resize":
                     request["cpus"] = "2"
+                if action["id"] in ("macos-click", "macos-input", "macos-scroll"):
+                    request.update(clickPid=42, clickX=10, clickY=20)
+                if action["id"] == "macos-input":
+                    request["inputKind"] = "double"
+                if action["id"] == "macos-scroll":
+                    request.update(scrollDirection="down", scrollPages=1)
+                if action["id"] == "macos-element":
+                    request.update(elementSession="session123", elementId="element123", elementKind="click")
+                if action["id"] in ("macos-set-value", "macos-perform"):
+                    request.update(elementPid=42, elementPath="0.1", elementWindowId=7)
+                if action["id"] == "macos-set-value":
+                    request["elementValue"] = "sample"
+                if action["id"] == "macos-perform":
+                    request["axAction"] = "AXPress"
                 plan = oslab.plan(REPO_ROOT, request, host)
                 if plan["program"] == "bash":
                     assert os.path.isfile(plan["args"][0]), (lab, action["id"], plan["args"][0])
@@ -330,8 +351,9 @@ def test_native_macos_actions_follow_whether_appium_is_installed():
     present = oslab.lab_status("macos", make_host(os_name="macos", kvm=False, tools=("xcrun", "brew", "appium")))
     ids = {a["id"] for a in present["actions"]}
     assert {"appium-start", "appium-stop"} <= ids and "appium-install" not in ids
-    labels = {a["id"]: a["label"] for a in present["actions"]}
-    assert labels["start"] == "Start iOS Simulator" and labels["stop"] == "Stop iOS Simulator"
+    ios_labels = {a["id"]: a["label"] for a in oslab.lab_status(
+        "ios", make_host(os_name="macos", kvm=False, tools=("xcrun", "brew", "appium")))["actions"]}
+    assert ios_labels["start"] == "Start iOS Simulator" and ios_labels["stop"] == "Stop iOS Simulator"
     # Linux/container labs keep their own wording
     assert {a["id"]: a["label"] for a in oslab.lab_status("windows", make_host())["actions"]}["start"] == "Start"
 
@@ -408,3 +430,213 @@ def test_source_is_native_without_vm_dependencies(monkeypatch):
         assert all(not a["privileged"] for a in source["actions"])
     monkeypatch.setattr(source_control, "readiness", lambda root: {})
     assert oslab.lab_status("source", make_host())["state"] == "unavailable"
+
+
+# ── Xcode location (a non-system-volume Xcode must be detected where it lives) ──
+
+def test_xcode_status_reports_the_selected_developer_dir(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "macos")
+    def fake_capture(args, timeout=5, decode="utf-8"):
+        if args[:1] == ["xcodebuild"]:
+            return 0, "Xcode 16.2\nBuild version 16C5032a\n"
+        if args[:1] == ["xcode-select"]:
+            return 0, "/Volumes/Apps/Applications/Xcode.app/Contents/Developer\n"
+        return 1, "no"
+    monkeypatch.setattr(oslab, "_capture", fake_capture)
+    status = oslab.xcode_status()
+    assert status["installed"] is True
+    assert status["developerDir"] == "/Volumes/Apps/Applications/Xcode.app/Contents/Developer"
+    assert status["xcodeApp"] == "/Volumes/Apps/Applications/Xcode.app"
+
+
+def test_xcode_status_stays_honest_without_xcode(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "macos")
+    monkeypatch.setattr(oslab, "_capture", lambda args, timeout=5, decode="utf-8": (127, "command not found"))
+    assert oslab.xcode_status() == {"installed": False, "developerDir": None, "xcodeApp": None,
+                                    "iosRuntime": False, "iosDevice": False}
+
+
+def test_xcode_status_without_developer_dir_still_reports_installed(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "macos")
+    def fake_capture(args, timeout=5, decode="utf-8"):
+        if args[:1] == ["xcodebuild"]:
+            return 0, "Xcode 16.2\n"
+        return 1, "xcode-select: error"
+    monkeypatch.setattr(oslab, "_capture", fake_capture)
+    status = oslab.xcode_status()
+    assert status["installed"] is True and status["developerDir"] is None and status["xcodeApp"] is None
+
+
+# ── Real devices: devicectl listing, honest when the tooling is missing ──
+
+def test_ios_real_device_screenshot_captures_selected_udid(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "macos")
+    monkeypatch.setattr(oslab, "_which", lambda name: "/usr/bin/xcrun")
+    udid = "C2AC1E99-DB20-5F29-BC57-4EE540DCFEBA"
+    def fake_capture(args, timeout=5, decode="utf-8"):
+        assert args[:5] == ["xcrun", "devicectl", "device", "capture", "screenshot"]
+        assert args[args.index("--device") + 1] == udid
+        with open(args[args.index("--destination") + 1], "wb") as image:
+            image.write(b"\x89PNG\r\n\x1a\nfixture")
+        return 0, ""
+    monkeypatch.setattr(oslab, "_capture", fake_capture)
+    assert oslab.ios_real_device_screenshot(udid).startswith(b"\x89PNG")
+
+
+def test_ios_real_device_screenshot_rejects_invalid_id(monkeypatch):
+    monkeypatch.setattr(oslab, "_capture", lambda *args, **kwargs: pytest.fail("capture should not run"))
+    with pytest.raises(oslab.PlanError, match="UDID"):
+        oslab.ios_real_device_screenshot("not-a-device")
+
+
+def test_ios_screenshot_targets_the_selected_booted_simulator(monkeypatch):
+    udid = "C2AC1E99-DB20-5F29-BC57-4EE540DCFEBA"
+    def fake_capture(args, timeout=5, decode="utf-8"):
+        if args[:4] == ["xcrun", "simctl", "list", "devices"]:
+            return 0, f"iPhone 17 ({udid}) (Booted)\n"
+        assert args[:4] == ["xcrun", "simctl", "io", udid]
+        with open(args[-1], "wb") as image:
+            image.write(b"\x89PNG\r\n\x1a\nfixture")
+        return 0, ""
+    monkeypatch.setattr(oslab, "_capture", fake_capture)
+    assert oslab.ios_screenshot(udid).startswith(b"\x89PNG")
+    with pytest.raises(oslab.PlanError, match="UDID"):
+        oslab.ios_screenshot("not-a-simulator")
+
+
+def test_ios_device_check_does_not_mark_a_paired_offline_phone_reachable(monkeypatch):
+    import json as _json
+    monkeypatch.setattr(oslab, "host_os", lambda: "macos")
+    monkeypatch.setattr(oslab, "_which", lambda name: "/usr/bin/xcrun")
+    udid = "C2AC1E99-DB20-5F29-BC57-4EE540DCFEBA"
+    def fake_capture(args, timeout=5, decode="utf-8"):
+        out = args[args.index("--json-output") + 1]
+        with open(out, "w", encoding="utf-8") as handle:
+            _json.dump({"result": {"deviceProperties": {"name": "Aysan", "developerModeStatus": "enabled"},
+                                   "connectionProperties": {"pairingState": "paired", "tunnelState": "unavailable"}}}, handle)
+        return 0, ""
+    monkeypatch.setattr(oslab, "_capture", fake_capture)
+    result = oslab.ios_device_check(udid)
+    assert result["reachable"] is False and result["state"] == "unavailable"
+    assert "connection tunnel" in result["reason"]
+
+
+def test_ios_devices_lists_connected_devices(monkeypatch):
+    import json as _json
+    monkeypatch.setattr(oslab, "host_os", lambda: "macos")
+    monkeypatch.setattr(oslab, "_which", lambda name: "/usr/bin/xcrun" if name == "xcrun" else None)
+    payload = {"result": {"devices": [
+        {"identifier": "00008101-AAA", "visibilityClass": "default",
+         "deviceProperties": {"name": "iPhone 15", "osVersionNumber": "17.4"},
+         "hardwareProperties": {"udid": "00008101-AAA", "platformIdentifier": "com.apple.platform.iphoneos"},
+         "connectionProperties": {"tunnelState": "connected", "pairingState": "paired",
+                                  "transportType": "localNetwork", "lastConnectionDate": "2026-11-15T09:26:00.000Z"}},
+        {"identifier": "00008101-BBB", "visibilityClass": "default",
+         "deviceProperties": {"name": "iPad mini", "osVersion": {"major": 18, "minor": 1}},
+         "hardwareProperties": {}, "connectionProperties": {"tunnelState": "unavailable", "pairingState": "paired"}},
+        {"identifier": "740C59D8-SIM", "visibilityClass": "simulators",
+         "deviceProperties": {"name": "iPhone 17"}, "hardwareProperties": {},
+         "connectionProperties": {}},
+    ]}}
+    def fake_capture(args, timeout=5, decode="utf-8"):
+        assert args[:2] == ["xcrun", "devicectl"] and "--json-output" in args
+        out = args[args.index("--json-output") + 1]
+        with open(out, "w", encoding="utf-8") as handle:
+            _json.dump(payload, handle)
+        return 0, ""
+    monkeypatch.setattr(oslab, "_capture", fake_capture)
+    report = oslab.ios_devices()
+    assert report["available"] is True and report["reason"] is None
+    # devicectl's simulator rows are filtered out; the panel already lists those.
+    assert [(d["name"], d["state"]) for d in report["devices"]] == [("iPad mini", "unavailable"), ("iPhone 15", "connected")]
+    assert report["devices"][1]["udid"] == "00008101-AAA" and report["devices"][1]["osVersion"] == "17.4"
+    # A Wi-Fi-paired phone stays listed with its pairing facts, tunnel down or not.
+    assert report["devices"][1]["paired"] is True and report["devices"][1]["transport"] == "localNetwork"
+    assert report["devices"][1]["lastSeen"] == "2026-11-15T09:26:00.000Z"
+
+
+def test_ios_devices_is_honest_without_the_tooling(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "macos")
+    monkeypatch.setattr(oslab, "_which", lambda name: None)
+    report = oslab.ios_devices()
+    assert report["available"] is False and report["devices"] == [] and report["reason"]
+
+
+def test_ios_devices_refuses_off_macos(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "linux")
+    assert oslab.ios_devices()["available"] is False
+
+
+def test_ios_devices_reports_a_devicectl_failure(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "macos")
+    monkeypatch.setattr(oslab, "_which", lambda name: "/usr/bin/xcrun" if name == "xcrun" else None)
+    monkeypatch.setattr(oslab, "_capture", lambda args, timeout=5, decode="utf-8": (70, "ERROR: no device support"))
+    report = oslab.ios_devices()
+    assert report["available"] is False and report["devices"] == []
+    assert "no device support" in report["reason"]
+
+
+def test_idb_companion_is_found_under_its_real_name(monkeypatch):
+    # Homebrew installs the binary as `idb_companion` (underscore); the probe used to
+    # look for `idb-companion` only, so an installed companion read as missing.
+    monkeypatch.setattr(oslab.shutil, "which",
+                        lambda name: "/opt/homebrew/bin/idb_companion" if name == "idb_companion" else None)
+    assert oslab._which("idb-companion") == "/opt/homebrew/bin/idb_companion"
+    assert oslab._which("idb_companion") == "/opt/homebrew/bin/idb_companion"
+    # The ready gate needs both halves: the managed client plus the companion.
+    monkeypatch.setattr(oslab, "_managed_idb", lambda: "/Users/test/.oslab/idb/bin/idb")
+    assert oslab._which("idb") == "/Users/test/.oslab/idb/bin/idb"
+
+
+# ── Resource watchdog: host CPU/RAM pressure plus what Simulator.app costs ──
+
+def test_cpu_percent_is_the_tick_delta_between_polls(monkeypatch):
+    monkeypatch.setattr(oslab, "_CPU_SAMPLE", {"ticks": [100, 0, 100, 700]})
+    monkeypatch.setattr(oslab, "_cpu_ticks", lambda: [110, 0, 110, 780])
+    # busy delta 20 of 100 total ticks → 20%
+    assert oslab._cpu_percent() == 20.0
+    monkeypatch.setattr(oslab, "_cpu_ticks", lambda: None)
+    assert oslab._cpu_percent() is None
+
+
+def test_cpu_percent_is_none_before_the_first_sample(monkeypatch):
+    monkeypatch.setattr(oslab, "_CPU_SAMPLE", {"ticks": None})
+    monkeypatch.setattr(oslab, "_cpu_ticks", lambda: [1, 2, 3, 4])
+    assert oslab._cpu_percent() is None
+
+
+def test_memory_pressure_parses_vm_stat(monkeypatch):
+    def fake_run(args, timeout=5):
+        if args[:1] == ["sysctl"]:
+            return 0, "16000000000\n"
+        return 0, (
+            "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
+            "Pages free: 100000.\n"
+            "Pages active: 400000.\n"
+            "Pages inactive: 100000.\n"
+            "Pages speculative: 100000.\n"
+        )
+    memory = oslab._memory_pressure(fake_run)
+    # available = (100000 + 100000 + 100000) * 16384 → used = 16e9 - 4.9152e9
+    assert memory["totalBytes"] == 16000000000
+    assert memory["usedBytes"] == 16000000000 - 300000 * 16384
+    assert memory["percent"] == round(memory["usedBytes"] * 100.0 / 16000000000, 1)
+
+
+def test_simulator_process_sums_its_helpers_only():
+    def fake_run(args, timeout=5):
+        assert args[:1] == ["ps"]
+        return 0, (
+            "/Applications/Simulator.app/Contents/MacOS/Simulator 30.0 100000\n"
+            "/Applications/Simulator.app/Contents/XcodePrivateFrameworks/SimulatorHelper 20.0 50000\n"
+            "/Applications/Safari.app/Contents/MacOS/Safari 90.0 9000000\n"
+        )
+    sim = oslab._simulator_process(fake_run)
+    assert sim["running"] is True
+    assert sim["cpuPercent"] == 50.0
+    assert sim["rssBytes"] == 150000 * 1024
+
+
+def test_ios_resources_refuses_off_macos(monkeypatch):
+    monkeypatch.setattr(oslab, "host_os", lambda: "linux")
+    assert oslab.ios_resources()["available"] is False

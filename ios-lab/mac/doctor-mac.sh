@@ -23,6 +23,10 @@ say "xcode"
 if command -v xcodebuild >/dev/null 2>&1 && xcodebuild -version >/dev/null 2>&1; then
   ok "$(xcodebuild -version | tr '\n' ' ')"
   ok "developer dir: $(xcode-select -p)"
+  # The resolved path proves detection follows xcode-select: an Xcode installed
+  # on another volume is reported where it actually lives.
+  RESOLVED="$(xcrun --find xcodebuild 2>/dev/null || true)"
+  if [ -n "$RESOLVED" ]; then ok "resolved tool: $RESOLVED"; fi
 else
   bad "Xcode or the command line tools are missing; run: xcode-select --install"
 fi
@@ -42,6 +46,18 @@ if command -v xcrun >/dev/null 2>&1 && xcrun simctl list runtimes >/dev/null 2>&
   if [ -n "$BOOTED" ]; then printf '%s\n' "$BOOTED" | sed 's/^/       /'; else warn "no booted simulator"; fi
 else
   bad "simctl is unavailable"
+fi
+
+say "real devices"
+if command -v xcrun >/dev/null 2>&1 && xcrun devicectl list devices >/dev/null 2>&1; then
+  DEVICE_LINES="$(xcrun devicectl list devices 2>/dev/null | awk 'NR > 2 && NF' || true)"
+  if [ -n "$DEVICE_LINES" ]; then
+    printf '%s\n' "$DEVICE_LINES" | sed 's/^/       /'
+  else
+    warn "no real devices are paired with this Mac"
+  fi
+else
+  warn "devicectl is unavailable (needs Xcode 15 or newer); real-device listing is skipped"
 fi
 
 say "appium"

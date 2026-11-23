@@ -1,6 +1,6 @@
 [package]
 name = "os-lab-app"
-version = "0.3.6"
+version = "0.4.6"
 description = "os-lab desktop app: the dashboard in a native window, backed by the os-lab console"
 authors = ["Keyvan Arasteh"]
 license = "Apache-2.0"
@@ -20,10 +20,12 @@ tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-deep-link = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
 tauri-plugin-updater = "2"
+drag = "2.1.1"
 
 [profile.release]
 codegen-units = 1

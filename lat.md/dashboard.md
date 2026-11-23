@@ -1,7 +1,8 @@
 # Dashboard
 
-The browser console: the host overview, every lab, and the Android Lab
-workbench, built from the qLar app shell (qLar PR #174).
+The browser console for the host, labs, and Android workbench.
+
+It is built from the qLar app shell (qLar PR #174).
 
 ## Architecture
 
@@ -9,7 +10,16 @@ A static Astro app in [[dashboard]] served by the Python console; there is no
 Node server at runtime.
 
 [[dashboard/src/shell/app-shell.tsx]] carries the sidebar (labs with their
-availability pills), Spotlight and theme ported from qLar. Pages are React
+availability pills), Spotlight and theme ported from qLar.
+[[dashboard/src/shell/lab-switcher.tsx]] is the ⌘L / Ctrl+L modal that sets the
+focused lab: a compact card per lab with its live availability, remembered in
+[[dashboard/src/shell/active-lab.ts]]. Firewall Lab is one of those labs. With a
+focus, the sidebar replaces the OS Lab group with a group named after the lab
+that lists its nav items; "All labs" in the switcher restores the full OS Lab
+list, and Spotlight keeps every lab listed. The Help group is collapsible,
+closed by default, opens itself when the current page is inside it, and
+remembers the choice in localStorage.
+Pages are React
 islands: [[dashboard/src/views/host-page.tsx]],
 [[dashboard/src/views/lab-page.tsx]], [[dashboard/src/views/jobs-page.tsx]],
 [[dashboard/src/views/contribute-page.tsx]] and
@@ -33,14 +43,53 @@ against `xcrun simctl` (see [[ios-lab]]).
 
 When the macOS Lab is ready, [[dashboard/src/views/macos-app-mirror.tsx]]
 floats a draggable, resizable mirror of one real window on this Mac, fed by
-the read-only `/api/labs/macos/apps`, `/api/labs/macos/apps/<id>/screenshot`
-and `/api/labs/macos/apps/<id>/elements` endpoints.
+read-only endpoints under `/api/labs/macos/apps` (list, screenshot, stream,
+elements) and `/api/labs/macos/audit`.
 
 Mirror and hotspot clicks preview a `macos-click` action like any other;
 only while control mode is armed (an explicit toggle that disarms itself
 after ten minutes) do clicks land immediately through
 `/api/labs/macos/click`, which stays localhost-only like every other POST.
-See [[ios-lab]] for permissions.
+The stream is multipart MJPEG with a poll fallback; the elements endpoint
+takes a `revision` query and powers a diff overlay. Right-click or
+long-press a hotspot for the input family (double, right, type, key —
+previewed `macos-input`, typing never sends Return), Deep inspect opens one
+armed-only mac2 session per app through `/api/labs/macos/session*` and
+routes hotspot actions through stable element ids, and the toolbar
+downloads the local audit log from `/api/labs/macos/audit.json`.
+
+The agent surface adds the native AX helper's values, focus and advertised
+actions to every hotspot (a priority trim, with the serving engine shown),
+a hotspot menu with set-value, advertised AX actions, scroll and paste,
+submit-class confirms for Enter and pastes even while armed, a persistent
+panic Stop, single-owner arming, and read-only windows/menu-bar/focused
+endpoints. `console/mcp_server.py` exposes the same guarded surface as a
+stdio MCP server — the model acts, the console guards, every step is
+audited. See [[ios-lab]] for permissions.
+
+
+## macOS engine panel
+
+[[dashboard/src/views/macos-engine-panel.tsx]] sits under the mirror and shows
+engine state, permissions, displays, element search and a live audit feed.
+
+It reads `/api/labs/macos/{capabilities,permissions,displays}` and searches
+one window through `…/apps/<id>/search`. The only write is Request access
+(`POST …/permission/request`), which fires the Accessibility dialog or opens
+a Privacy pane. The feed is an opt-in `EventSource` on `…/events` that closes
+when switched off, hidden or unmounted.
+
+## Windows Apps Lab panel
+
+On Windows hosts, `winapps` serves a read-only desktop mirror through
+`/api/labs/winapps/apps` and `/api/labs/winapps/apps/<hwnd>/screenshot`.
+
+The backend uses ctypes to enumerate visible, captioned top-level windows and
+captures one window with `PrintWindow(PW_RENDERFULLCONTENT)`. The panel shows
+the selected window at its own aspect ratio, its dimensions and an `Elevated`
+badge when the owning process is elevated; only the newest capture updates the
+view. It is mounted only locally, is separate from the WSL2-backed VM lifecycle,
+and does not offer input control.
 
 ## UX readiness
 
@@ -68,6 +117,17 @@ use the shared preview and jobs service for explicit actions. Source readiness
 runs natively through Python, and public Source routes show information without
 polling a local engine. See [[source-lab#Console operations]].
 
+## Web Lab console
+
+[[console/web_api.py]] reports Web Lab readiness, starts and stops the engine
+process, and proxies the engine's `/api/web/*` JSON under the same Host guard.
+`console/oslab.py` registers the lab with the `native-rust` provider.
+
+The local workbench route (`/web-lab/`,
+[[dashboard/src/views/web-lab/pages.tsx]]) opens windows, manages injections,
+runs eval and tails the engine's event log; it is console-only and never
+appears on public Pages.
+
 ## Serving and builds
 
 [[android-lab/lab/web_ui.py]] serves the newest of `dashboard/build` (local)
@@ -81,9 +141,20 @@ the lab. Lab starts require the token returned by the plan preview. See
 
 ## Source navigation
 
-Cleanup Lab navigation links to scan, results, leftovers and history in
-[[dashboard/src/views/cleanup/pages.tsx]]. The public route explains that the
-engine is local, while the local app uses typed cleanup jobs and a confirm step.
+Cleanup Lab navigation splits into the compact Dashboard (Quick clean, Clean
+and monitor stats) and a Settings tab, with the detail tabs keeping their
+routes ([[dashboard/src/views/cleanup/pages.tsx]]).
+
+Settings hosts bookmarks, permissions, the monitor configuration, widgets and
+the tools hub, and is the last item in the Cleanup Lab nav and tab strip.
+
+In the sidebar, Dashboard, Advanced scan, Results and Settings are collapsible
+groups, closed until their page is open. Each lists an Overview entry plus one
+sub-nav per card, such as Storage, Plan & confirm or Desktop widgets. A
+sub-nav link (`/cleanup/<page>/#<section>`) loads the page, scrolls to that
+card once its data is in and outlines it for a few seconds. Spaces, Leftovers,
+History and Relocation have a single card and no group. The public route explains that the engine is local, while the
+local app uses typed cleanup jobs and a confirm step.
 
 [[dashboard/src/views/source/pages.tsx]] provides localized Source Lab routes and
 uses the existing shell for mobile navigation and themes. The sidebar and

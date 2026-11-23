@@ -1155,6 +1155,312 @@
         "slack",
         "Slack.exe"
       ]
+    },
+    {
+      "id": "developers.xcode-derived-data",
+      "name": "Xcode DerivedData",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "Xcode rebuilds the project indexes and build products on the next build, so the first build is slower.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "paths": {
+        "macos": [
+          "~/Library/Developer/Xcode/DerivedData"
+        ]
+      }
+    },
+    {
+      "id": "developers.xcode-device-support",
+      "name": "Xcode iOS DeviceSupport",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "Xcode copies the device symbols again the next time that device is connected.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "paths": {
+        "macos": [
+          "~/Library/Developer/Xcode/iOS DeviceSupport"
+        ]
+      }
+    },
+    {
+      "id": "developers.coresimulator-caches",
+      "name": "CoreSimulator caches",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "The simulator rebuilds its caches on the next boot; simulator devices are not touched.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "paths": {
+        "macos": [
+          "~/Library/Developer/CoreSimulator/Caches"
+        ]
+      }
+    },
+    {
+      "id": "developers.uv",
+      "name": "uv cache",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "uv re-downloads and rebuilds wheels the next time a project needs them.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "paths": {
+        "macos": [
+          "~/.cache/uv"
+        ],
+        "linux": [
+          "{cache}/uv"
+        ],
+        "windows": [
+          "%LOCALAPPDATA%\\uv\\cache"
+        ]
+      },
+      "toolName": "uv",
+      "cacheEnv": [
+        "UV_CACHE_DIR"
+      ],
+      "probeArgv": [
+        "uv",
+        "cache",
+        "dir"
+      ],
+      "owningProcesses": [
+        "uv"
+      ]
+    },
+    {
+      "id": "developers.vscode-extensions",
+      "name": "VS Code extensions",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "Installed extensions disappear and the editor reinstalls those that settings sync lists.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.vscode/extensions"
+        ],
+        "linux": [
+          "~/.vscode/extensions"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.vscode\\extensions"
+        ]
+      },
+      "owningProcesses": [
+        "Code",
+        "code"
+      ]
+    },
+    {
+      "id": "developers.vscode-insiders-extensions",
+      "name": "VS Code Insiders extensions",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "Installed extensions disappear and the editor reinstalls those that settings sync lists.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.vscode-insiders/extensions"
+        ],
+        "linux": [
+          "~/.vscode-insiders/extensions"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.vscode-insiders\\extensions"
+        ]
+      },
+      "owningProcesses": [
+        "Code - Insiders",
+        "code-insiders"
+      ]
+    },
+    {
+      "id": "developers.vscode-user-data",
+      "name": "VS Code user data",
+      "category": "developer",
+      "risk": "high",
+      "hint": "Settings, snippets, keybindings and workspace state. Measured only.",
+      "impact": "Cleaning would lose editor settings and unsynced state.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/Library/Application Support/Code"
+        ],
+        "linux": [
+          "~/.config/Code"
+        ],
+        "windows": [
+          "%APPDATA%\\Code"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only: remove the app's data through the app, not here."
+    },
+    {
+      "id": "developers.vscode-insiders-user-data",
+      "name": "VS Code Insiders user data",
+      "category": "developer",
+      "risk": "high",
+      "hint": "Settings, snippets, keybindings and workspace state. Measured only.",
+      "impact": "Cleaning would lose editor settings and unsynced state.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/Library/Application Support/Code - Insiders"
+        ],
+        "linux": [
+          "~/.config/Code - Insiders"
+        ],
+        "windows": [
+          "%APPDATA%\\Code - Insiders"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only: remove the app's data through the app, not here."
+    },
+    {
+      "id": "developers.codex-runtimes",
+      "name": "Codex runtimes",
+      "category": "developer",
+      "risk": "medium",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "Runtimes are downloaded again on the next use.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.cache/codex-runtimes"
+        ],
+        "linux": [
+          "{cache}/codex-runtimes"
+        ]
+      },
+      "owningProcesses": [
+        "codex"
+      ],
+      "cleanable": false,
+      "note": "Report-only until reviewed."
+    },
+    {
+      "id": "developers.rembg-models",
+      "name": "rembg models",
+      "category": "developer",
+      "risk": "low",
+      "hint": "Developer tool data under this account. Review the path and risk before cleaning.",
+      "impact": "Background-removal models are downloaded again on demand.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.rembg"
+        ],
+        "linux": [
+          "~/.rembg"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.rembg"
+        ]
+      }
+    },
+    {
+      "id": "developers.oslab-cache",
+      "name": "os-lab shared cache",
+      "category": "developer",
+      "risk": "medium",
+      "hint": "Shared node_modules, test virtualenvs and browser caches linked into every os-lab worktree. Measured only.",
+      "impact": "Worktrees linking into it would break until `scripts/worktree.sh doctor` rebuilds it.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "${OSLAB_CACHE_ROOT:-~/.cache/os-lab}"
+        ],
+        "linux": [
+          "${OSLAB_CACHE_ROOT:-~/.cache/os-lab}"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only: use `scripts/worktree.sh cache prune`."
+    },
+    {
+      "id": "developers.gopath",
+      "name": "Go workspace (GOPATH)",
+      "category": "developer",
+      "risk": "medium",
+      "hint": "The whole Go workspace: installed binaries, module cache and sources. Measured only.",
+      "impact": "Cleaning would remove installed Go tools along with caches.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "${GOPATH:-~/go}"
+        ],
+        "linux": [
+          "${GOPATH:-~/go}"
+        ],
+        "windows": [
+          "%USERPROFILE%\\go"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only: clean the module and build caches through their own entries."
+    },
+    {
+      "id": "developers.cargo-home",
+      "name": "Cargo home",
+      "category": "developer",
+      "risk": "medium",
+      "hint": "Installed Cargo binaries, registry and git caches. Measured only.",
+      "impact": "Cleaning would remove installed Rust tools along with caches.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "${CARGO_HOME:-~/.cargo}"
+        ],
+        "linux": [
+          "${CARGO_HOME:-~/.cargo}"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.cargo"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only: clean the registry and git caches through their own entries."
+    },
+    {
+      "id": "developers.homebrew-cellar",
+      "name": "Homebrew packages (Cellar)",
+      "category": "developer",
+      "risk": "high",
+      "hint": "Every package installed with `brew install`, one folder per version. Measured only.",
+      "impact": "Deleting folders by hand breaks Homebrew's links.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "/opt/homebrew/Cellar",
+          "/usr/local/Cellar"
+        ]
+      },
+      "cleanable": false,
+      "note": "Report-only: remove packages with `brew uninstall <name>`."
     }
   ]
 }

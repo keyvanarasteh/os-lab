@@ -10,7 +10,7 @@
 //   node scripts/stage-runtime.mjs --no-build stage the committed dashboard/dist instead
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, copyFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, copyFileSync, writeFileSync, chmodSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,7 +19,7 @@ const repo = resolve(here, "..", "..");
 const out = resolve(here, "..", "src-tauri", "resources", "os-lab");
 
 // Tracked top-level paths the console and the labs need at run time.
-export const INCLUDE = ["labctl", "console", "source-lab", "cleanup-lab", "android-lab", "linux-lab", "win-lab", "ios-lab", "firewall-lab", "docs/legal", "LICENSE"];
+export const INCLUDE = ["labctl", "console", "source-lab", "cleanup-lab", "android-lab", "linux-lab", "win-lab", "ios-lab", "firewall-lab", "web-lab", "docs/legal", "LICENSE"];
 
 // These are the entry points used by the installed console and every supported lab path.
 export const REQUIRED = [
@@ -34,7 +34,8 @@ export const REQUIRED = [
   "source-lab/engine/source_lab/collectors/browser/canary.js", "console/source_api.py",
   "console/source_control.py", "console/source_jobs.py", "console/source_worker.py",
   "console/source_artifacts.py", "console/source_overview.py", "console/source_manifest_specs.json", "console/source_pipeline.json",
-  "labctl", "console/oslab.py", "console/content.py", "console/capabilities.json", "android-lab/lab/web_ui.py",
+  "labctl", "console/oslab.py", "console/content.py", "console/capabilities.json",
+  "console/winapps.py", "android-lab/lab/web_ui.py",
   "android-lab/lab/scripts/setup-ubuntu.sh", "android-lab/lab/docker-compose.yml",
   "android-lab/lab/scripts/preflight.sh", "android-lab/lab/scripts/install-service.sh",
   "android-lab/lab/scripts/uninstall-service.sh", "android-lab/lab/.env.example",
@@ -49,6 +50,7 @@ export const REQUIRED = [
   "ios-lab/scripts/install-service.sh", "ios-lab/scripts/uninstall-service.sh", "ios-lab/.env.example",
   "ios-lab/mac/setup-mac.sh", "ios-lab/mac/doctor-mac.sh", "ios-lab/mac/run-simulator.sh",
   "ios-lab/mac/stop-simulator.sh", "ios-lab/mac/appium.sh", "ios-lab/mac/config.env.example",
+  "web-lab/Makefile", "web-lab/browser/Cargo.toml", "web-lab/browser/src/main.rs", "console/web_api.py",
   "docs/legal/PRIVACY.md",
 ];
 
@@ -103,17 +105,44 @@ function listFiles(dir) {
   return found;
 }
 
+export function stageWebLabEngine(outDir, noBuild = false) {
+  const weblabDir = join(repo, "web-lab", "browser");
+  const suffix = process.platform === "win32" ? ".exe" : "";
+  const binaryName = `weblab${suffix}`;
+  const binary = join(weblabDir, "target", "release", binaryName);
+  if (!existsSync(binary) && !noBuild) {
+    try {
+      console.log("building web-lab engine (cargo build --release)...");
+      execFileSync("cargo", ["build", "--release"], {
+        cwd: weblabDir,
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+    } catch (err) {
+      console.warn(`warning: could not build web-lab engine: ${err.message}`);
+    }
+  }
+  if (existsSync(binary)) {
+    const dest = join(outDir, "web-lab", "browser", "target", "release", binaryName);
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(binary, dest);
+    try { chmodSync(dest, 0o755); } catch {}
+    return true;
+  }
+  return false;
+}
+
 function main() {
   const noBuild = process.argv.includes("--no-build");
   const dist = noBuild ? join(repo, "dashboard", "dist") : buildDashboard();
   try {
-    stage(dist);
+    stage(dist, noBuild);
   } finally {
     if (!noBuild) rmSync(dist, { recursive: true, force: true });
   }
 }
 
-function stage(dist) {
+function stage(dist, noBuild = false) {
   if (!existsSync(join(dist, "index.html"))) throw new Error(`no dashboard build at ${dist}`);
 
   const selected = trackedFiles();
@@ -130,6 +159,9 @@ function stage(dist) {
     const to = join(out, rel);
     mkdirSync(dirname(to), { recursive: true });
     copyFileSync(from, to); // copyFileSync keeps the mode, so labctl stays executable
+    count++;
+  }
+  if (stageWebLabEngine(out, noBuild)) {
     count++;
   }
   const distOut = join(out, "dashboard", "dist");

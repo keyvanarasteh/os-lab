@@ -66,3 +66,19 @@ test("Cleanup Lab engine and catalog ship with the desktop runtime", () => {
   ]);
   for (const path of selected) assert.ok(REQUIRED.includes(path), path);
 });
+
+test("Web Lab engine manifest and entry points ship with the desktop runtime", () => {
+  const selected = select([
+    "web-lab/Makefile",
+    "web-lab/browser/Cargo.toml",
+    "web-lab/browser/src/main.rs",
+    "web-lab/storage/engine.log",
+    "web-lab/storage/engine.pid",
+  ]);
+  assert.deepEqual(selected, [
+    "web-lab/Makefile",
+    "web-lab/browser/Cargo.toml",
+    "web-lab/browser/src/main.rs",
+  ]);
+  for (const path of selected) assert.ok(REQUIRED.includes(path), path);
+});

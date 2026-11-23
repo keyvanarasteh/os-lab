@@ -13,7 +13,9 @@ single-instance, store, dialog and opener plugins, without its agent-host code.
    console, so every page and lab action (preview → token → run) behaves as in `./labctl ui`.
 
 Nothing in the app runs lab commands. The dashboard page gets **no Tauri IPC**
-(`capabilities/launcher.json` names the launcher window only). Links that leave the console open in
+except two commands for the Full Disk Access guide, `app_relaunch` and `app_drag_self`, neither of
+which takes an argument (`capabilities/dashboard-grant.json`; `capabilities/launcher.json` names the
+launcher window). Links that leave the console open in
 the system browser. The console runs under a small supervisor and exits with the app, even if the
 app is killed; quitting stops its process group, jobs included.
 
@@ -24,6 +26,12 @@ repository containing `app/` in a debug build → the **bundled runtime**, copie
 folder on first launch and after an update. A sync never overwrites or removes `.env`,
 `config.env`, `storage/`, `artifacts/` and the other state names listed in `runtime.rs`; only the
 dashboard build is replaced wholesale.
+
+The launcher shows preparation, console startup and dashboard opening as separate steps. During
+bundled-runtime updates it shows the number of files processed, with a slow-disk or stalled-disk
+hint when preparation takes longer than expected. File synchronization runs on a blocking worker;
+an older dashboard build is moved aside and removed in the background. An interrupted cleanup is
+retried on the next update. Startup errors remain visible in the launcher.
 
 Use **File → Files folder…** to choose an empty folder for the app's writable files on macOS,
 Windows or Linux. The app copies its current data there before saving the choice. The bundled

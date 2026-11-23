@@ -55,9 +55,18 @@ the finding and the decision are in the session log.
 | CLN-24 | merged | [#148](https://github.com/keyvanarasteh/os-lab/pull/148) | 547f0a92 | — | catalog signatures behind CLN-07 sweep | none |
 | CLN-25 | merged | [#146](https://github.com/keyvanarasteh/os-lab/pull/146) | e5dfac27 | source label wired into cleanup results | engine and dashboard payloads ready | none |
 | CLN-26 | pending | — | — | — | — | none |
-| CLN-27 | in review (this PR) | [#172](https://github.com/keyvanarasteh/os-lab/pull/172) | — | `/cleanup/` relocation card (dashboard layer) | stacked on CLN-28 (uses its volume inventory) | none |
+| CLN-27 | in review (this PR) | [#172](https://github.com/keyvanarasteh/os-lab/pull/172) | — | `/cleanup/relocation/` tab (dashboard layer) landed with `simulators.coresimulator-devices` | stacked on CLN-28 (uses its volume inventory); engine console layer already merged | none |
 | CLN-28 | merged | [#170](https://github.com/keyvanarasteh/os-lab/pull/170) | c10d5ad9 | `/cleanup/` volumes card (dashboard layer) | console + engine landed per the layer split | none |
 | CLN-29 | pending | — | — | — | — | none |
+| CLNP-01…05 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | OS notification plumbing (desktop app) | engine + dashboard landed together | none |
+| CLNP-06…08 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | — | island router instead of Astro ClientRouter (localized catch-all shares ~40 page kinds) | none |
+| CLNP-09…13 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | OS notifications; labctl activation | monitor runs while the console runs, documented honestly | none |
+| CLNP-14…19 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | trusted quick clean (unconfirmed) | hook is Trash-only by design | none |
+| CLNP-20 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | — | risk restricted to low | none |
+| CLNP-21…23 | in review | [#214](https://github.com/keyvanarasteh/os-lab/pull/214) | — | treemap view; explorer on-disk sizes | bar-list first; purgeable only where the probe proves it | none |
+| CLW-01…02 | in review | [#226](https://github.com/keyvanarasteh/os-lab/pull/226) | — | — | widget shows used% only (purgeable stays on the dashboard hero) | none |
+| CLW-03…09 | in review | [#226](https://github.com/keyvanarasteh/os-lab/pull/226) | — | — | appex requires macOS 14 (AppIntents buttons); host app keeps 12 | none |
+| CLW-10…13 | in review | [#226](https://github.com/keyvanarasteh/os-lab/pull/226) | — | — | — | none |
 
 No CLN task has a student reservation or open student PR: `grep -rl CLN-
 reservations/` matches only `README.md` and `_schema.json`, and no open PR title or
@@ -790,3 +799,41 @@ relocation refusals are distinguishable. 24 engine tests on generated trees
 (rule 8); the symlink-needing ones skip honestly on Windows hosts without
 Developer Mode, and the symlink-failure refusal itself is tested everywhere.
 Windows host baseline failures are unchanged (86 identical ids; see VERIFY.md).
+
+## CLW-01…13 — cleaner widgets (PR #226)
+
+**2026-11-15 — cleaner widgets workstream.** The macOS widget snapshot,
+console surface, desktop-app bridge and release embedding, landed on
+`feat/cleaner-widgets`.
+
+* Engine: `cleanup_lab.widget` builds the path-free snapshot from the
+  existing modules and publishes it atomically into the App Group container
+  (never created, honest `capable` flag, `OSLAB_WIDGET_GROUP_DIR` test seam);
+  14 engine tests.
+* Console: `GET /api/cleanup/widget` builds and publishes in one call; the
+  spawn wrapper, monitor loop and mutation handlers refresh it in the
+  background; 3 contract tests.
+* Desktop: WidgetKit extension + reloader framework under `app/widget`
+  (xcodegen/xcodebuild, universal, macOS 14+), Rust bridge (`widget.rs`)
+  consuming the intent request on focus and reloading on snapshot changes,
+  `oslab://` deep links, host + appex entitlements; 5 Rust tests, `cargo
+  check` clean.
+* Dashboard: Desktop widgets card with live preview and Publish now,
+  `__oslabNavigate` / `__oslabQuickClean` globals, 27 strings × 7 locales,
+  `cleanup-widgets.spec.ts`.
+* Release: `release-mac.sh` embed + re-sign + re-notarize + updater rebuild;
+  PR dry run compiles the widget targets.
+
+**2026-11-15 — CLN-27 (dashboard layer).** The `/cleanup/relocation/` tab
+ships the CLN-27 handoff: status rows (path + Local folder / Linked /
+Interrupted chips from the relocatable/interrupted flags), a destination
+select from the volume inventory, plan preview behind a confirm dialog naming
+the entry, destination and the symlink fact, per-step run progress with
+cancel, restore/relink on linked rows, and relocation rows on History.
+`simulators.coresimulator-devices` joins as the first `simulators` family
+entry — CoreSimulator devices, `cleanable: false`, owning processes Simulator
+and Xcode — so simulator device data can move off the OS disk (runtimes stay
+system-managed). 26 strings × 7 locales, `cleanup-relocation.spec.ts`; the
+engine suite's pre-existing Windows-seam failures on POSIX hosts (ntpath
+isabs/normpath vs a POSIX filesystem inside the `platform="windows"` test
+seams) are unchanged by this work and tracked for their own fix.

@@ -6,6 +6,8 @@ fn main() {
             "console_start",
             "console_status",
             "console_restart",
+            "app_relaunch",
+            "app_drag_self",
             "console_choose_root",
             "console_reset_root",
             "console_logs",
