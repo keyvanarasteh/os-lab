@@ -538,6 +538,12 @@ The local app polls only while a job runs. Public Pages renders the routes witho
 engine calls or destructive controls. All eight route sets are built, including
 the seven translated locales.
 
+### Advanced scan filter bar
+
+The Advanced scan grid has a filter bar (CUX-03): a search over entry name, id and path, a risk filter, a measured-only toggle and **Select visible / Deselect visible**.
+
+Select visible skips credentials, privacy and high-risk entries, the same rule as Defaults, and the bar reports how many selected entries the filters hide.
+
 ### Scan card and Catalogs
 
 The dashboard scan card ([[dashboard/src/views/cleanup/scan-card.tsx]]) shows "Scanning your Mac" with the category being measured, percent, bar, current path and Stop while a scan runs. When it finishes it shows "Scan complete", the selected size, a Clean action and the plan by tool group.

@@ -2859,5 +2859,12 @@
   "Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.": "برای انتخاب مجموعهٔ پاک‌سازی سریع خودتان، در صفحهٔ اسکن پیشرفته نشانک اضافه کنید یا در تنظیمات پوشه بیفزایید.",
   "Enable quick clean on a bookmark in Settings to choose your own set.": "برای انتخاب مجموعهٔ خودتان، در تنظیمات پاک‌سازی سریع را روی یک نشانک فعال کنید.",
   "One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.": "یک اجرای تأییدشده به سطل زباله روی نشانک‌های پاک‌سازی سریع شما، یا اگر هیچ‌کدام علامت نخورده باشد، روی مجموعهٔ امن پیشنهادی.",
-  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "هیچ نشانکی برای پاک‌سازی سریع علامت نخورده است، بنابراین مجموعهٔ امن پیشنهادی اسکن و بازبینی می‌شود."
+  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "هیچ نشانکی برای پاک‌سازی سریع علامت نخورده است، بنابراین مجموعهٔ امن پیشنهادی اسکن و بازبینی می‌شود.",
+  "All risks": "همهٔ ریسک‌ها",
+  "Filter by risk": "فیلتر بر اساس ریسک",
+  "Find an entry or path": "جستجوی مورد یا مسیر",
+  "Measured only": "فقط اندازه‌گیری‌شده‌ها",
+  "No entries match these filters.": "هیچ موردی با این فیلترها مطابقت ندارد.",
+  "Deselect visible": "لغو انتخاب موارد نمایان",
+  "selected hidden by filters": "انتخاب‌شده، پنهان با فیلترها"
 }

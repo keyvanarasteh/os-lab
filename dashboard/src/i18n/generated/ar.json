@@ -2859,5 +2859,12 @@
   "Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.": "أضف إشارات مرجعية في صفحة الفحص المتقدم أو مجلدات من الإعدادات لاختيار مجموعة التنظيف السريع الخاصة بك.",
   "Enable quick clean on a bookmark in Settings to choose your own set.": "فعّل التنظيف السريع على إشارة مرجعية من الإعدادات لاختيار مجموعتك الخاصة.",
   "One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.": "تشغيل واحد مؤكَّد إلى سلة المهملات على إشاراتك المرجعية للتنظيف السريع، أو على المجموعة الآمنة الموصى بها إن لم تُحدَّد أي منها.",
-  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "لا توجد إشارة مرجعية محددة للتنظيف السريع، لذا تُفحص المجموعة الآمنة الموصى بها وتُراجَع."
+  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "لا توجد إشارة مرجعية محددة للتنظيف السريع، لذا تُفحص المجموعة الآمنة الموصى بها وتُراجَع.",
+  "All risks": "كل المخاطر",
+  "Filter by risk": "التصفية حسب المخاطر",
+  "Find an entry or path": "ابحث عن عنصر أو مسار",
+  "Measured only": "المقاسة فقط",
+  "No entries match these filters.": "لا توجد عناصر تطابق هذه التصفية.",
+  "Deselect visible": "إلغاء تحديد المعروض",
+  "selected hidden by filters": "محددة ومخفية بالمرشحات"
 }

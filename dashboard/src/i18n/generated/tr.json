@@ -2859,5 +2859,12 @@
   "Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.": "Kendi hızlı temizlik kümenizi seçmek için Gelişmiş tarama sayfasında girdileri yer imine ekleyin ya da Ayarlar'dan klasör ekleyin.",
   "Enable quick clean on a bookmark in Settings to choose your own set.": "Kendi kümenizi seçmek için Ayarlar'da bir yer iminde hızlı temizliği etkinleştirin.",
   "One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.": "Hızlı temizlik yer imleriniz üzerinde tek onaylı Çöp Sepeti temizliği; hiçbiri işaretli değilse önerilen güvenli küme.",
-  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "Hızlı temizlik için işaretli yer imi yok; bu yüzden önerilen güvenli küme taranır ve gözden geçirilir."
+  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "Hızlı temizlik için işaretli yer imi yok; bu yüzden önerilen güvenli küme taranır ve gözden geçirilir.",
+  "All risks": "Tüm riskler",
+  "Filter by risk": "Riske göre filtrele",
+  "Find an entry or path": "Girdi veya yol bul",
+  "Measured only": "Yalnızca ölçülenler",
+  "No entries match these filters.": "Bu filtrelerle eşleşen girdi yok.",
+  "Deselect visible": "Görünenlerin seçimini kaldır",
+  "selected hidden by filters": "seçili öğe filtrelerle gizli"
 }

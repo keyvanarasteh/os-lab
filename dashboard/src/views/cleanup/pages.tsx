@@ -318,6 +318,10 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const autoReview = useRef(false);
   const [reviewNote, setReviewNote] = useState("");
   const [order, setOrder] = useState<SortOrder>("size");
+  // CUX-03: the Advanced scan filter bar.
+  const [query, setQuery] = useState("");
+  const [riskFilter, setRiskFilter] = useState("");
+  const [measuredOnly, setMeasuredOnly] = useState(false);
   const [now, setNow] = useState(Date.now() / 1000);
   const coreLoaded = useRef(false);
   const locale = typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname);
@@ -620,6 +624,21 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   }, [page]);
   const selectedBytes = useMemo(() => selected.reduce((sum, id) => sum + (sizes.get(id) ?? 0), 0), [selected, sizes]);
   const sortedEntries = useMemo(() => sortEntries(entries, sizes, order), [entries, sizes, order]);
+  const visibleEntries = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return sortedEntries.filter((item) => {
+      if (riskFilter && item.risk !== riskFilter) return false;
+      if (measuredOnly && !(sizes.get(item.id) ?? 0)) return false;
+      if (!needle) return true;
+      return item.name.toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle)
+        || item.paths.some((path) => (path.path ?? "").toLowerCase().includes(needle));
+    });
+  }, [sortedEntries, query, riskFilter, measuredOnly, sizes]);
+  const riskOptions = useMemo(() => [...new Set(entries.map((item) => item.risk))], [entries]);
+  // Select visible never picks entries that need a deliberate choice (the same rule as Defaults).
+  const bulkVisible = visibleEntries.filter((item) => item.risk !== "credentials" && item.risk !== "privacy" && item.risk !== "high");
+  const canSelectMore = bulkVisible.some((item) => !selected.includes(item.id));
+  const hiddenSelected = selected.filter((id) => !visibleEntries.some((item) => item.id === id)).length;
   const riskTotals = useMemo(() => totalsByRisk(entries, sizes), [entries, sizes]);
   const resultGroups = useMemo(() => {
     if (!latestScan) return [];
@@ -758,12 +777,26 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                     {active?.state === "running" && <button type="button" className="iux-btn" onClick={() => void cancel()}>Cancel</button>}
                   </div>
                 </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2" role="search">
+                  <input type="search" className="iux-input min-w-48 flex-1" aria-label="Find an entry or path" placeholder="Find an entry or path"
+                    value={query} onChange={(event) => setQuery(event.target.value)} />
+                  <select className="iux-input" aria-label="Filter by risk" value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)}>
+                    <option value="">All risks</option>
+                    {riskOptions.map((risk) => <option key={risk} value={risk}>{riskLabel(risk)}</option>)}
+                  </select>
+                  <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" className="accent-[#f36c21]" checked={measuredOnly} onChange={(event) => setMeasuredOnly(event.target.checked)} />Measured only</label>
+                  <button type="button" className="iux-btn" data-variant="outline" disabled={busy || (!canSelectMore && !visibleEntries.some((item) => selected.includes(item.id)))}
+                    onClick={() => { setSelected((old) => canSelectMore ? [...new Set([...old, ...bulkVisible.map((item) => item.id)])] : old.filter((id) => !visibleEntries.some((item) => item.id === id))); setConfirm(false); }}>
+                    {canSelectMore ? "Select visible" : "Deselect visible"}
+                  </button>
+                  <span role="status" className="text-xs text-(--iux-muted-foreground)"><span dir="ltr" className="tabular-nums">{visibleEntries.length} / {entries.length}</span> <span>shown</span>{hiddenSelected > 0 && <> · <span dir="ltr" className="tabular-nums">{hiddenSelected}</span> <span>selected hidden by filters</span></>}</span>
+                </div>
                 {active?.state === "running" && <div className="mt-2 space-y-1">
                   <div className="iux-progress h-1 rounded-full" aria-hidden="true" />
                   <p role="status" aria-live="polite" className="text-xs">{active.kind} in progress · <span dir="ltr">{String(active.progress?.pathsDone ?? active.progress?.itemsDone ?? 0)} / {String(active.progress?.pathsTotal ?? active.progress?.itemsTotal ?? 0)}</span><span translate="no" className="block truncate">{active.progress?.currentPath}</span></p>
                 </div>}
                 </div>
-                <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(13.5rem,1fr))] gap-1.5">{sortedEntries.map((item) => {
+                <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(13.5rem,1fr))] gap-1.5">{visibleEntries.map((item) => {
                   const size = sizes.get(item.id);
                   const on = selected.includes(item.id);
                   return <label key={item.id} onContextMenu={(event) => { event.preventDefault(); setEntryMenu({ x: event.clientX, y: event.clientY, entryId: item.id }); }}
@@ -772,7 +805,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                       <input type="checkbox" className="iux-touch-target size-3.5 shrink-0 accent-[#f36c21]" checked={on} disabled={busy}
                         onChange={(event) => { setSelected((old) => event.target.checked ? [...old, item.id] : old.filter((id) => id !== item.id)); setConfirm(false); }} />
                       <CategoryIcon category={item.category} size={12} />
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={item.name}>{item.name}</span>
+                      <span className="min-w-0 flex-1 line-clamp-2 break-words text-[13px] font-medium" title={item.name}>{item.name}</span>
                       {item.needsPrivilege && <PrivilegeMarker />}
                       <button type="button" className="iux-btn" data-variant="ghost" aria-haspopup="menu" aria-label={`Actions for ${item.name}`}
                         onClick={(event) => { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); setEntryMenu({ x: box.left, y: box.bottom + 4, entryId: item.id }); }}>
@@ -790,6 +823,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                     {size != null && <SizeBar value={size} max={maxSize} />}
                   </label>;
                 })}</div>
+                {!visibleEntries.length && <Empty>No entries match these filters.</Empty>}
                 {entryMenu && (() => {
                   const item = entries.find((entry) => entry.id === entryMenu.entryId);
                   return item ? <EntryMenu state={entryMenu} title={item.name} items={entryMenuItems(item)} onClose={() => setEntryMenu(null)} /> : null;

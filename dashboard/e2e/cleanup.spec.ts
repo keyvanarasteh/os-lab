@@ -110,6 +110,18 @@ test("advanced scan sorts by size, reviews a plan and cleans typed", async ({ pa
   });
   await page.goto("/cleanup/scan/");
   await expect(page.getByRole("heading", { name: "Scan" })).toBeVisible();
+  // CUX-03: the filter bar narrows the grid, reports hidden selections and selects only what is visible.
+  await page.getByRole("searchbox", { name: "Find an entry or path" }).fill("no-such-entry");
+  await expect(page.getByText("No entries match these filters.")).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "hidden by filters" })).toContainText("0 / 1");
+  await expect(page.getByRole("button", { name: "Select visible" })).toBeDisabled();
+  await page.getByRole("searchbox", { name: "Find an entry or path" }).fill("caches");
+  await expect(page.getByText("No entries match these filters.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Deselect visible" }).click();
+  await expect(page.getByRole("button", { name: "Select visible" })).toBeVisible();
+  await page.getByRole("button", { name: "Select visible" }).click();
+  await expect(page.getByRole("button", { name: "Deselect visible" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Find an entry or path" }).fill("");
   await page.getByRole("button", { name: "Scan selected" }).click();
   await expect(page.getByText("42 B across 1 entries")).toBeVisible();
   await page.getByRole("button", { name: "Review & clean" }).click();

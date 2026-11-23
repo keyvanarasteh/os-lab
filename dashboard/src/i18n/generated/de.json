@@ -2859,5 +2859,12 @@
   "Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.": "Setzen Sie auf der Seite „Erweiterter Scan“ Lesezeichen oder fügen Sie in den Einstellungen Ordner hinzu, um Ihren eigenen Schnellbereinigungssatz zu wählen.",
   "Enable quick clean on a bookmark in Settings to choose your own set.": "Aktivieren Sie in den Einstellungen die Schnellbereinigung für ein Lesezeichen, um Ihren eigenen Satz zu wählen.",
   "One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.": "Ein bestätigter Papierkorb-Durchlauf über Ihre Schnellbereinigungs-Lesezeichen oder, wenn keines markiert ist, über den empfohlenen sicheren Satz.",
-  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "Kein Lesezeichen ist für die Schnellbereinigung markiert, daher wird der empfohlene sichere Satz gescannt und geprüft."
+  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "Kein Lesezeichen ist für die Schnellbereinigung markiert, daher wird der empfohlene sichere Satz gescannt und geprüft.",
+  "All risks": "Alle Risiken",
+  "Filter by risk": "Nach Risiko filtern",
+  "Find an entry or path": "Eintrag oder Pfad suchen",
+  "Measured only": "Nur gemessene",
+  "No entries match these filters.": "Keine Einträge entsprechen diesen Filtern.",
+  "Deselect visible": "Auswahl der sichtbaren aufheben",
+  "selected hidden by filters": "ausgewählt, durch Filter ausgeblendet"
 }

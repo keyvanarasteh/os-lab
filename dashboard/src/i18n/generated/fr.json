@@ -2859,5 +2859,12 @@
   "Bookmark entries on the Advanced scan page or add folders in Settings to choose your own quick-clean set.": "Ajoutez des signets sur la page Analyse avancée ou des dossiers dans les Réglages pour choisir votre propre ensemble de nettoyage rapide.",
   "Enable quick clean on a bookmark in Settings to choose your own set.": "Activez le nettoyage rapide sur un signet dans les Réglages pour choisir votre propre ensemble.",
   "One confirmed Trash run over your quick-clean bookmarks, or the recommended safe set when none are marked.": "Une passe confirmée vers la Corbeille sur vos signets de nettoyage rapide, ou sur l'ensemble sûr recommandé si aucun n'est marqué.",
-  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "Aucun signet n'est marqué pour le nettoyage rapide : l'ensemble sûr recommandé est donc analysé puis vérifié."
+  "No bookmark is marked for quick clean, so it scans and reviews the recommended safe set.": "Aucun signet n'est marqué pour le nettoyage rapide : l'ensemble sûr recommandé est donc analysé puis vérifié.",
+  "All risks": "Tous les risques",
+  "Filter by risk": "Filtrer par risque",
+  "Find an entry or path": "Trouver une entrée ou un chemin",
+  "Measured only": "Mesurés uniquement",
+  "No entries match these filters.": "Aucune entrée ne correspond à ces filtres.",
+  "Deselect visible": "Désélectionner les visibles",
+  "selected hidden by filters": "sélectionnés masqués par les filtres"
 }
