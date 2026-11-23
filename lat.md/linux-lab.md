@@ -186,6 +186,33 @@ ve ayrıştırma davranışlarını çevrimdışı sınar. dpkg varsa geçici se
 veritabanında gerçek komutla bütünleşme testi de çalışır. Canlı Ubuntu
 kanıtıyla sentetik testlerin ayrımı [[linux-lab/os-23/VERIFY.md]] içinde açıklanır.
 
+## OS-29 Log Viewer
+
+[[linux-lab/scripts/log-viewer.sh]] is a menu helper that shows the first or last lines of a log, follows it, counts lines, pages through it and searches it.
+
+Log text is treated as untrusted: terminal control bytes are stripped before display. Missing or unreadable files stop with a message, end of input leaves the menu, and without a file argument it falls back to `journalctl` when `/var/log/syslog` is absent. [[linux-lab/tests/test_log_viewer.py]] covers these cases with temporary files.
+
+## OS-17 SSH Troubleshooter
+
+[[linux-lab/scripts/ssh_doctor.py]] classifies a pasted SSH error into timeout, authentication, loopback, firewall, adapter or unknown, and prints an explanation and a fix.
+
+Loopback (127.x.x.x, `::1`, `localhost`) is checked first because it is the real cause of many timeouts. A `--host` value with an IPv6 scope id or control bytes is rejected without being echoed. It never opens a connection or changes settings. [[linux-lab/tests/test_ssh_doctor.py]] covers the rules.
+
+## Shell basics exercise checker (OS-11)
+
+[[linux-lab/exercises/shell_basics_check.py]] checks a documented example
+directory exercise with per-path feedback and hints, without changing files.
+
+Each of ali, eda and aleyna contains odevler, sinavlar, sunumlar directories
+and a regular puan.txt file: 15 expected paths. Extra entries and empty files
+are allowed; content is not graded. This profile is not an official course mark.
+Child paths use directory descriptors and no-follow operations; symlinks and
+unreadable paths cannot pass. It is an observation, not an atomic tree snapshot.
+Text/JSON reports and interactive root entry are supported; exit 0 means all
+paths match, 1 means mismatches, 2 means invalid usage or an inaccessible root.
+[[android-lab/lab/tests/test_shell_basics_check.py]] exercises these contracts.
+[[linux-lab/docs/OS-11/VERIFY.md]] supplies reproducible lab commands.
+
 ## PENT-05 Binary hardening and crash triage
 
 PENT-05 verifies compiler/linker mitigations on ELF binaries and triages AFL++ crashes.

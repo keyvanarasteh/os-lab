@@ -314,3 +314,13 @@ python3 android-lab/lab/tests/test_dpkg_inventory.py
 ```
 
 [Görev raporu](os-23/REPORT.md) · [Doğrulama sonuçları](os-23/VERIFY.md).
+
+## OS-11: Shell basics exercise checker
+
+Run `python3 linux-lab/exercises/shell_basics_check.py --show-exercise` to see
+the explicit example profile; pass your lab root to check it, or use
+`--interactive`. `--json` emits a machine-readable report. The checker is
+read-only, requires Linux and Python 3.11+, and never executes its hints.
+Exit codes: 0 complete structure, 1 mismatches, 2 invalid root/usage.
+See [OS-11 verification](docs/OS-11/VERIFY.md) for the sample layout, commands,
+limitations and evidence steps, and [the report](docs/OS-11/REPORT.md).
