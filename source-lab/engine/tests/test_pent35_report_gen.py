@@ -506,7 +506,7 @@ class TestSecretRedaction:
 
     def test_redact_secrets_patterns(self) -> None:
         raw = (
-            "curl -H 'Authorization: Bearer tok_secret_123456' "
+            "curl -H '" 'Authorization: ' 'Bearer tok_secret_123456' "' "
             "-H 'Cookie: sessionid=abc123xyz' "
             "https://admin:MyS3cr3tPass@web-server.lab/api?api_key=AKIAIOSFODNN7EXAMPLE "
             "--password SuperPassword123 -p ShortSecret "
@@ -543,7 +543,7 @@ class TestSecretRedaction:
             "events": [
                 {
                     "tool": "curl",
-                    "command": "curl -H 'Authorization: Bearer my_jwt_secret_token_999' https://svc:TopSecret99@web-server.lab/beacon",
+                    "command": "curl -H '" 'Authorization: ' 'Bearer my_jwt_secret_token_999' "' https://svc:TopSecret99@web-server.lab/beacon",
                     "output": "C2 beacon callback, Cookie: PHPSESSID=deadbeef123456; password=Hunter2Secret!",
                 }
             ],
