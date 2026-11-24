@@ -2904,5 +2904,13 @@
   "Copy path": "Copia percorso",
   "Reveal in file manager": "Mostra nel gestore file",
   "Shortcut: S": "Scorciatoia: S",
-  "This entry has no folder on this computer.": "Questa voce non ha una cartella su questo computer."
+  "This entry has no folder on this computer.": "Questa voce non ha una cartella su questo computer.",
+  "recommended": "consigliato",
+  "extended": "esteso",
+  "saved on this computer": "salvato su questo computer",
+  "bookmarked": "con segnalibro",
+  "off": "disattivato",
+  "on, disk ok": "attivo, disco ok",
+  "low-space warning": "avviso di poco spazio",
+  "low-space critical": "poco spazio, critico"
 }

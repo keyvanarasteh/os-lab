@@ -47,8 +47,8 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await expect(page.getByText("Purgeable space is managed by macOS", { exact: false })).toBeVisible();
   // CUX-09: the options are collapsed rows with live one-line summaries; one primary action stays visible.
   const options = page.getByRole("region", { name: "Cleanup options" });
-  await expect(options.getByText("0 bookmarked")).toBeVisible();
-  await expect(options.getByText("auto · saved on this computer")).toBeVisible();
+  await expect(options.locator("summary", { hasText: "Quick clean" })).toContainText("0 bookmarked");
+  await expect(options.locator("summary", { hasText: "Suggestions" })).toContainText("auto · saved on this computer");
   // CUX-02: no bookmarks in this fixture, so Quick clean offers the recommended set instead of staying disabled.
   await options.locator("summary", { hasText: "Quick clean" }).click();
   await expect(options.getByRole("button", { name: "Quick clean", exact: true })).toBeEnabled();
@@ -141,6 +141,10 @@ test("advanced scan sorts by size, reviews a plan and cleans typed", async ({ pa
   await page.getByRole("button", { name: "Select visible" }).click();
   await expect(page.getByRole("button", { name: "Deselect visible" })).toBeVisible();
   await page.getByRole("searchbox", { name: "Find an entry or path" }).fill("");
+  // CUX-04: the row menu reveals the folder by entry id; the page never sends a path.
+  await page.getByRole("button", { name: "Actions for Caches" }).click();
+  await page.getByRole("menuitem", { name: "Reveal in file manager" }).click();
+  await expect.poll(() => calls.find((call) => call.path === "/api/cleanup/entries/reveal")?.body).toEqual({ entryId: "system.caches" });
   await page.getByRole("button", { name: "Scan selected" }).click();
   await expect(page.getByText("42 B across 1 entries")).toBeVisible();
   await page.getByRole("button", { name: "Review & clean" }).click();

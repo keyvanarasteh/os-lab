@@ -2904,5 +2904,13 @@
   "Copy path": "Copiar ruta",
   "Reveal in file manager": "Mostrar en el administrador de archivos",
   "Shortcut: S": "Atajo: S",
-  "This entry has no folder on this computer.": "Esta entrada no tiene carpeta en este equipo."
+  "This entry has no folder on this computer.": "Esta entrada no tiene carpeta en este equipo.",
+  "recommended": "recomendado",
+  "extended": "ampliado",
+  "saved on this computer": "guardado en este equipo",
+  "bookmarked": "marcados",
+  "off": "desactivado",
+  "on, disk ok": "activo, disco correcto",
+  "low-space warning": "aviso de poco espacio",
+  "low-space critical": "poco espacio, crítico"
 }

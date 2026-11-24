@@ -2904,5 +2904,13 @@
   "Copy path": "Pfad kopieren",
   "Reveal in file manager": "Im Dateimanager zeigen",
   "Shortcut: S": "Tastenkürzel: S",
-  "This entry has no folder on this computer.": "Dieser Eintrag hat auf diesem Computer keinen Ordner."
+  "This entry has no folder on this computer.": "Dieser Eintrag hat auf diesem Computer keinen Ordner.",
+  "recommended": "empfohlen",
+  "extended": "erweitert",
+  "saved on this computer": "auf diesem Computer gespeichert",
+  "bookmarked": "mit Lesezeichen",
+  "off": "aus",
+  "on, disk ok": "an, Datenträger in Ordnung",
+  "low-space warning": "Warnung: wenig Speicher",
+  "low-space critical": "wenig Speicher, kritisch"
 }

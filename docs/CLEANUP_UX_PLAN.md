@@ -27,7 +27,9 @@ Findings below come from reading the code and from screenshots of `/cleanup/`, `
 - [x] **CUX-09 — Compact dashboard**: one primary action plus collapsed rows with live summaries.
 - [x] **CUX-10 — MCP tools** for every function above.
 
-Still open, stated honestly: a visual pass at narrow width, 200% zoom and right-to-left; "Exclude from cleanup" as a catalog-level action beyond the suggestion "never" list; one-click for the report-only inventories (containers, VMs, packages, projects, simulators, leftovers) is a link from All tools, not an automatic run, because each needs its own preview.
+Visual pass (2026-11-24, real console, 390 px phone, Arabic right-to-left, 200% text): no horizontal overflow in any of them and every row opens; the row summaries were English-only in Arabic and are now translatable fragments.
+
+Still open, stated honestly: "Exclude from cleanup" as a catalog-level action beyond the suggestion "never" list; the report-only inventories (containers, VMs, packages, projects, simulators, leftovers) are a link from All tools, not an automatic run, because each needs its own preview.
 
 ## Coverage: every ability, and how it is reached
 

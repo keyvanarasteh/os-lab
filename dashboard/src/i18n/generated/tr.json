@@ -2904,5 +2904,13 @@
   "Copy path": "Yolu kopyala",
   "Reveal in file manager": "Dosya yöneticisinde göster",
   "Shortcut: S": "Kısayol: S",
-  "This entry has no folder on this computer.": "Bu girdinin bu bilgisayarda klasörü yok."
+  "This entry has no folder on this computer.": "Bu girdinin bu bilgisayarda klasörü yok.",
+  "recommended": "önerilen",
+  "extended": "genişletilmiş",
+  "saved on this computer": "bu bilgisayarda kayıtlı",
+  "bookmarked": "yer imli",
+  "off": "kapalı",
+  "on, disk ok": "açık, disk iyi",
+  "low-space warning": "düşük alan uyarısı",
+  "low-space critical": "düşük alan, kritik"
 }

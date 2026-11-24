@@ -758,15 +758,17 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                 groupHref={(id) => link(`catalog/#${id}`)} />
               {/* CUX-09: everything else, collapsed, with a live one-line summary; nothing is removed from the app. */}
               <CareList label="Cleanup options">
-                <CareRow id="overview-suggestions" title="Suggestions" summary={`${prefsSummary} · saved on this computer`}>
+                <CareRow id="overview-suggestions" title="Suggestions" summary={<><span>{prefsSummary}</span> · <span>saved on this computer</span></>}>
                   <SuggestionSettings entries={entries} sizes={sizes} onSaved={(saved) => setPrefsSummary(saved.mode)} />
                 </CareRow>
-                <CareRow id="overview-quick-clean" title="Quick clean" summary={`${(bookmarks?.bookmarks ?? []).filter((item) => item.quickClean).length} bookmarked`}>
+                <CareRow id="overview-quick-clean" title="Quick clean" summary={<><span dir="ltr" className="tabular-nums">{(bookmarks?.bookmarks ?? []).filter((item) => item.quickClean).length}</span> <span>bookmarked</span></>}>
                   <QuickCleanCard bare bookmarks={bookmarks} busy={busy} canWork={canWork} measured={measured} refusals={quickRefusals}
                     onQuickClean={runQuickClean} settingsHref={link("settings/")} />
                 </CareRow>
                 <CareRow id="cleanup-monitor" title="Alerts" attention={!!monitor?.activeWarnings.length}
-                  summary={!monitor?.enabled ? "off" : monitor.activeWarnings.length ? `${monitor.activeWarnings.length} low-space ${monitor.activeWarnings.some((w) => w.level === "critical") ? "(critical)" : "warning"}` : "on, disk ok"}>
+                  summary={!monitor?.enabled ? <span>off</span> : monitor.activeWarnings.length
+                    ? <><span dir="ltr" className="tabular-nums">{monitor.activeWarnings.length}</span> <span>{monitor.activeWarnings.some((w) => w.level === "critical") ? "low-space critical" : "low-space warning"}</span></>
+                    : <span>on, disk ok</span>}>
                   <MonitorStatsCard bare monitor={monitor} volumes={volumes} settingsHref={link("settings/")} reload={monitorReload} />
                 </CareRow>
                 <CareRow id="cleanup-tools" title="All tools" summary="scan, explore, containers, packages, relocation, history and more">

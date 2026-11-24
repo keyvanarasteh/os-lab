@@ -2904,5 +2904,13 @@
   "Copy path": "کپی مسیر",
   "Reveal in file manager": "نمایش در مدیر فایل",
   "Shortcut: S": "میانبر: S",
-  "This entry has no folder on this computer.": "این مورد در این رایانه پوشه‌ای ندارد."
+  "This entry has no folder on this computer.": "این مورد در این رایانه پوشه‌ای ندارد.",
+  "recommended": "پیشنهادی",
+  "extended": "گسترده",
+  "saved on this computer": "روی این رایانه ذخیره شد",
+  "bookmarked": "نشانک‌شده",
+  "off": "خاموش",
+  "on, disk ok": "روشن، دیسک سالم",
+  "low-space warning": "هشدار کمبود فضا",
+  "low-space critical": "کمبود فضا، بحرانی"
 }

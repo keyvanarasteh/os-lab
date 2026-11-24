@@ -2904,5 +2904,13 @@
   "Copy path": "Copier le chemin",
   "Reveal in file manager": "Afficher dans le gestionnaire de fichiers",
   "Shortcut: S": "Raccourci : S",
-  "This entry has no folder on this computer.": "Cette entrée n'a pas de dossier sur cet ordinateur."
+  "This entry has no folder on this computer.": "Cette entrée n'a pas de dossier sur cet ordinateur.",
+  "recommended": "recommandé",
+  "extended": "étendu",
+  "saved on this computer": "enregistré sur cet ordinateur",
+  "bookmarked": "en signet",
+  "off": "désactivé",
+  "on, disk ok": "actif, disque correct",
+  "low-space warning": "alerte d'espace faible",
+  "low-space critical": "espace faible, critique"
 }

@@ -2904,5 +2904,13 @@
   "Copy path": "نسخ المسار",
   "Reveal in file manager": "إظهار في مدير الملفات",
   "Shortcut: S": "الاختصار: S",
-  "This entry has no folder on this computer.": "لا يوجد مجلد لهذا العنصر على هذا الحاسوب."
+  "This entry has no folder on this computer.": "لا يوجد مجلد لهذا العنصر على هذا الحاسوب.",
+  "recommended": "موصى به",
+  "extended": "موسّع",
+  "saved on this computer": "محفوظ على هذا الحاسوب",
+  "bookmarked": "بإشارة مرجعية",
+  "off": "متوقف",
+  "on, disk ok": "يعمل، القرص سليم",
+  "low-space warning": "تحذير من قلة المساحة",
+  "low-space critical": "قلة مساحة حرجة"
 }
