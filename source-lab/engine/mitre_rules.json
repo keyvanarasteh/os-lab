@@ -1,12 +1,13 @@
 {
-  "version": "1.0",
-  "description": "MITRE ATT&CK mapping rules for red-team session log analysis",
+  "version": "1.1",
+  "description": "MITRE ATT&CK mapping rules for red-team session log analysis (tightened against false positives)",
   "rules": [
     {
       "id": "T1046",
       "name": "Network Service Discovery",
       "tactic": "Discovery",
       "keywords": ["nmap", "masscan", "port scan", "service scan", "syn scan", "tcp scan", "udp scan", "network scan"],
+      "negative_keywords": ["nmap not installed", "port scan blocked", "no port scan detected"],
       "severity": 4,
       "remediation": "Segment the network and deploy IDS/IPS to detect scanning activity. Use firewall rules to limit lateral scanning between VLANs."
     },
@@ -14,7 +15,8 @@
       "id": "T1059.001",
       "name": "Command and Scripting Interpreter: PowerShell",
       "tactic": "Execution",
-      "keywords": ["powershell", "powershell.exe", "invoke-expression", "invoke-command", "iex", "invoke-webrequest", "downloadstring", "encodedcommand", "bypass executionpolicy"],
+      "keywords": ["powershell -ep", "powershell -enc", "powershell -e ", "powershell.exe -", "invoke-expression", "invoke-command", "iex(", "iex (", "downloadstring", "encodedcommand", "bypass executionpolicy", "executionpolicy bypass"],
+      "negative_keywords": ["powershell script block logging enabled", "constrained language mode enabled"],
       "severity": 7,
       "remediation": "Enable PowerShell Script Block Logging and Module Logging. Restrict PowerShell to Constrained Language Mode via AppLocker or WDAC. Monitor for encoded commands and download cradles."
     },
@@ -22,7 +24,8 @@
       "id": "T1059.003",
       "name": "Command and Scripting Interpreter: Windows Command Shell",
       "tactic": "Execution",
-      "keywords": ["cmd.exe", "cmd /c", "command prompt", "batch file", "bat file"],
+      "keywords": ["cmd.exe /c", "cmd.exe /k", "cmd /c", "cmd /k"],
+      "negative_keywords": [],
       "severity": 5,
       "remediation": "Monitor command-line process creation events. Use AppLocker to restrict cmd.exe usage for non-administrative users."
     },
@@ -30,7 +33,8 @@
       "id": "T1059.004",
       "name": "Command and Scripting Interpreter: Unix Shell",
       "tactic": "Execution",
-      "keywords": ["bash", "/bin/sh", "/bin/bash", "shell script", "sh -c", "bash -i"],
+      "keywords": ["/bin/sh -i", "/bin/bash -i", "bash -i", "sh -c", "bash -c", "-exec /bin/sh", "-exec /bin/bash"],
+      "negative_keywords": ["login shell", "default shell"],
       "severity": 5,
       "remediation": "Audit shell process creation. Use auditd rules for execve monitoring. Restrict shell access to necessary users only."
     },
@@ -38,7 +42,8 @@
       "id": "T1547.001",
       "name": "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder",
       "tactic": "Persistence",
-      "keywords": ["reg.exe", "reg add", "hklm\\software\\microsoft\\windows\\currentversion\\run", "hkcu\\software\\microsoft\\windows\\currentversion\\run", "startup folder", "registry run key"],
+      "keywords": ["reg add", "reg.exe add", "hklm\\software\\microsoft\\windows\\currentversion\\run", "hkcu\\software\\microsoft\\windows\\currentversion\\run", "registry run key"],
+      "negative_keywords": [],
       "severity": 8,
       "remediation": "Monitor registry key modifications at HKLM/HKCU Run/RunOnce. Deploy EDR with registry monitoring capabilities. Audit Startup folder contents regularly."
     },
@@ -46,7 +51,8 @@
       "id": "T1082",
       "name": "System Information Discovery",
       "tactic": "Discovery",
-      "keywords": ["systeminfo", "uname", "hostname", "ver", "cat /etc/os-release", "lsb_release", "hostnamectl", "wmic os"],
+      "keywords": ["systeminfo", "uname -a", "cat /etc/os-release", "lsb_release -a", "hostnamectl", "wmic os"],
+      "negative_keywords": [],
       "severity": 3,
       "remediation": "This is a low-severity reconnaissance technique. Monitor for bulk enumeration commands. Correlate with other suspicious activity for context."
     },
@@ -54,7 +60,8 @@
       "id": "T1033",
       "name": "System Owner/User Discovery",
       "tactic": "Discovery",
-      "keywords": ["whoami", "whoami /all", "whoami /priv", "id", "who", "w", "users", "net user", "net users"],
+      "keywords": ["whoami /all", "whoami /priv", "whoami", "net user /domain", "net users", "id -a"],
+      "negative_keywords": [],
       "severity": 3,
       "remediation": "Monitor for user enumeration commands post-initial access. Correlate with privilege escalation attempts."
     },
@@ -62,7 +69,8 @@
       "id": "T1003",
       "name": "OS Credential Dumping",
       "tactic": "Credential Access",
-      "keywords": ["mimikatz", "lsass", "sekurlsa", "logonpasswords", "credential dump", "hashdump", "sam dump", "ntds.dit", "procdump lsass", "comsvcs.dll"],
+      "keywords": ["mimikatz", "sekurlsa", "logonpasswords", "credential dump", "hashdump", "sam dump", "ntds.dit", "procdump lsass", "comsvcs.dll"],
+      "negative_keywords": [],
       "severity": 10,
       "remediation": "Enable Credential Guard on Windows 10+. Configure LSA protection (RunAsPPL). Monitor for LSASS access via Sysmon Event ID 10. Deploy EDR with memory protection."
     },
@@ -70,7 +78,8 @@
       "id": "T1003.001",
       "name": "OS Credential Dumping: LSASS Memory",
       "tactic": "Credential Access",
-      "keywords": ["lsass.exe", "lsass memory", "minidump lsass", "procdump -ma lsass"],
+      "keywords": ["lsass.exe", "lsass memory", "minidump lsass", "procdump -ma lsass", "extracted credentials from lsass"],
+      "negative_keywords": ["lsass protection enabled", "runasppl enabled"],
       "severity": 10,
       "remediation": "Enable Credential Guard and LSA protection (RunAsPPL). Monitor for suspicious LSASS access patterns via Sysmon Event ID 10."
     },
@@ -78,7 +87,8 @@
       "id": "T1053.005",
       "name": "Scheduled Task/Job: Scheduled Task",
       "tactic": "Persistence",
-      "keywords": ["schtasks", "schtasks /create", "scheduled task", "at.exe", "at /every"],
+      "keywords": ["schtasks /create", "schtasks.exe /create", "at.exe /every"],
+      "negative_keywords": [],
       "severity": 7,
       "remediation": "Audit scheduled task creation via Windows Event ID 4698. Restrict task creation to administrators. Monitor Task Scheduler for unexpected entries."
     },
@@ -86,7 +96,8 @@
       "id": "T1053.003",
       "name": "Scheduled Task/Job: Cron",
       "tactic": "Persistence",
-      "keywords": ["cron", "crontab", "crontab -e", "/etc/cron", "/var/spool/cron"],
+      "keywords": ["crontab -e", "crontab -l", "/etc/cron.d/", "/var/spool/cron"],
+      "negative_keywords": ["cron service started", "cron job completed"],
       "severity": 7,
       "remediation": "Monitor crontab modifications. Restrict cron access via /etc/cron.allow. Audit /etc/cron.d/ and user crontabs for unexpected entries."
     },
@@ -94,7 +105,8 @@
       "id": "T1071",
       "name": "Application Layer Protocol",
       "tactic": "Command and Control",
-      "keywords": ["curl", "wget", "beacon", "callback", "c2", "http beacon", "https callback", "reverse shell", "reverse_tcp"],
+      "keywords": ["beacon", "c2 callback", "c2 server", "http beacon", "https callback", "reverse shell", "reverse_tcp"],
+      "negative_keywords": ["healthcheck", "health check", "status 200 ok"],
       "severity": 8,
       "remediation": "Deploy SSL/TLS inspection on egress proxies. Monitor for periodic beaconing patterns. Use DNS sinkholing and threat intelligence feeds for known C2 domains."
     },
@@ -103,6 +115,7 @@
       "name": "Application Layer Protocol: Web Protocols",
       "tactic": "Command and Control",
       "keywords": ["http c2", "https c2", "web shell", "webshell", "reverse http"],
+      "negative_keywords": [],
       "severity": 8,
       "remediation": "Inspect outbound HTTP/S traffic via proxy. Monitor for unusual User-Agent strings and beaconing intervals. Deploy WAF for web shell detection."
     },
@@ -110,7 +123,8 @@
       "id": "T1021.001",
       "name": "Remote Services: Remote Desktop Protocol",
       "tactic": "Lateral Movement",
-      "keywords": ["rdp", "mstsc", "remote desktop", "3389", "xfreerdp"],
+      "keywords": ["xfreerdp", "mstsc.exe", "rdp lateral", "rdp brute"],
+      "negative_keywords": ["rdp disabled", "nla enabled"],
       "severity": 6,
       "remediation": "Enforce NLA (Network Level Authentication) for RDP. Restrict RDP access via firewall to management subnets only. Enable RDP session logging."
     },
@@ -118,7 +132,8 @@
       "id": "T1021.004",
       "name": "Remote Services: SSH",
       "tactic": "Lateral Movement",
-      "keywords": ["ssh", "ssh brute", "ssh lateral", "paramiko", "plink"],
+      "keywords": ["ssh brute", "ssh lateral", "paramiko", "plink.exe", "lateral_movement"],
+      "negative_keywords": ["ssh service started", "sshd listening", "accepted publickey"],
       "severity": 5,
       "remediation": "Enforce key-based SSH authentication. Monitor for lateral SSH connections from compromised hosts. Use SSH certificate authorities for enterprise environments."
     },
@@ -126,7 +141,8 @@
       "id": "T1105",
       "name": "Ingress Tool Transfer",
       "tactic": "Command and Control",
-      "keywords": ["certutil", "certutil -urlcache", "bitsadmin", "invoke-webrequest", "wget", "curl -o", "scp", "nc", "netcat"],
+      "keywords": ["certutil -urlcache", "bitsadmin /transfer", "invoke-webrequest", "curl -o ", "wget -o ", "netcat -e", "nc -e"],
+      "negative_keywords": [],
       "severity": 7,
       "remediation": "Monitor for LOLBins used for file downloads (certutil, bitsadmin). Restrict outbound connections to approved destinations. Enable proxy logging."
     },
@@ -134,7 +150,8 @@
       "id": "T1055",
       "name": "Process Injection",
       "tactic": "Defense Evasion",
-      "keywords": ["process injection", "dll injection", "reflective dll", "createremotethread", "ntcreatethreadex", "shellcode inject", "hollowing"],
+      "keywords": ["process injection", "dll injection", "reflective dll", "createremotethread", "ntcreatethreadex", "shellcode inject", "process hollowing"],
+      "negative_keywords": [],
       "severity": 9,
       "remediation": "Deploy EDR with process injection detection. Enable Sysmon for cross-process activity monitoring. Use Attack Surface Reduction (ASR) rules."
     },
@@ -142,7 +159,8 @@
       "id": "T1078",
       "name": "Valid Accounts",
       "tactic": "Persistence",
-      "keywords": ["net user /add", "useradd", "adduser", "new-localuser", "account created", "password changed"],
+      "keywords": ["net user /add", "useradd ", "adduser ", "new-localuser"],
+      "negative_keywords": [],
       "severity": 8,
       "remediation": "Enforce MFA for all accounts. Monitor for unexpected account creation events (Windows 4720, Linux useradd in auth.log). Implement PAM for privileged access."
     },
@@ -150,7 +168,8 @@
       "id": "T1048",
       "name": "Exfiltration Over Alternative Protocol",
       "tactic": "Exfiltration",
-      "keywords": ["exfiltration", "data exfil", "dns exfil", "dns tunnel", "icmp tunnel", "ftp upload", "exfil over dns"],
+      "keywords": ["data exfil", "exfiltration", "dns exfil", "dns tunnel", "icmp tunnel", "exfil over dns"],
+      "negative_keywords": ["dlp blocked exfiltration"],
       "severity": 9,
       "remediation": "Monitor DNS query lengths and volume for DNS tunneling indicators. Restrict outbound protocols. Deploy DLP on egress points."
     },
@@ -158,7 +177,8 @@
       "id": "T1070.004",
       "name": "Indicator Removal: File Deletion",
       "tactic": "Defense Evasion",
-      "keywords": ["del /f", "rm -rf", "shred", "wipe", "evidence deletion", "clear logs", "wevtutil cl"],
+      "keywords": ["wevtutil cl", "clear logs", "event log cleared", "evidence deletion", "rm -rf /var/log"],
+      "negative_keywords": [],
       "severity": 7,
       "remediation": "Enable centralized log collection (SIEM) to preserve logs even after local deletion. Monitor for log clearing events (Windows 1102, 104)."
     },
@@ -166,7 +186,8 @@
       "id": "T1087",
       "name": "Account Discovery",
       "tactic": "Discovery",
-      "keywords": ["net user", "net group", "net localgroup", "get-aduser", "get-adgroupmember", "ldapsearch", "enum4linux"],
+      "keywords": ["net user /domain", "net group /domain", "net localgroup", "get-aduser", "get-adgroupmember", "ldapsearch", "enum4linux"],
+      "negative_keywords": [],
       "severity": 4,
       "remediation": "Monitor for bulk AD enumeration queries. Restrict LDAP query access. Deploy honeypot accounts to detect enumeration."
     },
@@ -174,7 +195,8 @@
       "id": "T1135",
       "name": "Network Share Discovery",
       "tactic": "Discovery",
-      "keywords": ["net share", "net view", "smbclient", "smbmap", "crackmapexec", "enum shares"],
+      "keywords": ["net share", "net view", "smbclient", "smbmap", "crackmapexec", "enum shares", "enum4linux"],
+      "negative_keywords": [],
       "severity": 5,
       "remediation": "Restrict SMB access between workstation segments. Monitor for share enumeration. Disable unnecessary network shares."
     },
@@ -183,6 +205,7 @@
       "name": "Remote System Discovery",
       "tactic": "Discovery",
       "keywords": ["ping sweep", "arp -a", "arp scan", "nbtscan", "net view /domain", "dns enumeration"],
+      "negative_keywords": [],
       "severity": 4,
       "remediation": "Deploy network segmentation and monitor for ARP/ICMP sweep patterns on IDS. Disable LLMNR and NetBIOS-NS."
     },
@@ -191,6 +214,7 @@
       "name": "Brute Force",
       "tactic": "Credential Access",
       "keywords": ["brute force", "hydra", "medusa", "patator", "password spray", "credential stuffing", "ncrack"],
+      "negative_keywords": [],
       "severity": 7,
       "remediation": "Implement account lockout policies. Enable MFA. Monitor for multiple failed authentication attempts in SIEM. Use progressive delays."
     },
@@ -198,7 +222,8 @@
       "id": "T1190",
       "name": "Exploit Public-Facing Application",
       "tactic": "Initial Access",
-      "keywords": ["exploit", "sqlmap", "sql injection", "sqli", "rce", "remote code execution", "cve-", "metasploit", "msfconsole"],
+      "keywords": ["sqlmap", "sql injection", "sqli", "remote code execution", "metasploit", "msfconsole"],
+      "negative_keywords": ["no sql injection found", "vulnerability patched"],
       "severity": 9,
       "remediation": "Patch public-facing applications promptly. Deploy WAF with virtual patching. Conduct regular vulnerability scans and penetration tests."
     },
@@ -206,7 +231,8 @@
       "id": "T1068",
       "name": "Exploitation for Privilege Escalation",
       "tactic": "Privilege Escalation",
-      "keywords": ["privilege escalation", "privesc", "local exploit", "kernel exploit", "sudo exploit", "suid", "potato exploit", "juicypotato", "printspoofer"],
+      "keywords": ["privilege escalation", "privesc", "local exploit", "kernel exploit", "sudo exploit", "suid", "potato exploit", "juicypotato", "printspoofer", "nopasswd"],
+      "negative_keywords": [],
       "severity": 9,
       "remediation": "Keep systems patched. Audit SUID/SGID binaries. Remove unnecessary sudo privileges. Deploy kernel exploit mitigations (SMEP, SMAP, KASLR)."
     },
@@ -214,7 +240,8 @@
       "id": "T1572",
       "name": "Protocol Tunneling",
       "tactic": "Command and Control",
-      "keywords": ["tunnel", "chisel", "ligolo", "socks proxy", "ssh tunnel", "port forwarding", "proxychains", "ngrok"],
+      "keywords": ["chisel client", "chisel server", "ligolo", "socks proxy", "ssh tunnel", "proxychains", "ngrok"],
+      "negative_keywords": [],
       "severity": 8,
       "remediation": "Monitor for unusual outbound connections and tunneling indicators. Block unauthorized tunnel tools. Inspect encrypted traffic at egress."
     },
@@ -222,7 +249,8 @@
       "id": "T1562.001",
       "name": "Impair Defenses: Disable or Modify Tools",
       "tactic": "Defense Evasion",
-      "keywords": ["disable antivirus", "disable defender", "set-mppreference", "tamper protection", "stop-service windefend", "disable firewall", "netsh advfirewall"],
+      "keywords": ["disable antivirus", "disable defender", "set-mppreference", "tamper protection disabled", "stop-service windefend", "netsh advfirewall set"],
+      "negative_keywords": ["tamper protection enabled", "defender enabled"],
       "severity": 9,
       "remediation": "Enable Tamper Protection for Windows Defender. Monitor for security tool stoppage events. Use EDR with self-protection capabilities."
     }

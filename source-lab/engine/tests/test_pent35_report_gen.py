@@ -39,6 +39,7 @@ from pent35_report_gen import (
     load_rules,
     load_session,
     main,
+    redact_secrets,
     run_pipeline,
     validate_scope,
 )
@@ -423,3 +424,168 @@ class TestCLI:
         )
         assert result.returncode != 0
         assert "SCOPE VIOLATION" in result.stderr
+
+
+# ── Hardened Security & Quality Tests ─────────────────────────────────
+
+def _extract_pdf_streams(pdf_bytes: bytes) -> str:
+    """Decompress all FlateDecode streams from a PDF byte buffer."""
+    import re
+    import zlib
+
+    chunks: list[str] = []
+    for match in re.finditer(rb"stream\n(.*?)\nendstream", pdf_bytes, re.DOTALL):
+        chunks.append(zlib.decompress(match.group(1)).decode("latin-1"))
+    return "\n".join(chunks)
+
+
+class TestHardenedScopeGuard:
+    """Scope Guard must catch metadata, IPv6, IPv4-mapped, and .sh ccTLD targets."""
+
+    def test_ipv6_loopback_and_ula_accepted(self) -> None:
+        assert _is_ip_safe("::1")
+        assert _is_ip_safe("fc00::1")
+        assert _is_ip_safe("fd00::1/64")
+        assert _is_ip_safe("::ffff:192.168.1.10")
+
+    def test_ipv6_public_and_mapped_public_rejected(self) -> None:
+        assert not _is_ip_safe("2001:4860:4860::8888")
+        assert not _is_ip_safe("2606:4700:4700::1111")
+        assert not _is_ip_safe("::ffff:8.8.8.8")
+
+    def test_bracketed_ipv6_and_url_rejected_in_events(self) -> None:
+        for payload in (
+            {"endpoint": "[2001:4860:4860::8888]:443"},
+            {"url": "https://[2001:4860:4860::8888]:443/api"},
+            {"host": "::ffff:8.8.8.8"},
+        ):
+            with pytest.raises(ScopeViolationError):
+                validate_scope([payload])
+
+    def test_bracketed_ipv6_private_accepted(self) -> None:
+        targets = validate_scope([
+            {"endpoint": "[::1]:8080"},
+            {"url": "http://[fd00::10]:8443/beacon"},
+        ])
+        assert "::1" in targets
+        assert "fd00::10" in targets
+
+    def test_public_sh_cctld_rejected(self) -> None:
+        assert not _is_hostname_safe("evil.sh")
+        assert not _is_hostname_safe("target.sh")
+        for payload in (
+            {"target": "evil.sh"},
+            {"host": "target.sh"},
+            {"url": "https://deploy.sh/api"},
+        ):
+            with pytest.raises(ScopeViolationError):
+                validate_scope([payload])
+
+    def test_extended_lab_domains_accepted(self) -> None:
+        for host in ("api.internal", "app.test", "svc.localhost", "db01.lab", "printer.local"):
+            assert _is_hostname_safe(host)
+
+    @pytest.mark.parametrize("meta_key", [
+        "metadata", "session", "target", "targets", "scope",
+        "environment", "assets", "host", "ip", "url", "endpoint",
+    ])
+    def test_metadata_oos_target_rejected_end_to_end(
+        self, tmp_path: Path, tmp_out: Path, meta_key: str
+    ) -> None:
+        session_file = tmp_path / f"meta_{meta_key}.json"
+        session_data = {
+            meta_key: {"nested": ["https://evil.sh/exfil"]} if meta_key in ("metadata", "session", "environment", "assets") else "8.8.8.8",
+            "events": [{"tool": "nmap", "command": "nmap -sV 192.168.10.10"}],
+        }
+        session_file.write_text(json.dumps(session_data), encoding="utf-8")
+        assert main(["--input", str(session_file), "--out-dir", str(tmp_out)]) == 2
+
+
+class TestSecretRedaction:
+    """Secrets must never leak into Markdown or PDF reports."""
+
+    def test_redact_secrets_patterns(self) -> None:
+        raw = (
+            "curl -H 'Authorization: Bearer tok_secret_123456' "
+            "-H 'Cookie: sessionid=abc123xyz' "
+            "https://admin:MyS3cr3tPass@web-server.lab/api?api_key=AKIAIOSFODNN7EXAMPLE "
+            "--password SuperPassword123 -p ShortSecret "
+            "token=ghp_1234567890abcdef123456 "
+            "sk-proj1234567890abcdef "
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA\n-----END RSA PRIVATE KEY-----"
+        )
+        redacted = redact_secrets(raw)
+        for leaked in (
+            "tok_secret_123456",
+            "abc123xyz",
+            "MyS3cr3tPass",
+            "AKIAIOSFODNN7EXAMPLE",
+            "SuperPassword123",
+            "ShortSecret",
+            "ghp_1234567890abcdef123456",
+            "sk-proj1234567890abcdef",
+            "MIIEpAIBAAKCAQEA",
+        ):
+            assert leaked not in redacted, f"Secret leaked: {leaked}"
+        assert "[REDACTED]" in redacted
+        assert "[REDACTED PRIVATE KEY]" in redacted
+
+    def test_nmap_port_flag_preserved(self) -> None:
+        cmd = "nmap -p 1-65535 -T4 192.168.10.10"
+        assert redact_secrets(cmd) == cmd
+
+    def test_pipeline_redacts_secrets_from_md_and_pdf(
+        self, tmp_path: Path, tmp_out: Path
+    ) -> None:
+        session_file = tmp_path / "secrets_session.json"
+        session_data = {
+            "meta": {"operator": "tester", "api_key": "sk-secretkey9876543210"},
+            "events": [
+                {
+                    "tool": "curl",
+                    "command": "curl -H 'Authorization: Bearer my_jwt_secret_token_999' https://svc:TopSecret99@web-server.lab/beacon",
+                    "output": "C2 beacon callback, Cookie: PHPSESSID=deadbeef123456; password=Hunter2Secret!",
+                }
+            ],
+        }
+        session_file.write_text(json.dumps(session_data), encoding="utf-8")
+        run_pipeline(session_file, tmp_out)
+
+        md_text = (tmp_out / "redteam_report.md").read_text(encoding="utf-8")
+        pdf_stream = _extract_pdf_streams((tmp_out / "redteam_report.pdf").read_bytes())
+
+        for secret in (
+            "sk-secretkey9876543210",
+            "my_jwt_secret_token_999",
+            "TopSecret99",
+            "deadbeef123456",
+            "Hunter2Secret!",
+        ):
+            assert secret not in md_text, f"Secret leaked in MD: {secret}"
+            assert secret not in pdf_stream, f"Secret leaked in PDF: {secret}"
+
+
+class TestPdfAndFalsePositives:
+    """PDF must preserve all wrapped/multi-page/Turkish text; benign text yields 0 findings."""
+
+    def test_pdf_multipage_and_turkish_normalization(self) -> None:
+        long_line = "Güvenlik açığı tespiti ve ağ taraması raporu: " + ("veri " * 30)
+        many_lines = [f"- Bulgu {i}: {long_line}" for i in range(60)]
+        md = "# Türkçe Başlık: ğüşıöç ĞÜŞİÖÇ (test) \\path\n\n" + "\n".join(many_lines)
+
+        pdf = _PDFWriter().generate(md)
+        stream = _extract_pdf_streams(pdf)
+        assert b"/Count 1 " not in pdf  # must span multiple pages
+        assert "?" not in stream  # no lost glyphs replaced with '?'
+        assert "Turkce Baslik: gusioc GUSIOC" in stream
+        assert "Bulgu 59" in stream  # last line not dropped
+
+    def test_benign_ordinary_text_produces_zero_findings(self, rules: list[MitreRule]) -> None:
+        benign_events = [
+            {"message": "User alice logged in via ssh on port 22 over http"},
+            {"level": "info", "status": "ok", "message": "SSH service started, HTTP server version 2.4 verified"},
+            {"log": "Normal user login completed without errors; server id 42"},
+        ]
+        findings = analyze_events(benign_events, rules)
+        assert findings == []
+

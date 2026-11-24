@@ -3,28 +3,21 @@
 
 Reads red-team / pentest session logs (.json / .jsonl) produced in an
 **isolated lab environment**, maps observed tools and commands to MITRE
-ATT&CK techniques, calculates a composite risk score, and outputs a
-professional report in both Markdown and PDF formats.
+ATT&CK techniques, redacts any embedded secrets, calculates a composite
+risk score, and outputs a professional report in both Markdown and PDF
+formats.
 
-Safety: A mandatory **Scope Guard** verifies every target (IP, CIDR,
-hostname) in the session log.  Only RFC 1918 private addresses,
-loopback, and ``.local`` / ``.lab`` hostnames are accepted.  Any
-public IP or unauthorized domain causes an immediate abort with a
-non-zero exit code and a ``ScopeViolationError``.
-
-Usage::
-
-    python pent35_report_gen.py --input session.json --out-dir ./reports
-    python pent35_report_gen.py --input session.jsonl --out-dir ./reports
-
-Outputs::
-
-    <out-dir>/redteam_report.md
-    <out-dir>/redteam_report.pdf
+Safety: A mandatory **Scope Guard** verifies every target (IPv4, IPv6,
+CIDR, URL, hostname) across both root metadata and session events.
+Only RFC 1918 private IPv4 addresses, IPv4/IPv6 loopback, IPv6 ULA
+(``fc00::/7``), and explicit lab domains (``.lab``, ``.local``,
+``.internal``, ``.test``, ``.localhost``) are accepted.  Any public IP
+or unauthorized domain (including public ccTLDs such as ``.sh``) causes
+an immediate abort with exit code 2 and a ``ScopeViolationError``.
 
 Dependencies: **Python 3.11+ standard library only** — no external
 packages.  The PDF writer is a minimal, self-contained ``%PDF-1.4``
-generator that produces valid, openable PDF documents.
+generator that produces valid, openable, multi-page PDF documents.
 """
 
 from __future__ import annotations
@@ -32,9 +25,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
-import os
 import re
-import struct
 import sys
 import textwrap
 import zlib
@@ -42,6 +33,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 
 # ── Exceptions ──────────────────────────────────────────────────────────
@@ -60,6 +52,7 @@ class MitreRule:
     keywords: list[str]
     severity: int
     remediation: str
+    negative_keywords: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -82,13 +75,97 @@ class ReportData:
     event_count: int = 0
 
 
+# ── Secret Redaction ───────────────────────────────────────────────────
+
+_PRIVATE_KEY_RE = re.compile(
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?"
+    r"(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)"
+)
+_URL_CREDS_RE = re.compile(
+    r"([a-zA-Z][a-zA-Z0-9+.-]*://)([^/\s:@]+:[^/\s@]+@)"
+)
+_AUTH_HEADER_RE = re.compile(
+    r"(?i)(Authorization\s*:\s*(?:Bearer|Basic|Token|ApiKey|Digest)?\s*)"
+    r"([A-Za-z0-9\-._~+/=]{6,})"
+)
+_BEARER_RE = re.compile(
+    r"(?i)(Bearer\s+)([A-Za-z0-9\-._~+/=]{6,})"
+)
+_COOKIE_HEADER_RE = re.compile(
+    r"(?i)((?:Set-)?Cookie\s*:\s*)([^\r\n'\"]+)"
+)
+_KV_SECRET_RE = re.compile(
+    r"(?i)(\b(?:password|passwd|pwd|api[_-]?key|client[_-]?secret|"
+    r"app[_-]?secret|secret|access[_-]?token|auth[_-]?token|"
+    r"refresh[_-]?token|token|session[_-]?id|sessionid|"
+    r"phpsessid|jsessionid)\s*[:=]\s*)"
+    r"(\"[^\"]*\"|'[^']*'|[^\s,;\"'&]+)"
+)
+_CLI_PASSWORD_RE = re.compile(
+    r"(?i)(--(?:password|passwd|token|api-key|secret)(?:=|\s+))"
+    r"(\"[^\"]*\"|'[^']*'|[^\s]+)"
+)
+_CLI_SHORT_P_RE = re.compile(
+    r"(?<!\S)(-p\s+)(?!\d+(?:[-,]\d+)*\b)(\"[^\"]*\"|'[^']*'|[^\s-]+)"
+)
+_KNOWN_TOKEN_RE = re.compile(
+    r"\b(?:"
+    r"sk-[A-Za-z0-9_-]{10,}"
+    r"|gh[pousr]_[A-Za-z0-9]{10,}"
+    r"|github_pat_[A-Za-z0-9_]{10,}"
+    r"|AKIA[0-9A-Z]{16}"
+    r"|ASIA[0-9A-Z]{16}"
+    r"|xox[baprs]-[A-Za-z0-9-]+"
+    r"|eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"
+    r")\b"
+)
+_CRED_PAIR_RE = re.compile(
+    r"(?i)(credentials?[^:\n]*:\s*)([a-zA-Z0-9_.-]+):([^\s,;\"']+)"
+)
+
+
+def redact_secrets(text: str) -> str:
+    """Mask passwords, API keys, tokens, cookies, and private keys."""
+    if not text:
+        return text
+    result = _PRIVATE_KEY_RE.sub("[REDACTED PRIVATE KEY]", text)
+    result = _URL_CREDS_RE.sub(r"\1[REDACTED]@", result)
+    result = _AUTH_HEADER_RE.sub(r"\1[REDACTED]", result)
+    result = _BEARER_RE.sub(r"\1[REDACTED]", result)
+    result = _COOKIE_HEADER_RE.sub(r"\1[REDACTED]", result)
+    result = _KV_SECRET_RE.sub(r"\1[REDACTED]", result)
+    result = _CLI_PASSWORD_RE.sub(r"\1[REDACTED]", result)
+    result = _CLI_SHORT_P_RE.sub(r"\1[REDACTED]", result)
+    result = _KNOWN_TOKEN_RE.sub("[REDACTED]", result)
+    result = _CRED_PAIR_RE.sub(r"\1\2:[REDACTED]", result)
+    return result
+
+
+def redact_obj(obj: Any) -> Any:
+    """Recursively redact secrets from strings, lists, and dicts."""
+    if isinstance(obj, str):
+        return redact_secrets(obj)
+    if isinstance(obj, dict):
+        return {k: redact_obj(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [redact_obj(item) for item in obj]
+    if isinstance(obj, tuple):
+        return tuple(redact_obj(item) for item in obj)
+    return obj
+
+
 # ── Scope Guard ─────────────────────────────────────────────────────────
 
-_PRIVATE_NETWORKS = [
+_PRIVATE_IPV4_NETWORKS = [
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
     ipaddress.ip_network("127.0.0.0/8"),
+]
+
+_ALLOWED_IPV6_NETWORKS = [
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),  # Unique Local Addresses (includes fd00::/8)
 ]
 
 _SAFE_HOSTNAME_RE = re.compile(
@@ -96,12 +173,30 @@ _SAFE_HOSTNAME_RE = re.compile(
     r"localhost"
     r"|[\w.-]+\.local"
     r"|[\w.-]+\.lab"
+    r"|[\w.-]+\.internal"
+    r"|[\w.-]+\.test"
+    r"|[\w.-]+\.localhost"
     r")$",
     re.IGNORECASE,
 )
 
-_IP_RE = re.compile(
+_URL_RE = re.compile(
+    r"(?:https?|ftp|wss?|ssh|rdp|ldap|smb)://[^\s\"'<>]+",
+    re.IGNORECASE,
+)
+
+_IPV4_RE = re.compile(
     r"\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:/\d{1,2})?)\b"
+)
+
+_BRACKETED_IPV6_RE = re.compile(
+    r"\[([0-9a-fA-F:]+(?:%[a-zA-Z0-9_.-]+)?)\](?::\d+)?"
+)
+
+_IPV6_TOKEN_RE = re.compile(
+    r"(?<![a-zA-Z0-9._-])"
+    r"([0-9a-fA-F:]*:[0-9a-fA-F:]*:[0-9a-fA-F:.]*(?:/\d{1,3})?)"
+    r"(?![a-zA-Z0-9._-])"
 )
 
 _HOSTNAME_RE = re.compile(
@@ -109,37 +204,112 @@ _HOSTNAME_RE = re.compile(
     r"[a-zA-Z]{2,})\b"
 )
 
+# Strictly non-domain file extensions (note: .sh is intentionally NOT here
+# because .sh is a public ccTLD and targets like evil.sh must be rejected).
+_NON_DOMAIN_EXTENSIONS = (
+    ".exe", ".dll", ".py", ".js", ".ts", ".json", ".jsonl",
+    ".md", ".txt", ".log", ".cfg", ".conf", ".ini",
+    ".yml", ".yaml", ".xml", ".html", ".css",
+    ".bat", ".ps1", ".c", ".h", ".cpp", ".java", ".rb", ".go",
+    ".dit", ".dmp", ".pdf",
+)
+
+
+def _strip_ipv6_zone(ip_str: str) -> str:
+    """Remove optional IPv6 zone identifier (e.g. %eth0) before parsing."""
+    if "%" in ip_str:
+        addr_part, _, rest = ip_str.partition("%")
+        if "/" in rest:
+            _, _, prefix = rest.partition("/")
+            return f"{addr_part}/{prefix}"
+        return addr_part
+    return ip_str
+
 
 def _is_ip_safe(ip_str: str) -> bool:
-    """Return True if *ip_str* (IP or CIDR) is within allowed ranges."""
+    """Return True if *ip_str* (IPv4, IPv6, or CIDR) is within lab scope."""
+    cleaned = _strip_ipv6_zone(ip_str.strip("[]"))
     try:
-        net = ipaddress.ip_network(ip_str, strict=False)
+        net = ipaddress.ip_network(cleaned, strict=False)
     except ValueError:
         return False
-    return any(
-        net.subnet_of(priv) for priv in _PRIVATE_NETWORKS
-    )
+
+    if net.version == 4:
+        return any(net.subnet_of(priv) for priv in _PRIVATE_IPV4_NETWORKS)
+
+    # IPv6: check IPv4-mapped IPv6 addresses (e.g. ::ffff:8.8.8.8)
+    if net.prefixlen == 128 and net.network_address.ipv4_mapped is not None:
+        mapped_v4 = ipaddress.ip_network(
+            f"{net.network_address.ipv4_mapped}/32", strict=False
+        )
+        return any(mapped_v4.subnet_of(priv) for priv in _PRIVATE_IPV4_NETWORKS)
+
+    return any(net.subnet_of(allowed) for allowed in _ALLOWED_IPV6_NETWORKS)
 
 
 def _is_hostname_safe(hostname: str) -> bool:
     """Return True if *hostname* is an allowed lab hostname."""
-    return bool(_SAFE_HOSTNAME_RE.match(hostname))
+    return bool(_SAFE_HOSTNAME_RE.match(hostname.rstrip(".")))
+
+
+def _extract_targets_from_string(text: str) -> set[str]:
+    """Extract IPv4, IPv6, URL hostnames, and domain targets from *text*."""
+    targets: set[str] = set()
+
+    # 1. URLs (handles user:pass@host, [ipv6]:port, domains, etc.)
+    for url_match in _URL_RE.finditer(text):
+        url_str = url_match.group(0).rstrip(".,;)")
+        try:
+            parsed = urlsplit(url_str)
+            if parsed.hostname:
+                targets.add(parsed.hostname)
+        except ValueError:
+            pass
+
+    # 2. Bracketed IPv6 with optional port: [2001:4860:4860::8888]:443
+    for m in _BRACKETED_IPV6_RE.finditer(text):
+        candidate = _strip_ipv6_zone(m.group(1))
+        try:
+            ipaddress.ip_network(candidate, strict=False)
+            targets.add(candidate)
+        except ValueError:
+            pass
+
+    # 3. Bare IPv6 tokens (including ::1, fd00::/8, ::ffff:8.8.8.8)
+    for m in _IPV6_TOKEN_RE.finditer(text):
+        candidate = _strip_ipv6_zone(m.group(1))
+        try:
+            net = ipaddress.ip_network(candidate, strict=False)
+            if net.version == 6:
+                targets.add(candidate)
+        except ValueError:
+            pass
+
+    # 4. IPv4 / CIDR
+    for m in _IPV4_RE.finditer(text):
+        targets.add(m.group(1))
+
+    # 5. Hostnames / domains (including .sh public ccTLD)
+    for m in _HOSTNAME_RE.finditer(text):
+        h = m.group(1)
+        lower_h = h.lower()
+        # Skip if already parsed as IPv4
+        try:
+            ipaddress.ip_network(h, strict=False)
+            continue
+        except ValueError:
+            pass
+        if not lower_h.endswith(_NON_DOMAIN_EXTENSIONS):
+            targets.add(h)
+
+    return targets
 
 
 def _extract_targets_from_value(value: Any) -> set[str]:
-    """Recursively extract IP addresses and hostnames from a value."""
+    """Recursively extract IP addresses and hostnames from any value."""
     targets: set[str] = set()
     if isinstance(value, str):
-        targets.update(_IP_RE.findall(value))
-        for m in _HOSTNAME_RE.finditer(value):
-            h = m.group(1)
-            # Skip common non-hostname patterns
-            if not h.endswith((".exe", ".dll", ".py", ".js", ".json",
-                               ".md", ".txt", ".log", ".cfg", ".conf",
-                               ".yml", ".yaml", ".xml", ".html", ".css",
-                               ".sh", ".bat", ".ps1", ".c", ".h",
-                               ".cpp", ".java", ".rb", ".go")):
-                targets.add(h)
+        targets.update(_extract_targets_from_string(value))
     elif isinstance(value, dict):
         for v in value.values():
             targets.update(_extract_targets_from_value(v))
@@ -149,28 +319,34 @@ def _extract_targets_from_value(value: Any) -> set[str]:
     return targets
 
 
-def validate_scope(events: list[dict[str, Any]]) -> list[str]:
-    """Validate all targets in *events* are within lab scope.
+def validate_scope(
+    events: list[dict[str, Any]],
+    meta: dict[str, Any] | None = None,
+) -> list[str]:
+    """Validate all targets in *meta* and *events* are within lab scope.
 
-    Returns the list of unique targets found.
+    Returns the sorted list of unique targets found.
     Raises ``ScopeViolationError`` on the first out-of-scope target.
     """
     all_targets: set[str] = set()
+    if meta:
+        all_targets.update(_extract_targets_from_value(meta))
     for event in events:
         all_targets.update(_extract_targets_from_value(event))
 
     validated: list[str] = []
     for target in sorted(all_targets):
+        cleaned = _strip_ipv6_zone(target.strip("[]"))
         # Try as IP/CIDR first
         try:
-            ipaddress.ip_network(target, strict=False)
-            if _is_ip_safe(target):
+            ipaddress.ip_network(cleaned, strict=False)
+            if _is_ip_safe(cleaned):
                 validated.append(target)
                 continue
             raise ScopeViolationError(
                 f"Public/out-of-scope IP detected: {target}. "
-                f"Only RFC 1918 private, loopback, and .local/.lab "
-                f"targets are allowed."
+                f"Only RFC 1918 private IPv4, loopback (127.0.0.0/8, ::1), "
+                f"IPv6 ULA (fc00::/7), and lab domains are allowed."
             )
         except ValueError:
             pass
@@ -180,7 +356,8 @@ def validate_scope(events: list[dict[str, Any]]) -> list[str]:
             continue
         raise ScopeViolationError(
             f"Unauthorized hostname detected: {target}. "
-            f"Only .local and .lab domains are allowed."
+            f"Only .lab, .local, .internal, .test, and .localhost "
+            f"domains are allowed."
         )
 
     return validated
@@ -202,9 +379,18 @@ def load_rules(rules_path: Path | None = None) -> list[MitreRule]:
             keywords=r["keywords"],
             severity=r["severity"],
             remediation=r["remediation"],
+            negative_keywords=r.get("negative_keywords", []),
         )
         for r in data["rules"]
     ]
+
+
+def _compile_keyword_pattern(kw: str) -> re.Pattern[str]:
+    """Build a boundary-aware regex for *kw* to avoid substring false hits."""
+    escaped = re.escape(kw.lower())
+    prefix = r"(?<![a-z0-9_])" if kw and (kw[0].isalnum() or kw[0] == "_") else ""
+    suffix = r"(?![a-z0-9_])" if kw and (kw[-1].isalnum() or kw[-1] == "_") else ""
+    return re.compile(f"{prefix}{escaped}{suffix}")
 
 
 def _event_text(event: dict[str, Any]) -> str:
@@ -225,6 +411,18 @@ def _event_text(event: dict[str, Any]) -> str:
     return " ".join(parts).lower()
 
 
+def _is_benign_informational(event: dict[str, Any]) -> bool:
+    """Return True if *event* is clearly an ordinary benign status log."""
+    level = str(event.get("level", "")).lower()
+    status = str(event.get("status", "")).lower()
+    ev_type = str(event.get("type", "")).lower()
+    if level in {"info", "debug", "notice"} and status in {"ok", "healthy", "success"}:
+        return True
+    if ev_type in {"healthcheck", "heartbeat", "keepalive"}:
+        return True
+    return False
+
+
 def analyze_events(
     events: list[dict[str, Any]],
     rules: list[MitreRule],
@@ -233,21 +431,34 @@ def analyze_events(
     findings: list[Finding] = []
     seen: set[tuple[str, int]] = set()  # (technique_id, event_index)
 
+    compiled_rules = [
+        (
+            rule,
+            [(kw, _compile_keyword_pattern(kw)) for kw in rule.keywords],
+            [_compile_keyword_pattern(nkw) for nkw in rule.negative_keywords],
+        )
+        for rule in rules
+    ]
+
     for idx, event in enumerate(events):
+        if _is_benign_informational(event):
+            continue
         text = _event_text(event)
-        for rule in rules:
+        for rule, kw_patterns, neg_patterns in compiled_rules:
             key = (rule.id, idx)
             if key in seen:
                 continue
-            for kw in rule.keywords:
-                if kw.lower() in text:
+            if any(np.search(text) for np in neg_patterns):
+                continue
+            for kw, pat in kw_patterns:
+                if pat.search(text):
                     findings.append(Finding(
                         technique_id=rule.id,
                         technique_name=rule.name,
                         tactic=rule.tactic,
                         severity=rule.severity,
                         matched_keyword=kw,
-                        source_event=event,
+                        source_event=redact_obj(event),
                         remediation=rule.remediation,
                     ))
                     seen.add(key)
@@ -274,11 +485,13 @@ def calculate_risk_score(findings: list[Finding]) -> float:
 def load_session(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Load a session file (.json or .jsonl).
 
-    Returns (session_metadata, events_list).
+    Returns (session_metadata, events_list).  All root-level metadata
+    and target fields are preserved in *session_metadata* so the Scope
+    Guard validates them as well.
     """
     text = path.read_text(encoding="utf-8")
     if path.suffix == ".jsonl":
-        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
         events = [json.loads(line) for line in lines]
         meta = {
             "format": "jsonl",
@@ -294,31 +507,52 @@ def load_session(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             "source_file": path.name,
             "event_count": len(data),
         }, data
-    # Expect {"meta": {...}, "events": [...]}
-    meta = data.get("meta", data.get("metadata", {}))
-    if not isinstance(meta, dict):
-        meta = {}
+
+    if not isinstance(data, dict):
+        raise ValueError("Session JSON root must be an object or array")
+
+    # Preserve all root-level keys except the event list itself so
+    # Scope Guard inspects metadata, session, target, targets, scope,
+    # environment, assets, host, ip, url, endpoint, etc.
+    event_key = next(
+        (k for k in ("events", "findings", "log") if k in data),
+        None,
+    )
+    raw_events = data.get(event_key, []) if event_key else []
+    if not isinstance(raw_events, list):
+        raw_events = [data]
+
+    meta: dict[str, Any] = {}
+    for k, v in data.items():
+        if k != event_key:
+            meta[k] = v
+    # Flatten common nested meta dict keys at top for display convenience
+    nested_meta = data.get("meta") or data.get("metadata")
+    if isinstance(nested_meta, dict):
+        for k, v in nested_meta.items():
+            meta.setdefault(k, v)
+
     meta["source_file"] = path.name
-    events = data.get("events", data.get("findings", data.get("log", [])))
-    if not isinstance(events, list):
-        events = [data]
-    meta["event_count"] = len(events)
-    return meta, events
+    meta["event_count"] = len(raw_events)
+    return meta, raw_events
 
 
 # ── Markdown Report ────────────────────────────────────────────────────
 
 def generate_markdown(report: ReportData) -> str:
-    """Generate a professional Markdown report."""
+    """Generate a professional Markdown report with all secrets redacted."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines: list[str] = []
     w = lines.append
+
+    safe_meta = redact_obj(report.session_meta)
+    safe_targets = [redact_secrets(t) for t in report.targets]
 
     w("# Red-Team Engagement Report")
     w("")
     w(f"> **Generated:** {now}  ")
     w(f"> **Tool:** PENT-35 Red-Team Report & MITRE ATT&CK Mapping Generator  ")
-    w(f"> **Source:** `{report.session_meta.get('source_file', 'N/A')}`  ")
+    w(f"> **Source:** `{safe_meta.get('source_file', 'N/A')}`  ")
     w(f"> **Events Analyzed:** {report.event_count}")
     w("")
 
@@ -340,17 +574,17 @@ def generate_markdown(report: ReportData) -> str:
     w("")
     w(f"- **Total Findings:** {len(report.findings)}")
     tactics = sorted({f.tactic for f in report.findings})
-    w(f"- **MITRE ATT&CK Tactics Observed:** {len(tactics)} — {', '.join(tactics) if tactics else 'None'}")
+    w(f"- **MITRE ATT&CK Tactics Observed:** {len(tactics)} - {', '.join(tactics) if tactics else 'None'}")
     w(f"- **Unique Techniques Matched:** {len({f.technique_id for f in report.findings})}")
-    w(f"- **Targets in Scope:** {len(report.targets)}")
+    w(f"- **Targets in Scope:** {len(safe_targets)}")
     w("")
 
     # Targets
     w("## Scope & Targets")
     w("")
-    w("All targets validated as in-scope (RFC 1918 / loopback / .local / .lab):")
+    w("All targets validated as in-scope (RFC 1918 / loopback / ULA / lab domains):")
     w("")
-    for t in report.targets:
+    for t in safe_targets:
         w(f"- `{t}`")
     w("")
 
@@ -367,12 +601,14 @@ def generate_markdown(report: ReportData) -> str:
     w("## Detailed Findings")
     w("")
     for i, f in enumerate(report.findings, 1):
-        w(f"### {i}. {f.technique_id} — {f.technique_name}")
+        safe_event = redact_obj(f.source_event)
+        event_preview = json.dumps(safe_event, ensure_ascii=False)[:220]
+        w(f"### {i}. {f.technique_id} - {f.technique_name}")
         w("")
         w(f"- **Tactic:** {f.tactic}")
         w(f"- **Severity:** {f.severity}/10")
         w(f"- **Matched Keyword:** `{f.matched_keyword}`")
-        w(f"- **Source Event:** `{json.dumps(f.source_event, ensure_ascii=False)[:200]}`")
+        w(f"- **Source Event:** `{event_preview}`")
         w("")
         w(f"**Remediation:** {f.remediation}")
         w("")
@@ -397,55 +633,110 @@ def generate_markdown(report: ReportData) -> str:
       "lab environment.*")
     w("")
 
-    return "\n".join(lines)
+    return redact_secrets("\n".join(lines))
 
 
 # ── Pure-Python PDF Generator ──────────────────────────────────────────
 
+_CHAR_NORMALIZE_MAP = str.maketrans({
+    "ğ": "g", "Ğ": "G",
+    "ş": "s", "Ş": "S",
+    "ı": "i", "İ": "I",
+    "ö": "o", "Ö": "O",
+    "ü": "u", "Ü": "U",
+    "ç": "c", "Ç": "C",
+    "—": "-", "–": "-",
+    "’": "'", "‘": "'",
+    "“": '"', "”": '"',
+    "•": "*", "·": "-",
+    "✓": "[OK]", "✗": "[X]",
+})
+
+
 class _PDFWriter:
     """Minimal PDF 1.4 writer using only the standard library.
 
-    Produces a valid PDF with a proper cross-reference table, page tree,
-    and embedded Type1 font (Helvetica).  Text is encoded to
-    latin-1/WinAnsiEncoding with fallback replacement.
+    Produces a valid, multi-page PDF with a proper cross-reference table,
+    page tree, and embedded Type1 fonts (Helvetica / Helvetica-Bold).
+    Turkish characters and punctuation are normalized cleanly so no glyphs
+    are lost in standard WinAnsiEncoding, and lines are wrapped strictly
+    according to font size and page width before pagination.
     """
 
     def __init__(self) -> None:
         self._objects: list[bytes] = []  # 1-indexed (obj 0 unused)
-        self._objects.append(b"")  # placeholder for 0-index
+        self._objects.append(b"")
 
     def _add_obj(self, content: bytes) -> int:
         obj_num = len(self._objects)
         self._objects.append(content)
         return obj_num
 
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        """Normalize non-WinAnsi characters (including Turkish) losslessly."""
+        normalized = text.translate(_CHAR_NORMALIZE_MAP)
+        return normalized.encode("latin-1", errors="replace").decode("latin-1")
+
     def _encode_text(self, text: str) -> str:
-        """Encode text for PDF string, escaping special chars."""
-        safe = text.encode("latin-1", errors="replace").decode("latin-1")
+        """Normalize and escape PDF literal string special characters."""
+        safe = self._normalize_text(text)
         safe = safe.replace("\\", "\\\\")
         safe = safe.replace("(", "\\(")
         safe = safe.replace(")", "\\)")
         return safe
 
-    def _wrap_lines(self, text: str, max_chars: int = 90) -> list[str]:
-        """Wrap text to fit within PDF page width."""
-        result: list[str] = []
-        for line in text.split("\n"):
-            if len(line) <= max_chars:
-                result.append(line)
+    @staticmethod
+    def _max_chars_for_font(font_size: int) -> int:
+        """Return safe character width for A4 (495pt usable width)."""
+        if font_size >= 16:
+            return 50
+        if font_size >= 13:
+            return 62
+        if font_size >= 11:
+            return 74
+        return 84
+
+    def _parse_and_wrap(self, markdown_text: str) -> list[tuple[str, int, bool]]:
+        """Clean markdown formatting and wrap each line to fit page width."""
+        wrapped_entries: list[tuple[str, int, bool]] = []
+        for raw_line in markdown_text.split("\n"):
+            is_heading = raw_line.startswith("#")
+            if raw_line.startswith("# "):
+                font_size = 16
+            elif raw_line.startswith("## "):
+                font_size = 13
+            elif raw_line.startswith("### "):
+                font_size = 11
             else:
-                wrapped = textwrap.wrap(line, width=max_chars,
-                                        break_long_words=True,
-                                        break_on_hyphens=False)
-                result.extend(wrapped if wrapped else [""])
-        return result
+                font_size = 10
+
+            clean = raw_line.lstrip("#").strip() if is_heading else raw_line
+            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", clean)
+            clean = re.sub(r"`(.+?)`", r"\1", clean)
+            clean = re.sub(r"^>\s*", "", clean)
+            clean = re.sub(r"^\|\s*", "", clean)
+            clean = self._normalize_text(clean)
+
+            max_chars = self._max_chars_for_font(font_size)
+            if len(clean) <= max_chars:
+                wrapped_entries.append((clean, font_size, is_heading))
+            else:
+                parts = textwrap.wrap(
+                    clean,
+                    width=max_chars,
+                    break_long_words=True,
+                    break_on_hyphens=False,
+                )
+                for part in (parts or [""]):
+                    wrapped_entries.append((part, font_size, is_heading))
+        return wrapped_entries
 
     def generate(self, markdown_text: str) -> bytes:
         """Generate a valid PDF document from markdown text."""
         self._objects = [b""]  # reset
 
-        # Parse markdown into lines with basic formatting
-        lines = self._wrap_lines(markdown_text, max_chars=95)
+        entries = self._parse_and_wrap(markdown_text)
 
         # Page dimensions (A4: 595 x 842 points)
         page_w, page_h = 595, 842
@@ -456,29 +747,17 @@ class _PDFWriter:
         title_line_height = 20
         usable_h = page_h - margin_top - margin_bottom
 
-        # Build pages of content
+        # Paginate strictly so bottom lines never overflow
         pages_content: list[list[tuple[str, int, bool]]] = []
         current_page: list[tuple[str, int, bool]] = []
         y_used = 0
 
-        for line in lines:
-            is_heading = line.startswith("#")
+        for clean, font_size, is_heading in entries:
             lh = title_line_height if is_heading else line_height
             if y_used + lh > usable_h and current_page:
                 pages_content.append(current_page)
                 current_page = []
                 y_used = 0
-            # Clean markdown formatting for PDF
-            clean = line.lstrip("#").strip()
-            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", clean)
-            clean = re.sub(r"`(.+?)`", r"\1", clean)
-            clean = re.sub(r"^>\s*", "", clean)
-            clean = re.sub(r"^\|\s*", "", clean)
-            font_size = 16 if line.startswith("# ") else (
-                13 if line.startswith("## ") else (
-                    11 if line.startswith("### ") else 10
-                )
-            )
             current_page.append((clean, font_size, is_heading))
             y_used += lh
 
@@ -505,7 +784,6 @@ class _PDFWriter:
 
         page_obj_nums: list[int] = []
         for page_lines in pages_content:
-            # Build content stream
             stream_parts: list[str] = ["BT"]
             y = page_h - margin_top
             for text, font_size, is_heading in page_lines:
@@ -514,7 +792,7 @@ class _PDFWriter:
                 safe = self._encode_text(text)
                 stream_parts.append(
                     f"{font_ref} {font_size} Tf "
-                    f"{margin_left} {y} Td "
+                    f"1 0 0 1 {margin_left} {y} Tm "
                     f"({safe}) Tj"
                 )
                 y -= lh
@@ -522,7 +800,6 @@ class _PDFWriter:
             stream_text = "\n".join(stream_parts)
             stream_bytes = stream_text.encode("latin-1", errors="replace")
 
-            # Compress stream
             compressed = zlib.compress(stream_bytes)
 
             content_num = self._add_obj(
@@ -544,7 +821,6 @@ class _PDFWriter:
             )
             page_obj_nums.append(page_num)
 
-        # Fill in Pages object
         kids = b" ".join(
             str(n).encode() + b" 0 R" for n in page_obj_nums
         )
@@ -553,25 +829,22 @@ class _PDFWriter:
             b" /Count " + str(len(page_obj_nums)).encode() + b" >>"
         )
 
-        # Fill in Catalog
         self._objects[catalog_num] = (
             b"<< /Type /Catalog /Pages " +
             str(pages_num).encode() + b" 0 R >>"
         )
 
-        # Build the PDF file
         buf = bytearray()
         buf.extend(b"%PDF-1.4\n")
-        buf.extend(b"%\xe2\xe3\xcf\xd3\n")  # binary comment
+        buf.extend(b"%\xe2\xe3\xcf\xd3\n")
 
-        offsets: list[int] = [0]  # 0-index unused
+        offsets: list[int] = [0]
         for i in range(1, len(self._objects)):
             offsets.append(len(buf))
             buf.extend(f"{i} 0 obj\n".encode())
             buf.extend(self._objects[i])
             buf.extend(b"\nendobj\n")
 
-        # Cross-reference table
         xref_offset = len(buf)
         buf.extend(b"xref\n")
         buf.extend(f"0 {len(self._objects)}\n".encode())
@@ -579,7 +852,6 @@ class _PDFWriter:
         for i in range(1, len(self._objects)):
             buf.extend(f"{offsets[i]:010d} 00000 n \n".encode())
 
-        # Trailer
         buf.extend(b"trailer\n")
         buf.extend(
             f"<< /Size {len(self._objects)}"
@@ -602,38 +874,30 @@ def run_pipeline(
     """Execute the full analysis pipeline.
 
     1. Load session log
-    2. Validate scope (raises ScopeViolationError on violation)
-    3. Run MITRE ATT&CK matching
+    2. Validate scope across metadata and events
+    3. Run MITRE ATT&CK matching (with secret redaction)
     4. Calculate risk score
     5. Generate Markdown + PDF reports
-
-    Returns the ReportData for programmatic use.
     """
-    # Load
     meta, events = load_session(input_path)
 
-    # Scope guard
-    targets = validate_scope(events)
+    # Scope guard across BOTH metadata and events
+    targets = validate_scope(events, meta=meta)
 
-    # Analyze
     rules = load_rules(rules_path)
     findings = analyze_events(events, rules)
-
-    # Sort findings by severity (highest first)
     findings.sort(key=lambda f: f.severity, reverse=True)
 
-    # Risk score
     score = calculate_risk_score(findings)
 
     report = ReportData(
-        session_meta=meta,
+        session_meta=redact_obj(meta),
         findings=findings,
         risk_score=score,
-        targets=targets,
+        targets=[redact_secrets(t) for t in targets],
         event_count=len(events),
     )
 
-    # Output
     out_dir.mkdir(parents=True, exist_ok=True)
 
     md_text = generate_markdown(report)
@@ -689,7 +953,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error processing session log: {exc}", file=sys.stderr)
         return 3
 
-    print(f"Report generated successfully!")
+    print("Report generated successfully!")
     print(f"  Risk Score : {report.risk_score}/10")
     print(f"  Findings   : {len(report.findings)}")
     print(f"  Markdown   : {args.out_dir / 'redteam_report.md'}")
