@@ -275,14 +275,16 @@ cp "$UPDATE.sig" "$UPDATE_ASSET.sig"
 # ── 7. Publish ──────────────────────────────────────────────────────────────────────────────────
 if [ "$PUBLISH" = 1 ]; then
   [ "$NOTARIZE" = 1 ] || die "refusing to publish an un-notarized DMG"
-  if gh release view "$TAG" -R "$SLUG" >/dev/null 2>&1; then
-    say "updating release $TAG"
-    gh release upload "$TAG" "$ASSET" "$ASSET.sha256" "$ASSET.sig" "$UPDATE_ASSET" "$UPDATE_ASSET.sig" "$UPDATE_ASSET.sha256" --clobber -R "$SLUG"
-  else
+  if ! gh release view "$TAG" -R "$SLUG" >/dev/null 2>&1; then
     say "creating release $TAG"
-    gh release create "$TAG" "$ASSET" "$ASSET.sha256" "$ASSET.sig" "$UPDATE_ASSET" "$UPDATE_ASSET.sig" "$UPDATE_ASSET.sha256" -R "$SLUG" --title "os-lab app $VERSION" \
-      --notes "os-lab desktop app $VERSION. One installer per platform, each with a .sha256 file. The macOS DMG is universal, signed and notarized. The app can download managed Python on request."
+    # The Windows and Linux publishers may create the same release at the same moment: a lost
+    # race is fine as long as the release exists afterwards, and the upload below fills it in.
+    gh release create "$TAG" -R "$SLUG" --title "os-lab app $VERSION" \
+      --notes "os-lab desktop app $VERSION. One installer per platform, each with a .sha256 file. The macOS DMG is universal, signed and notarized. The app can download managed Python on request." \
+      || gh release view "$TAG" -R "$SLUG" >/dev/null || die "could not create release $TAG"
   fi
+  say "uploading to release $TAG"
+  gh release upload "$TAG" "$ASSET" "$ASSET.sha256" "$ASSET.sig" "$UPDATE_ASSET" "$UPDATE_ASSET.sig" "$UPDATE_ASSET.sha256" --clobber -R "$SLUG"
   say "published: https://github.com/$SLUG/releases/tag/$TAG"
 else
   say "dry run: nothing uploaded (use --publish)"
