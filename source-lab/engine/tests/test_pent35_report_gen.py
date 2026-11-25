@@ -589,3 +589,42 @@ class TestPdfAndFalsePositives:
         findings = analyze_events(benign_events, rules)
         assert findings == []
 
+class TestInstructorReviewScopeCases:
+    """Explicit regression tests requested in 25.11 instructor review."""
+
+    def test_public_ipv6_event_target_raises_and_exits_2(
+        self, tmp_path: Path, tmp_out: Path
+    ) -> None:
+        event = {"tool": "nmap", "target": "2001:4860:4860::8888"}
+        with pytest.raises(ScopeViolationError):
+            validate_scope([event])
+
+        session_file = tmp_path / "ipv6_oos.json"
+        session_file.write_text(
+            json.dumps({"events": [event]}),
+            encoding="utf-8",
+        )
+        assert main(["--input", str(session_file), "--out-dir", str(tmp_out)]) == 2
+
+    @pytest.mark.parametrize(
+        "target_value",
+        [
+            "evil.example.sh",
+            "evil.example.py",
+            "evil.example.md",
+            "evil.example.go",
+        ],
+    )
+    def test_public_cctld_extensions_in_target_field_raise_and_exit_2(
+        self, tmp_path: Path, tmp_out: Path, target_value: str
+    ) -> None:
+        event = {"tool": "curl", "target": target_value}
+        with pytest.raises(ScopeViolationError):
+            validate_scope([event])
+
+        session_file = tmp_path / f"cctld_{target_value.replace('.', '_')}.json"
+        session_file.write_text(
+            json.dumps({"events": [event]}),
+            encoding="utf-8",
+        )
+        assert main(["--input", str(session_file), "--out-dir", str(tmp_out)]) == 2

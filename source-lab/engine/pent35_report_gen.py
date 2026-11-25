@@ -252,8 +252,30 @@ def _is_hostname_safe(hostname: str) -> bool:
     return bool(_SAFE_HOSTNAME_RE.match(hostname.rstrip(".")))
 
 
-def _extract_targets_from_string(text: str) -> set[str]:
-    """Extract IPv4, IPv6, URL hostnames, and domain targets from *text*."""
+_TARGET_FIELD_NAMES = frozenset({
+    "target", "targets",
+    "host", "hosts", "hostname", "hostnames",
+    "ip", "ips", "ip_address", "ipv4", "ipv6",
+    "url", "urls", "uri", "uris",
+    "endpoint", "endpoints",
+    "destination", "destinations", "dst", "dest",
+    "rhost", "rhosts", "remote_host", "remote_addr",
+    "address", "addr", "server", "domain", "domains",
+})
+
+
+def _extract_targets_from_string(
+    text: str,
+    *,
+    in_target_field: bool = False,
+) -> set[str]:
+    """Extract IPv4, IPv6, URL hostnames, and domain targets from *text*.
+
+    When *in_target_field* is True (e.g. ``target`` or ``host`` keys),
+    filename extension exclusions are never applied so any domain
+    (including ``.sh``, ``.py``, ``.md``, ``.go`` ccTLDs) or bare
+    hostname is strictly validated against allowed lab scope.
+    """
     targets: set[str] = set()
 
     # 1. URLs (handles user:pass@host, [ipv6]:port, domains, etc.)
@@ -289,33 +311,52 @@ def _extract_targets_from_string(text: str) -> set[str]:
     for m in _IPV4_RE.finditer(text):
         targets.add(m.group(1))
 
-    # 5. Hostnames / domains (including .sh public ccTLD)
+    # 5. Hostnames / domains (never skip extensions inside target/host fields)
     for m in _HOSTNAME_RE.finditer(text):
         h = m.group(1)
         lower_h = h.lower()
-        # Skip if already parsed as IPv4
         try:
             ipaddress.ip_network(h, strict=False)
             continue
         except ValueError:
             pass
-        if not lower_h.endswith(_NON_DOMAIN_EXTENSIONS):
+        if in_target_field or not lower_h.endswith(_NON_DOMAIN_EXTENSIONS):
             targets.add(h)
+
+    # 6. Inside an explicit target/host field, any non-empty scalar value
+    # that did not match a structured pattern must still be validated.
+    if in_target_field and not targets:
+        stripped = text.strip()
+        if stripped:
+            targets.add(stripped)
 
     return targets
 
 
-def _extract_targets_from_value(value: Any) -> set[str]:
+def _extract_targets_from_value(
+    value: Any,
+    *,
+    in_target_field: bool = False,
+) -> set[str]:
     """Recursively extract IP addresses and hostnames from any value."""
     targets: set[str] = set()
     if isinstance(value, str):
-        targets.update(_extract_targets_from_string(value))
+        targets.update(
+            _extract_targets_from_string(value, in_target_field=in_target_field)
+        )
     elif isinstance(value, dict):
-        for v in value.values():
-            targets.update(_extract_targets_from_value(v))
+        for k, v in value.items():
+            child_in_target = in_target_field or (
+                isinstance(k, str) and k.strip().lower() in _TARGET_FIELD_NAMES
+            )
+            targets.update(
+                _extract_targets_from_value(v, in_target_field=child_in_target)
+            )
     elif isinstance(value, (list, tuple)):
         for item in value:
-            targets.update(_extract_targets_from_value(item))
+            targets.update(
+                _extract_targets_from_value(item, in_target_field=in_target_field)
+            )
     return targets
 
 
