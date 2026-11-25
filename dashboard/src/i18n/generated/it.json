@@ -2871,7 +2871,6 @@
   "Could not stop macOS Lab control:": "Impossibile arrestare il controllo del laboratorio macOS:",
   "Click": "Clic",
   "Pointer action": "Azione del puntatore",
-  "Recent actions": "Azioni recenti",
   "Scroll": "Scorrimento",
   "Scroll amount": "Quantità di scorrimento",
   "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.": "La revisione della consegna è aperta. Seleziona una finestra Terminale o della macchina virtuale per esaminarla e acquisire prove. Le azioni di controllo richiedono ancora la conferma o la modalità di controllo attivata.",
@@ -2949,5 +2948,7 @@
   "off": "disattivato",
   "on, disk ok": "attivo, disco ok",
   "low-space warning": "avviso di poco spazio",
-  "low-space critical": "poco spazio, critico"
+  "low-space critical": "poco spazio, critico",
+  "Measured only. It cannot be removed here.": "Solo misurato. Non può essere rimosso da qui.",
+  "Selected items are measured only and cannot be removed. Pick a cleanable item.": "Gli elementi selezionati sono solo misurati e non possono essere rimossi. Scegli un elemento pulibile."
 }

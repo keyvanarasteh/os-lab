@@ -118,6 +118,176 @@
       },
       "cleanable": false,
       "note": "Report-only."
+    },
+    {
+      "id": "agents.codex-bulk",
+      "name": "Codex packages and caches",
+      "category": "developer",
+      "risk": "medium",
+      "hint": "Downloaded packages, plugins, caches and scratch worktrees kept by the tool. Sign-in, settings and memories are not included.",
+      "impact": "Packages, plugins and caches are downloaded again on the next use. Sign-in and settings are kept.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.codex/packages",
+          "~/.codex/plugins",
+          "~/.codex/cache",
+          "~/.codex/generated_images",
+          "~/.codex/computer-use",
+          "~/.codex/worktrees",
+          "~/.codex/attachments"
+        ],
+        "linux": [
+          "~/.codex/packages",
+          "~/.codex/plugins",
+          "~/.codex/cache",
+          "~/.codex/generated_images",
+          "~/.codex/computer-use",
+          "~/.codex/worktrees",
+          "~/.codex/attachments"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.codex\\packages",
+          "%USERPROFILE%\\.codex\\plugins",
+          "%USERPROFILE%\\.codex\\cache",
+          "%USERPROFILE%\\.codex\\generated_images",
+          "%USERPROFILE%\\.codex\\computer-use",
+          "%USERPROFILE%\\.codex\\worktrees",
+          "%USERPROFILE%\\.codex\\attachments"
+        ]
+      },
+      "owningProcesses": [
+        "codex"
+      ],
+      "cleanable": true
+    },
+    {
+      "id": "agents.zcode-bulk",
+      "name": "ZCode worktrees and caches",
+      "category": "developer",
+      "risk": "medium",
+      "hint": "Downloaded packages, plugins, caches and scratch worktrees kept by the tool. Sign-in, settings and memories are not included.",
+      "impact": "Worktrees, the CLI bundle and caches are rebuilt on the next use. Sign-in and settings are kept.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.zcode/worktrees",
+          "~/.zcode/cli",
+          "~/.zcode/v2",
+          "~/.zcode/computer-use",
+          "~/.zcode/tmp"
+        ],
+        "linux": [
+          "~/.zcode/worktrees",
+          "~/.zcode/cli",
+          "~/.zcode/v2",
+          "~/.zcode/computer-use",
+          "~/.zcode/tmp"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.zcode\\worktrees",
+          "%USERPROFILE%\\.zcode\\cli",
+          "%USERPROFILE%\\.zcode\\v2",
+          "%USERPROFILE%\\.zcode\\computer-use",
+          "%USERPROFILE%\\.zcode\\tmp"
+        ]
+      },
+      "owningProcesses": [
+        "zcode"
+      ],
+      "cleanable": true,
+      "note": "Worktrees are removed with their uncommitted files; push or commit first."
+    },
+    {
+      "id": "agents.gemini-bulk",
+      "name": "Gemini / Antigravity binaries and logs",
+      "category": "developer",
+      "risk": "medium",
+      "hint": "Downloaded packages, plugins, caches and scratch worktrees kept by the tool. Sign-in, settings and memories are not included.",
+      "impact": "Downloaded binaries are fetched again and logs are recreated. Sign-in and settings are kept.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.gemini/bin",
+          "~/.gemini/logs",
+          "~/.gemini/tmp"
+        ],
+        "linux": [
+          "~/.gemini/bin",
+          "~/.gemini/logs",
+          "~/.gemini/tmp"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.gemini\\bin",
+          "%USERPROFILE%\\.gemini\\logs",
+          "%USERPROFILE%\\.gemini\\tmp"
+        ]
+      },
+      "owningProcesses": [
+        "gemini",
+        "antigravity"
+      ],
+      "cleanable": true
+    },
+    {
+      "id": "agents.codex-history",
+      "name": "Codex conversation history",
+      "category": "developer",
+      "risk": "privacy",
+      "hint": "Saved conversations and search indexes of the tool. Sign-in and settings are not included.",
+      "impact": "Past conversations are lost and cannot be recovered.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.codex/sessions",
+          "~/.codex/archived_sessions"
+        ],
+        "linux": [
+          "~/.codex/sessions",
+          "~/.codex/archived_sessions"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.codex\\sessions",
+          "%USERPROFILE%\\.codex\\archived_sessions"
+        ]
+      },
+      "owningProcesses": [
+        "codex"
+      ],
+      "cleanable": true
+    },
+    {
+      "id": "agents.codex-databases",
+      "name": "Codex history and log databases",
+      "category": "developer",
+      "risk": "privacy",
+      "hint": "Thread-history and log databases of the tool. Memories, goals and state are not included.",
+      "impact": "Thread history and logs are lost and cannot be recovered.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "paths": {
+        "macos": [
+          "~/.codex/thread_history_*.sqlite*",
+          "~/.codex/logs_*.sqlite*"
+        ],
+        "linux": [
+          "~/.codex/thread_history_*.sqlite*",
+          "~/.codex/logs_*.sqlite*"
+        ],
+        "windows": [
+          "%USERPROFILE%\\.codex\\thread_history_*.sqlite*",
+          "%USERPROFILE%\\.codex\\logs_*.sqlite*"
+        ]
+      },
+      "owningProcesses": [
+        "codex"
+      ],
+      "cleanable": true,
+      "detector": "profile-glob"
     }
   ]
 }

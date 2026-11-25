@@ -837,3 +837,15 @@ system-managed). 26 strings × 7 locales, `cleanup-relocation.spec.ts`; the
 engine suite's pre-existing Windows-seam failures on POSIX hosts (ntpath
 isabs/normpath vs a POSIX filesystem inside the `platform="windows"` test
 seams) are unchanged by this work and tracked for their own fix.
+
+**2026-11-25 — CLNA-01…08 (agent homes).** *Review removal* stayed grey for the
+AI agents & models catalog because every agent home and `codex-runtimes` was
+`cleanable: false`. Parents stay report-only; `agents.codex-bulk`,
+`agents.zcode-bulk`, `agents.gemini-bulk` (medium) and opt-in `agents.codex-history`,
+`agents.codex-databases` (privacy) are cleanable children that never name
+`auth.json`, `config.toml`, memories, settings or an agent home root.
+`catalog.credential_reason` enforces that at load time and again when a plan is
+built. Report-only rows now have a disabled checkbox with a hint, and the footer
+says why the button is disabled. Engine suite 362 tests, `cleanup*.spec.ts` 21
+passed, two new strings × 7 locales. `claude-bulk` was left out on purpose: its
+regenerable data is small and `~/.claude` also holds conversations.

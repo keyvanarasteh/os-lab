@@ -80,6 +80,7 @@ export function CatalogPage(props: CatalogPageProps) {
   const pickedBytes = picked.reduce((sum, id) => sum + (sizes.get(id) ?? 0), 0);
   const found = inGroup.reduce((sum, entry) => sum + (sizes.get(entry.id) ?? 0), 0);
   const blocked = (entry: CleanupEntry) => entry.cleanable === false || entry.needsPrivilege;
+  const hasBlockedPick = picked.some((id) => { const entry = inGroup.find((row) => row.id === id); return entry && blocked(entry); });
   const reviewable = picked.filter((id) => { const entry = inGroup.find((row) => row.id === id); return entry && !blocked(entry); });
   return <section id={`catalog-${group.id}`} className="iux-card overflow-hidden rounded-lg border border-(--iux-border)" aria-label={group.label}>
     <header className="flex flex-wrap items-start gap-4 p-4">
@@ -112,7 +113,8 @@ export function CatalogPage(props: CatalogPageProps) {
         const size = sizes.get(entry.id);
         const path = entry.paths.find((row) => row.path)?.path;
         return <li key={entry.id} className="flex items-center gap-3 px-4 py-2.5">
-          <input type="checkbox" className="size-4 accent-[#f36c21]" aria-label={`Select ${entry.name}`} checked={selected.includes(entry.id)} disabled={busy}
+          <input type="checkbox" className="size-4 accent-[#f36c21]" aria-label={`Select ${entry.name}`} checked={selected.includes(entry.id)} disabled={busy || blocked(entry)}
+            title={blocked(entry) ? "Measured only. It cannot be removed here." : undefined}
             onChange={(event) => setSelected(event.target.checked ? [...selected, entry.id] : selected.filter((id) => id !== entry.id))} />
           <span aria-hidden="true" className="shrink-0 text-(--iux-muted-foreground)">
             {blocked(entry) ? <GearSixIcon size={18} /> : path && /\.[a-z0-9]{1,5}$/i.test(path) ? <FileIcon size={18} /> : <FolderIcon size={18} />}
@@ -132,7 +134,8 @@ export function CatalogPage(props: CatalogPageProps) {
     <footer className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-(--iux-border) bg-(--iux-card) px-4 py-3">
       <span className="text-sm"><b>{picked.length}</b> selected · <span dir="ltr" className="tabular-nums">{formatBytes(pickedBytes)}</span></span>
       <span className="text-xs text-(--iux-muted-foreground)">Cleanup moves files to Trash unless you choose permanent delete.</span>
-      <span className="ms-auto flex gap-2">
+      <span className="ms-auto flex flex-wrap items-center gap-2">
+        {hasBlockedPick && !reviewable.length && <span role="status" className="text-xs text-(--iux-muted-foreground)">Selected items are measured only and cannot be removed. Pick a cleanable item.</span>}
         <button type="button" className="iux-btn" data-variant="ghost" disabled={!picked.length} onClick={() => setSelected(selected.filter((id) => !ids.includes(id)))}>Clear selection</button>
         <button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !reviewable.length} onClick={() => onReview(reviewable)}><TrashIcon size={14} />Review removal</button>
       </span>

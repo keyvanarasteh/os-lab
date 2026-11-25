@@ -42,8 +42,16 @@ defaults, credentials and toolchains.
 
 A real disk review added `uv`, VS Code extensions, `rembg`, Codex runtimes, the whole GOPATH and Cargo home,
 the shared os-lab cache, Homebrew's Cellar and system crash reports, plus an `agents` family
-([[cleanup-lab/catalog/agents.json]]) for AI agent data. Agent, toolchain and workspace entries are
+([[cleanup-lab/catalog/agents.json]]) for AI agent data. Agent homes (see below), toolchain and workspace entries are
 `cleanable: false` and the Cellar is measured only, so a plan skips them and Homebrew packages go through `brew uninstall`.
+
+## Agent homes: report-only parents, cleanable children
+
+Agent home folders hold sign-in state, so the `agents.*` parents stay `cleanable: false` and are only measured.
+
+The regenerable bulk inside them (`~/.codex`, `~/.zcode`, `~/.gemini`) is cleaned through narrow child entries in `cleanup-lab/catalog/agents.json` (`agents.codex-bulk`, `agents.zcode-bulk`, `agents.gemini-bulk`, plus opt-in `privacy` history entries) and `developers.codex-runtimes`.
+
+[[cleanup-lab/engine/cleanup_lab/catalog.py#credential_reason]] rejects any cleanable entry whose path is a credential or configuration file or an agent home root, and [[cleanup-lab/engine/cleanup_lab/clean.py]] re-checks every resolved path at plan time (`credentials` skip code). [[dashboard/src/views/cleanup/catalog-page.tsx]] disables the checkbox of report-only rows and explains a disabled *Review removal* button.
 
 The catalog reports binary presence through `shutil.which` without a shell.
 Shell functions are tracked by their directories. Credential entries are never

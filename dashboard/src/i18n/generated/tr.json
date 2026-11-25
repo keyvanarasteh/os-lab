@@ -2871,7 +2871,6 @@
   "Could not stop macOS Lab control:": "macOS Lab denetimi durdurulamadı:",
   "Click": "Tıklama",
   "Pointer action": "İşaretçi eylemi",
-  "Recent actions": "Son eylemler",
   "Scroll": "Kaydır",
   "Scroll amount": "Kaydırma miktarı",
   "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.": "Teslim incelemesi açıldı. İncelemek ve kanıt yakalamak için bir Terminal veya VM penceresi seçin. Denetim eylemleri yine onay veya etkinleştirilmiş denetim modu gerektirir.",
@@ -2949,5 +2948,7 @@
   "off": "kapalı",
   "on, disk ok": "açık, disk iyi",
   "low-space warning": "düşük alan uyarısı",
-  "low-space critical": "düşük alan, kritik"
+  "low-space critical": "düşük alan, kritik",
+  "Measured only. It cannot be removed here.": "Yalnızca ölçülür. Buradan kaldırılamaz.",
+  "Selected items are measured only and cannot be removed. Pick a cleanable item.": "Seçili öğeler yalnızca ölçülür ve kaldırılamaz. Temizlenebilir bir öğe seçin."
 }

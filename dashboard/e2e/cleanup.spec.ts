@@ -239,3 +239,39 @@ test("public cleanup route has no engine controls", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Sonuçlar" })).toHaveAttribute("href", "/os-lab/tr/cleanup/results/");
   expect(apiCalls).toBe(0);
 });
+
+test("catalogs: report-only agent homes cannot be ticked, cleanable children enable Review removal", async ({ page }) => {
+  const entry = (id: string, name: string, risk: string, cleanable: boolean, path: string) => ({
+    id, name, category: "developer", risk, hint: "Agent data", impact: "", defaultSelected: false, needsPrivilege: false, cleanable,
+    paths: [{ template: path, path, reason: "" }],
+  });
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    let data: unknown = {};
+    if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/monitor") data = { enabled: false, running: false, intervalSeconds: 300, cooldownSeconds: 3600, volumes: [], state: { volumes: {}, events: [], lastEvaluationAt: null, lastError: null }, activeWarnings: [], configError: null };
+    else if (path === "/api/cleanup/volumes") data = { platform: "macos", threshold: 0.9, volumes: [], homeVolume: null, warnings: [], error: null };
+    else if (path === "/api/cleanup/bookmarks") data = { bookmarks: [], error: null };
+    else if (path === "/api/cleanup/permissions") data = { platform: "macos", permissions: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "macos", entries: [
+      entry("agents.codex", "Codex data", "credentials", false, "/Users/demo/.codex"),
+      entry("agents.codex-bulk", "Codex packages and caches", "medium", true, "/Users/demo/.codex/packages"),
+    ] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+    else if (path === "/api/host") data = { host: { os: "linux", osPretty: "Linux", arch: "amd64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/catalog/#agents");
+  const parent = page.getByRole("checkbox", { name: "Select Codex data" });
+  const child = page.getByRole("checkbox", { name: "Select Codex packages and caches" });
+  const review = page.getByRole("button", { name: "Review removal" });
+  await expect(parent).toBeDisabled();
+  await expect(parent).toHaveAttribute("title", "Measured only. It cannot be removed here.");
+  await expect(review).toBeDisabled();
+  await expect(child).toBeEnabled();
+  await child.check();
+  await expect(review).toBeEnabled();
+});

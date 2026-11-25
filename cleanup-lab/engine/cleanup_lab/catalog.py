@@ -75,6 +75,31 @@ REQUIRED_ENTRY_KEYS = (
 OPTIONAL_ENTRY_KEYS = ("owningProcesses", "detector", "note", "toolName", "cleanable", "cacheEnv", "envSuffix", "probeArgv")
 
 
+#: File names that hold sign-in or hand-written configuration. No cleanable entry may
+#: point at one, however it is spelled (CLNA-04).
+CREDENTIAL_NAMES = re.compile(
+    r"^(auth\.json|config\.toml|settings(\..+)?\.json|\.env(\..+)?|oauth_creds\.json|"
+    r"google_accounts\.json|jetski-standalone-oauth-token|\.credentials(\..+)?|"
+    r"memories_.*|agents\.md)$",
+    re.IGNORECASE,
+)
+#: The home folders of AI agents: cleanable entries may name children, never the root.
+AGENT_HOMES = (".codex", ".zcode", ".gemini", ".claude", ".opencode")
+
+
+def credential_reason(path):
+    """Why *path* (a template or a resolved path) may not be cleaned, or ``None``."""
+    parts = [part for part in re.split(r"[\\/]+", path) if part]
+    if not parts:
+        return None
+    last = parts[-1]
+    if CREDENTIAL_NAMES.match(last):
+        return "{0} holds sign-in or configuration data".format(last)
+    if last in AGENT_HOMES:
+        return "{0} is an agent home folder; only its children may be cleaned".format(last)
+    return None
+
+
 class CatalogError(ValueError):
     """The catalog is malformed. The message names the file and the entry."""
 
@@ -221,6 +246,12 @@ def _check_entry(entry, family, name, index):
         raise CatalogError("{0}: toolName must be an executable name, not a path".format(where))
     if not isinstance(entry.get("cleanable", True), bool):
         raise CatalogError("{0}: cleanable must be a boolean".format(where))
+    if entry.get("cleanable", True):
+        for platform, templates in (entry["paths"].items() if isinstance(entry["paths"], dict) else ()):
+            for template in templates if isinstance(templates, list) else ():
+                refusal = credential_reason(template) if isinstance(template, str) else None
+                if refusal:
+                    raise CatalogError("{0}: cleanable entry path {1} refused: {2}".format(where, template, refusal))
     cache_env = entry.get("cacheEnv", [])
     if "cacheEnv" in entry and (not isinstance(cache_env, list) or not cache_env or any(
         not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)

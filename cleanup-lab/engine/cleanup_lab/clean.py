@@ -48,7 +48,7 @@ from dataclasses import dataclass
 
 from . import safety
 from . import scan
-from .catalog import load, resolve as catalog_resolve
+from .catalog import credential_reason, load, resolve as catalog_resolve
 from .paths import platform_id, trash_dir
 
 #: The modes a plan may name. ``trash`` is the default and the only automatic
@@ -436,6 +436,11 @@ def build_plan(
                     _plan_item(entry, template, None, "skipped", mode=mode, code="no-path", reason=reason,
                                source=resolved["source"])
                 )
+                continue
+            protected = credential_reason(path)
+            if protected:
+                items.append(_plan_item(entry, template, path, "skipped", mode=mode,
+                                        code="credentials", reason=protected, source=resolved["source"]))
                 continue
             if privileged:
                 items.append(

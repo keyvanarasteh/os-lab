@@ -2871,7 +2871,6 @@
   "Could not stop macOS Lab control:": "تعذّر إيقاف التحكم في مختبر macOS:",
   "Click": "نقرة",
   "Pointer action": "إجراء المؤشر",
-  "Recent actions": "الإجراءات الأخيرة",
   "Scroll": "تمرير",
   "Scroll amount": "مقدار التمرير",
   "Submission review opened. Select a Terminal or VM window to inspect and capture evidence. Control actions still require confirmation or armed mode.": "فُتحت مراجعة التسليم. اختر نافذة Terminal أو آلة افتراضية لفحصها والتقاط الأدلة. ما زالت إجراءات التحكم تتطلب التأكيد أو تفعيل وضع التحكم.",
@@ -2949,5 +2948,7 @@
   "off": "متوقف",
   "on, disk ok": "يعمل، القرص سليم",
   "low-space warning": "تحذير من قلة المساحة",
-  "low-space critical": "قلة مساحة حرجة"
+  "low-space critical": "قلة مساحة حرجة",
+  "Measured only. It cannot be removed here.": "للقياس فقط. لا يمكن إزالته من هنا.",
+  "Selected items are measured only and cannot be removed. Pick a cleanable item.": "العناصر المحددة للقياس فقط ولا يمكن إزالتها. اختر عنصرًا قابلًا للتنظيف."
 }

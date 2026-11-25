@@ -2949,5 +2949,7 @@
   "off": "خاموش",
   "on, disk ok": "روشن، دیسک سالم",
   "low-space warning": "هشدار کمبود فضا",
-  "low-space critical": "کمبود فضا، بحرانی"
+  "low-space critical": "کمبود فضا، بحرانی",
+  "Measured only. It cannot be removed here.": "فقط اندازه‌گیری می‌شود. از اینجا قابل حذف نیست.",
+  "Selected items are measured only and cannot be removed. Pick a cleanable item.": "موارد انتخاب‌شده فقط اندازه‌گیری می‌شوند و قابل حذف نیستند. یک مورد قابل پاکسازی انتخاب کنید."
 }

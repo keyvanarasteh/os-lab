@@ -1354,8 +1354,7 @@
       "owningProcesses": [
         "codex"
       ],
-      "cleanable": false,
-      "note": "Report-only until reviewed."
+      "cleanable": true
     },
     {
       "id": "developers.rembg-models",

@@ -108,6 +108,48 @@ class CleanTests(unittest.TestCase):
         self.assertEqual(plan.id, plan.payload["planId"])
         self.assertEqual(len(plan.fingerprints), 1)  # one fingerprint per ready item
 
+    def agent_home(self):
+        self.write(".codex/auth.json", 10)
+        self.write(".codex/config.toml", 20)
+        self.write(".codex/memories_1.sqlite", 30)
+        self.write(".codex/packages/pkg/bin", 400)
+        self.write(".codex/plugins/p/lib", 300)
+        self.write(".codex/sessions/2026/s.jsonl", 200)
+
+    def codex_bulk(self, **overrides):
+        dirs = ["packages", "plugins"]
+        templates = ["~/.codex/" + name for name in dirs]
+        return make_entry("agents.codex-bulk", {"macos": templates, "linux": templates}, risk="medium",
+                          defaultSelected=False, cleanable=True, **overrides)
+
+    def test_agent_bulk_is_cleaned_while_credentials_and_history_stay(self):
+        self.agent_home()
+        plan, result = self.plan_and_run([self.codex_bulk()])
+        self.assertEqual(plan.payload["totals"]["bytes"], 700)
+        self.assertFalse(os.path.exists(os.path.join(self.home, ".codex/packages")))
+        self.assertFalse(os.path.exists(os.path.join(self.home, ".codex/plugins")))
+        for kept in (".codex/auth.json", ".codex/config.toml", ".codex/memories_1.sqlite",
+                     ".codex/sessions/2026/s.jsonl"):
+            self.assertTrue(os.path.exists(os.path.join(self.home, kept)), kept)
+
+    def test_a_report_only_agent_parent_is_still_refused(self):
+        self.agent_home()
+        parent = make_entry("agents.codex", {"macos": ["~/.codex"], "linux": ["~/.codex"]}, risk="credentials",
+                            defaultSelected=False, cleanable=False)
+        plan = self.build([parent])
+        self.assertEqual(plan.payload["items"][0]["code"], "not-cleanable")
+        self.assertTrue(os.path.exists(os.path.join(self.home, ".codex/auth.json")))
+
+    def test_the_plan_refuses_a_credential_path_even_if_the_entry_says_cleanable(self):
+        self.agent_home()
+        sneaky = make_entry("agents.codex-sneaky", {"macos": ["~/.codex/auth.json", "~/.codex"],
+                                                    "linux": ["~/.codex/auth.json", "~/.codex"]},
+                            risk="medium", defaultSelected=False, cleanable=True)
+        plan = self.build([sneaky])
+        codes = [item["code"] for item in plan.payload["items"]]
+        self.assertEqual(codes, ["credentials", "credentials"])
+        self.assertEqual(plan.payload["totals"]["bytes"], 0)
+
     def test_the_guard_refuses_running_apps_and_privileged_entries(self):
         self.write("Library/Caches/app/data.bin", 10)
         busy = self.caches_entry(owningProcesses=["DemoApp"])

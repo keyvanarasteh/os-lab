@@ -49,56 +49,55 @@ contain a credential or config file.
 ## Tasks
 
 ### CLNA-01 — Child catalog entries for regenerable agent data
-- [ ] `agents.codex-bulk`: `packages`, `plugins`, `cache`, `generated_images`, `computer-use`,
+- [x] `agents.codex-bulk`: `packages`, `plugins`, `cache`, `generated_images`, `computer-use`,
       `worktrees`, `attachments` under `~/.codex` (macOS, Linux, Windows `%USERPROFILE%`).
-- [ ] `agents.zcode-bulk`: `worktrees`, `cli`, `v2`, `computer-use`, `tmp` under `~/.zcode`.
-- [ ] `agents.gemini-bulk`: the equivalent regenerable folders under `~/.gemini` (measure
+- [x] `agents.zcode-bulk`: `worktrees`, `cli`, `v2`, `computer-use`, `tmp` under `~/.zcode`.
+- [x] `agents.gemini-bulk`: the equivalent regenerable folders under `~/.gemini` (measure
       first: list sizes on a real home, include only what the tool re-creates).
-- [ ] `agents.claude-bulk`: only caches/telemetry that Claude Code re-creates; never
+- [ ] `agents.claude-bulk` (dropped: tiny and shares a home with conversations): only caches/telemetry that Claude Code re-creates; never
       `settings*.json`, `projects/`, `.credentials*`.
-- [ ] `risk: medium`, `cleanable: true`, `defaultSelected: false`, `owningProcesses` set so
+- [x] `risk: medium`, `cleanable: true`, `defaultSelected: false`, `owningProcesses` set so
       the existing busy-process refusal applies, `impact` says what is re-downloaded.
-- [ ] Reasoning: removes the 9 GB case without a single credential path in scope.
+- [x] Reasoning: removes the 9 GB case without a single credential path in scope.
 
 ### CLNA-02 — History entries (opt-in)
-- [ ] `agents.codex-history` (`sessions`, `archived_sessions`, `thread_history_*.sqlite`,
-      `logs_*.sqlite`), `agents.zcode-history` equivalents; `risk: privacy`,
+- [x] `agents.codex-history` (`sessions`, `archived_sessions`) and `agents.codex-databases` (`thread_history_*.sqlite`, `logs_*.sqlite`), `agents.zcode-history` equivalents; `risk: privacy`,
       `defaultSelected: false`, `impact: "Conversation history is lost."`.
-- [ ] Never suggested by `suggest.py` (privacy risk is already excluded there; add a test).
+- [x] Never suggested by `suggest.py` (privacy risk is already excluded there; add a test).
 
 ### CLNA-03 — `developers.codex-runtimes` becomes cleanable
-- [ ] Flip `cleanable` to `true`; drop the "Report-only until reviewed" note; keep
+- [x] Flip `cleanable` to `true`; drop the "Report-only until reviewed" note; keep
       `risk: medium`, `owningProcesses: ["codex"]`. Update the test that pins it.
-- [ ] Reasoning: `impact` already says "Runtimes are downloaded again on the next use".
+- [x] Reasoning: `impact` already says "Runtimes are downloaded again on the next use".
 
 ### CLNA-04 — Engine guard: credentials can never be in a cleanable entry
-- [ ] Catalog validation (`catalog.py`) rejects a `cleanable: true` entry whose paths are
+- [x] Catalog validation (`catalog.py`) rejects a `cleanable: true` entry whose paths are
       inside a known credential/config location, or whose resolved children include
       `auth.json`, `config.toml`, `*.credentials*`, `.env`, `settings*.json` (deny-list).
-- [ ] Plan builder re-checks at plan time (defence in depth) and records the refusal reason.
-- [ ] Reasoning: the safety no longer depends on someone remembering not to flip a flag.
+- [x] Plan builder re-checks at plan time (defence in depth) and records the refusal reason.
+- [x] Reasoning: the safety no longer depends on someone remembering not to flip a flag.
 
 ### CLNA-05 — Dashboard: explain and prevent dead selections
-- [ ] Disable the row checkbox when `blocked(entry)`; add a tooltip/`aria-description`
+- [x] Disable the row checkbox when `blocked(entry)`; add a tooltip/`aria-description`
       "Measured only — cannot be removed here".
-- [ ] When `reviewable` is empty but something is ticked, show the reason under the
+- [x] When `reviewable` is empty but something is ticked, show the reason under the
       disabled **Review removal** button instead of leaving it silently grey.
-- [ ] "Select visible" and the row checkbox use the same predicate (one source of truth).
-- [ ] Seven-locale translations for the new strings (see the i18n workflow in `lat.md`).
+- [x] "Select visible" and the row checkbox use the same predicate (one source of truth).
+- [x] Seven-locale translations for the new strings (see the i18n workflow in `lat.md`).
 
 ### CLNA-06 — Dashboard e2e
-- [ ] `cleanup.spec.ts`: report-only row cannot be ticked and shows the hint; a cleanable
+- [x] `cleanup.spec.ts`: report-only row cannot be ticked and shows the hint; a cleanable
       agent child can be ticked and **Review removal** opens the confirm dialog with the
       exact paths and size; credentials path never appears in the dialog.
 
 ### CLNA-07 — Engine tests
-- [ ] Catalog: child entries valid per `schema.json`; none contain a deny-listed file.
-- [ ] Plan: planning `agents.codex-bulk` on a fixture home keeps `auth.json`/`config.toml`
+- [x] Catalog: child entries valid per `schema.json`; none contain a deny-listed file.
+- [x] Plan: planning `agents.codex-bulk` on a fixture home keeps `auth.json`/`config.toml`
       untouched; planning the parent `agents.codex` is still refused.
-- [ ] `suggest.py`: history/privacy entries never suggested.
+- [x] `suggest.py`: history/privacy entries never suggested.
 
 ### CLNA-08 — Docs, roadmap, STATUS
-- [ ] `cleanup-lab/README`/`VERIFY.md`/`STATUS.md` and the `lat.md` Cleanup Lab nodes
+- [x] `cleanup-lab/README`/`VERIFY.md`/`STATUS.md` and the `lat.md` Cleanup Lab nodes
       describe report-only parents vs cleanable children; roadmap page gets CLNA-01…08.
 
 ## Out of scope
