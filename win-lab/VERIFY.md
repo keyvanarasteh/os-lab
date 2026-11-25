@@ -197,7 +197,45 @@ CLI is not installed on this host).
   captures are capped at 4K and every capture has a 15 s deadline; the panel clears the previous
   window's image when the selection changes and no longer starves a slow capture.
 
-## 8. Scope and limits
+## 8. Input gate (WINMIR-11a, 11b, 11c, 11d, 11e)
+
+`console/winapps_input_gate.py` decides whether one input action may run and never sends input
+itself; this change adds no `SendInput`. Observed on this host (Windows 11, standard user) with
+two windows this script owned (`python`, one titled `[InPrivate]`) and a policy allowing only
+`python`:
+
+- `desktop_locked()` returned `False` on the unlocked desktop.
+- A click while disarmed: `NOT_ARMED`. After `arm panel-1` (30 s): a second owner got `INPUT_BUSY`.
+- A click on the allowlisted window was authorized; on the `[InPrivate]` window `RESTRICTED_WINDOW`;
+  on another application's window `APP_NOT_ALLOWED`.
+- A paste without confirmation: `CONFIRM_REQUIRED`; with `confirm=True` it was authorized.
+- The panic stop disarmed (epoch 1) and the next click was `NOT_ARMED`.
+- The audit held arm, authorization and refusal rows with codes; no window title and no owner name.
+
+```text
+pytest test_winapps_input_gate.py                               : 60 passed
+pytest test_winapps*.py test_mcp_winapps.py test_web_ui.py      : 210 passed
+pytest android-lab/lab/tests (whole backend)                    : 764 passed, 2 failed, 73 skipped
+app: npm run test:stage                                         : 9 passed
+```
+
+Integration onto master (#316/#318 control lock, #299 guard): the gate's own expiring arm state
+was folded into the console's single control lock, and the click and input routes now call
+`authorize()` before sending. Re-run on macOS with the Windows calls faked:
+
+```text
+pytest test_winapps_input_gate.py test_mcp_winapps.py test_winapps*.py test_web_ui.py : 262 passed
+```
+
+Not verified on a real host: a locked screen or UAC prompt (the lock check is unit-tested with a
+fake `OpenInputDesktop` only), and any real input, because none is sent. The gate is a guard
+against mistakes, not a hostile local user: a process that can reach the local HTTP address with
+the `X-OSLab` header can arm it.
+
+The 2 backend failures (`test_apk_patcher`, `test_cleanup_console`) do not involve this lab and fail
+on this host without this change.
+
+## 9. Scope and limits
 
 - This proves the read-only phase: window inventory, window capture and a
   doctor probe. UIA hotspots, previewed clicks, typing and armed control are

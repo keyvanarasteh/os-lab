@@ -129,6 +129,10 @@ def classify(window: dict, policy: Policy) -> Verdict:
     """Restricted wins over the allowlist; an app off the allowlist is simply not allowed."""
     app = _norm_app(window.get("app") or "")
     title = _norm(window.get("title") or "")
+    if policy.error:
+        # A broken policy may have lost restrictions it meant to add: nothing is shown or captured
+        # until it is fixed (the doctor and the policy summary report the error).
+        return Verdict(True, False, "policy-error")
     if app in BUILTIN_RESTRICTED_APPS:
         return Verdict(True, False, "password-manager")
     if app and app in policy.restricted_apps:
@@ -161,19 +165,21 @@ _AUDIT: list[dict] = []
 _AUDIT_SEQ = 0
 _AUDIT_LOCK = threading.Lock()
 _AUDIT_FILE_MAX_ROWS = 10_000  # per process and day: a flood of distinct rows must not fill the disk
-_AUDIT_FILE_ROWS = 0
+_AUDIT_FILE_ROWS = 0     # rows written to `_AUDIT_FILE_DAY`'s file by this process
+_AUDIT_FILE_DAY = ""
 _AUDIT_PERSISTENT = True
 _AUDIT_DAY = ""          # the day whose file `_AUDIT_SEQ` was resumed from
 _AUDIT_PENDING: dict = {}  # seq -> row whose coalesced count is not yet in the file
 
 
 def _reset_audit() -> None:
-    global _AUDIT_SEQ, _AUDIT_FILE_ROWS, _AUDIT_PERSISTENT, _AUDIT_DAY
+    global _AUDIT_SEQ, _AUDIT_FILE_ROWS, _AUDIT_PERSISTENT, _AUDIT_DAY, _AUDIT_FILE_DAY
     with _AUDIT_LOCK:
         _AUDIT.clear()
         _AUDIT_PENDING.clear()
         _AUDIT_SEQ = 0
         _AUDIT_FILE_ROWS = 0
+        _AUDIT_FILE_DAY = ""
         _AUDIT_PERSISTENT = True
         _AUDIT_DAY = ""
 
@@ -200,21 +206,27 @@ def _last_seq(path: str) -> int:
 
 def _write_line(folder: str | None, payload: dict) -> None:
     """Append one JSONL line to today's file; the cap or a failure only flips `persistent`.
+
+    The cap is per day: a new day's file starts a fresh count. After a failed write the rest of
+    that day's rows stay in memory only, so a half-written line is never followed by another row.
     Call with the lock held, so lines reach the file in seq order."""
-    global _AUDIT_FILE_ROWS, _AUDIT_PERSISTENT
+    global _AUDIT_FILE_ROWS, _AUDIT_PERSISTENT, _AUDIT_FILE_DAY
     if not folder:
         return
+    day = time.strftime("%Y%m%d")
+    if day != _AUDIT_FILE_DAY:
+        _AUDIT_FILE_DAY, _AUDIT_FILE_ROWS, _AUDIT_PERSISTENT = day, 0, True
     if _AUDIT_FILE_ROWS >= _AUDIT_FILE_MAX_ROWS:
         _AUDIT_PERSISTENT = False
         return
     try:
         os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, "winapps-audit-%s.jsonl" % time.strftime("%Y%m%d")),
-                  "a", encoding="utf-8") as f:
+        with open(os.path.join(folder, "winapps-audit-%s.jsonl" % day), "a", encoding="utf-8") as f:
             f.write(json.dumps(payload) + "\n")
         _AUDIT_FILE_ROWS += 1
     except OSError:
         _AUDIT_PERSISTENT = False
+        _AUDIT_FILE_ROWS = _AUDIT_FILE_MAX_ROWS  # no more appends to this day's file
 
 
 def _flush_counts(folder: str | None, now: float, force: bool = False) -> None:
@@ -231,8 +243,8 @@ def audit(root: str | None, kind: str, *, audience: str, app: str | None = None,
           window_id: int | None = None, code: str | None = None, tool: str | None = None) -> None:
     """Record one row. Never raises: auditing must not break the action it describes.
 
-    Titles and pixels cannot be passed in. An identical row (same audience, kind, app, window and
-    code) within 60 seconds of an earlier one only raises that row's count, even when other events
+    Titles and pixels cannot be passed in. An identical row (same audience, kind, app, window, code
+    and tool) within 60 seconds of an earlier one only raises that row's count, even when other events
     came in between, so a panel retrying a restricted window every few seconds writes one row a
     minute; the final count reaches the file as one `{"seq", "kind": "count"}` line.
     """
@@ -246,7 +258,7 @@ def audit(root: str | None, kind: str, *, audience: str, app: str | None = None,
                 if now - row["time"] > _COALESCE_SECONDS:
                     break
                 if (row["audience"] == audience and row["kind"] == kind and row["app"] == app
-                        and row["windowId"] == window_id and row["code"] == code):
+                        and row["windowId"] == window_id and row["code"] == code and row["tool"] == tool):
                     row["count"] += 1
                     _AUDIT_PENDING[row["seq"]] = row
                     return
@@ -291,10 +303,28 @@ _MAX_HWND = 0xFFFFFFFF
 AUDIENCES = ("human", "agent")
 AGENT_MAX_PIXELS = 3840 * 2160  # an agent capture is base64'd into one JSON line; people keep the 8K ceiling
 _CAPTURE_TIMEOUT = 15.0
+_MAX_STUCK_CAPTURES = 2  # timed-out workers still running; past this no new capture starts
+_STUCK_CAPTURES: list[threading.Thread] = []
+_STUCK_LOCK = threading.Lock()
+
+
+def _png_pixels(png: bytes) -> int | None:
+    """Width x height from a PNG header, or None when the bytes are not a PNG."""
+    if len(png) < 24 or png[:8] != b"\x89PNG\r\n\x1a\n" or png[12:16] != b"IHDR":
+        return None
+    return int.from_bytes(png[16:20], "big") * int.from_bytes(png[20:24], "big")
 
 
 def _capture(hwnd: int, expected_token: str | None = None) -> bytes:
-    """The raw capture with a deadline: a window that stops responding must not block the caller."""
+    """The raw capture with a deadline: a window that stops responding must not block the caller.
+
+    A timed-out worker cannot be killed, so at most `_MAX_STUCK_CAPTURES` may linger; while that
+    many are still running, a new capture is refused instead of piling up threads."""
+    with _STUCK_LOCK:
+        _STUCK_CAPTURES[:] = [worker for worker in _STUCK_CAPTURES if worker.is_alive()]
+        if len(_STUCK_CAPTURES) >= _MAX_STUCK_CAPTURES:
+            raise winapps.WinAppError("Earlier captures are still hung; try again later",
+                                      status=503, code="CAPTURE_BUSY")
     box: dict = {}
 
     def run() -> None:
@@ -309,6 +339,8 @@ def _capture(hwnd: int, expected_token: str | None = None) -> bytes:
     worker.start()
     worker.join(_CAPTURE_TIMEOUT)
     if worker.is_alive():
+        with _STUCK_LOCK:
+            _STUCK_CAPTURES.append(worker)
         raise winapps.WinAppError("That window did not respond in time; try again later", status=504, code="CAPTURE_TIMEOUT")
     if "error" in box:
         raise box["error"]
@@ -319,6 +351,16 @@ def _audience(value: object) -> None:
     """Fail closed: an unknown audience must never fall through to the more permissive human view."""
     if value not in AUDIENCES:
         raise GuardError("Unknown audience", "INVALID_AUDIENCE")
+
+
+def require_audience(value: object) -> None:
+    """Public form of the audience check for sibling modules such as the input gate."""
+    _audience(value)
+
+
+def parse_window_id(value: object) -> int:
+    """Public form of the window id check: a GuardError(INVALID_WINDOW) unless it is a plausible HWND."""
+    return _window_id(value)
 
 
 def _window_id(value: object) -> int:
@@ -439,6 +481,10 @@ def screenshot(root: str, window_id: object, audience: str, *, tool: str | None 
                       "That window is not on screen anymore; refresh the mirror", "retry")
     # Reload: the policy file may have changed while the capture ran.
     _check(root, audience, tool, after, hwnd, load_policy(root))
+    # The window can grow between the size check and the capture: check the pixels actually taken.
+    if audience == "agent" and (_png_pixels(png) or 0) > AGENT_MAX_PIXELS:
+        raise _refuse(root, audience, tool, after, hwnd, "CAPTURE_TOO_LARGE",
+                      "That window is too large for an agent capture")
     if audience == "agent" and _audit_success:
         audit(root, "screenshot", audience=audience, app=window.get("app"), window_id=hwnd, tool=tool)
     return png

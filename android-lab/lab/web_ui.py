@@ -60,8 +60,9 @@ except ImportError:
     web_api = None
 try:
     import winapps_guard  # noqa: E402  (console/winapps_guard.py: policy gate in front of the Windows app mirror)
+    import winapps_input_gate  # noqa: E402  (console/winapps_input_gate.py: arm/panic gate for future input)
 except ImportError:
-    winapps_guard = None
+    winapps_guard = winapps_input_gate = None
 try:
     import websec_api  # noqa: E402  (console/websec_api.py: Web Sec Lab scans and reports)
 except ImportError:
@@ -525,8 +526,9 @@ class LabHttpHandler(BaseHTTPRequestHandler):
 
     def _winapps_get(self, parts: list):
         """Read-only Windows app mirror endpoints, all served to the human audience through the guard."""
-        if winapps_guard is None:
-            self._json(501, {"error": "The Windows app mirror guard (console/winapps_guard.py) is not installed"})
+        if winapps_guard is None or (parts[3] == "input" and winapps_input_gate is None):
+            self._json(501, {"error": "The Windows app mirror guard (console/winapps_guard.py, "
+                                      "winapps_input_gate.py) is not installed"})
             return
         try:
             if parts[3] == "apps" and len(parts) == 4:
@@ -537,6 +539,8 @@ class LabHttpHandler(BaseHTTPRequestHandler):
                 self._json(200, winapps_guard.policy_summary(REPO_ROOT))
             elif parts[3] == "audit":
                 self._json(200, winapps_guard.audit_rows(200))
+            elif parts[3] == "input":
+                self._json(200, winapps_input_gate.state())
             else:
                 query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query, keep_blank_values=True)
                 expected_token = (query.get("windowToken") or [None])[0]
@@ -638,7 +642,7 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         elif len(parts) == 6 and parts[:4] == ["api", "labs", "macos", "session"] and parts[5] == "elements":
             self._json(200, oslab.macos_session_elements(REPO_ROOT, parts[4]))
         elif parts[:3] == ["api", "labs", "winapps"] and (
-                parts[3:] in (["apps"], ["doctor"], ["policy"], ["audit"])
+                parts[3:] in (["apps"], ["doctor"], ["policy"], ["audit"], ["input"])
                 or (len(parts) == 6 and parts[3] == "apps" and parts[5] == "screenshot")):
             self._winapps_get(parts)
         elif len(parts) == 6 and parts[:4] == ["api", "labs", "winapps", "apps"] and parts[5] == "elements":
@@ -918,24 +922,76 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         except (OSError, ValueError):
             pass  # the client hung up; nothing to clean up
 
+    def _winapps_gate_error(self, exc) -> None:
+        """Reply for a refusal from the input gate (a GuardError) with the status the dashboard expects."""
+        if exc.code in ("RESTRICTED_WINDOW", "APP_NOT_ALLOWED"):
+            status = 403
+        elif exc.code in ("INPUT_BUSY", "WINDOW_GONE", "NOT_ARMED", "SCREEN_LOCKED"):
+            status = 409
+        elif exc.code == "NOT_SUPPORTED":
+            status = 501
+        else:
+            status = 400
+        self._json(status, {"error": str(exc), "code": exc.code})
+
+    def _winapps_input_post(self, action: str, data: dict | None = None):
+        """Arm, disarm or panic-stop through the input gate (the POST guards already ran)."""
+        if winapps_input_gate is None:
+            self._json(501, {"error": "The Windows input gate (console/winapps_input_gate.py) is not installed"})
+            return
+        if data is None:
+            data = self._read_json() if action != "panic" else {}
+        try:
+            if action == "arm":
+                reply = winapps_input_gate.arm(REPO_ROOT, data.get("owner"))
+            elif action == "disarm":
+                reply = winapps_input_gate.disarm(REPO_ROOT, data.get("owner"))
+            else:
+                reply = winapps_input_gate.panic_stop(REPO_ROOT)
+        except winapps_guard.GuardError as exc:
+            self._winapps_gate_error(exc)
+            return
+        self._json(200, reply)
+
     def _lab_post(self, path: str):
         parts = [p for p in path.split("/") if p]
-        if path.startswith("/api/labs/winapps/"):
+        if path in ("/api/labs/winapps/input/arm", "/api/labs/winapps/input/disarm",
+                    "/api/labs/winapps/input/panic"):
+            self._winapps_input_post(path.rsplit("/", 1)[1])
+        elif path.startswith("/api/labs/winapps/"):
             if winapps is None:
                 self._json(501, {"error": "The Windows app mirror module (console/winapps.py) is not installed"})
                 return
             try:
                 if path == "/api/labs/winapps/control":
                     data = self._read_json()
+                    if winapps_input_gate is not None and isinstance(data.get("armed"), bool):
+                        # The single control lock, through the gate so every arm and disarm is audited.
+                        self._winapps_input_post("arm" if data["armed"] else "disarm", data)
+                        return
                     result = winapps.winapps_control_arm(data.get("armed"), data.get("owner"))
                 elif path in ("/api/labs/winapps/click", "/api/labs/winapps/input"):
                     data = self._read_json()
-                    # Input reaches only a window the policy allows; restricted windows never get it.
-                    if not self._winapps_allowed(data.get("windowId") if isinstance(data, dict) else None):
+                    if not isinstance(data, dict):
+                        self._json(400, {"error": "Expected a JSON object"})
+                        return
+                    if winapps_input_gate is None:
+                        self._json(501, {"error": "The Windows input gate (console/winapps_input_gate.py) is not installed"})
+                        return
+                    kind = data.get("action", "click") if path.endswith("/click") else data.get("kind")
+                    try:
+                        # The gate: armed, unlocked desktop, window on screen, not restricted, allowlisted.
+                        winapps_input_gate.authorize(REPO_ROOT, data.get("windowId"), kind,
+                                                     confirm=data.get("confirm"), key=data.get("key"))
+                    except winapps_guard.GuardError as exc:
+                        self._winapps_gate_error(exc)
                         return
                     action = winapps.winapps_control_click if path.endswith("/click") else winapps.winapps_control_input
                     result = action(data)
                 elif path == "/api/labs/winapps/stop":
+                    if winapps_input_gate is not None:
+                        self._winapps_input_post("panic")
+                        return
                     result = winapps.winapps_panic_stop()
                 else:
                     self._json(404, {"error": "Not found"})

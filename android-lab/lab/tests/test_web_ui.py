@@ -138,10 +138,17 @@ def test_winapps_endpoint_serves_the_read_only_inventory(web_server, monkeypatch
     import web_ui
 
     _no_policy(monkeypatch, tmp_path)
-    fixture = {"available": True, "windows": [], "reason": None}
+    fixture = {"available": True, "reason": None, "windows": [
+        {"windowId": 1, "app": "Notepad", "title": "notes.txt", "width": 10, "height": 10},
+        {"windowId": 3, "app": "1Password", "title": "Vault: bank", "width": 10, "height": 10}]}
     monkeypatch.setattr(web_ui.winapps_guard.winapps, "winapps_windows", lambda: fixture)
-    data = json.loads(urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps").read().decode("utf-8"))
-    assert data == fixture
+    raw = urllib.request.urlopen(f"{web_server}/api/labs/winapps/apps").read().decode("utf-8")
+    data = json.loads(raw)
+    by_id = {window["windowId"]: window for window in data["windows"]}
+    # Served through the guard: the restricted window is flagged and its title never leaves.
+    assert by_id[1]["restricted"] is False and by_id[1]["title"] == "notes.txt"
+    assert by_id[3]["restricted"] is True and by_id[3]["title"] == "(restricted)"
+    assert "Vault: bank" not in raw
 
 
 def test_winapps_endpoints_are_501_without_the_guard_module(web_server, monkeypatch):
@@ -351,6 +358,7 @@ def test_winapps_control_post_routes_require_header_and_dispatch_actions(web_ser
     monkeypatch.setattr(web_ui.winapps, "winapps_control_click", click)
     monkeypatch.setattr(web_ui.winapps, "winapps_control_input", input_action)
     monkeypatch.setattr(web_ui.winapps, "winapps_panic_stop", stop)
+    monkeypatch.setattr(web_ui.winapps_input_gate, "authorize", lambda *a, **k: {"windowId": 7})
 
     arm_payload = {"armed": True, "owner": "panel"}
     binding = {
@@ -394,6 +402,7 @@ def test_winapps_control_post_preserves_validation_status(web_server, monkeypatc
         raise web_ui.winapps.WinAppError("Another dashboard holds the lock", status=409, code="INPUT_BUSY")
 
     monkeypatch.setattr(web_ui.winapps, "winapps_control_click", refused)
+    monkeypatch.setattr(web_ui.winapps_input_gate, "authorize", lambda *a, **k: {"windowId": 7})
     status, data = _post(f"{web_server}/api/labs/winapps/click", {"confirm": True}, {"X-OSLab": "1"})
     assert status == 409 and data["code"] == "INPUT_BUSY"
 
@@ -466,6 +475,72 @@ def test_app_update_status_is_reported_without_network(web_server):
     assert data["install"] is None
 
 
+def test_winapps_input_gate_endpoints_need_the_header_and_share_the_control_lock(web_server, monkeypatch, tmp_path):
+    import web_ui
+
+    monkeypatch.setenv("OSLAB_WINAPPS_AUDIT_DIR", str(tmp_path / "audit"))
+
+    winapps = web_ui.winapps
+    monkeypatch.setattr(winapps.sys, "platform", "win32")
+    monkeypatch.setattr(winapps, "_user32", object())
+    monkeypatch.setattr(winapps, "_CONTROL_STATE", {"armed": False, "armedAt": 0.0, "owner": None})
+    monkeypatch.setattr(winapps, "_WINAPPS_STREAM_EPOCH", 0)
+    monkeypatch.setattr(winapps, "desktop_locked", lambda: False)
+    state = json.loads(urllib.request.urlopen(f"{web_server}/api/labs/winapps/input").read().decode("utf-8"))
+    assert state["armed"] is False and "owner" not in state
+    arm = f"{web_server}/api/labs/winapps/input/arm"
+    assert _post(arm, {"owner": "panel-1"}, {})[0] == 403
+    status, data = _post(arm, {"owner": "panel-1"}, {"X-OSLab": "1"})
+    assert status == 200 and data["armed"] is True and data["owner"] == "panel-1"
+    status, data = _post(f"{web_server}/api/labs/winapps/control", {"armed": True, "owner": "agent-9"},
+                         {"X-OSLab": "1"})
+    assert (status, data["code"]) == (409, "INPUT_BUSY")  # one lock behind both doors
+    status, data = _post(f"{web_server}/api/labs/winapps/input/disarm", {"owner": "agent-9"}, {"X-OSLab": "1"})
+    assert (status, data["code"]) == (409, "INPUT_BUSY")
+    status, data = _post(f"{web_server}/api/labs/winapps/stop", {}, {"X-OSLab": "1"})
+    assert status == 200 and data["disarmed"] is True and data["gate"]["epoch"] == 1
+    assert winapps.winapps_control_state()["armed"] is False
+
+    monkeypatch.setattr(web_ui, "winapps_input_gate", None)
+    with pytest.raises(urllib.error.HTTPError) as caught:
+        urllib.request.urlopen(f"{web_server}/api/labs/winapps/input")
+    assert caught.value.code == 501
+
+
+@pytest.mark.parametrize("code,status", [("NOT_ARMED", 409), ("SCREEN_LOCKED", 409), ("APP_NOT_ALLOWED", 403),
+                                         ("RESTRICTED_WINDOW", 403), ("CONFIRM_REQUIRED", 400)])
+def test_winapps_click_and_input_stop_at_the_gate(web_server, monkeypatch, code, status):
+    import web_ui
+
+    sent = []
+    seen = []
+    monkeypatch.setattr(web_ui.winapps, "winapps_control_click", lambda data: sent.append("click") or {})
+    monkeypatch.setattr(web_ui.winapps, "winapps_control_input", lambda data: sent.append("input") or {})
+
+    def refuse(root, window_id, kind, **kwargs):
+        seen.append((window_id, kind, kwargs.get("confirm"), kwargs.get("key")))
+        raise web_ui.winapps_guard.GuardError("refused", code)
+
+    monkeypatch.setattr(web_ui.winapps_input_gate, "authorize", refuse)
+    for path, body in (("click", {"windowId": 7, "confirm": True}),
+                       ("input", {"windowId": 7, "kind": "key", "key": "Enter", "confirm": True})):
+        got, data = _post(f"{web_server}/api/labs/winapps/{path}", body, {"X-OSLab": "1"})
+        assert (got, data["code"]) == (status, code)
+    assert seen == [(7, "click", True, None), (7, "key", True, "Enter")]
+    assert sent == []
+
+
+def test_winapps_input_reaches_the_mirror_only_after_the_gate_allows_it(web_server, monkeypatch):
+    import web_ui
+
+    sent = []
+    monkeypatch.setattr(web_ui.winapps_input_gate, "authorize", lambda *a, **k: {"windowId": 7})
+    monkeypatch.setattr(web_ui.winapps, "winapps_control_input", lambda data: sent.append(data) or {"ok": True})
+    status, data = _post(f"{web_server}/api/labs/winapps/input", {"windowId": 7, "kind": "type", "text": "hi",
+                                                                   "confirm": True}, {"X-OSLab": "1"})
+    assert status == 200 and data == {"ok": True} and sent[0]["text"] == "hi"
+
+
 class _FakeFrida:
     name = "api"
 
@@ -509,16 +584,14 @@ def test_frida_inventory_refuses_targets_outside_the_lab(web_server, monkeypatch
     assert fake.calls == []
 
 
-def test_winapps_restricted_windows_are_refused_on_uia_stream_and_input_routes(web_server, monkeypatch):
-    """The policy gate also stands in front of the UIA, search, stream and input routes from #316/#318."""
+def test_winapps_restricted_windows_are_refused_on_uia_and_stream_routes(web_server, monkeypatch):
+    """The policy gate also stands in front of the UIA, search, and stream routes from #316/#318."""
     import web_ui
 
     called = []
     monkeypatch.setattr(web_ui.winapps, "winapps_window_elements", lambda *a, **k: called.append("elements") or {})
     monkeypatch.setattr(web_ui.winapps, "winapps_search_elements", lambda *a, **k: called.append("search") or {})
     monkeypatch.setattr(web_ui.winapps, "winapps_window_stream", lambda *a, **k: called.append("stream") or iter(()))
-    monkeypatch.setattr(web_ui.winapps, "winapps_control_click", lambda data: called.append("click") or {})
-    monkeypatch.setattr(web_ui.winapps, "winapps_control_input", lambda data: called.append("input") or {})
 
     def restricted(root, window_id, audience, **kwargs):
         raise web_ui.winapps_guard.GuardError("That window is restricted and cannot be mirrored", "RESTRICTED_WINDOW")
@@ -527,11 +600,4 @@ def test_winapps_restricted_windows_are_refused_on_uia_stream_and_input_routes(w
     for path in ("apps/7/elements", "apps/7/search?q=save", "apps/7/stream"):
         code, body = _http_error(f"{web_server}/api/labs/winapps/{path}")
         assert code == 403 and body["code"] == "RESTRICTED_WINDOW"
-    for path in ("click", "input"):
-        request = urllib.request.Request(f"{web_server}/api/labs/winapps/{path}", method="POST",
-                                         data=json.dumps({"windowId": 7}).encode(),
-                                         headers={"Content-Type": "application/json", "X-OSLab": "1"})
-        with pytest.raises(urllib.error.HTTPError) as caught:
-            urllib.request.urlopen(request)
-        assert caught.value.code == 403
-    assert called == []
+    assert called == []  # click and input stop at the input gate: test_winapps_click_and_input_stop_at_the_gate

@@ -978,3 +978,26 @@ def test_doctor_uses_the_given_capture_function(host):
     host.setattr(winapps, "winapps_window_screenshot", lambda hwnd: (_ for _ in ()).throw(AssertionError("raw")))
     result = winapps.doctor(capture=lambda hwnd: b"\x89PNG\r\n\x1a\n")
     assert result["capture"] is True
+
+
+def test_desktop_locked_is_true_when_the_input_desktop_cannot_be_opened(host):
+    closed = []
+
+    class WithDesktop(FakeUser32):
+        def __init__(self, handle):
+            super().__init__()
+            self.handle = handle
+
+        def OpenInputDesktop(self, _flags, _inherit, _access):
+            return self.handle
+
+        def CloseDesktop(self, handle):
+            closed.append(handle)
+            return True
+
+    host.setattr(winapps, "_user32", WithDesktop(77))
+    assert winapps.desktop_locked() is False and closed == [77]
+    host.setattr(winapps, "_user32", WithDesktop(0))
+    assert winapps.desktop_locked() is True and closed == [77]
+    host.setattr(winapps.sys, "platform", "linux")
+    assert winapps.desktop_locked() is None

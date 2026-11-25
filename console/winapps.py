@@ -91,6 +91,8 @@ TOOL_CLASSES = {
 }
 
 
+DESKTOP_SWITCHDESKTOP = 0x0100  # OpenInputDesktop access: fails while the lock screen or a UAC prompt is up
+
 class WinAppError(Exception):
     """A safe, user-presentable native window inventory/capture failure."""
 
@@ -280,6 +282,10 @@ if sys.platform == "win32":
     _kernel32.ProcessIdToSessionId.restype = wintypes.BOOL
     _user32.GetShellWindow.argtypes = []
     _user32.GetShellWindow.restype = wintypes.HWND
+    _user32.OpenInputDesktop.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    _user32.OpenInputDesktop.restype = wintypes.HANDLE
+    _user32.CloseDesktop.argtypes = [wintypes.HANDLE]
+    _user32.CloseDesktop.restype = wintypes.BOOL
     _user32.GetForegroundWindow.argtypes = []
     _user32.GetForegroundWindow.restype = wintypes.HWND
     _user32.SetForegroundWindow.argtypes = [wintypes.HWND]
@@ -682,6 +688,21 @@ def window_info(window_id: int) -> dict[str, Any] | None:
     if isinstance(window_id, bool) or not isinstance(window_id, int) or not 0 < window_id <= 0xFFFFFFFF:
         return None
     return _window(window_id) if _user32.GetAncestor(window_id, GA_ROOT) == window_id else None
+
+
+def desktop_locked() -> bool | None:
+    """True when this process cannot open the input desktop, i.e. the lock screen or a UAC prompt is up.
+
+    A process that is not allowed to ask also gets True, which is the safe answer for an input gate.
+    None means this is not a Windows host.
+    """
+    if sys.platform != "win32" or _user32 is None:
+        return None
+    desktop = _user32.OpenInputDesktop(0, False, DESKTOP_SWITCHDESKTOP)
+    if not desktop:
+        return True
+    _user32.CloseDesktop(desktop)
+    return False
 
 
 def _validated_window(window_id: int | str) -> tuple[int, dict[str, Any]]:

@@ -35,7 +35,7 @@ export const REQUIRED = [
   "console/source_control.py", "console/source_jobs.py", "console/source_worker.py",
   "console/source_artifacts.py", "console/source_overview.py", "console/source_manifest_specs.json", "console/source_pipeline.json",
   "labctl", "console/oslab.py", "console/content.py", "console/capabilities.json",
-  "console/winapps.py", "console/winapps_guard.py", "android-lab/lab/web_ui.py",
+  "console/winapps.py", "console/winapps_guard.py", "console/winapps_input_gate.py", "android-lab/lab/web_ui.py",
   "android-lab/lab/scripts/setup-ubuntu.sh", "android-lab/lab/docker-compose.yml",
   "android-lab/lab/scripts/preflight.sh", "android-lab/lab/scripts/install-service.sh",
   "android-lab/lab/scripts/uninstall-service.sh", "android-lab/lab/.env.example",

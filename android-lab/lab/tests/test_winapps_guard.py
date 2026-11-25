@@ -422,8 +422,16 @@ def test_unknown_policy_keys_are_a_policy_error(tmp_path, monkeypatch):
 def test_valid_restrictions_survive_an_invalid_allowlist(tmp_path, monkeypatch):
     write_policy(tmp_path, monkeypatch, {"allowedApps": "nope", "restrictedTitles": ["secret"]})
     policy = guard.load_policy(str(tmp_path))
-    assert policy.error and policy.allowed == frozenset()
-    assert guard.classify(win("msedge", "my SECRET plan"), policy).reason == "policy-title"
+    assert policy.error and policy.allowed == frozenset() and policy.restricted_titles == ("secret",)
+
+
+@pytest.mark.parametrize("raw", [b"{not json", b"[]", b'{"restrictedApp": ["keepass"]}'])
+def test_a_broken_policy_restricts_every_window_until_it_is_fixed(tmp_path, monkeypatch, raw):
+    write_policy(tmp_path, monkeypatch, raw=raw)
+    policy = guard.load_policy(str(tmp_path))
+    assert policy.error
+    verdict = guard.classify(win("Notepad", "notes.txt"), policy)
+    assert verdict.restricted and not verdict.allowed and verdict.reason == "policy-error"
 
 
 def test_policy_change_with_the_same_size_and_mtime_is_seen(tmp_path, monkeypatch):
@@ -563,3 +571,80 @@ def test_a_restart_on_the_same_day_continues_the_sequence(audit_dir):
     guard._reset_audit()  # a new console process
     guard.audit(None, "screenshot", audience="agent", window_id=1)
     assert [line["seq"] for line in _lines(audit_dir)] == [1, 2, 3]
+
+
+# ── review follow-ups on #319 ─────────────────────────────────────────────────
+
+def test_a_broken_policy_hides_titles_and_refuses_captures_for_people(world, monkeypatch, tmp_path):
+    write_policy(tmp_path, monkeypatch, raw=b"{broken")
+    listed = guard.list_windows(world["root"], "human")["windows"]
+    assert all(w["restricted"] and w["title"] == "(restricted)" and w["reason"] == "policy-error" for w in listed)
+    with pytest.raises(guard.GuardError) as refused:
+        guard.screenshot(world["root"], 1, "human")
+    assert refused.value.code == "RESTRICTED_WINDOW" and world["captures"] == []
+
+
+def test_rows_from_different_tools_do_not_coalesce(audit_dir):
+    guard.audit(None, "refused", audience="agent", window_id=1, code="X", tool="winapps_apps")
+    guard.audit(None, "refused", audience="agent", window_id=1, code="X", tool="winapps_screenshot")
+    assert [(row["tool"], row["count"]) for row in rows()] == [("winapps_apps", 1), ("winapps_screenshot", 1)]
+
+
+def test_the_row_cap_is_per_day(audit_dir, tmp_path, monkeypatch):
+    monkeypatch.setattr(guard, "_AUDIT_FILE_MAX_ROWS", 2)
+    day = ["20261125"]
+    real = guard.time.strftime
+    monkeypatch.setattr(guard.time, "strftime", lambda fmt, *a: day[0] if fmt == "%Y%m%d" else real(fmt, *a))
+    for i in range(3):
+        guard.audit(str(tmp_path), "list", audience="agent", window_id=i + 1)
+    assert guard.audit_rows()["persistent"] is False
+    day[0] = "20261126"
+    guard.audit(str(tmp_path), "list", audience="agent", window_id=9)
+    assert guard.audit_rows()["persistent"] is True
+    assert len((audit_dir / "winapps-audit-20261125.jsonl").read_text().splitlines()) == 2
+    assert len((audit_dir / "winapps-audit-20261126.jsonl").read_text().splitlines()) == 1
+
+
+def test_after_a_failed_write_that_days_file_gets_no_more_rows(audit_dir, tmp_path, monkeypatch):
+    guard.audit(str(tmp_path), "list", audience="agent", window_id=1)
+    real_open = open
+    fail = [True]
+
+    def flaky(path, *args, **kwargs):
+        if fail[0] and str(path).endswith(".jsonl") and "a" in (args[0] if args else kwargs.get("mode", "")):
+            raise OSError("disk full")
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", flaky)
+    guard.audit(str(tmp_path), "list", audience="agent", window_id=2)
+    fail[0] = False
+    guard.audit(str(tmp_path), "list", audience="agent", window_id=3)
+    monkeypatch.setattr("builtins.open", real_open)
+    file = next(audit_dir.glob("winapps-audit-*.jsonl"))
+    assert [json.loads(line)["windowId"] for line in file.read_text().splitlines()] == [1]
+    assert len(rows()) == 3 and guard.audit_rows()["persistent"] is False
+
+
+def test_hung_captures_are_bounded(world, monkeypatch):
+    release = threading.Event()
+    monkeypatch.setattr(guard, "_CAPTURE_TIMEOUT", 0.05)
+    monkeypatch.setattr(guard, "_STUCK_CAPTURES", [])
+    monkeypatch.setattr(winapps, "winapps_window_screenshot", lambda hwnd: release.wait(5) and PNG)
+    codes = []
+    try:
+        for _ in range(4):
+            with pytest.raises(guard.GuardError) as refused:
+                guard.screenshot(world["root"], 1, "human")
+            codes.append(refused.value.code)
+    finally:
+        release.set()
+    assert codes == ["CAPTURE_TIMEOUT", "CAPTURE_TIMEOUT", "CAPTURE_BUSY", "CAPTURE_BUSY"]
+
+
+def test_the_agent_ceiling_is_checked_on_the_pixels_actually_captured(world, monkeypatch):
+    big = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (5000).to_bytes(4, "big") + (3000).to_bytes(4, "big")
+    monkeypatch.setattr(winapps, "winapps_window_screenshot", lambda hwnd: big)  # grew after the size check
+    with pytest.raises(guard.GuardError) as refused:
+        guard.screenshot(world["root"], 1, "agent")
+    assert refused.value.code == "CAPTURE_TOO_LARGE"
+    assert guard.screenshot(world["root"], 1, "human") == big
