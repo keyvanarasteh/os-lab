@@ -292,6 +292,16 @@ before a Confirm, and History renders simulator runs as their own rows. The
 overview's Simulators card scrolls to it. CoreSimulator caches stay a normal
 catalog entry; the devices folder itself stays relocation-only.
 
+CLS-03 adds downloaded simulator runtimes. `simulators.runtimes()` reads
+`xcrun simctl runtime list -j` (identifier, version, build, runtime id, state,
+`deletable`, size) and `GET /api/cleanup/simulators` returns them with a
+`runtimeReason` when the list fails. `simulators.delete-runtime` (high risk)
+takes exactly one runtime identifier per preview, refuses runtimes Xcode marks
+as not deletable and runtimes a booted device uses, reports how many devices
+use it, and runs `xcrun simctl runtime delete <identifier>` through the same
+single-use preview, digest re-check and audit record. The card lists runtimes
+by size with a Managed by Xcode badge and a per-row Delete.
+
 ## Simulator storage
 
 CLS-02 sets up where the iOS Simulator devices folder lives and when to suggest moving it.

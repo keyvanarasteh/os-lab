@@ -1301,6 +1301,8 @@ def test_simulator_cleanup_requires_single_use_preview_and_audits(tmp_path, monk
         if argv == ["xcrun", "simctl", "list", "-j", "devices"]:
             payload = {"devices": {"rt": [{"udid": gone, "name": "Old", "state": "Shutdown", "isAvailable": False}]}}
             return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+        if argv == ["xcrun", "simctl", "runtime", "list", "-j"]:
+            return SimpleNamespace(returncode=0, stdout="{}", stderr="")
         calls.append(argv)
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
@@ -1312,6 +1314,7 @@ def test_simulator_cleanup_requires_single_use_preview_and_audits(tmp_path, monk
     api = cleanup_api.CleanupAPI(REPO_ROOT)
     inventory = api.get("/api/cleanup/simulators", {})
     assert {a["id"] for a in inventory["actions"]} == set(simulators.ACTIONS)
+    assert inventory["runtimes"] == []
     for body in ({"actionId": "/bin/sh"}, {"actionId": "simulators.delete-unavailable", "argv": ["sh"]},
                  {"actionId": "simulators.delete-devices", "deviceIds": ["../../etc"]}):
         with pytest.raises(cleanup_api.CleanupError) as refused:

@@ -3307,5 +3307,9 @@
   "os-lab is up to date.": "os-lab güncel.",
   "Downloading update": "Güncelleme indiriliyor",
   "Update ready to install": "Güncelleme kurulmaya hazır",
-  "Updates": "Güncellemeler"
+  "Updates": "Güncellemeler",
+  "Managed by Xcode": "Xcode tarafından yönetiliyor",
+  "Runtimes": "Çalışma zamanları",
+  "Simulators that use this runtime become unavailable. Xcode can download the runtime again.": "Bu çalışma zamanını kullanan simülatörler kullanılamaz hale gelir. Xcode çalışma zamanını yeniden indirebilir.",
+  "Delete simulator runtime": "Simülatör çalışma zamanını sil"
 }

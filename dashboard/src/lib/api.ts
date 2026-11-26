@@ -571,8 +571,16 @@ export interface CleanupVMInventory {
 export interface CleanupSimulatorDevice {
   id: string; name: string | null; runtime: string; state: string | null; available: boolean; sizeBytes: number | null;
 }
-export interface CleanupSimulatorAction { id: string; risk: string; needsSelection: boolean; defaultSelected: false; command: string[] }
-export interface CleanupSimulators { available: boolean; reason: string; devices: CleanupSimulatorDevice[]; actions: CleanupSimulatorAction[] }
+export interface CleanupSimulatorAction { id: string; risk: string; needsSelection: boolean; defaultSelected: false; target?: "devices" | "runtime"; command: string[] }
+/** CLS-03: a downloaded simulator runtime from `simctl runtime list -j`. */
+export interface CleanupSimulatorRuntime {
+  id: string; name: string; version: string | null; build: string | null; runtime: string; state: string | null;
+  deletable: boolean; lastUsedAt: string | null; kind: string | null; sizeBytes: number | null;
+}
+export interface CleanupSimulators {
+  available: boolean; reason: string; devices: CleanupSimulatorDevice[]; actions: CleanupSimulatorAction[];
+  runtimes?: CleanupSimulatorRuntime[]; runtimeReason?: string;
+}
 export interface CleanupSimulatorPreview {
   previewId: string; actionId: string; risk: string; candidateCount: number; bytes: number;
   devices: CleanupSimulatorDevice[]; command: string[]; expiresAt: number;

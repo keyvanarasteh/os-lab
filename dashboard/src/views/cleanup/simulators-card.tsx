@@ -22,7 +22,8 @@ export function simulatorActionLabel(actionId: string): string {
   const labels: Record<string, string> = {
     "simulators.delete-unavailable": "Delete unavailable simulators",
     "simulators.erase-devices": "Erase selected simulators",
-    "simulators.delete-devices": "Delete selected simulators"
+    "simulators.delete-devices": "Delete selected simulators",
+    "simulators.delete-runtime": "Delete simulator runtime"
   };
   return labels[actionId] ?? actionId;
 }
@@ -62,6 +63,9 @@ export function SimulatorsCard({ now }: { now: number }) {
   const total = devices.reduce((sum, d) => sum + (d.sizeBytes ?? 0), 0);
   const unavailableBytes = unavailable.reduce((sum, d) => sum + (d.sizeBytes ?? 0), 0);
   const busy = pending || job?.state === "running";
+  const runtimes = useMemo(() => [...(inventory?.runtimes ?? [])].sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0)), [inventory]);
+  const usedBy = (runtime: string) => devices.filter((d) => d.runtime === runtime).length;
+  const isRuntimePreview = preview?.actionId === "simulators.delete-runtime";
 
   async function loadPreview(actionId: string, deviceIds?: string[]) {
     setPending(true); setError(""); setPreview(null); setJob(null);
@@ -124,16 +128,36 @@ export function SimulatorsCard({ now }: { now: number }) {
           })}
         </ul>}
 
+      {runtimes.length > 0 && <div className="mt-4">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-(--iux-muted-foreground)">Runtimes</h3>
+        <ul className="mt-2 divide-y divide-(--iux-border) rounded-md border border-(--iux-border)">
+          {runtimes.map((runtime) => <li key={runtime.id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium" translate="no">{runtime.name}</span>
+              <span className="block truncate text-xs text-(--iux-muted-foreground)">
+                <span translate="no">{runtime.build ?? ""}</span> · {usedBy(runtime.runtime)} <span>simulators</span>
+              </span>
+            </span>
+            {!runtime.deletable && <Badge>Managed by Xcode</Badge>}
+            <span dir="ltr" className="w-20 shrink-0 text-end tabular-nums">{runtime.sizeBytes === null ? "—" : bytes(runtime.sizeBytes)}</span>
+            <button type="button" className="iux-btn" disabled={busy || !runtime.deletable}
+              onClick={() => void loadPreview("simulators.delete-runtime", [runtime.id])}>Delete</button>
+          </li>)}
+        </ul>
+      </div>}
+      {inventory.runtimeReason && <p className="mt-3 text-xs text-(--iux-muted-foreground)">{inventory.runtimeReason}</p>}
+
       {preview && <div className="mt-3 rounded-md border border-(--iux-border) p-3 text-sm">
         <div className="flex flex-wrap items-center gap-2">
           <strong>{simulatorActionLabel(preview.actionId)}</strong>
           <Badge tone={riskTone(preview.risk)}>{riskLabel(preview.risk)}</Badge>
-          <span className="tabular-nums text-(--iux-muted-foreground)">{preview.candidateCount} <span>simulators</span> · <span dir="ltr">{bytes(preview.bytes)}</span></span>
+          <span className="tabular-nums text-(--iux-muted-foreground)">{isRuntimePreview ? null : <>{preview.candidateCount} <span>simulators</span> · </>}<span dir="ltr">{bytes(preview.bytes)}</span></span>
           <span className="ms-auto"><CopyButton text={preview.command.join(" ")} label="Copy command" /></span>
         </div>
         <p className="mt-1 break-all text-xs"><span className="font-medium text-(--iux-muted-foreground)">Command</span> <code translate="no">{preview.command.join(" ")}</code></p>
         <p className="mt-1 text-xs text-(--iux-muted-foreground)">{preview.devices.map((d) => d.name ?? d.id).join(", ")}</p>
-        {preview.actionId !== "simulators.erase-devices" && <p className="mt-1 text-xs text-(--iux-danger)">Deleted simulators and their apps and data cannot be restored.</p>}
+        {isRuntimePreview ? <p className="mt-1 text-xs text-(--iux-danger)">Simulators that use this runtime become unavailable. Xcode can download the runtime again.</p>
+          : preview.actionId !== "simulators.erase-devices" && <p className="mt-1 text-xs text-(--iux-danger)">Deleted simulators and their apps and data cannot be restored.</p>}
         {preview.expiresAt <= now ? <p className="mt-2">Preview expired. Preview again.</p> :
           <div className="mt-2 flex gap-2">
             <button type="button" className="iux-btn" data-variant="primary" disabled={busy || !preview.candidateCount} onClick={() => void run()}>Confirm</button>
