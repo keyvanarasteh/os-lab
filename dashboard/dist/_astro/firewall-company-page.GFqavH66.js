@@ -1,0 +1,1 @@
+export{t as FirewallCompanyPage}from"./firewall-company-page.JN7FI_v7.js";
