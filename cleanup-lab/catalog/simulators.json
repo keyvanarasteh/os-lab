@@ -7,7 +7,7 @@
       "name": "Android emulator images",
       "category": "simulator",
       "risk": "high",
-      "hint": "Per-AVD emulator data under this account. Typed delete and wipe run through avdmanager; the Relocation tab (CLA-02) moves the folder off the OS disk.",
+      "hint": "Per-AVD emulator data under this account. Typed delete and wipe run through avdmanager; the Relocation tab moves the folder off the OS disk behind a symlink or Windows junction.",
       "impact": "Cleaning this folder as a catalog path is disabled: it would destroy every AVD. Use Android emulators on Advanced scan to delete or wipe one AVD at a time.",
       "defaultSelected": false,
       "needsPrivilege": false,
@@ -21,7 +21,7 @@
         "windows": ["~/.android/avd"]
       },
       "cleanable": false,
-      "note": "CLA-01: inventory and typed avdmanager actions. Relocation of this folder is CLA-02."
+      "note": "Relocation-only entry (CLN-27 / CLA-02): Move/Restore happen on the Relocation tab. Windows uses a directory junction; macOS and Linux use a symlink. Do not write ANDROID_AVD_HOME."
     },
     {
       "id": "simulators.coresimulator-devices",

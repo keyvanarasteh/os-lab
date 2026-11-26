@@ -488,6 +488,8 @@ test("dashboard shows the Android emulator setup card with delete unavailable", 
     else if (path === "/api/cleanup/preferences") data = { suggestion: { mode: "auto", include: [], exclude: [], minEntryBytes: 1048576, targetFreeBytes: null }, configError: null };
     else if (path === "/api/cleanup/simulator-storage") data = { available: false, reason: "iOS Simulator storage is macOS only" };
     else if (path === "/api/cleanup/simulators") data = { available: false, reason: "Xcode simulators require macOS", devices: [], actions: [] };
+    else if (path === "/api/cleanup/emulator-storage") data = { available: false, reason: "No Android SDK or AVD folder on this computer" };
+    else if (path === "/api/cleanup/relocation") data = { platform: "linux", entries: [], destinations: [] };
     else if (path === "/api/cleanup/emulators") data = { available: true, reason: "", folder: "/tmp/avd", source: "default", devices, actions: [] };
     else if (path === "/api/cleanup/emulators/preview") data = { previewId: "emu-1", actionId: body.actionId, risk: "low", candidateCount: 1, bytes: 0, devices: [devices[1]], command: ["avdmanager", "delete", "avd", "-n", "Old_8"], expiresAt: Date.now() / 1000 + 600 };
     else if (path === "/api/cleanup/emulators/run") data = { id: "job-emu", kind: "emulator-run", state: "running", progress: null, result: null, error: null };
@@ -501,7 +503,6 @@ test("dashboard shows the Android emulator setup card with delete unavailable", 
   await page.goto("/cleanup/");
   const card = page.locator("#emulator-setup");
   await expect(card.getByRole("heading", { name: "Android emulator setup" })).toBeVisible();
-  await expect(card.getByText("2 emulators", { exact: false })).toBeVisible();
   await expect(card.getByText("1 unavailable emulators", { exact: false })).toBeVisible();
   await card.getByRole("button", { name: "Delete unavailable emulators" }).click();
   await expect(card.getByText("Deleted emulators and their apps and data cannot be restored.")).toBeVisible();

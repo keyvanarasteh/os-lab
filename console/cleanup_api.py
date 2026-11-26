@@ -60,6 +60,7 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "simulator-preview": ("actionId", "deviceIds"), "simulator-run": ("previewId",),
               "emulator-preview": ("actionId", "deviceIds"), "emulator-run": ("previewId",),
               "simulator-storage": ("destination", "suggest", "floorBytes"),
+              "emulator-storage": ("destination", "suggest", "floorBytes"),
               "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "reminderSeconds", "notify", "volumes"),
               "entry-reveal": ("entryId",),
               "preferences": ("suggestion",),
@@ -1025,6 +1026,13 @@ class MonitorRunner:
                                 _module(self.root, "notify").send_message(*note)
                         except Exception:
                             pass
+                        try:
+                            note = _module(self.root, "emulator_storage").notification(
+                                _module(self.root, "emulator_storage").status(self.root))
+                            if note:
+                                _module(self.root, "notify").send_message(*note)
+                        except Exception:
+                            pass
                     self._evaluate_bookmark_sizes()
                     publish_widget(self.root)  # CLW-04: monitor ticks refresh the widget
                     self.stop.wait(config["intervalSeconds"])
@@ -1135,6 +1143,9 @@ class CleanupAPI:
         if path == "/api/cleanup/simulator-storage":
             _query(query)
             return _module(self.root, "simulator_storage").status(self.root)
+        if path == "/api/cleanup/emulator-storage":
+            _query(query)
+            return _module(self.root, "emulator_storage").status(self.root)
         if path == "/api/cleanup/simulators":
             _query(query)
             inventory = _module(self.root, "deep").simulators(self.root)
@@ -1282,6 +1293,17 @@ class CleanupAPI:
         if path == "/api/cleanup/simulator-storage":
             _object_body(body, "simulator-storage")
             storage = _module(self.root, "simulator_storage")
+            report = storage.status(self.root)
+            if not report["available"]:
+                raise CleanupError(409, report["reason"])
+            try:
+                storage.save(body, destinations=[item["mountPoint"] for item in report["destinations"]])
+            except storage.StorageConfigError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            return storage.status(self.root)
+        if path == "/api/cleanup/emulator-storage":
+            _object_body(body, "emulator-storage")
+            storage = _module(self.root, "emulator_storage")
             report = storage.status(self.root)
             if not report["available"]:
                 raise CleanupError(409, report["reason"])

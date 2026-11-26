@@ -327,11 +327,15 @@ appends `kind: "emulators"` to the audit history.
 
 The dashboard `#scan-emulators` card on Advanced scan lists AVDs with size and
 state, previews the command, and History renders emulator runs as their own
-rows. `#emulator-setup` on `/cleanup/` appears when any AVD exists and can
-delete unavailable ones with progress and a report. Catalog entry
-`simulators.android-avd` is relocation-only (`cleanable: false`) so a later
-move can take the folder off the OS disk. docker-android volumes stay in
-android-lab.
+rows. CLA-02 relocates `simulators.android-avd` with CLN-27 to
+`<volume>/oslab-caches/simulators.android-avd`. Windows uses a directory
+junction; macOS and Linux use a symlink. Do not write `ANDROID_AVD_HOME`.
+[[cleanup-lab/engine/cleanup_lab/emulator_storage.py]] stores the destination
+and floor; `GET/POST /api/cleanup/emulator-storage` is the setup API.
+`#emulator-setup` on `/cleanup/` appears when the AVD folder is still local,
+the linked disk is missing, a move was interrupted, or unavailable AVDs
+exist, and hides when there is no SDK and no AVD folder. The Relocation tab
+hosts `#emulator-storage`. docker-android volumes stay in android-lab.
 
 ## Simulator storage
 
@@ -592,7 +596,8 @@ The main view keeps only the
 cleaning actions and the stats around them: the storage hero, the iOS Simulator
 setup card when this Mac still has devices on the system disk (or a missing
 disk, an interrupted move, or unavailable simulators), the Android emulator
-setup card when any AVD exists, the Quick clean
+setup card when AVDs are still local, their disk is missing, a move was
+interrupted, or unavailable AVDs exist, the Quick clean
 card (one confirmed Trash run over the bookmarks flagged for quick clean; with
 none flagged it runs the Clean card's Scan & review on the recommended set,
 CUX-02, which also serves the widget intent), the Clean card (one **Scan & review**

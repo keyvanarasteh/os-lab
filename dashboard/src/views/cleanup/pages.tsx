@@ -11,7 +11,8 @@ import { CategoryIcon, PrivilegeMarker, StatusIcon } from "./icons";
 import { bytes, itemStatusLabel, riskLabel, riskTone, sortEntries, totalsByRisk, type SortOrder } from "./format";
 import { CleanupExtraTools } from "./extra-tools";
 import { SimulatorsCard, simulatorActionLabel } from "./simulators-card";
-import { EmulatorsCard, EmulatorSetupCard, emulatorActionLabel } from "./emulators-card";
+import { EmulatorsCard, emulatorActionLabel } from "./emulators-card";
+import { EmulatorSetupCard, EmulatorStorageCard } from "./emulator-storage-card";
 import { CrossPlatformLeftovers } from "./cross-leftovers";
 import { MonitorBanner, MonitorCard, MonitorStatsCard } from "./monitor-card";
 import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
@@ -962,6 +963,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           {page === "space" && <SpaceExplorer scanHref={link("scan/")} />}
           {page === "relocation" && <>
             {!PUBLIC && <SimulatorStorageCard refreshKey={storageKey}
+              onMove={(entryId, destination) => setRelocationRequest({ entryId, destination, nonce: Date.now() })} />}
+            {!PUBLIC && <EmulatorStorageCard refreshKey={storageKey}
               onMove={(entryId, destination) => setRelocationRequest({ entryId, destination, nonce: Date.now() })} />}
             <RelocationCard now={now} request={relocationRequest} onChanged={() => setStorageKey((key) => key + 1)} />
           </>}

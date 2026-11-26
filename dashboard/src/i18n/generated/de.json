@@ -3366,5 +3366,19 @@
   "Wipe selected data": "Ausgewählte Daten leeren",
   "Wipes userdata, cache and snapshots. The AVD definition stays.": "Löscht Nutzerdaten, Cache und Snapshots. Die AVD-Definition bleibt.",
   "emulators": "Emulatoren",
-  "unavailable emulators": "nicht verfügbare Emulatoren"
+  "unavailable emulators": "nicht verfügbare Emulatoren",
+  "Keep Android Virtual Devices on another disk. The emulator still opens them from the original path.": "Android Virtual Devices auf einem anderen Datenträger halten. Der Emulator öffnet sie weiter über den ursprünglichen Pfad.",
+  "Emulator storage": "Emulator-Speicher",
+  "Checking emulator storage…": "Emulator-Speicher wird geprüft…",
+  "Connect the disk that holds your emulators before opening Android Studio.": "Schließen Sie den Datenträger mit den Emulatoren an, bevor Sie Android Studio öffnen.",
+  "The system disk is below your free-space floor. Move the emulators to free space.": "Die Systemplatte liegt unter der freien-Speicher-Schwelle. Verschieben Sie die Emulatoren, um Platz zu schaffen.",
+  "Disk for emulators": "Datenträger für Emulatoren",
+  "This disk can be unplugged. The emulator cannot start while it is disconnected.": "Dieser Datenträger kann getrennt werden. Der Emulator startet nicht, solange er getrennt ist.",
+  "Android Virtual Devices should live on a non-system disk. Unavailable AVDs can be deleted through a previewed avdmanager action.": "Android Virtual Devices gehören auf einen Nicht-Systemdatenträger. Nicht verfügbare AVDs lassen sich über eine vorgesehene avdmanager-Aktion löschen.",
+  "Android Virtual Devices are still on the system disk. Move them to another disk; Android Studio still opens them from the original path.": "Android Virtual Devices liegen noch auf der Systemplatte. Verschieben Sie sie; Android Studio öffnet sie weiter über den ursprünglichen Pfad.",
+  "Connect another disk to move emulators off the system disk.": "Schließen Sie einen weiteren Datenträger an, um Emulatoren von der Systemplatte zu verschieben.",
+  "Move emulators off the system disk": "Emulatoren von der Systemplatte verschieben",
+  "Moving emulators…": "Emulatoren werden verschoben…",
+  "Studio still opens these AVDs through a junction at the original path.": "Studio öffnet diese AVDs weiter über einen Junction am ursprünglichen Pfad.",
+  "Studio still opens these AVDs through a symlink at the original path.": "Studio öffnet diese AVDs weiter über einen Symlink am ursprünglichen Pfad."
 }

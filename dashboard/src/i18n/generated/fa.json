@@ -3366,5 +3366,19 @@
   "Wipe selected data": "پاک‌کردن داده‌های انتخاب‌شده",
   "Wipes userdata, cache and snapshots. The AVD definition stays.": "داده‌کاربر، کش و اسنپ‌شات را پاک می‌کند. تعریف AVD می‌ماند.",
   "emulators": "شبیه‌ساز",
-  "unavailable emulators": "شبیه‌سازهای در دسترس نیست"
+  "unavailable emulators": "شبیه‌سازهای در دسترس نیست",
+  "Keep Android Virtual Devices on another disk. The emulator still opens them from the original path.": "دستگاه‌های مجازی اندروید را روی دیسک دیگری نگه دارید. شبیه‌ساز همچنان از مسیر اصلی آن‌ها را باز می‌کند.",
+  "Emulator storage": "ذخیره‌سازی شبیه‌ساز",
+  "Checking emulator storage…": "در حال بررسی ذخیره‌سازی شبیه‌ساز…",
+  "Connect the disk that holds your emulators before opening Android Studio.": "پیش از باز کردن Android Studio دیسکی که شبیه‌سازها را نگه می‌دارد وصل کنید.",
+  "The system disk is below your free-space floor. Move the emulators to free space.": "دیسک سیستم زیر آستانه فضای آزاد است. شبیه‌سازها را جابه‌جا کنید تا فضا آزاد شود.",
+  "Disk for emulators": "دیسک شبیه‌سازها",
+  "This disk can be unplugged. The emulator cannot start while it is disconnected.": "این دیسک جداشدنی است. تا وقتی وصل نباشد شبیه‌ساز راه‌اندازی نمی‌شود.",
+  "Android Virtual Devices should live on a non-system disk. Unavailable AVDs can be deleted through a previewed avdmanager action.": "دستگاه‌های مجازی اندروید باید روی دیسک غیرسیستم باشند. AVDهای در دسترس‌نبودنی را می‌توان با کنش پیش‌نمایش‌شده avdmanager حذف کرد.",
+  "Android Virtual Devices are still on the system disk. Move them to another disk; Android Studio still opens them from the original path.": "دستگاه‌های مجازی اندروید هنوز روی دیسک سیستم‌اند. آن‌ها را جابه‌جا کنید؛ Android Studio همچنان از مسیر اصلی بازشان می‌کند.",
+  "Connect another disk to move emulators off the system disk.": "برای بردن شبیه‌سازها از دیسک سیستم دیسک دیگری وصل کنید.",
+  "Move emulators off the system disk": "شبیه‌سازها را از دیسک سیستم جابه‌جا کن",
+  "Moving emulators…": "در حال جابه‌جایی شبیه‌سازها…",
+  "Studio still opens these AVDs through a junction at the original path.": "استودیو این AVDها را همچنان از طریق junction در مسیر اصلی باز می‌کند.",
+  "Studio still opens these AVDs through a symlink at the original path.": "استودیو این AVDها را همچنان از طریق پیوند نمادین در مسیر اصلی باز می‌کند."
 }

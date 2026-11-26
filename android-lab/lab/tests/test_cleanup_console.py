@@ -1391,3 +1391,32 @@ def test_simulator_storage_settings_accept_only_offered_volumes(tmp_path, monkey
     assert saved["config"]["destination"] == str(external)
     assert saved["suggestion"]["action"] == "move"
     assert (tmp_path / "Library/Developer/CoreSimulator/Devices").is_dir()
+
+
+def test_emulator_storage_settings_accept_only_offered_volumes(tmp_path, monkeypatch):
+    """CLA-02: a saved destination from the offered volumes; nothing moves."""
+    from cleanup_lab import emulator_storage
+    gib = 1024 ** 3
+    (tmp_path / ".android" / "avd").mkdir(parents=True)
+    (tmp_path / "Android" / "Sdk").mkdir(parents=True)
+    external = tmp_path / "Volumes" / "Fast"
+    external.mkdir(parents=True)
+    rows = [{"mountPoint": "/", "kind": "root", "isHome": True, "freeBytes": 3 * gib, "totalBytes": 500 * gib},
+            {"mountPoint": str(external), "name": "Fast", "kind": "internal", "isHome": False,
+             "freeBytes": 800 * gib, "totalBytes": 1000 * gib}]
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(emulator_storage.paths, "platform_id", lambda: "linux")
+    monkeypatch.setattr(emulator_storage.volumes, "inventory", lambda *args, **kwargs: {"volumes": rows})
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    report = api.get("/api/cleanup/emulator-storage", {})
+    assert report["state"] == "local"
+    assert report["linkKind"] == "symlink"
+    assert [item["mountPoint"] for item in report["destinations"]] == [str(external)]
+    for body in ({"destination": "/"}, {"destination": "/Volumes/Nope"}, {"floorBytes": 5}, {"argv": ["sh"]}):
+        with pytest.raises(cleanup_api.CleanupError) as refused:
+            api.post("/api/cleanup/emulator-storage", body)
+        assert refused.value.status == 400
+    saved = api.post("/api/cleanup/emulator-storage", {"destination": str(external), "floorBytes": 20 * gib})
+    assert saved["config"]["destination"] == str(external)
+    assert saved["suggestion"]["action"] == "move"
+    assert (tmp_path / ".android" / "avd").is_dir()

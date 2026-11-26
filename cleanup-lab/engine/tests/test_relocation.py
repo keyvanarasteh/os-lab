@@ -182,6 +182,19 @@ class ExecuteStepsTest(TreeBase):
         self.assertEqual(rl.tree_fingerprint(self.store), (1, 300))
         self.assertFalse(os.path.lexists(self.home + rl.ASIDE_SUFFIX))
 
+    def test_windows_plan_uses_a_junction_helper(self):
+        with mock.patch.object(rl, "_windows_junction") as junction:
+            with mock.patch.object(rl.os, "name", "nt"):
+                rl._dir_link("/store", "/link", platform="windows")
+        junction.assert_called_once()
+
+    def test_windows_plan_on_posix_still_links(self):
+        if not SYMLINKS_OK:
+            self.skipTest(NEEDS_SYMLINK)
+        os.makedirs(self.store)
+        rl._dir_link(self.store, self.home, platform="windows")
+        self.assertTrue(os.path.islink(self.home))
+
     def test_a_verify_failure_keeps_the_original(self):
         os.makedirs(self.home)
         self.write(os.path.join(self.home, "cache.bin"), 300)
