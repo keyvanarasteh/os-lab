@@ -3459,5 +3459,7 @@
   "Install as a Grok Build plugin": "نصب به‌عنوان افزونه Grok Build",
   "Cursor plugin": "افزونه Cursor",
   "ZCode plugin": "افزونه ZCode",
-  "Grok Build plugin": "افزونه Grok Build"
+  "Grok Build plugin": "افزونه Grok Build",
+  "Apps keep writing here. Whatever is inside when the clean runs is removed.": "برنامه‌ها پیوسته در اینجا می‌نویسند. هر چه هنگام اجرای پاک‌سازی داخل آن باشد حذف می‌شود.",
+  "Build a new plan": "ساخت طرح جدید"
 }

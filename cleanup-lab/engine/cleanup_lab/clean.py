@@ -11,8 +11,10 @@ Ports the *behaviour* of Qleaner's ``clean_items`` / ``clean_leftovers`` /
 * **Plan → confirm → run.** A plan is built from catalog entry ids (never a path
   list from the page), lists every item with its size, mode and refusal reason,
   and carries a fingerprint per item. Running re-measures first: an item that
-  changed or vanished since the plan was made expires the whole plan. A plan is
-  single-use and short-lived (:data:`PLAN_TTL`).
+  changed or vanished since the plan was made expires the whole plan. Live caches
+  and logs (catalog ``liveContent``) change all the time, so for those only a
+  vanished, unreadable or replaced item expires it. A plan is single-use and
+  short-lived (:data:`PLAN_TTL`).
 * **Honest results.** Per item one of ``trashed`` / ``deleted`` / ``skipped``
   (with a stable ``code`` and reason) / ``failed`` (with the error). Bytes are
   credited only when the item is really gone from its original path, and only in
@@ -240,11 +242,18 @@ def _walk_fingerprint(root, measure, *, cancel, progress):
     return measure
 
 
-def _fingerprint_key(measure):
-    """The comparable fingerprint; any component changing means "the plan is stale"."""
+def _fingerprint_key(measure, *, live=False):
+    """The comparable fingerprint; any component changing means "the plan is stale".
+
+    ``live`` is for the catalog's ``liveContent`` entries, folders that running apps
+    write all the time. Their sizes and times never hold still, so only identity is
+    compared: the same kind of thing, still the same inode on the same device.
+    """
     kind = measure["kind"]
     if kind in ("missing", "unreadable"):
         return (kind,)
+    if live:
+        return (kind, measure["dev"], measure["ino"])
     return (
         kind,
         measure["bytes"],
@@ -332,6 +341,7 @@ def _plan_item(entry, template, path, status, *, mode, code="", reason="", sourc
         "code": code,
         "reason": reason,
         "privileged": bool(entry.get("needsPrivilege")),
+        "liveContent": bool(entry.get("liveContent")),
         "mode": mode,
         "sizeBytes": 0,
         "sizeOnDiskBytes": None,
@@ -523,7 +533,7 @@ def build_plan(
         item["sizeOnDiskBytes"] = measure["onDiskBytes"]
         item["files"] = measure["files"]
         item["folders"] = measure["folders"]
-        fingerprints[item["path"]] = _fingerprint_key(measure)
+        fingerprints[item["path"]] = _fingerprint_key(measure, live=item["liveContent"])
 
     # A ready item inside another ready item would be removed by its parent; the
     # later one yields and says so instead of failing mid-run.
@@ -584,6 +594,9 @@ def _run_walks(pending, walk_one, *, workers):
 def verify_plan(plan, *, cancel=None, clock=None, progress_callback=None):
     """Re-measure every ready item right before the run; any change expires the plan.
 
+    A ``liveContent`` item expires only when it is gone, unreadable or replaced;
+    the run removes, and credits, what this fresh walk measured.
+
     Returns ``{path: measure}`` — the numbers the run credits when an item is
     really removed. Raises :class:`PlanError` (``expired`` / ``stale`` /
     ``cancelled``) without touching anything. ``progress_callback`` receives
@@ -628,7 +641,7 @@ def verify_plan(plan, *, cancel=None, clock=None, progress_callback=None):
                 "The plan expired: {0} cannot be read anymore. Build a new plan.".format(path),
                 "stale",
             )
-        if _fingerprint_key(fresh) != plan.fingerprints.get(path):
+        if _fingerprint_key(fresh, live=item.get("liveContent", False)) != plan.fingerprints.get(path):
             raise PlanError(
                 "The plan expired: {0} changed since it was confirmed. Build a new plan.".format(path),
                 "stale",

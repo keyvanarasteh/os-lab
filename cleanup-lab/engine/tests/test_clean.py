@@ -442,6 +442,67 @@ class CleanTests(unittest.TestCase):
             clean.verify_plan(plan)
         self.assertEqual(caught.exception.code, "stale")
 
+    def test_a_live_folder_that_keeps_changing_is_still_cleaned(self):
+        for mode, status in (("trash", "trashed"), ("delete", "deleted")):
+            with self.subTest(mode=mode):
+                target = self.write("Library/Caches/app/data.bin", 10)
+                plan = self.build([self.caches_entry(liveContent=True)], mode=mode)
+                self.assertTrue(plan.payload["items"][0]["liveContent"])
+                with open(target, "ab") as handle:
+                    handle.write(b"grew")
+                self.write("Library/Caches/other/added.bin", 5)
+                result = self.run_plan(plan)
+                item = result["results"][0]
+                self.assertEqual(item["status"], status)
+                self.assertEqual(item["bytes"], 19)  # what the run measured, not the preview
+                self.assertFalse(os.path.exists(os.path.join(self.home, "Library/Caches")))
+
+    def test_a_replaced_live_folder_expires_the_plan(self):
+        self.write("Library/Caches/app/data.bin", 10)
+        plan = self.build([self.caches_entry(liveContent=True)])
+        caches = os.path.join(self.home, "Library", "Caches")
+        os.rename(caches, caches + ".old")  # kept, so the new folder cannot reuse its inode
+        self.write("Library/Caches/app/data.bin", 10)
+        with self.assertRaises(clean.PlanError) as caught:
+            clean.verify_plan(plan)
+        self.assertEqual(caught.exception.code, "stale")
+
+    def test_a_live_folder_swapped_for_a_link_expires_the_plan(self):
+        if not hasattr(os, "symlink") or os.name == "nt":
+            self.skipTest("needs symlinks")
+        self.write("Library/Caches/app/data.bin", 10)
+        self.write("precious/keep.bin", 10)
+        plan = self.build([self.caches_entry(liveContent=True)])
+        caches = os.path.join(self.home, "Library", "Caches")
+        os.rename(caches, caches + ".old")
+        os.symlink(os.path.join(self.home, "precious"), caches)
+        with self.assertRaises(clean.PlanError) as caught:
+            clean.verify_plan(plan)
+        self.assertEqual(caught.exception.code, "stale")
+        self.assertTrue(os.path.exists(os.path.join(self.home, "precious", "keep.bin")))
+
+    def test_a_vanished_live_folder_expires_the_plan(self):
+        self.write("Library/Caches/app/data.bin", 10)
+        plan = self.build([self.caches_entry(liveContent=True)])
+        os.rename(os.path.join(self.home, "Library", "Caches"), os.path.join(self.home, "gone"))
+        with self.assertRaises(clean.PlanError) as caught:
+            clean.verify_plan(plan)
+        self.assertEqual(caught.exception.code, "stale")
+
+    def test_only_low_risk_cleanable_entries_may_be_live(self):
+        from cleanup_lab import catalog
+
+        shipped = catalog.load(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        live = {entry["id"] for entry in shipped if entry["liveContent"]}
+        self.assertLessEqual({"system.user-caches", "system.user-logs"}, live)
+        self.assertNotIn("system.trash", live)
+        for bad in ({"risk": "medium"}, {"cleanable": False}, {"liveContent": "yes"}):
+            record = make_entry("system.caches", {"macos": ["~/Library/Caches"]}, liveContent=True)
+            record.pop("family")
+            record.update(bad)
+            with self.assertRaises(catalog.CatalogError):
+                catalog._check_entry(record, "system", "<test>", 0)
+
     def test_verify_plan_reports_progress(self):
         self.write("Library/Caches/app/data.bin", 10)
         plan = self.build([self.caches_entry()])

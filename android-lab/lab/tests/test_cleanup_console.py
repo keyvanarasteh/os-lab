@@ -323,13 +323,19 @@ def test_plan_and_clean_requests_are_typed(tmp_path, monkeypatch):
 
 
 def test_a_changed_item_fails_the_clean_and_removes_nothing(tmp_path, monkeypatch):
-    target = catalog_cache_target(tmp_path, monkeypatch)
+    catalog_cache_target(tmp_path, monkeypatch)  # points HOME at the temp tree
+    entry = next(
+        item for item in catalog_module.load(REPO_ROOT) if item["id"] == "developers.maven"
+    )
+    target = catalog_module.resolve(entry, paths_module.platform_id())[0]["path"]
+    assert target.startswith(str(tmp_path))
+    os.makedirs(target, exist_ok=True)
     original = os.path.join(target, "one.bin")
     with open(original, "wb") as handle:
         handle.write(b"x" * 20)
 
     api = cleanup_api.CleanupAPI(REPO_ROOT)
-    plan = wait_done(api.post("/api/cleanup/plan", {"entryIds": ["system.user-caches"]}))
+    plan = wait_done(api.post("/api/cleanup/plan", {"entryIds": ["developers.maven"]}))
     with open(os.path.join(target, "added.bin"), "wb") as handle:
         handle.write(b"new")
 
@@ -339,6 +345,22 @@ def test_a_changed_item_fails_the_clean_and_removes_nothing(tmp_path, monkeypatc
     assert os.path.exists(original)
     assert os.path.exists(os.path.join(target, "added.bin"))
     assert not os.path.exists(os.path.join(tmp_path, ".Trash"))
+
+
+def test_user_caches_clean_although_apps_wrote_after_the_plan(tmp_path, monkeypatch):
+    target = catalog_cache_target(tmp_path, monkeypatch)
+    with open(os.path.join(target, "one.bin"), "wb") as handle:
+        handle.write(b"x" * 20)
+
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    plan = wait_done(api.post("/api/cleanup/plan", {"entryIds": ["system.user-caches"]}))
+    with open(os.path.join(target, "added.bin"), "wb") as handle:
+        handle.write(b"new")
+
+    job = wait_done(api.post("/api/cleanup/clean", {"planId": plan.result["planId"]}))
+    assert job.result["results"][0]["status"] == "trashed"
+    assert job.result["totals"]["bytes"] == 23
+    assert not os.path.exists(target)
 
 
 def test_a_plan_is_single_use_and_expires(tmp_path, monkeypatch):

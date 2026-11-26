@@ -52,6 +52,7 @@ catalog id or to the reason it was dropped.
 | `owningProcesses` | Process names that make the item skip with a reason (CLN-12) |
 | `toolName` | Optional executable name checked on `PATH`, without invoking a shell |
 | `cleanable` | `false` keeps toolchains visible for scans while the plan refuses cleaning |
+| `liveContent` | A cache or log folder running apps keep writing: a confirmed plan expires only if it is gone, unreadable or replaced, not when its contents change. Cleanable `low` risk only |
 | `detector` | `paths` (default), `profile-glob`, `temp`, `spotlight`, `artifacts`, `signatures` or `tool` |
 | `cacheEnv` | For `tool` entries, ordered environment variables that may name the cache root |
 | `envSuffix` | One directory component appended to an environment cache root, such as `registry` under `CARGO_HOME` |

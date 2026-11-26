@@ -70,6 +70,8 @@ export function ConfirmDialog({
   const failed = job?.state === "failed" && (job.kind === "clean" || job.kind === "plan");
   const done = !!result && result.planId === plan.planId && (job?.kind === "clean" ? job.state !== "running" : true);
   const blocked = expired || planUsed || !ready.length || busy || running || done;
+  // A plan that failed, ran or timed out can never run again, so offer its replacement.
+  const stale = !done && !running && (failed || expired || planUsed);
   const trash = plan.mode === "trash";
   const phase = String(job?.progress?.phase ?? (planning ? "planning" : "verifying"));
   const doneCount = Number(job?.progress?.itemsDone ?? job?.progress?.pathsDone ?? 0);
@@ -169,6 +171,7 @@ export function ConfirmDialog({
               </span>}
               <p className="mt-1 break-all text-xs text-(--iux-muted-foreground)" translate="no" dir="ltr">{item.path}</p>
               <p className="text-xs"><PathSource source={item.source} /></p>
+              {item.liveContent && <p className="text-xs text-(--iux-muted-foreground)">Apps keep writing here. Whatever is inside when the clean runs is removed.</p>}
             </li>)}
           </ul> : <Empty>Nothing is ready to clean.</Empty>}
         </Tile>
@@ -199,7 +202,8 @@ export function ConfirmDialog({
       </div>
       {working ? <button type="button" className="iux-btn" onClick={onCancel} disabled={!onCancel}>Stop</button>
         : <button type="button" className="iux-btn" onClick={onClose}>{done || failed ? "Close" : "Back"}</button>}
-      {!done && <button type="button" className="iux-btn" data-variant="primary" disabled={blocked} onClick={onRun}>Run clean</button>}
+      {stale && onChangeMode ? <button type="button" className="iux-btn" data-variant="primary" disabled={busy} onClick={() => onChangeMode(plan.mode)}>Build a new plan</button>
+        : !done && <button type="button" className="iux-btn" data-variant="primary" disabled={blocked} onClick={onRun}>Run clean</button>}
     </footer>
   </dialog>;
 }

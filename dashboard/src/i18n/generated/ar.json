@@ -3459,5 +3459,7 @@
   "Install as a Grok Build plugin": "التثبيت كإضافة Grok Build",
   "Cursor plugin": "إضافة Cursor",
   "ZCode plugin": "إضافة ZCode",
-  "Grok Build plugin": "إضافة Grok Build"
+  "Grok Build plugin": "إضافة Grok Build",
+  "Apps keep writing here. Whatever is inside when the clean runs is removed.": "تكتب التطبيقات هنا باستمرار. يُحذف كل ما بداخله عند تشغيل التنظيف.",
+  "Build a new plan": "إنشاء خطة جديدة"
 }

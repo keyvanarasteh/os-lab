@@ -174,6 +174,15 @@ reason. `POST /api/cleanup/plan` names catalog ids and an optional mode; `POST
 is a failed item, never a silent delete, and bytes are counted only when the
 original is gone.
 
+Any change to a planned item expires the plan, except for catalog entries marked
+`liveContent`: user caches and logs, browser caches and common build caches. Running
+apps write there all the time, so an exact fingerprint never survived the confirm
+step. Those expire only when the item is gone, unreadable or replaced (another kind,
+device or inode); the run removes and credits what the check just measured, and the
+confirm dialog says so. The [[cleanup-lab/engine/cleanup_lab/catalog.py#load|loader]]
+allows the flag on cleanable low-risk entries only. A plan that failed, ran or timed
+out offers **Build a new plan**.
+
 ## Readiness
 
 `readiness.py` reports what the engine can do on this host without writing anything.

@@ -12,6 +12,7 @@
       "impact": "Apps rebuild these; the first launch after cleaning is slower.",
       "defaultSelected": true,
       "needsPrivilege": false,
+      "liveContent": true,
       "owningProcesses": ["explorer.exe"],
       "detector": "paths",
       "paths": {
@@ -29,6 +30,7 @@
       "impact": "Apps start a new log file on their next run.",
       "defaultSelected": true,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": ["~/Library/Logs"],
@@ -133,6 +135,7 @@
       "impact": "Fonts may load more slowly while the cache is rebuilt.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": ["~/Library/Caches/com.apple.ATS"],

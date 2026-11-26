@@ -72,7 +72,7 @@ REQUIRED_ENTRY_KEYS = (
     "needsPrivilege",
     "paths",
 )
-OPTIONAL_ENTRY_KEYS = ("owningProcesses", "detector", "note", "toolName", "cleanable", "cacheEnv", "envSuffix", "probeArgv")
+OPTIONAL_ENTRY_KEYS = ("owningProcesses", "detector", "note", "toolName", "cleanable", "cacheEnv", "envSuffix", "probeArgv", "liveContent")
 
 
 #: File names that hold sign-in or hand-written configuration. No cleanable entry may
@@ -252,6 +252,11 @@ def _check_entry(entry, family, name, index):
                 refusal = credential_reason(template) if isinstance(template, str) else None
                 if refusal:
                     raise CatalogError("{0}: cleanable entry path {1} refused: {2}".format(where, template, refusal))
+    live = entry.get("liveContent", False)
+    if not isinstance(live, bool):
+        raise CatalogError("{0}: liveContent must be a boolean".format(where))
+    if live and (entry["risk"] != "low" or not entry.get("cleanable", True)):
+        raise CatalogError("{0}: only a cleanable low-risk entry can have liveContent".format(where))
     cache_env = entry.get("cacheEnv", [])
     if "cacheEnv" in entry and (not isinstance(cache_env, list) or not cache_env or any(
         not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
@@ -297,6 +302,7 @@ def _check_entry(entry, family, name, index):
         "note": note,
         "toolName": tool_name,
         "cleanable": entry.get("cleanable", True),
+        "liveContent": live,
         "cacheEnv": list(cache_env),
         "envSuffix": suffix,
         "probeArgv": list(probe) if probe else None,
