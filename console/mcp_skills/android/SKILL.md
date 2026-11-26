@@ -5,9 +5,9 @@ description: Use the os-lab MCP Android Lab tools (android_status, android_frida
 
 # Android Lab MCP
 
-Related MCP tools: `android_status, android_frida_inventory, android_plan`.
+Related MCP tools: `android_status, android_frida_inventory, android_plan, android_jobs, android_job, android_app_overview`.
 
-See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
+Coverage checklist: docs/PLAN-mcp-coverage.md (remaining TODOs complete on this branch).
 
 ## Rules
 

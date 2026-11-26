@@ -7,6 +7,7 @@ import oslab
 import web_api
 
 _API = None
+W = mcp_ui.WEB_WIDGET
 
 
 def _api(root):
@@ -19,19 +20,25 @@ def _api(root):
 TOOLS = [
     mcp_ui.tool("web_status",
                 "Web Lab readiness and engine health (ready / stopped / needs-setup / unavailable). Read-only.",
-                common.obj(), read_only=True, idempotent=True),
+                common.obj(), read_only=True, idempotent=True, resource_uri=W["status"]),
     mcp_ui.tool("web_overview",
                 "Engine overview when running (windows, injections). Read-only.",
-                common.obj(), read_only=True),
+                common.obj(), read_only=True, resource_uri=W["engine"]),
     mcp_ui.tool("web_windows",
                 "Open Web Lab browser windows. Read-only list.",
-                common.obj(), read_only=True),
+                common.obj(), read_only=True, resource_uri=W["windows"]),
+    mcp_ui.tool("web_injections",
+                "Active Web Lab JavaScript injections (mirrors GET /api/web/injections). Read-only observe.",
+                common.obj(), read_only=True, resource_uri=W["injections"]),
+    mcp_ui.tool("web_profiles",
+                "Saved Web Lab profiles (mirrors GET /api/web/profiles). Read-only observe.",
+                common.obj(), read_only=True, resource_uri=W["profiles"]),
     mcp_ui.tool("web_engine_start",
                 "Start the local Web Lab engine on loopback (builds must already exist via labctl web setup).",
-                common.obj(), open_world=False),
+                common.obj(), open_world=False, resource_uri=W["engine"]),
     mcp_ui.tool("web_engine_stop",
                 "Stop the local Web Lab engine.",
-                common.obj(), idempotent=True),
+                common.obj(), idempotent=True, resource_uri=W["engine"]),
     mcp_ui.tool("web_app_overview",
                 "Web Lab overview MCP App: readiness and engine health (dashboard Overview UX).",
                 common.obj(), read_only=True, idempotent=True, resource_uri=mcp_ui.LAB_APP["web"]),
@@ -54,7 +61,6 @@ def call(name, args, root):
 def _dispatch(api, name, args, root):
     if name == "web_status":
         common.check(args, [])
-        # Prefer lab_status (dashboard chip) plus engine detail.
         return {"lab": common.lab_status(root, "web"), "engine": api.status()}
     if name == "web_overview":
         common.check(args, [])
@@ -62,6 +68,12 @@ def _dispatch(api, name, args, root):
     if name == "web_windows":
         common.check(args, [])
         return api.get("/api/web/windows", {})
+    if name == "web_injections":
+        common.check(args, [])
+        return api.get("/api/web/injections", {})
+    if name == "web_profiles":
+        common.check(args, [])
+        return api.get("/api/web/profiles", {})
     if name == "web_engine_start":
         common.check(args, [])
         return api.start_engine()

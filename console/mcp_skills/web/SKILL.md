@@ -5,9 +5,9 @@ description: Use the os-lab MCP Web Lab tools (web_status, web_overview, web_win
 
 # Web Lab MCP
 
-Related MCP tools: `web_status, web_overview, web_windows, web_engine_start, web_engine_stop`.
+Related MCP tools: `web_status, web_overview, web_windows, web_injections, web_profiles, web_engine_start, web_engine_stop, web_app_overview`.
 
-See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
+Coverage checklist: docs/PLAN-mcp-coverage.md (remaining TODOs complete on this branch).
 
 ## Rules
 

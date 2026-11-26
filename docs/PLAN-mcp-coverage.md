@@ -1,7 +1,7 @@
 # MCP coverage plan — remaining work
 
-Follow-up to the mergeable MCP coverage PR (`cursor/mcp-write-abilities-cleanup-widgets-apps-9ed3`).  
-Server: [[console/mcp_server.py]]. Guides: [[dashboard/src/lib/mcp-guides.ts]].  
+Follow-up to the merged MCP coverage PR (#370).  
+Server: [[console/mcp_server.py]] (v0.6.0). Guides: [[dashboard/src/lib/mcp-guides.ts]].  
 Verification: [[console/mcp_verification.json]].
 
 ## Status legend
@@ -13,7 +13,7 @@ Verification: [[console/mcp_verification.json]].
 | `verified` | Proof filled (test name, PR, or artifact) |
 | `n/a` | Deliberately out of scope |
 
-## Shipped (do not re-implement — already on the parent PR)
+## Shipped on #370 (do not re-implement)
 
 - Missing-lab modules: android / ios / linux / web / source / firewall
 - Cleanup writes + aux tools (preview → confirm)
@@ -28,37 +28,37 @@ Verification: [[console/mcp_verification.json]].
 
 ### A. Fuller MCP Apps
 
-- [ ] Web Sec workbench MCP App (beyond status/review/report widgets)
-- [ ] macOS Lab MCP App (beyond apps/control widgets)
-- [ ] Optional: Cleanup host UX polish beyond first batch
+- [x] Web Sec workbench MCP App (`websec_app_workbench` + `mcp_apps/websec/workbench.html`)
+- [x] macOS Lab MCP App (`macos_app_overview` + `mcp_apps/macos/overview.html`)
+- [x] Cleanup host UX polish (overview refresh + monitor chip)
 
 ### B. Per-tool lab widgets
 
-- [ ] Android Lab per-tool widgets (status / Frida inventory / plan)
-- [ ] iOS Lab per-tool widgets (devices / simulator / resources / screenshot)
-- [ ] Web Lab per-tool widgets (status / windows / engine)
-- [ ] Source Lab per-tool widgets (status / candidates / plan)
-- [ ] Linux / Firewall widgets only if there is clear UX (otherwise leave `none`)
+- [x] Android Lab per-tool widgets (status / Frida / plan / jobs)
+- [x] iOS Lab per-tool widgets (status / devices / simulator / resources / screenshot)
+- [x] Web Lab per-tool widgets (status / windows / engine / injections / profiles)
+- [x] Source Lab per-tool widgets (status / candidates / plan / analyzer)
+- [x] Linux widgets (status / doctor) — Firewall left `none` (no clear UX)
 
 ### C. Lab depth / tool gaps
 
-- [ ] Android: job observe polish (list/poll lab jobs via MCP without arming inject)
-- [ ] Linux: doctor depth beyond status/plan
-- [ ] Web: injections / profiles tools mirroring `console/web_api.py`
-- [ ] Source: analyzer job observe (start stays plan/dashboard unless confirm-gated)
-- [ ] iOS: keep device drive confirm-gated on the dashboard (no agent arm)
+- [x] Android: job observe (`android_jobs` / `android_job` via console `/api/jobs`)
+- [x] Linux: doctor depth (`linux_doctor` host + plan preview)
+- [x] Web: injections / profiles tools (`web_injections` / `web_profiles`)
+- [x] Source: analyzer job observe (`source_analyzer` / `source_jobs` / `source_job`)
+- [x] iOS: device drive stays confirm-gated on the dashboard (documented; no agent arm)
 
 ### D. Verification contributor flips
 
-- [ ] Flip remaining section `engineUsage` slots from `pending` → `verified` with proofs
-- [ ] Flip tool `engineUsage` still `pending` (~cleanup / websec / macos / winapps) where tests exist
-- [ ] Flip section `widgets`/`apps` from `pending` → `verified` once a real UI host (not just resource-read tests) exercises them
-- [ ] Leave deliberate non-goals as `n/a`: `macos` arm tool; WinApps input tools
+- [x] Flip section `engineUsage` slots to `verified` with test proofs
+- [x] Flip tool `engineUsage` where suites exist (cleanup / websec / labs / winapps / macos observe)
+- [x] Flip section `widgets`/`apps` to `verified` with `test_mcp_ui_hosts.py` proofs
+- [x] Leave deliberate non-goals as `n/a`: `macos` arm tool; WinApps input tools
 
 ### E. Docs / dashboard sync
 
-- [ ] Keep [[dashboard/src/lib/mcp-guides.ts]] and `/mcp/` planned sections in sync as widgets/apps land
-- [ ] Refresh skills blurbs when new tools ship
+- [x] Keep [[dashboard/src/lib/mcp-guides.ts]] and `/mcp/` planned sections in sync
+- [x] Refresh skills blurbs for new tools
 
 ## Non-goals (do not add)
 

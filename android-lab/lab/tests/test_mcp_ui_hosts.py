@@ -14,8 +14,11 @@ def test_all_ui_resources_list_and_read_with_bridge():
     resources = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "resources/list"})["result"]["resources"]
     uris = {item["uri"] for item in resources}
     expected = set(mcp_ui.CLEANUP_WIDGET.values()) | set(mcp_ui.CLEANUP_APP.values())
-    expected |= set(mcp_ui.WEBSEC_WIDGET.values()) | set(mcp_ui.MACOS_WIDGET.values())
-    expected |= set(mcp_ui.LAB_APP.values())
+    expected |= set(mcp_ui.WEBSEC_WIDGET.values()) | set(mcp_ui.WEBSEC_APP.values())
+    expected |= set(mcp_ui.MACOS_WIDGET.values()) | set(mcp_ui.MACOS_APP.values())
+    expected |= set(mcp_ui.ANDROID_WIDGET.values()) | set(mcp_ui.IOS_WIDGET.values())
+    expected |= set(mcp_ui.WEB_WIDGET.values()) | set(mcp_ui.SOURCE_WIDGET.values())
+    expected |= set(mcp_ui.LINUX_WIDGET.values()) | set(mcp_ui.LAB_APP.values())
     assert expected <= uris, sorted(expected - uris)
     for uri in sorted(expected):
         body = mcp_server.handle({
@@ -80,6 +83,8 @@ def test_lab_overview_apps_are_callable():
         ("ios_app_overview", mcp_ui.LAB_APP["ios"]),
         ("web_app_overview", mcp_ui.LAB_APP["web"]),
         ("source_app_overview", mcp_ui.LAB_APP["source"]),
+        ("websec_app_workbench", mcp_ui.WEBSEC_APP["workbench"]),
+        ("macos_app_overview", mcp_ui.MACOS_APP["overview"]),
     ):
         reply = mcp_server.handle({
             "jsonrpc": "2.0", "id": 1, "method": "tools/call",
@@ -90,3 +95,27 @@ def test_lab_overview_apps_are_callable():
         assert result["_meta"]["ui"]["resourceUri"] == uri
         payload = json.loads(result["content"][0]["text"])
         assert isinstance(payload, dict)
+
+
+def test_lab_depth_observe_tools():
+    for name in ("android_jobs", "linux_doctor", "source_analyzer", "source_jobs"):
+        reply = mcp_server.handle({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": name, "args": {}},
+        })
+        result = reply["result"]
+        assert result["isError"] is False, (name, result)
+        payload = json.loads(result["content"][0]["text"])
+        assert isinstance(payload, dict)
+    # web injections/profiles need the engine; accept either payload or a WEB_503 plan error
+    for name in ("web_injections", "web_profiles"):
+        reply = mcp_server.handle({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": name, "args": {}},
+        })
+        result = reply["result"]
+        text = next(item["text"] for item in result["content"] if item.get("type") == "text")
+        payload = json.loads(text)
+        assert isinstance(payload, dict)
+        if result["isError"]:
+            assert "WEB_" in text or "engine" in text.lower() or "not running" in text.lower()

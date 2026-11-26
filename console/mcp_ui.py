@@ -106,11 +106,18 @@ _UI_SECTIONS = (
     ("cleanup", "widgets", WIDGET_ROOT),
     ("cleanup", "apps", APP_ROOT),
     ("websec", "widgets", WIDGET_ROOT),
+    ("websec", "apps", APP_ROOT),
     ("macos", "widgets", WIDGET_ROOT),
+    ("macos", "apps", APP_ROOT),
+    ("android", "widgets", WIDGET_ROOT),
     ("android", "apps", APP_ROOT),
+    ("ios", "widgets", WIDGET_ROOT),
     ("ios", "apps", APP_ROOT),
+    ("web", "widgets", WIDGET_ROOT),
     ("web", "apps", APP_ROOT),
+    ("source", "widgets", WIDGET_ROOT),
     ("source", "apps", APP_ROOT),
+    ("linux", "widgets", WIDGET_ROOT),
 )
 
 
@@ -182,9 +189,45 @@ WEBSEC_WIDGET = {
     "review": "ui://os-lab/websec/widgets/review.html",
     "report": "ui://os-lab/websec/widgets/report.html",
 }
+WEBSEC_APP = {
+    "workbench": "ui://os-lab/websec/apps/workbench.html",
+}
 MACOS_WIDGET = {
     "apps": "ui://os-lab/macos/widgets/apps.html",
     "control": "ui://os-lab/macos/widgets/control.html",
+}
+MACOS_APP = {
+    "overview": "ui://os-lab/macos/apps/overview.html",
+}
+ANDROID_WIDGET = {
+    "status": "ui://os-lab/android/widgets/status.html",
+    "frida": "ui://os-lab/android/widgets/frida.html",
+    "plan": "ui://os-lab/android/widgets/plan.html",
+    "jobs": "ui://os-lab/android/widgets/jobs.html",
+}
+IOS_WIDGET = {
+    "status": "ui://os-lab/ios/widgets/status.html",
+    "devices": "ui://os-lab/ios/widgets/devices.html",
+    "simulator": "ui://os-lab/ios/widgets/simulator.html",
+    "resources": "ui://os-lab/ios/widgets/resources.html",
+    "screenshot": "ui://os-lab/ios/widgets/screenshot.html",
+}
+WEB_WIDGET = {
+    "status": "ui://os-lab/web/widgets/status.html",
+    "windows": "ui://os-lab/web/widgets/windows.html",
+    "engine": "ui://os-lab/web/widgets/engine.html",
+    "injections": "ui://os-lab/web/widgets/injections.html",
+    "profiles": "ui://os-lab/web/widgets/profiles.html",
+}
+SOURCE_WIDGET = {
+    "status": "ui://os-lab/source/widgets/status.html",
+    "candidates": "ui://os-lab/source/widgets/candidates.html",
+    "plan": "ui://os-lab/source/widgets/plan.html",
+    "analyzer": "ui://os-lab/source/widgets/analyzer.html",
+}
+LINUX_WIDGET = {
+    "status": "ui://os-lab/linux/widgets/status.html",
+    "doctor": "ui://os-lab/linux/widgets/doctor.html",
 }
 LAB_APP = {
     "android": "ui://os-lab/android/apps/overview.html",

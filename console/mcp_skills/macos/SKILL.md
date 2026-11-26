@@ -5,7 +5,7 @@ description: Use the os-lab MCP macOS Lab MCP tools (macos_*). Prefer guarded re
 
 # macOS Lab MCP
 
-Related MCP tools: `macos_*`.
+Related MCP tools: `macos_* including macos_app_overview (no arm tool)`.
 
 Observe/act/verify. Never arm; human arms from the dashboard. Use macos_request_access for privacy panes.
 

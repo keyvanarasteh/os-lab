@@ -58,6 +58,7 @@ SCAN = {
 }
 
 W = mcp_ui.WEBSEC_WIDGET
+A = mcp_ui.WEBSEC_APP
 
 TOOLS = [
     {"name": "websec_status", "description": "Web Sec Lab readiness: ready / needs-setup / unavailable, requirements, scope summary and storage. Read-only.", "inputSchema": _obj(),
@@ -84,6 +85,8 @@ TOOLS = [
     {"name": "websec_delete_runs", "description": "Delete stored runs of one target by report name. Irreversible: requires confirm: true after the user approved the list.", "inputSchema": _obj({"target": TARGET, "names": {"type": "array", "items": REPORT, "minItems": 1, "maxItems": 50}, "confirm": {"type": "boolean"}}, ["target", "names", "confirm"])},
     {"name": "websec_clear_history", "description": "Delete every stored run of one target, or of all targets with all: true. Irreversible: requires confirm: true after the user approved it.", "inputSchema": _obj({"target": TARGET, "all": {"type": "boolean"}, "confirm": {"type": "boolean"}}, ["confirm"])},
     {"name": "websec_preferences_save", "description": "Save the workbench choices on this computer (kept across restarts and app updates). Takes scan {target, preset, scheme, modules, timeout, deadline} and bulk {preset}; there is no intrusive setting.", "inputSchema": _obj({"preferences": {"type": "object", "properties": {"scan": {"type": "object"}, "bulk": {"type": "object"}}, "additionalProperties": False}}, ["preferences"])},
+    {"name": "websec_app_workbench", "description": "Web Sec workbench MCP App: readiness, preferences, recent history and links into review/monitor (dashboard Workbench UX).", "inputSchema": _obj(),
+     "_meta": mcp_ui.ui_meta(A["workbench"])},
 ]
 NAMES = {tool["name"] for tool in TOOLS}
 _UI_FOR = {tool["name"]: tool["_meta"]["ui"]["resourceUri"] for tool in TOOLS if tool.get("_meta", {}).get("ui", {}).get("resourceUri")}
@@ -95,7 +98,7 @@ _DEST = {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False
 _RO_SET = {
     "websec_status", "websec_catalogue", "websec_guides", "websec_preferences", "websec_history",
     "websec_reports", "websec_report", "websec_compare", "websec_job", "websec_review",
-    "websec_monitor", "websec_stats",
+    "websec_monitor", "websec_stats", "websec_app_workbench",
 }
 _DEST_SET = {"websec_delete_runs", "websec_clear_history", "websec_scan_cancel"}
 for _tool in TOOLS:
@@ -272,4 +275,13 @@ def _dispatch(api, name, args):
     if name == "websec_preferences_save":
         _check(args, ["preferences"], ["preferences"])
         return api.save_preferences(args["preferences"])
+    if name == "websec_app_workbench":
+        _check(args, [])
+        return {
+            "status": api.status(),
+            "preferences": api.preferences(),
+            "history": api.history(None, 8),
+            "monitor": api.monitor_status(),
+            "stats": api.run_stats(),
+        }
     raise oslab.PlanError("Unknown tool {0}".format(name), code="INVALID_ARGS")

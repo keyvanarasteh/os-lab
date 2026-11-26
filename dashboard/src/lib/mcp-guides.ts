@@ -135,9 +135,9 @@ export const MCP_GROUPS: McpGroup[] = [
     title: "macOS Lab",
     platform: "macOS",
     docs: "lat.md/ios-lab.md (MIR-12)",
-    engineUsage: pending(),
-    widgets: pending(),
-    apps: none(),
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_mcp_verification.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
+    apps: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
     rules: [
       "Read-only tools always work.",
       "Input tools need the dashboard's armed control mode. There is no arm tool.",
@@ -169,7 +169,8 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "macos_set_value", safety: "armed", summary: "Write a value into one AX element.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_perform", safety: "armed", summary: "Run one advertised AX action.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_stop", safety: "panic", summary: "Disarm, close sessions, end streams, audit.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "macos_task", safety: "armed", summary: "Bounded scripted sequence of the tools above.", engineUsage: pending(), widget: none(), app: none() }
+      { name: "macos_task", safety: "armed", summary: "Bounded scripted sequence of the tools above.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "macos_app_overview", safety: "read-only", summary: "macOS Lab MCP App (windows, control, permissions).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
   {
@@ -251,14 +252,14 @@ export const MCP_GROUPS: McpGroup[] = [
     title: "Web Sec Lab",
     platform: "all hosts",
     docs: "lat.md/web-sec.md, web-sec/README.md",
-    engineUsage: pending(),
-    widgets: pending(),
-    apps: none(),
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_mcp_websec.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
+    apps: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
     rules: [
       "Every scan is scope-guarded. Targets outside the scope file are refused.",
       "Passive scans need no confirmation.",
       "Intrusive checks need active: true and confirm: true after written authorization.",
-      "Widgets: status, review, report under ui://os-lab/websec/widgets/."
+      "Widgets: status, review, report; workbench app under ui://os-lab/websec/apps/."
     ],
     tools: [
       { name: "websec_status", safety: "read-only", summary: "Readiness, scope summary and storage.", engineUsage: pending(), widget: pending(), app: none() },
@@ -281,7 +282,8 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "websec_favourite", safety: "write", summary: "Mark or unmark a stored run.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_delete_runs", safety: "confirm", summary: "Delete stored runs. confirm: true.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_clear_history", safety: "confirm", summary: "Delete stored runs of one or all targets. confirm: true.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "websec_preferences_save", safety: "write", summary: "Save workbench choices on this computer.", engineUsage: pending(), widget: none(), app: none() }
+      { name: "websec_preferences_save", safety: "write", summary: "Save workbench choices on this computer.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "websec_app_workbench", safety: "read-only", summary: "Workbench MCP App (status, prefs, history).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
   {
@@ -310,18 +312,20 @@ export const MCP_GROUPS: McpGroup[] = [
     title: "Android Lab",
     platform: "all hosts",
     docs: "lat.md/android-lab.md, console/mcp_android.py",
-    engineUsage: pending(),
-    widgets: none(),
-    apps: pending(),
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_mcp_labs.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
+    apps: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
     rules: [
-      "Status, Frida inventory and plan preview only.",
+      "Status, Frida inventory, plan preview and job observe only.",
       "Frida inventory never attaches or injects.",
       "Scripted lab actions still go through labctl plan/start — not macos_task."
     ],
     tools: [
-      { name: "android_status", safety: "read-only", summary: "Lab readiness, provider, reasons, actions.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "android_frida_inventory", safety: "read-only", summary: "Frida devices/processes (list only).", engineUsage: pending(), widget: none(), app: none() },
-      { name: "android_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "android_status", safety: "read-only", summary: "Lab readiness, provider, reasons, actions.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "android_frida_inventory", safety: "read-only", summary: "Frida devices/processes (list only).", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "android_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "android_jobs", safety: "read-only", summary: "List Android console jobs (observe only).", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "android_job", safety: "read-only", summary: "Poll one Android console job.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "android_app_overview", safety: "read-only", summary: "Overview MCP App (readiness + actions).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
@@ -330,20 +334,20 @@ export const MCP_GROUPS: McpGroup[] = [
     title: "iOS Lab",
     platform: "macOS",
     docs: "lat.md/ios-lab.md, console/mcp_ios.py",
-    engineUsage: pending(),
-    widgets: none(),
-    apps: pending(),
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_mcp_labs.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
+    apps: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
     rules: [
       "Observe only: devices, simulator, resources, screenshot.",
       "No agent arm or WebDriverAgent start — drive devices from the dashboard."
     ],
     tools: [
-      { name: "ios_status", safety: "read-only", summary: "Lab readiness and actions.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "ios_simulator", safety: "read-only", summary: "Installed simulators and runtimes.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "ios_devices", safety: "read-only", summary: "Paired/connected real devices.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "ios_device_check", safety: "read-only", summary: "Reachability probe for one UDID.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "ios_resources", safety: "read-only", summary: "Resource tips for this Mac.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "ios_screenshot", safety: "read-only", summary: "PNG of a booted simulator or real device.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "ios_status", safety: "read-only", summary: "Lab readiness and actions.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "ios_simulator", safety: "read-only", summary: "Installed simulators and runtimes.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "ios_devices", safety: "read-only", summary: "Paired/connected real devices.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "ios_device_check", safety: "read-only", summary: "Reachability probe for one UDID.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "ios_resources", safety: "read-only", summary: "Resource tips for this Mac.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "ios_screenshot", safety: "read-only", summary: "PNG of a booted simulator or real device.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "ios_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() },
       { name: "ios_app_overview", safety: "read-only", summary: "Overview MCP App (readiness + actions).", engineUsage: pending(), widget: none(), app: pending() }
     ]
@@ -353,15 +357,16 @@ export const MCP_GROUPS: McpGroup[] = [
     title: "Linux Lab",
     platform: "all hosts",
     docs: "lat.md/linux-lab.md, console/mcp_linux.py",
-    engineUsage: pending(),
-    widgets: none(),
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_mcp_labs.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
     apps: none(),
     rules: [
-      "Status and plan preview first.",
+      "Status, doctor depth and plan preview.",
       "Scripted actions only through existing plan/start — not from MCP mutate tools."
     ],
     tools: [
-      { name: "linux_status", safety: "read-only", summary: "Lab readiness, KVM/WSL hints, actions.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "linux_status", safety: "read-only", summary: "Lab readiness, KVM/WSL hints, actions.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "linux_doctor", safety: "read-only", summary: "Host/KVM/WSL doctor depth + plan preview.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "linux_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() }
     ]
   },
@@ -370,19 +375,21 @@ export const MCP_GROUPS: McpGroup[] = [
     title: "Web Lab",
     platform: "all hosts",
     docs: "lat.md/web-lab.md, console/mcp_web.py",
-    engineUsage: pending(),
-    widgets: none(),
-    apps: pending(),
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_mcp_labs.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
+    apps: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
     rules: [
-      "Status/overview/windows are read-only.",
+      "Status/overview/windows/injections/profiles are observe tools.",
       "Engine start/stop talk to the local loopback engine only."
     ],
     tools: [
-      { name: "web_status", safety: "read-only", summary: "Lab readiness and engine health.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "web_overview", safety: "read-only", summary: "Engine overview when running.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "web_windows", safety: "read-only", summary: "Open Web Lab browser windows.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "web_engine_start", safety: "write", summary: "Start the local Web Lab engine.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "web_engine_stop", safety: "write", summary: "Stop the local Web Lab engine.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "web_status", safety: "read-only", summary: "Lab readiness and engine health.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "web_overview", safety: "read-only", summary: "Engine overview when running.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "web_windows", safety: "read-only", summary: "Open Web Lab browser windows.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "web_injections", safety: "read-only", summary: "Active JS injections (observe).", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "web_profiles", safety: "read-only", summary: "Saved Web Lab profiles (observe).", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "web_engine_start", safety: "write", summary: "Start the local Web Lab engine.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "web_engine_stop", safety: "write", summary: "Stop the local Web Lab engine.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "web_app_overview", safety: "read-only", summary: "Overview MCP App (readiness + engine).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
@@ -391,19 +398,22 @@ export const MCP_GROUPS: McpGroup[] = [
     title: "Source Lab",
     platform: "all hosts",
     docs: "lat.md/source-lab.md, console/mcp_source.py",
-    engineUsage: pending(),
-    widgets: none(),
-    apps: pending(),
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_mcp_labs.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
+    apps: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
     rules: [
-      "Readiness, candidates and plan preview only.",
+      "Readiness, candidates, analyzer observe and plan preview.",
       "Detection/crawl jobs still start from the dashboard or labctl."
     ],
     tools: [
-      { name: "source_status", safety: "read-only", summary: "Lab readiness and actions.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "source_readiness", safety: "read-only", summary: "Raw engine readiness JSON.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "source_candidates", safety: "read-only", summary: "Local detection candidates.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "source_status", safety: "read-only", summary: "Lab readiness and actions.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "source_readiness", safety: "read-only", summary: "Raw engine readiness JSON.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "source_candidates", safety: "read-only", summary: "Local detection candidates.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "source_runtime", safety: "read-only", summary: "Saved runtime settings.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "source_plan", safety: "read-only", summary: "Guarded plan preview.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "source_analyzer", safety: "read-only", summary: "Analyzer observe (no start).", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "source_jobs", safety: "read-only", summary: "List Source console jobs.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "source_job", safety: "read-only", summary: "Poll one Source console job.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "source_plan", safety: "read-only", summary: "Guarded plan preview.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "source_app_overview", safety: "read-only", summary: "Overview MCP App (readiness + actions).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
@@ -430,8 +440,8 @@ export const MCP_GROUPS: McpGroup[] = [
 
 /** Remaining gaps after the first widget/app batches. See docs/PLAN-mcp-coverage.md. */
 export const MCP_PLANNED_SECTIONS: { id: string; title: string; engineUsage: VerifySlot; widgets: VerifySlot; apps: VerifySlot; note: string }[] = [
-  { id: "websec-apps", title: "Web Sec MCP Apps", engineUsage: pending(), widgets: pending(), apps: none(), note: "Follow-up: fuller workbench app. See docs/PLAN-mcp-coverage.md remaining checklist." },
-  { id: "macos-apps", title: "macOS MCP Apps", engineUsage: pending(), widgets: pending(), apps: none(), note: "Follow-up: fuller macOS app. No arm tool (n/a)." },
-  { id: "lab-widgets", title: "Lab MCP widgets", engineUsage: pending(), widgets: none(), apps: pending(), note: "Follow-up: per-tool widgets + lab depth gaps in docs/PLAN-mcp-coverage.md." },
-  { id: "verification-flips", title: "Verification proofs", engineUsage: pending(), widgets: pending(), apps: pending(), note: "Contributor flips pending→verified with proof in console/mcp_verification.json." }
+  { id: "websec-apps", title: "Web Sec MCP Apps", engineUsage: pending(), widgets: pending(), apps: pending(), note: "Workbench app shipped (websec_app_workbench). See docs/PLAN-mcp-coverage.md." },
+  { id: "macos-apps", title: "macOS MCP Apps", engineUsage: pending(), widgets: pending(), apps: pending(), note: "Overview app shipped (macos_app_overview). No arm tool (n/a)." },
+  { id: "lab-widgets", title: "Lab MCP widgets", engineUsage: pending(), widgets: pending(), apps: pending(), note: "Per-tool widgets + lab depth tools shipped; Firewall widgets left none." },
+  { id: "verification-flips", title: "Verification proofs", engineUsage: pending(), widgets: pending(), apps: pending(), note: "Section/tool proofs flipped in console/mcp_verification.json for this PR." }
 ];

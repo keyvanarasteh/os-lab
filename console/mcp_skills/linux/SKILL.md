@@ -5,9 +5,9 @@ description: Use the os-lab MCP Linux Lab tools (linux_status, linux_plan). Pref
 
 # Linux Lab MCP
 
-Related MCP tools: `linux_status, linux_plan`.
+Related MCP tools: `linux_status, linux_doctor, linux_plan`.
 
-See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
+Coverage checklist: docs/PLAN-mcp-coverage.md (remaining TODOs complete on this branch).
 
 ## Rules
 
