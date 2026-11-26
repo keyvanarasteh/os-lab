@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import oslab  # noqa: E402
 import mcp_cleanup  # noqa: E402
 import mcp_websec  # noqa: E402
+import mcp_ui  # noqa: E402
 import winapps  # noqa: E402
 import winapps_guard  # noqa: E402
 
@@ -223,8 +224,20 @@ TOOLS = [
     },
     {
         "name": "macos_permissions",
-        "description": "Accessibility and Screen Recording state and the app each grant belongs to (read-only). Requesting a grant is a human step in the dashboard.",
+        "description": "Accessibility and Screen Recording state and the app each grant belongs to (read-only).",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "macos_request_access",
+        "description": "Ask macOS for Accessibility or Screen Recording: open the privacy pane and, when possible, fire the consent prompt (write counterpart to macos_permissions). The human still grants in System Settings; there is no silent grant.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"pane": {"type": "string", "enum": ["accessibility", "screen-recording"]}},
+            "required": ["pane"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
     },
     {
         "name": "macos_control_state",
@@ -328,6 +341,34 @@ WIN_TOOLS = [
 ]
 
 
+
+
+# Annotate core macos / winapps tools that were declared without annotations above.
+_RO = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+_WR = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False}
+_WR_OPEN = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
+_STOP = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+_RO_NAMES = {
+    "macos_apps", "macos_get_app_state", "macos_screenshot", "macos_windows", "macos_menubar",
+    "macos_search", "macos_displays", "macos_capabilities", "macos_control_state",
+    "winapps_apps", "winapps_screenshot", "winapps_capabilities", "winapps_doctor", "winapps_audit",
+}
+_WR_NAMES = {
+    "macos_click", "macos_type", "macos_key", "macos_paste", "macos_scroll",
+    "macos_set_value", "macos_perform", "macos_task",
+}
+for _tool in TOOLS + WIN_TOOLS:
+    if "annotations" in _tool:
+        continue
+    name = _tool["name"]
+    if name in _RO_NAMES:
+        _tool["annotations"] = dict(_RO)
+    elif name == "macos_stop":
+        _tool["annotations"] = dict(_STOP)
+    elif name in _WR_NAMES:
+        _tool["annotations"] = dict(_WR)
+
+
 def _text(value: dict) -> dict:
     return {"content": [{"type": "text", "text": json.dumps(value)}]}
 
@@ -415,6 +456,8 @@ def tool_call(name: str, args: dict) -> dict:
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_capabilities(REPO_ROOT))}]}
     if name == "macos_permissions":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_permissions(REPO_ROOT))}]}
+    if name == "macos_request_access":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_request_access(REPO_ROOT, args))}]}
     if name == "macos_control_state":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_control_state())}]}
     if name == "macos_stop":
@@ -464,14 +507,29 @@ def handle(message: dict) -> dict | None:
     if method == "initialize":
         return {"jsonrpc": "2.0", "id": message_id, "result": {
             "protocolVersion": PROTOCOL_VERSION,
-            "capabilities": {"tools": {}},
+            "capabilities": {
+                "tools": {"listChanged": False},
+                "resources": {"listChanged": False, "subscribe": False},
+                "extensions": {"io.modelcontextprotocol/ui": {"mimeTypes": [mcp_ui.RESOURCE_MIME]}},
+            },
             "serverInfo": {"name": "os-lab-windows" if sys.platform == "win32" else "os-lab-macos",
-                           "version": "0.2.0"}}}
+                           "version": "0.3.0"}}}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":
         tools = TOOLS + WIN_TOOLS if sys.platform == "win32" else TOOLS
         return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": tools}}
+    if method == "resources/list":
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"resources": mcp_ui.list_resources()}}
+    if method == "resources/templates/list":
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"resourceTemplates": []}}
+    if method == "resources/read":
+        params = message.get("params") or {}
+        uri = params.get("uri")
+        try:
+            return {"jsonrpc": "2.0", "id": message_id, "result": mcp_ui.read_resource(str(uri))}
+        except KeyError:
+            return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32002, "message": f"Resource not found: {uri}"}}
     if method == "tools/call":
         params = message.get("params") or {}
         try:

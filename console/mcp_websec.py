@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import time
 
+import mcp_ui
 import oslab
 import websec_api
 
@@ -80,6 +81,26 @@ TOOLS = [
     {"name": "websec_preferences_save", "description": "Save the workbench choices on this computer (kept across restarts and app updates). Takes scan {target, preset, scheme, modules, timeout, deadline} and bulk {preset}; there is no intrusive setting.", "inputSchema": _obj({"preferences": {"type": "object", "properties": {"scan": {"type": "object"}, "bulk": {"type": "object"}}, "additionalProperties": False}}, ["preferences"])},
 ]
 NAMES = {tool["name"] for tool in TOOLS}
+
+# Annotate every websec tool so hosts can gate write / destructive calls.
+_RO = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+_RW = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False}
+_DEST = {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": False}
+_RO_SET = {
+    "websec_status", "websec_catalogue", "websec_guides", "websec_preferences", "websec_history",
+    "websec_reports", "websec_report", "websec_compare", "websec_job", "websec_review",
+    "websec_monitor", "websec_stats",
+}
+_DEST_SET = {"websec_delete_runs", "websec_clear_history", "websec_scan_cancel"}
+for _tool in TOOLS:
+    name = _tool["name"]
+    if name in _RO_SET:
+        _tool["annotations"] = dict(_RO)
+    elif name in _DEST_SET:
+        _tool["annotations"] = dict(_DEST)
+    else:
+        _tool["annotations"] = dict(_RW)
+
 
 
 def _text(value):

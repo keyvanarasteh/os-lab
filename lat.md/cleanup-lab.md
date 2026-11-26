@@ -690,7 +690,15 @@ The Advanced scan row menu offers Reveal in file manager and Copy path.
 
 [[console/mcp_cleanup.py]] adds the Cleanup Lab to the os-lab MCP server, on the same engine and guards as the dashboard.
 
-Read-only tools: status, catalog, volumes, monitor, permissions, bookmarks, history, widget, preferences and job. Tools that never apply anything: `cleanup_scan`, `cleanup_suggest`, `cleanup_review` and `cleanup_quick_clean_plan`. `cleanup_clean` needs `confirm: true` and is Trash only. Settings tools cover preferences, monitor, bookmarks and reveal.
+Read-only tools: status, catalog, volumes, monitor, permissions, bookmarks, history, widget, preferences and job. Tools that never apply anything: `cleanup_scan`, `cleanup_suggest`, `cleanup_review`, `cleanup_plan` and `cleanup_quick_clean_plan`. `cleanup_clean` needs `confirm: true` and is Trash only. Settings tools cover preferences, monitor, bookmarks and reveal.
+
+Write counterparts for every mutatable surface already on the dashboard: `cleanup_preferences_save`, `cleanup_monitor_config` / `cleanup_monitor_evaluate`, bookmark add/update/remove, `cleanup_reveal`, `cleanup_job_cancel`, `cleanup_widget_refresh`, and permission helpers `cleanup_permissions_open`, `cleanup_permissions_reveal_app`, `cleanup_permissions_reset` (reset needs `confirm: true`). Every tool carries MCP annotations (`readOnlyHint` / `destructiveHint` / …).
+
+#### MCP widgets and apps
+
+[[console/mcp_ui.py]] registers Cleanup Lab UI resources (`resources/list` / `resources/read`) as `text/html;profile=mcp-app`.
+
+First-batch widgets under [[console/mcp_widgets/cleanup/]] attach to status, volumes, catalog, monitor, permissions, bookmarks, history, widget, preferences, suggest, review and job via `_meta.ui.resourceUri`. Three MCP Apps under [[console/mcp_apps/cleanup/]] mirror the dashboard UX parts: overview (`cleanup_app_overview`), review (`cleanup_app_review`) and settings (`cleanup_app_settings`). Hosts without UI still get the JSON text fallback and `structuredContent`.
 
 The tools take catalog ids, never paths or commands, and are refused inside `macos_task`. Tests: `android-lab/lab/tests/test_mcp_cleanup.py`.
 
