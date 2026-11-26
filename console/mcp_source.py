@@ -27,14 +27,19 @@ TOOLS = common.annotate_ro([
                     "target": {"type": "string"},
                     "glob": {"type": "string"},
                 }, ["action"]), read_only=True),
+    mcp_ui.tool("source_app_overview",
+                "Source Lab overview MCP App: readiness and available actions (dashboard Overview UX).",
+                common.obj(), read_only=True, idempotent=True, resource_uri=mcp_ui.LAB_APP["source"]),
 ])
 NAMES = {tool["name"] for tool in TOOLS}
+_UI_FOR = {tool["name"]: tool["_meta"]["ui"]["resourceUri"]
+           for tool in TOOLS if tool.get("_meta", {}).get("ui", {}).get("resourceUri")}
 
 
 def call(name, args, root):
     args = args if isinstance(args, dict) else {}
     try:
-        return common.result(_dispatch(name, args, root))
+        return mcp_ui.result(_dispatch(name, args, root), resource_uri=_UI_FOR.get(name))
     except ArtifactError as exc:
         status = getattr(exc, "status", 400)
         raise oslab.PlanError(str(exc), code="SOURCE_{0}".format(status)) from exc
@@ -61,4 +66,7 @@ def _dispatch(name, args, root):
         if args.get("glob"):
             request["glob"] = args["glob"]
         return oslab.plan(root, request)
+    if name == "source_app_overview":
+        common.check(args, [])
+        return {"status": common.lab_status(root, "source")}
     raise oslab.PlanError("Unknown tool {0}".format(name), code="INVALID_ARGS")

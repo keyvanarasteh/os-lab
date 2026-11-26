@@ -65,14 +65,15 @@ Contributors open PRs that flip `pending` → `verified` and set `proof`.
 ### B. Verification proofs
 
 - [x] Fill `engineUsage.proof` for shipped tools that have unit coverage
-- [ ] Fill Cleanup widget/app proofs once a UI host is exercised
+- [x] Fill Cleanup widget/app proofs via host-style resource read + structuredContent (`test_mcp_ui_hosts.py`)
 - [x] Mark deliberate non-goals (`macos` arm, `winapps` input) as `n/a` with rationale in section `nonGoals`
 
 ### C. Widgets / apps (beyond cleanup)
 
-- [ ] Web Sec widgets (status, review, report)
-- [ ] macOS observe widgets (apps list, control state)
-- [ ] Lab apps for android / ios / web / source once tools exist
+- [x] Web Sec widgets (status, review, report)
+- [x] macOS observe widgets (apps list, control state)
+- [x] Lab overview apps for android / ios / web / source
+- [ ] Fuller Web Sec / macOS apps and per-tool lab widgets (follow-up)
 
 ### D. Skills & plugins
 

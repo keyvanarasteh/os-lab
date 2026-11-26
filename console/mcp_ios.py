@@ -40,8 +40,13 @@ TOOLS = common.annotate_ro([
                     "action": {"type": "string"},
                     "device": {"type": "string", "description": "Simulator name or UDID for start"},
                 }, ["action"]), read_only=True),
+    mcp_ui.tool("ios_app_overview",
+                "iOS Lab overview MCP App: readiness and available actions (dashboard Overview UX).",
+                common.obj(), read_only=True, idempotent=True, resource_uri=mcp_ui.LAB_APP["ios"]),
 ])
 NAMES = {tool["name"] for tool in TOOLS}
+_UI_FOR = {tool["name"]: tool["_meta"]["ui"]["resourceUri"]
+           for tool in TOOLS if tool.get("_meta", {}).get("ui", {}).get("resourceUri")}
 
 
 def call(name, args, root):
@@ -61,7 +66,7 @@ def call(name, args, root):
             ],
             "structuredContent": {"ok": True, "bytes": len(png)},
         }
-    return common.result(_dispatch(name, args, root))
+    return mcp_ui.result(_dispatch(name, args, root), resource_uri=_UI_FOR.get(name))
 
 
 def _dispatch(name, args, root):
@@ -86,4 +91,7 @@ def _dispatch(name, args, root):
         if args.get("device"):
             request["device"] = args["device"]
         return oslab.plan(root, request)
+    if name == "ios_app_overview":
+        common.check(args, [])
+        return {"status": common.lab_status(root, "ios")}
     raise oslab.PlanError("Unknown tool {0}".format(name), code="INVALID_ARGS")

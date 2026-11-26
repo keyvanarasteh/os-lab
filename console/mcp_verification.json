@@ -22,8 +22,8 @@
         "proof": null
       },
       "widgets": {
-        "status": "none",
-        "proof": null
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (apps/control shipped)"
       },
       "apps": {
         "status": "none",
@@ -43,12 +43,12 @@
         "proof": null
       },
       "widgets": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py"
       },
       "apps": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py"
       }
     },
     "websec": {
@@ -58,8 +58,8 @@
         "proof": null
       },
       "widgets": {
-        "status": "none",
-        "proof": null
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (status/review/report shipped)"
       },
       "apps": {
         "status": "none",
@@ -98,8 +98,8 @@
         "proof": null
       },
       "apps": {
-        "status": "none",
-        "proof": null
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (overview app shipped)"
       }
     },
     "ios": {
@@ -113,8 +113,8 @@
         "proof": null
       },
       "apps": {
-        "status": "none",
-        "proof": null
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (overview app shipped)"
       }
     },
     "linux": {
@@ -143,8 +143,8 @@
         "proof": null
       },
       "apps": {
-        "status": "none",
-        "proof": null
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (overview app shipped)"
       }
     },
     "source": {
@@ -158,8 +158,8 @@
         "proof": null
       },
       "apps": {
-        "status": "none",
-        "proof": null
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (overview app shipped)"
       }
     },
     "firewall": {
@@ -182,48 +182,48 @@
     "cleanup_app_overview": {
       "section": "cleanup",
       "engineUsage": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_cleanup_apps_return_structured_ui_meta"
       },
       "widget": {
         "status": "none",
         "proof": null
       },
       "app": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/apps/overview.html"
       }
     },
     "cleanup_app_review": {
       "section": "cleanup",
       "engineUsage": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge"
       },
       "widget": {
         "status": "none",
         "proof": null
       },
       "app": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/apps/review.html"
       }
     },
     "cleanup_app_settings": {
       "section": "cleanup",
       "engineUsage": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_cleanup_apps_return_structured_ui_meta"
       },
       "widget": {
         "status": "none",
         "proof": null
       },
       "app": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/apps/settings.html"
       }
     },
@@ -234,8 +234,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
       },
       "app": {
@@ -250,8 +250,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
       },
       "app": {
@@ -266,8 +266,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
       },
       "app": {
@@ -282,8 +282,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
       },
       "app": {
@@ -298,8 +298,8 @@
         "proof": "android-lab/lab/tests/test_mcp_cleanup.py"
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/catalog.html"
       },
       "app": {
@@ -329,8 +329,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/history.html"
       },
       "app": {
@@ -345,8 +345,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/job.html"
       },
       "app": {
@@ -376,8 +376,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
       },
       "app": {
@@ -392,8 +392,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
       },
       "app": {
@@ -408,8 +408,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
       },
       "app": {
@@ -424,8 +424,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
       },
       "app": {
@@ -440,8 +440,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
       },
       "app": {
@@ -456,8 +456,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
       },
       "app": {
@@ -472,8 +472,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
       },
       "app": {
@@ -488,8 +488,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
       },
       "app": {
@@ -504,8 +504,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/preferences.html"
       },
       "app": {
@@ -520,8 +520,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/preferences.html"
       },
       "app": {
@@ -536,8 +536,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
       },
       "app": {
@@ -567,8 +567,8 @@
         "proof": "android-lab/lab/tests/test_mcp_cleanup.py::test_review_scans_suggests_and_plans_but_never_cleans"
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
       },
       "app": {
@@ -595,11 +595,11 @@
       "section": "cleanup",
       "engineUsage": {
         "status": "verified",
-        "proof": "android-lab/lab/tests/test_mcp_cleanup.py"
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_cleanup_widget_tools_return_structured_ui_meta"
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/status.html"
       },
       "app": {
@@ -614,8 +614,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/suggest.html"
       },
       "app": {
@@ -630,8 +630,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/volumes.html"
       },
       "app": {
@@ -646,8 +646,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/widget.html"
       },
       "app": {
@@ -662,8 +662,8 @@
         "proof": null
       },
       "widget": {
-        "status": "pending",
-        "proof": null,
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
         "resourceUri": "ui://os-lab/cleanup/widgets/widget.html"
       },
       "app": {
@@ -674,12 +674,13 @@
     "macos_apps": {
       "section": "macos",
       "engineUsage": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
       },
       "widget": {
-        "status": "none",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/macos/widgets/apps.html"
       },
       "app": {
         "status": "none",
@@ -719,12 +720,13 @@
     "macos_control_state": {
       "section": "macos",
       "engineUsage": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
       },
       "widget": {
-        "status": "none",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/macos/widgets/control.html"
       },
       "app": {
         "status": "none",
@@ -1184,12 +1186,13 @@
     "websec_report": {
       "section": "websec",
       "engineUsage": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
       },
       "widget": {
-        "status": "none",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/websec/widgets/report.html"
       },
       "app": {
         "status": "none",
@@ -1214,12 +1217,13 @@
     "websec_review": {
       "section": "websec",
       "engineUsage": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
       },
       "widget": {
-        "status": "none",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/websec/widgets/review.html"
       },
       "app": {
         "status": "none",
@@ -1274,12 +1278,13 @@
     "websec_status": {
       "section": "websec",
       "engineUsage": {
-        "status": "pending",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
       },
       "widget": {
-        "status": "none",
-        "proof": null
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/websec/widgets/status.html"
       },
       "app": {
         "status": "none",
@@ -2184,6 +2189,70 @@
       "app": {
         "status": "none",
         "proof": null
+      }
+    },
+    "android_app_overview": {
+      "section": "android",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_lab_overview_apps_are_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/android/apps/overview.html"
+      }
+    },
+    "ios_app_overview": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_lab_overview_apps_are_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/ios/apps/overview.html"
+      }
+    },
+    "web_app_overview": {
+      "section": "web",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_lab_overview_apps_are_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/web/apps/overview.html"
+      }
+    },
+    "source_app_overview": {
+      "section": "source",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_lab_overview_apps_are_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/source/apps/overview.html"
       }
     }
   }

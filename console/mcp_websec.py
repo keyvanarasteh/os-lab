@@ -57,17 +57,22 @@ SCAN = {
                "description": "Include the intrusive checks; needs written authorization and confirm: true"},
 }
 
+W = mcp_ui.WEBSEC_WIDGET
+
 TOOLS = [
-    {"name": "websec_status", "description": "Web Sec Lab readiness: ready / needs-setup / unavailable, requirements, scope summary and storage. Read-only.", "inputSchema": _obj()},
+    {"name": "websec_status", "description": "Web Sec Lab readiness: ready / needs-setup / unavailable, requirements, scope summary and storage. Read-only.", "inputSchema": _obj(),
+     "_meta": mcp_ui.ui_meta(W["status"])},
     {"name": "websec_catalogue", "description": "Every registered check: id, label, group, weight, whether it is intrusive (active), its upstream module and its SecOps guide id. Read-only.", "inputSchema": _obj()},
     {"name": "websec_guides", "description": "The SecOps guides: short defensive how-tos and the check ids each one explains. Read-only.", "inputSchema": _obj()},
     {"name": "websec_preferences", "description": "The saved workbench choices (last target, preset, protocol, check selection, pacing, bulk preset). Intrusive mode is never saved. Read-only.", "inputSchema": _obj()},
     {"name": "websec_history", "description": "Recent scans, newest first: target, time, grade, score, finding counts and the stored report name. Read-only.", "inputSchema": _obj({"target": TARGET, "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}})},
     {"name": "websec_reports", "description": "Stored report names for one target, newest first. Read-only.", "inputSchema": _obj({"target": TARGET}, ["target"])},
-    {"name": "websec_report", "description": "One stored report rendered as markdown (default), json, sarif, text or html. Read-only.", "inputSchema": _obj({"target": TARGET, "name": REPORT, "format": {"enum": ["markdown", "json", "sarif", "text", "html"], "default": "markdown"}}, ["target", "name"])},
+    {"name": "websec_report", "description": "One stored report rendered as markdown (default), json, sarif, text or html. Read-only.", "inputSchema": _obj({"target": TARGET, "name": REPORT, "format": {"enum": ["markdown", "json", "sarif", "text", "html"], "default": "markdown"}}, ["target", "name"]),
+     "_meta": mcp_ui.ui_meta(W["report"])},
     {"name": "websec_compare", "description": "What changed between two stored runs of one target: grade and score delta, new and resolved findings, check status changes. Defaults to the latest two runs. Read-only.", "inputSchema": _obj({"target": TARGET, "old": REPORT, "new": REPORT}, ["target"])},
     {"name": "websec_job", "description": "Poll one scan or bulk job by id; a finished scan returns its graded summary. Read-only.", "inputSchema": _obj({"jobId": {"type": "string"}}, ["jobId"])},
-    {"name": "websec_review", "description": "The review step: normalizes the target, asks the scope guard and lists every check a scan would run (intrusive ones held back unless active). Sends nothing to the target. Show it to the user, then call websec_scan.", "inputSchema": _obj(dict(SCAN), ["target"])},
+    {"name": "websec_review", "description": "The review step: normalizes the target, asks the scope guard and lists every check a scan would run (intrusive ones held back unless active). Sends nothing to the target. Show it to the user, then call websec_scan.", "inputSchema": _obj(dict(SCAN), ["target"]),
+     "_meta": mcp_ui.ui_meta(W["review"])},
     {"name": "websec_scan", "description": "Run a scope-checked scan as a job and return its graded summary. A passive scan needs no confirmation; active: true runs the intrusive checks and requires confirm: true after the user approved them with written authorization.", "inputSchema": _obj({**SCAN, "confirm": {"type": "boolean"}, **WAIT}, ["target"])},
     {"name": "websec_scan_cancel", "description": "Stop a running scan or bulk job.", "inputSchema": _obj({"jobId": {"type": "string"}}, ["jobId"])},
     {"name": "websec_bulk", "description": "Validate up to 20 targets passively, one job; targets outside the scope come back as refusal rows.", "inputSchema": _obj({"targets": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 20}, "preset": {"enum": ["quick", "standard", "full"], "default": "quick"}, **WAIT}, ["targets"])},
@@ -81,6 +86,7 @@ TOOLS = [
     {"name": "websec_preferences_save", "description": "Save the workbench choices on this computer (kept across restarts and app updates). Takes scan {target, preset, scheme, modules, timeout, deadline} and bulk {preset}; there is no intrusive setting.", "inputSchema": _obj({"preferences": {"type": "object", "properties": {"scan": {"type": "object"}, "bulk": {"type": "object"}}, "additionalProperties": False}}, ["preferences"])},
 ]
 NAMES = {tool["name"] for tool in TOOLS}
+_UI_FOR = {tool["name"]: tool["_meta"]["ui"]["resourceUri"] for tool in TOOLS if tool.get("_meta", {}).get("ui", {}).get("resourceUri")}
 
 # Annotate every websec tool so hosts can gate write / destructive calls.
 _RO = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
@@ -167,7 +173,11 @@ def call(name, args, root):
     """Run one Web Sec Lab tool. Raises oslab.PlanError with a code on every refusal."""
     api = websec_api.api_for(root)
     try:
-        return _text(_dispatch(api, name, args if isinstance(args, dict) else {}))
+        value = _dispatch(api, name, args if isinstance(args, dict) else {})
+        uri = _UI_FOR.get(name)
+        if uri:
+            return mcp_ui.result(value, resource_uri=uri)
+        return _text(value)
     except websec_api.WebSecError as exc:
         raise oslab.PlanError(str(exc), code="WEBSEC_{0}".format(exc.status),
                               retry="reobserve" if exc.status in (404, 409) else None) from exc

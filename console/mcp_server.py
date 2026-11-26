@@ -53,6 +53,7 @@ TOOLS = [
         "name": "macos_apps",
         "description": "List the visible app windows on this Mac: id, pid, app, title, rect and the display scale of each (read-only).",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "_meta": mcp_ui.ui_meta(mcp_ui.MACOS_WIDGET["apps"]),
     },
     {
         "name": "macos_get_app_state",
@@ -270,6 +271,7 @@ TOOLS = [
         "name": "macos_control_state",
         "description": "Whether armed control mode is active, its owner and remaining seconds (read-only). Input tools refuse while it is off; there is no arm tool — the human arms from the dashboard.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "_meta": mcp_ui.ui_meta(mcp_ui.MACOS_WIDGET["control"]),
     },
     {
         "name": "macos_stop",
@@ -458,7 +460,7 @@ def tool_call(name: str, args: dict) -> dict:
     if name in mcp_firewall.NAMES:
         return mcp_firewall.call(name, args, REPO_ROOT)
     if name == "macos_apps":
-        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_windows())}]}
+        return mcp_ui.result(oslab.macos_windows(), resource_uri=mcp_ui.MACOS_WIDGET["apps"])
     if name == "macos_get_app_state":
         state = oslab.macos_window_elements(REPO_ROOT, args.get("windowId"), args.get("revision"))
         content: list[dict] = [{"type": "text", "text": json.dumps(state)}]
@@ -511,7 +513,7 @@ def tool_call(name: str, args: dict) -> dict:
     if name == "macos_sessions":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_session_state(REPO_ROOT))}]}
     if name == "macos_control_state":
-        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_control_state())}]}
+        return mcp_ui.result(oslab.macos_control_state(), resource_uri=mcp_ui.MACOS_WIDGET["control"])
     if name == "macos_stop":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_panic_stop(REPO_ROOT))}]}
     if name == "macos_task":

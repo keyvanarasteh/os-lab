@@ -30,14 +30,19 @@ TOOLS = common.annotate_ro([
                     "profile": {"type": "string"},
                     "device": {"type": "string", "description": "Emulator device for resize/start when applicable"},
                 }, ["action"]), read_only=True),
+    mcp_ui.tool("android_app_overview",
+                "Android Lab overview MCP App: readiness, provider and available actions (dashboard Overview UX).",
+                common.obj(), read_only=True, idempotent=True, resource_uri=mcp_ui.LAB_APP["android"]),
 ])
 NAMES = {tool["name"] for tool in TOOLS}
+_UI_FOR = {tool["name"]: tool["_meta"]["ui"]["resourceUri"]
+           for tool in TOOLS if tool.get("_meta", {}).get("ui", {}).get("resourceUri")}
 
 
 def call(name, args, root):
     args = args if isinstance(args, dict) else {}
     try:
-        return common.result(_dispatch(name, args, root))
+        return mcp_ui.result(_dispatch(name, args, root), resource_uri=_UI_FOR.get(name))
     except frida_inventory.ScopeError as exc:
         raise oslab.PlanError(str(exc), code="ANDROID_SCOPE") from exc
     except frida_inventory.ToolError as exc:
@@ -65,4 +70,7 @@ def _dispatch(name, args, root):
         if args.get("device"):
             request["device"] = args["device"]
         return oslab.plan(root, request)
+    if name == "android_app_overview":
+        common.check(args, [])
+        return {"status": common.lab_status(root, "android")}
     raise oslab.PlanError("Unknown tool {0}".format(name), code="INVALID_ARGS")

@@ -136,7 +136,7 @@ export const MCP_GROUPS: McpGroup[] = [
     platform: "macOS",
     docs: "lat.md/ios-lab.md (MIR-12)",
     engineUsage: pending(),
-    widgets: none(),
+    widgets: pending(),
     apps: none(),
     rules: [
       "Read-only tools always work.",
@@ -147,7 +147,7 @@ export const MCP_GROUPS: McpGroup[] = [
       "macos_task runs a bounded step list. Cleanup and Web Sec tools are refused inside it."
     ],
     tools: [
-      { name: "macos_apps", safety: "read-only", summary: "Visible app windows: id, pid, app, title, rect.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "macos_apps", safety: "read-only", summary: "Visible app windows: id, pid, app, title, rect.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "macos_get_app_state", safety: "read-only", summary: "Accessibility tree of one window, optional PNG.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_screenshot", safety: "read-only", summary: "PNG of one visible window (Screen Recording).", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_windows", safety: "read-only", summary: "AX window list of one app.", engineUsage: pending(), widget: none(), app: none() },
@@ -160,7 +160,7 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "macos_focused", safety: "read-only", summary: "Focused AX element of one app (pid).", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_audit", safety: "read-only", summary: "Recent macOS Lab audit rows (no thumbnails).", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_sessions", safety: "read-only", summary: "Open deep-inspect sessions and Appium reachability.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "macos_control_state", safety: "read-only", summary: "Whether control mode is armed, owner, remaining seconds.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "macos_control_state", safety: "read-only", summary: "Whether control mode is armed, owner, remaining seconds.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "macos_click", safety: "armed", summary: "One click at a point or element path.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_type", safety: "armed", summary: "Type text; newlines are refused.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_key", safety: "confirm", summary: "Allowlisted key. Enter/Return need confirm: true.", engineUsage: pending(), widget: none(), app: none() },
@@ -184,7 +184,7 @@ export const MCP_GROUPS: McpGroup[] = [
       "Scan, suggest and review never move files.",
       "cleanup_clean needs confirm: true after the user approved the plan. Trash only.",
       "Tools take catalog ids, never raw paths.",
-      "First-batch MCP widgets/apps ship under ui://os-lab/cleanup/; proofs stay pending until a host verifies them."
+      "MCP widgets/apps under ui://os-lab/cleanup/; host resource read + structuredContent proofs in test_mcp_ui_hosts.py."
     ],
     tools: [
       { name: "cleanup_status", safety: "read-only", summary: "Readiness, requirements and capabilities.", engineUsage: pending(), widget: pending(), app: none() },
@@ -252,24 +252,25 @@ export const MCP_GROUPS: McpGroup[] = [
     platform: "all hosts",
     docs: "lat.md/web-sec.md, web-sec/README.md",
     engineUsage: pending(),
-    widgets: none(),
+    widgets: pending(),
     apps: none(),
     rules: [
       "Every scan is scope-guarded. Targets outside the scope file are refused.",
       "Passive scans need no confirmation.",
-      "Intrusive checks need active: true and confirm: true after written authorization."
+      "Intrusive checks need active: true and confirm: true after written authorization.",
+      "Widgets: status, review, report under ui://os-lab/websec/widgets/."
     ],
     tools: [
-      { name: "websec_status", safety: "read-only", summary: "Readiness, scope summary and storage.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "websec_status", safety: "read-only", summary: "Readiness, scope summary and storage.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "websec_catalogue", safety: "read-only", summary: "Registered checks and whether they are intrusive.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_guides", safety: "read-only", summary: "SecOps guides for the checks.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_preferences", safety: "read-only", summary: "Saved workbench choices. Intrusive mode is never saved.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_history", safety: "read-only", summary: "Recent scans for a target.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_reports", safety: "read-only", summary: "Stored report names for a target.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "websec_report", safety: "read-only", summary: "One stored report (markdown, json, sarif, text, html).", engineUsage: pending(), widget: none(), app: none() },
+      { name: "websec_report", safety: "read-only", summary: "One stored report (markdown, json, sarif, text, html).", engineUsage: pending(), widget: pending(), app: none() },
       { name: "websec_compare", safety: "read-only", summary: "What changed between two stored runs.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_job", safety: "read-only", summary: "Poll one scan or bulk job.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "websec_review", safety: "read-only", summary: "Normalize the target, ask the scope guard, list checks.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "websec_review", safety: "read-only", summary: "Normalize the target, ask the scope guard, list checks.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "websec_scan", safety: "confirm", summary: "Run a scope-checked scan. Active needs confirm: true.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_scan_cancel", safety: "write", summary: "Stop a running scan or bulk job.", engineUsage: pending(), widget: none(), app: none() },
       { name: "websec_bulk", safety: "read-only", summary: "Validate up to 20 targets passively.", engineUsage: pending(), widget: none(), app: none() },
@@ -311,7 +312,7 @@ export const MCP_GROUPS: McpGroup[] = [
     docs: "lat.md/android-lab.md, console/mcp_android.py",
     engineUsage: pending(),
     widgets: none(),
-    apps: none(),
+    apps: pending(),
     rules: [
       "Status, Frida inventory and plan preview only.",
       "Frida inventory never attaches or injects.",
@@ -320,7 +321,8 @@ export const MCP_GROUPS: McpGroup[] = [
     tools: [
       { name: "android_status", safety: "read-only", summary: "Lab readiness, provider, reasons, actions.", engineUsage: pending(), widget: none(), app: none() },
       { name: "android_frida_inventory", safety: "read-only", summary: "Frida devices/processes (list only).", engineUsage: pending(), widget: none(), app: none() },
-      { name: "android_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() }
+      { name: "android_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "android_app_overview", safety: "read-only", summary: "Overview MCP App (readiness + actions).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
   {
@@ -330,7 +332,7 @@ export const MCP_GROUPS: McpGroup[] = [
     docs: "lat.md/ios-lab.md, console/mcp_ios.py",
     engineUsage: pending(),
     widgets: none(),
-    apps: none(),
+    apps: pending(),
     rules: [
       "Observe only: devices, simulator, resources, screenshot.",
       "No agent arm or WebDriverAgent start — drive devices from the dashboard."
@@ -342,7 +344,8 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "ios_device_check", safety: "read-only", summary: "Reachability probe for one UDID.", engineUsage: pending(), widget: none(), app: none() },
       { name: "ios_resources", safety: "read-only", summary: "Resource tips for this Mac.", engineUsage: pending(), widget: none(), app: none() },
       { name: "ios_screenshot", safety: "read-only", summary: "PNG of a booted simulator or real device.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "ios_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() }
+      { name: "ios_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "ios_app_overview", safety: "read-only", summary: "Overview MCP App (readiness + actions).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
   {
@@ -369,7 +372,7 @@ export const MCP_GROUPS: McpGroup[] = [
     docs: "lat.md/web-lab.md, console/mcp_web.py",
     engineUsage: pending(),
     widgets: none(),
-    apps: none(),
+    apps: pending(),
     rules: [
       "Status/overview/windows are read-only.",
       "Engine start/stop talk to the local loopback engine only."
@@ -379,7 +382,8 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "web_overview", safety: "read-only", summary: "Engine overview when running.", engineUsage: pending(), widget: none(), app: none() },
       { name: "web_windows", safety: "read-only", summary: "Open Web Lab browser windows.", engineUsage: pending(), widget: none(), app: none() },
       { name: "web_engine_start", safety: "write", summary: "Start the local Web Lab engine.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "web_engine_stop", safety: "write", summary: "Stop the local Web Lab engine.", engineUsage: pending(), widget: none(), app: none() }
+      { name: "web_engine_stop", safety: "write", summary: "Stop the local Web Lab engine.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "web_app_overview", safety: "read-only", summary: "Overview MCP App (readiness + engine).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
   {
@@ -389,7 +393,7 @@ export const MCP_GROUPS: McpGroup[] = [
     docs: "lat.md/source-lab.md, console/mcp_source.py",
     engineUsage: pending(),
     widgets: none(),
-    apps: none(),
+    apps: pending(),
     rules: [
       "Readiness, candidates and plan preview only.",
       "Detection/crawl jobs still start from the dashboard or labctl."
@@ -399,7 +403,8 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "source_readiness", safety: "read-only", summary: "Raw engine readiness JSON.", engineUsage: pending(), widget: none(), app: none() },
       { name: "source_candidates", safety: "read-only", summary: "Local detection candidates.", engineUsage: pending(), widget: none(), app: none() },
       { name: "source_runtime", safety: "read-only", summary: "Saved runtime settings.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "source_plan", safety: "read-only", summary: "Guarded plan preview.", engineUsage: pending(), widget: none(), app: none() }
+      { name: "source_plan", safety: "read-only", summary: "Guarded plan preview.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "source_app_overview", safety: "read-only", summary: "Overview MCP App (readiness + actions).", engineUsage: pending(), widget: none(), app: pending() }
     ]
   },
   {
@@ -423,9 +428,9 @@ export const MCP_GROUPS: McpGroup[] = [
   }
 ];
 
-/** Remaining gaps (widgets/apps for newer labs, deliberate non-goals). See docs/PLAN-mcp-coverage.md. */
+/** Remaining gaps after the first widget/app batches. See docs/PLAN-mcp-coverage.md. */
 export const MCP_PLANNED_SECTIONS: { id: string; title: string; engineUsage: VerifySlot; widgets: VerifySlot; apps: VerifySlot; note: string }[] = [
-  { id: "websec-ui", title: "Web Sec widgets/apps", engineUsage: pending(), widgets: none(), apps: none(), note: "Tools shipped; status/review/report widgets still none." },
-  { id: "macos-ui", title: "macOS observe widgets", engineUsage: pending(), widgets: none(), apps: none(), note: "Optional apps-list / control-state widgets still none. No arm tool (n/a)." },
-  { id: "lab-apps", title: "Lab MCP Apps", engineUsage: pending(), widgets: none(), apps: none(), note: "android / ios / web / source lab apps once host UX is adapted." }
+  { id: "websec-apps", title: "Web Sec MCP Apps", engineUsage: pending(), widgets: pending(), apps: none(), note: "status/review/report widgets shipped; fuller workbench app still open." },
+  { id: "macos-apps", title: "macOS MCP Apps", engineUsage: pending(), widgets: pending(), apps: none(), note: "apps/control widgets shipped. No arm tool (n/a)." },
+  { id: "lab-widgets", title: "Lab MCP widgets", engineUsage: pending(), widgets: none(), apps: pending(), note: "android/ios/web/source overview apps shipped; per-tool widgets still open." }
 ];

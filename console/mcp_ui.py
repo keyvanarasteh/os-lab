@@ -102,19 +102,31 @@ def _walk_html(root: str, uri_prefix: str) -> list[dict]:
     return resources
 
 
+_UI_SECTIONS = (
+    ("cleanup", "widgets", WIDGET_ROOT),
+    ("cleanup", "apps", APP_ROOT),
+    ("websec", "widgets", WIDGET_ROOT),
+    ("macos", "widgets", WIDGET_ROOT),
+    ("android", "apps", APP_ROOT),
+    ("ios", "apps", APP_ROOT),
+    ("web", "apps", APP_ROOT),
+    ("source", "apps", APP_ROOT),
+)
+
+
 def list_resources() -> list[dict]:
     """Every predeclared widget and app HTML resource."""
-    return (
-        _walk_html(os.path.join(WIDGET_ROOT, "cleanup"), "ui://os-lab/cleanup/widgets")
-        + _walk_html(os.path.join(APP_ROOT, "cleanup"), "ui://os-lab/cleanup/apps")
-    )
+    resources = []
+    for section, kind, base in _UI_SECTIONS:
+        resources.extend(_walk_html(os.path.join(base, section),
+                                    "ui://os-lab/{0}/{1}".format(section, kind)))
+    return resources
 
 
 def _path_for_uri(uri: str) -> str | None:
-    prefixes = (
-        ("ui://os-lab/cleanup/widgets/", os.path.join(WIDGET_ROOT, "cleanup")),
-        ("ui://os-lab/cleanup/apps/", os.path.join(APP_ROOT, "cleanup")),
-    )
+    prefixes = []
+    for section, kind, base in _UI_SECTIONS:
+        prefixes.append(("ui://os-lab/{0}/{1}/".format(section, kind), os.path.join(base, section)))
     for prefix, root in prefixes:
         if not uri.startswith(prefix):
             continue
@@ -164,4 +176,19 @@ CLEANUP_APP = {
     "overview": "ui://os-lab/cleanup/apps/overview.html",
     "review": "ui://os-lab/cleanup/apps/review.html",
     "settings": "ui://os-lab/cleanup/apps/settings.html",
+}
+WEBSEC_WIDGET = {
+    "status": "ui://os-lab/websec/widgets/status.html",
+    "review": "ui://os-lab/websec/widgets/review.html",
+    "report": "ui://os-lab/websec/widgets/report.html",
+}
+MACOS_WIDGET = {
+    "apps": "ui://os-lab/macos/widgets/apps.html",
+    "control": "ui://os-lab/macos/widgets/control.html",
+}
+LAB_APP = {
+    "android": "ui://os-lab/android/apps/overview.html",
+    "ios": "ui://os-lab/ios/apps/overview.html",
+    "web": "ui://os-lab/web/apps/overview.html",
+    "source": "ui://os-lab/source/apps/overview.html",
 }
