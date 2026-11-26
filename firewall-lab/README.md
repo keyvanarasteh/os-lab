@@ -36,6 +36,34 @@ firewall-lab/
     catalog.py               collect every firewall + props into catalog.{json,md}
 ```
 
+## Find a firewall
+
+The dashboard lists every deployed firewall at **/firewall/devices/** with search,
+filters (vendor, segment, branch role, throughput, price) and a page per firewall.
+
+## Ask an AI agent (MCP)
+
+`console/mcp_firewall_server.py` is a read-only stdio MCP server with only the
+Firewall Lab tools; the full `console/mcp_server.py` serves the same ones. Replace
+`<REPO>` with the checkout path:
+
+```json
+{
+  "mcpServers": {
+    "os-lab-firewall": {
+      "command": "python3",
+      "args": ["<REPO>/console/mcp_firewall_server.py"]
+    }
+  }
+}
+```
+
+Then ask, for example: *"A 1 Gbps branch office, about 200 people, under $10,000,
+high availability. Which firewall?"* The agent can search (`firewall_devices`,
+`firewall_products`), open and compare (`firewall_device`, `firewall_compare`) and
+rank for the context (`firewall_recommend`). Throughput and prices are quoted by
+students, not taken from vendor datasheets; confirm with the vendor before buying.
+
 ## Contribute your company (the exercise)
 
 1. **Copy the template** into a new folder named with your company slug:

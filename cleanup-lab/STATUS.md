@@ -123,6 +123,8 @@ no other key → `202` job `kind: "clean"`. Errors are answered before a job sta
 `404` unknown plan, `410` expired, `409` already used. A plan is **single-use** and
 expires after ten minutes **or** when any item's fingerprint changed; the change is
 re-checked inside the job, which ends `failed` with that message and removes nothing.
+Items with `liveContent: true` (live caches and logs) compare only kind, device and
+inode.
 
 Clean progress: `phase` `queued`/`cleaning`/`done`/`cancelled`, `itemsDone`,
 `itemsTotal`, `bytesRemoved`, `currentPath`. When finished:

@@ -1,0 +1,7 @@
+---
+import Base from "../../../layouts/Base.astro";
+import { FirewallDevicePage } from "../../../views/firewall-device-page";
+import { devicesCopy } from "../../../firewall/devices-copy";
+import "../../../styles/firewall-contribute.css";
+---
+<Base title={devicesCopy.tr.title} description={devicesCopy.tr.intro} lang="tr"><FirewallDevicePage locale="tr" client:only="react" /></Base>

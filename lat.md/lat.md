@@ -14,6 +14,7 @@ This is the main project documentation; start here when changing behavior.
 - [[source-lab]] — local multi-platform source/package analysis
 - [[source-tests]] — retained engine contracts and distribution regressions
 - [[cleanup-lab]] — disk cleanup: readiness, catalog, scan jobs, guarded cleaning
+- [[firewall-lab]] — student firewall designs: company pages, device search and read-only MCP advisor tools
 - [[web-lab]] — embedded in-app browser with JavaScript injection
 - [[web-sec]] — scope-guarded web posture assessment (engine-only)
 - [[ai-plugins]] — os-lab as a Claude plugin: package, requirement checks, install and setup

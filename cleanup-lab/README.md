@@ -89,7 +89,10 @@ one `lstat` walk records its size, files, folders and a fingerprint (symlinks ar
 counted, never followed). `POST /api/cleanup/plan` requires catalog `entryIds`
 (plus optional `workers` and `mode`) — the page never sends a path list. The plan
 lists every item as `ready` or `skipped` with a stable code and reason, defaults to
-`trash`, and expires after ten minutes or as soon as an item changes.
+`trash`, and expires after ten minutes or as soon as an item changes. Entries marked
+`liveContent` in the catalog (caches and logs that apps keep writing) expire only
+when the item is gone, unreadable or replaced; whatever is inside at run time is
+removed.
 
 `POST /api/cleanup/clean {planId}` verifies the fingerprints again, then runs the
 plan once (`used` afterwards). Trash is the default and the only automatic choice:

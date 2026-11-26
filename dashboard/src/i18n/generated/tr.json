@@ -3459,5 +3459,8 @@
   "Install as a Grok Build plugin": "Grok Build eklentisi olarak kur",
   "Cursor plugin": "Cursor eklentisi",
   "ZCode plugin": "ZCode eklentisi",
-  "Grok Build plugin": "Grok Build eklentisi"
+  "Grok Build plugin": "Grok Build eklentisi",
+  "Apps keep writing here. Whatever is inside when the clean runs is removed.": "Uygulamalar buraya sürekli yazıyor. Temizlik çalışırken içinde ne varsa silinir.",
+  "Build a new plan": "Yeni plan oluştur",
+  "Firewall Lab: search and filter every seeded firewall, its specs, alternatives and rules": "Güvenlik Duvarı Laboratuvarı: tüm örnek güvenlik duvarlarında, teknik değerlerinde, alternatiflerinde ve kurallarında arama ve filtreleme"
 }

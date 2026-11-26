@@ -69,6 +69,7 @@ import { toggleMode, useThemeMode } from "./theme";
 import { UpdateModal } from "../views/update-modal";
 import { androidLogsStore, formatBytes, healthStore, hostStore, jobsStore, type LabId, type LabStatus } from "../lib/api";
 import { copy, firewallPath, type FirewallLocale } from "../firewall/locale";
+import { devicesCopy } from "../firewall/devices-copy";
 import { CATALOG_GROUPS } from "../views/cleanup/groups";
 import { GROUP_BYTES_EVENT, GroupGlyph, readGroupBytes } from "../views/cleanup/group-icon";
 import { localeFromPath, localePath } from "../i18n/paths";
@@ -110,6 +111,7 @@ export function sectionHref(id: string): string {
     const anchor = id.split("#")[1];
     return localized("/web-sec/") + (anchor ? `#${anchor}` : "");
   }
+  if (id === "firewall-devices") return firewallPath(typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname), "devices");
   if (id === "firewall" || id === "firewall-lab" || id === "firewall-companies" || id === "firewall-add") {
     const locale = typeof window === "undefined" ? "en" : localeFromPath(window.location.pathname);
     const hash = id === "firewall-companies" ? "#companies" : id === "firewall-add" ? "#add" : "";
@@ -165,6 +167,7 @@ const PAGE_ICON: Record<string, ReactNode> = {
   "lab-websec": <WrenchIcon size={16} />,
   "web-lab": <BrowserIcon size={16} />, "lab-web": <WrenchIcon size={16} />,
   firewall: <SquaresFourIcon size={16} />, "firewall-companies": <BuildingsIcon size={16} />,
+  "firewall-devices": <MagnifyingGlassIcon size={16} />,
   "firewall-add": <PlusCircleIcon size={16} />
 };
 
@@ -307,6 +310,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
       children: [
         { id: "firewall", label: copy[locale].overview },
         { id: "firewall-companies", label: copy[locale].companies },
+        { id: "firewall-devices", label: devicesCopy[locale].title },
         { id: "firewall-add", label: copy[locale].add }
       ]
     },
@@ -411,6 +415,7 @@ function buildMeta(): Record<string, SpotlightMeta> {
     "web-sec#websec-guides": { description: "Web Sec Lab SecOps guides and reference", aliases: ["websec guides", "secops", "cwe"] },
     "lab-web": { description: "Web Lab engine readiness: cargo, make and the built engine", aliases: ["web", "engine", "setup"] },
     firewall: { description: "BGT207 dream-company firewall designs — branches, segmentation, products and rule sets", aliases: ["firewall", "bgt207", "ufw", "rules", "vlan", "dmz", "company"] },
+    "firewall-devices": { description: "Firewall Lab: search and filter every seeded firewall, its specs, alternatives and rules", aliases: ["firewall", "devices", "fortigate", "throughput", "price", "compare", "waf"] },
     health: { description: "GET /api/health", aliases: ["status", "api"] },
     contribute: { description: "How to set up, test, rebuild, open a pull request and view roadmap TODOs", aliases: ["contribute", "contributing", "pull request", "pr", "development", "tests", "todos", "roadmap", "pentesting", "firewall", "tasks"] },
     "how-to-use": howToUse,

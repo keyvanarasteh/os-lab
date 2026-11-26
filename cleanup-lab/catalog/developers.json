@@ -12,6 +12,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -84,6 +85,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -129,6 +131,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -214,6 +217,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -657,6 +661,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -683,6 +688,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -732,6 +738,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -755,6 +762,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -778,6 +786,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -800,6 +809,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -822,6 +832,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -844,6 +855,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -867,6 +879,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -890,6 +903,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -954,6 +968,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -1039,6 +1054,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -1064,6 +1080,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -1091,6 +1108,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -1111,6 +1129,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -1138,6 +1157,7 @@
       "impact": "The tool may redownload or rebuild data, or lose local configuration.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "paths",
       "paths": {
         "macos": [
@@ -1165,6 +1185,7 @@
       "impact": "Xcode rebuilds the project indexes and build products on the next build, so the first build is slower.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -1197,6 +1218,7 @@
       "impact": "The simulator rebuilds its caches on the next boot; simulator devices are not touched.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [
@@ -1213,6 +1235,7 @@
       "impact": "uv re-downloads and rebuilds wheels the next time a project needs them.",
       "defaultSelected": false,
       "needsPrivilege": false,
+      "liveContent": true,
       "detector": "tool",
       "paths": {
         "macos": [

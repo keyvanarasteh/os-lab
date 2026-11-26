@@ -535,7 +535,7 @@ export interface CleanupScan {
 }
 export interface CleanupPlan {
   planId: string; mode: "trash" | "delete"; expiresAt: number;
-  items: { entryId: string; entryName: string; path: string | null; status: string; code: string; reason: string; source?: string; sizeBytes: number; files: number; folders: number }[];
+  items: { entryId: string; entryName: string; path: string | null; status: string; code: string; reason: string; source?: string; sizeBytes: number; files: number; folders: number; liveContent?: boolean }[];
   totals: { ready: number; skipped: number; bytes: number };
 }
 export interface CleanupResult {

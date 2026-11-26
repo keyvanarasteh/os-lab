@@ -1,0 +1,36 @@
+{
+  "$comment": "How product quotes from companies/*/company.json are grouped. Read by console/firewall_catalog.py (MCP) and dashboard/src/firewall/devices.ts (pages); dashboard/scripts/firewall-devices.test.mjs checks that both agree. Patterns must mean the same in Python and JavaScript.",
+  "vendorAliases": {
+    "Palo Alto": "Palo Alto Networks",
+    "Juniper": "Juniper Networks",
+    "Amazon": "Amazon Web Services",
+    "Deciso (açık kaynak)": "Deciso",
+    "Imperva (Thales)": "Imperva",
+    "IPFire (açık kaynak)": "IPFire",
+    "Açık kaynak": "Open source",
+    "OWASP / açık kaynak": "OWASP"
+  },
+  "modelPrefixes": [
+    "Fortinet",
+    "Palo Alto Networks",
+    "Palo Alto",
+    "Check Point",
+    "Cisco",
+    "SonicWall",
+    "Sophos",
+    "Juniper Networks",
+    "Juniper",
+    "WatchGuard",
+    "Ubiquiti",
+    "MikroTik",
+    "F5"
+  ],
+  "haPattern": "\\bHA\\b",
+  "modelNoisePatterns": [
+    "\\s*\\([^()]*(?:\\bHA\\b|ISFW)[^()]*\\)",
+    "\\s+class\\b"
+  ],
+  "wafPattern": "waf|fortiweb|modsecurity|app & api protector",
+  "networkFirewallPattern": "fortigate",
+  "openSourcePattern": "opnsense|pfsense|nftables|modsecurity|ipfire|owasp"
+}

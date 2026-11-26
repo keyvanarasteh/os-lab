@@ -1,0 +1,14 @@
+---
+import Base from "../../../layouts/Base.astro";
+import { FirewallDevicesPage } from "../../../views/firewall-devices-page";
+import { devicesCopy } from "../../../firewall/devices-copy";
+import { FIREWALL_LOCALES, type FirewallLocale } from "../../../firewall/locale";
+import "../../../styles/firewall-contribute.css";
+
+export function getStaticPaths() {
+  return FIREWALL_LOCALES.filter((locale) => locale !== "en" && locale !== "tr").map((locale) => ({ params: { locale } }));
+}
+
+const locale = Astro.params.locale as FirewallLocale;
+---
+<Base title={devicesCopy[locale].title} description={devicesCopy[locale].intro} lang={locale}><FirewallDevicesPage locale={locale} client:only="react" /></Base>

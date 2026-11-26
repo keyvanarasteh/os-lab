@@ -13,7 +13,7 @@ Node server at runtime.
 availability pills), Spotlight and theme ported from qLar.
 [[dashboard/src/shell/lab-switcher.tsx]] is the ⌘L / Ctrl+L modal that sets the
 focused lab: a compact card per lab with its live availability, remembered in
-[[dashboard/src/shell/active-lab.ts]]. Firewall Lab is one of those labs. With a
+[[dashboard/src/shell/active-lab.ts]]. [[firewall-lab]] is one of those labs. With a
 focus, the sidebar replaces the OS Lab group with a group named after the lab
 that lists its nav items; "All labs" in the switcher restores the full OS Lab
 list, and Spotlight keeps every lab listed. The Help group is collapsible,

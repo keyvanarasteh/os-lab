@@ -67,6 +67,7 @@ INSTRUCTIONS = (
     "tool), and tools with a confirm argument need the user's approval first. Never set confirm: true "
     "without it.\n"
     "- Web Sec scans outside the declared scope are refused.\n"
+    "- To suggest firewalls, call firewall_recommend, then firewall_compare; figures are student-quoted.\n"
     "- For Claude plugin setup call plugin_doctor, then plugin_status. To change that installation "
     "call plugin_plan, show its commands, and only after approval plugin_apply.\n"
     "- For Codex plugin setup call codex_plugin_doctor and codex_plugin_status, preview with "

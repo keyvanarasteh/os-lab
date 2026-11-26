@@ -124,6 +124,10 @@
           "type": "boolean",
           "description": "False for toolchains and other data that may be inspected but never cleaned."
         },
+        "liveContent": {
+          "type": "boolean",
+          "description": "A cache or log folder that running apps keep writing. A confirmed plan covers what is there at run time; it expires only if the folder is gone, unreadable or replaced. Low risk and cleanable only."
+        },
         "note": {
           "type": "string"
         },
@@ -158,6 +162,26 @@
             "properties": {
               "defaultSelected": {
                 "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "liveContent": {
+                "const": true
+              }
+            },
+            "required": ["liveContent"]
+          },
+          "then": {
+            "properties": {
+              "risk": {
+                "const": "low"
+              },
+              "cleanable": {
+                "const": true
               }
             }
           }

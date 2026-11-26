@@ -44,7 +44,7 @@
     { "paths": ["src/shell/lab-switcher.tsx", "src/shell/active-lab.ts"], "specs": ["lab-switcher.spec.ts"], "routes": ["/", "/labs/ios/"] },
 
     { "paths": ["src/views/android/**", "src/pages/android/**", "src/apk-lab/**", "src/styles/apk-lab.css"], "specs": ["health-and-content.spec.ts"], "routes": ["/android/", "/android/console/", "/android/workflows/"] },
-    { "paths": ["src/firewall/**", "src/views/firewall-*.tsx", "src/views/gap-modal.tsx", "src/pages/firewall/**", "src/pages/[locale]/firewall/**", "src/styles/firewall-*.css"], "specs": ["health-and-content.spec.ts"], "routes": ["/firewall/", "/firewall/acme-academy/"] },
+    { "paths": ["src/firewall/**", "src/views/firewall-*.tsx", "src/views/gap-modal.tsx", "src/pages/firewall/**", "src/pages/[locale]/firewall/**", "src/styles/firewall-*.css"], "specs": ["health-and-content.spec.ts", "firewall-devices.spec.ts"], "routes": ["/firewall/", "/firewall/acme-academy/", "/firewall/devices/"] },
     { "paths": ["src/views/health-page.tsx", "src/views/host-page.tsx", "src/health/**", "src/pages/health.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/health/"] },
     { "paths": ["src/views/jobs-page.tsx", "src/pages/jobs.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/jobs/"] },
     { "paths": ["src/views/content-*.tsx", "src/pages/content.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/content/"] },

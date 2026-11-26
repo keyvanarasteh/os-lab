@@ -16,6 +16,9 @@ by the server (`prompts/list`, `tools/list`, `resources/list`).
 | Zcode | `zcode/` | stdio MCP entry |
 | Antigravity | `antigravity/` | generic MCP connector JSON |
 
+Firewall Lab only: point any host at `console/mcp_firewall_server.py` instead; see
+[firewall-lab/README.md](../../firewall-lab/README.md#ask-an-ai-agent-mcp).
+
 Claude Code has a full plugin in [`plugins/claude/os-lab/`](../claude/os-lab/README.md).
 `python3 scripts/claude-plugin.py bundle` builds a Claude Desktop `.mcpb`.
 
