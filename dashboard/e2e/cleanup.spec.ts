@@ -275,3 +275,54 @@ test("catalogs: report-only agent homes cannot be ticked, cleanable children ena
   await child.check();
   await expect(review).toBeEnabled();
 });
+
+test("CLS-01 simulators: preview a fixed simctl action, confirm once, running devices locked", async ({ page }) => {
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  const devices = [
+    { id: "B1B2C3D4-1111-2222-3333-444455556666", name: "iPhone 8", runtime: "com.apple.CoreSimulator.SimRuntime.iOS-15-0", state: "Shutdown", available: false, sizeBytes: 3_000_000_000 },
+    { id: "A1B2C3D4-1111-2222-3333-444455556666", name: "iPhone 16", runtime: "com.apple.CoreSimulator.SimRuntime.iOS-18-0", state: "Shutdown", available: true, sizeBytes: 2_000_000_000 },
+    { id: "C1B2C3D4-1111-2222-3333-444455556666", name: "iPad Air", runtime: "com.apple.CoreSimulator.SimRuntime.iOS-18-0", state: "Booted", available: true, sizeBytes: 1_000_000_000 }
+  ];
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().postDataJSON?.() ?? {};
+    if (route.request().method() === "POST") posts.push({ path, body });
+    let data: unknown = {};
+    if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/monitor") data = { enabled: false, running: false, intervalSeconds: 300, cooldownSeconds: 3600, volumes: [], state: { volumes: {}, events: [], lastEvaluationAt: null, lastError: null }, activeWarnings: [], configError: null, checkedAt: 1 };
+    else if (path === "/api/cleanup/volumes") data = { platform: "macos", threshold: 0.9, volumes: [], homeVolume: null, warnings: [], error: null };
+    else if (path === "/api/cleanup/bookmarks") data = { bookmarks: [], error: null };
+    else if (path === "/api/cleanup/permissions") data = { platform: "macos", permissions: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "macos", entries: [] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+    else if (path === "/api/cleanup/containers") data = { available: false, engine: null, reason: "Neither Docker nor Podman is responding.", actions: [] };
+    else if (path === "/api/cleanup/simulators") data = { available: true, reason: "", devices, actions: [] };
+    else if (path === "/api/cleanup/simulators/preview") data = { previewId: "sim-1", actionId: body.actionId, risk: "low", candidateCount: 1, bytes: 3_000_000_000, devices: [devices[0]], command: ["xcrun", "simctl", "delete", "unavailable"], expiresAt: Date.now() / 1000 + 600 };
+    else if (path === "/api/cleanup/simulators/run") data = { id: "job-sim", kind: "simulator-run", state: "running", progress: null, result: null, error: null };
+    else if (path === "/api/cleanup/jobs/job-sim") data = { id: "job-sim", kind: "simulator-run", state: "done", progress: null, result: { kind: "simulators", actionId: "simulators.delete-unavailable", status: "completed", candidateCount: 1, devices: [devices[0]], command: ["xcrun", "simctl", "delete", "unavailable"], bytesFreed: 3_000_000_000 }, error: null };
+    else if (path === "/api/host") data = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/scan/");
+  const card = page.locator("#scan-simulators");
+  await expect(card.getByText("iPhone 16")).toBeVisible();
+  await expect(card.getByText("iOS 18.0").first()).toBeVisible();
+  // A running simulator cannot be selected; nothing runs before a confirmed preview.
+  await expect(card.getByRole("checkbox", { name: "iPad Air" })).toBeDisabled();
+  await expect(card.getByRole("button", { name: "Delete selected" })).toBeDisabled();
+  await card.getByRole("button", { name: /Delete unavailable simulators/ }).click();
+  await expect(card.getByText("xcrun simctl delete unavailable")).toBeVisible();
+  expect(posts.filter((call) => call.path === "/api/cleanup/simulators/run")).toHaveLength(0);
+  expect(posts.find((call) => call.path === "/api/cleanup/simulators/preview")?.body).toEqual({ actionId: "simulators.delete-unavailable" });
+  await card.getByRole("button", { name: "Confirm" }).click();
+  await expect(card.getByText("Done.", { exact: false })).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/simulators/run")?.body).toEqual({ previewId: "sim-1" });
+  // Selecting a shut-down device previews the typed device action with its id.
+  await card.getByRole("checkbox", { name: "iPhone 16" }).check();
+  await card.getByRole("button", { name: "Erase selected" }).click();
+  await expect.poll(() => posts.filter((call) => call.path === "/api/cleanup/simulators/preview").at(-1)?.body)
+    .toEqual({ actionId: "simulators.erase-devices", deviceIds: ["A1B2C3D4-1111-2222-3333-444455556666"] });
+});

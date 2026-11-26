@@ -145,8 +145,8 @@ at a proved `node_modules` or Rust/Maven `target`, measures it without following
 links, and reports ecosystem, regeneration hint and project directory age.
 `GET /api/cleanup/simulators` reads Xcode's JSON device list with fixed argv,
 flags unavailable devices and measures each device directory under the configured
-[[cleanup-lab/simulator-roots.json]] root. These are detection results, not
-cleanup targets. CLN-24 replaces the first three project checks with marker-verified
+[[cleanup-lab/simulator-roots.json]] root. The inventory is read-only; CLS-01
+(see Simulator cleanup) adds the only way to change a device. CLN-24 replaces the first three project checks with marker-verified
 signatures from [[cleanup-lab/catalog/signatures/projects.json]].
 [[cleanup-lab/engine/cleanup_lab/artifacts.py]] validates the signature data,
 refuses symlink markers, checks `CACHEDIR.TAG`, and reports the project's newest
@@ -268,6 +268,29 @@ tab. The first entry in the family is
 `cleanable: false` (relocation-only — cleaning is refused), owning processes
 Simulator and Xcode, so an iOS Simulator setup can live outside the OS disk
 while simulator runtimes stay system-managed.
+
+## Simulator cleanup
+
+CLS-01 erases or deletes Xcode simulator devices through fixed `xcrun simctl` argv.
+
+[[cleanup-lab/engine/cleanup_lab/simulators.py]] offers three actions:
+`simulators.delete-unavailable` (`simctl delete unavailable`, low risk),
+`simulators.erase-devices` and `simulators.delete-devices` (`simctl erase|delete
+<udid>…`, medium and high risk). Device actions take UDIDs only, at most 100,
+and every one must be in the live inventory and `Shutdown`. A preview
+fingerprints the candidates (id, state, availability, runtime) and sums their
+measured size. `POST /api/cleanup/simulators/preview {actionId, deviceIds?}`
+registers it single-use for ten minutes; `POST /api/cleanup/simulators/run
+{previewId}` re-previews, refuses a changed digest, runs the stored argv without
+a shell, and appends the result (`kind: "simulators"`) to the audit history.
+`GET /api/cleanup/simulators` adds the action list next to the devices.
+
+The dashboard's `#scan-simulators` section on the Advanced scan tab
+([[dashboard/src/views/cleanup/simulators-card.tsx]]) lists devices with
+runtime, state and size, locks running ones, previews the command with its risk
+before a Confirm, and History renders simulator runs as their own rows. The
+overview's Simulators card scrolls to it. CoreSimulator caches stay a normal
+catalog entry; the devices folder itself stays relocation-only.
 
 ## Cleaner Pro (CLNP)
 

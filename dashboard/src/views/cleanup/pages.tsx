@@ -10,6 +10,7 @@ import { EntryMenu, type EntryMenuItem, type EntryMenuState } from "./entry-menu
 import { CategoryIcon, PrivilegeMarker, StatusIcon } from "./icons";
 import { bytes, itemStatusLabel, riskLabel, riskTone, sortEntries, totalsByRisk, type SortOrder } from "./format";
 import { CleanupExtraTools } from "./extra-tools";
+import { SimulatorsCard, simulatorActionLabel } from "./simulators-card";
 import { CrossPlatformLeftovers } from "./cross-leftovers";
 import { MonitorBanner, MonitorCard, MonitorStatsCard } from "./monitor-card";
 import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
@@ -25,7 +26,7 @@ import { CatalogPage } from "./catalog-page";
 import { ConfirmDialog, PathSource } from "./confirm-dialog";
 import { CATALOG_GROUPS, groupIdOf } from "./groups";
 import { publishGroupBytes } from "./group-icon";
-import type { BookmarksPayload, CleanupVolume, CleanupWidgetSnapshot } from "../../lib/api";
+import type { BookmarksPayload, CleanupSimulatorResult, CleanupVolume, CleanupWidgetSnapshot } from "../../lib/api";
 
 /**
  * CLW-03: overview sections the desktop app's deep links may target, and the
@@ -61,6 +62,7 @@ const PUBLIC = import.meta.env.PUBLIC_SITE_MODE === "pages";
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
 const isScan = (job: CleanupJob): job is CleanupJob & { result: CleanupScan } => job.kind === "scan" && !!job.result;
 const isPlan = (job: CleanupJob): job is CleanupJob & { result: CleanupPlan } => job.kind === "plan" && !!job.result;
+const isSimulatorRun = (result: object): result is CleanupSimulatorResult => (result as { kind?: string }).kind === "simulators";
 const isClean = (job: CleanupJob): job is CleanupJob & { result: CleanupResult } => job.kind === "clean" && !!job.result;
 
 const CATEGORY_LABEL: Record<string, string> = { system: "System", browser: "Browsers", developer: "Developer" };
@@ -359,7 +361,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const bookmarkedIds = new Set((bookmarks?.bookmarks ?? []).map((item) => item.entryId));
 
   /** Sections that moved with the settings split, and the tab hosting each. */
-  const SECTION_PAGE: Record<string, CleanupPageId> = { "cleanup-monitor": "settings", "cleanup-permissions": "settings", "cleanup-widgets": "settings", "cleanup-bookmarks": "settings", "overview-review": "", "overview-storage": "" };
+  const SECTION_PAGE: Record<string, CleanupPageId> = { "cleanup-monitor": "settings", "cleanup-permissions": "settings", "cleanup-widgets": "settings", "cleanup-bookmarks": "settings", "overview-review": "", "overview-storage": "", "scan-simulators": "scan" };
 
   /** CLNP-21: a capability card navigates a tab or its section, even when the section now lives on another tab. */
   function goCard(card: OverviewCard) {
@@ -853,6 +855,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
               <a className="iux-btn mt-3" href={link("leftovers/")}>View leftovers</a>
             </Section>}
             <CleanupExtraTools now={now} />
+            <SimulatorsCard now={now} />
           </>}
           {page === "catalog" && !PUBLIC && <CatalogPage entries={entries} sizes={sizes} modified={modified} groupId={catalogGroup} groupHref={(id) => link(id ? `catalog/#${id}` : "catalog/")}
             selected={selected} setSelected={(ids) => { setSelected(ids); setConfirm(false); }} busy={!!busy} canWork={canWork} isPublic={PUBLIC}
@@ -950,6 +953,16 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                     </div>)}
                   </div>
                 </details>
+              </div> :
+              isSimulatorRun(entry.result) ?
+              <div key={entry.id} className="border-b border-(--iux-border) py-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <strong>Run #{entry.id}</strong>
+                  <Badge>Simulators</Badge>
+                  <span dir="ltr" className="ms-auto tabular-nums">{bytes(entry.result.bytesFreed)}</span>
+                </div>
+                <p className="mt-1 text-xs text-(--iux-muted-foreground)">{simulatorActionLabel(entry.result.actionId)} · {entry.result.candidateCount} <span>simulators</span> · {entry.result.status === "completed" ? "completed" : "failed"}</p>
+                <p className="mt-0.5 break-all text-xs text-(--iux-muted-foreground)">{entry.result.devices.map((device) => device.name ?? device.id).join(", ")}</p>
               </div> :
               <div key={entry.id} className="border-b border-(--iux-border) py-3 text-sm">
                 <div className="flex items-center gap-2">

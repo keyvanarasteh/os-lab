@@ -3258,5 +3258,20 @@
   "Review what will be removed before running.": "Çalıştırmadan önce nelerin kaldırılacağını gözden geçirin.",
   "Space to free": "Boşaltılacak alan",
   "Items can be restored from the Trash.": "Öğeler Çöp Kutusu'ndan geri yüklenebilir.",
-  "Size to move to Trash": "Çöp Kutusu'na taşınacak boyut"
+  "Size to move to Trash": "Çöp Kutusu'na taşınacak boyut",
+  "Confirm": "Onayla",
+  "Delete unavailable simulators": "Kullanılamayan simülatörleri sil",
+  "Deleted simulators and their apps and data cannot be restored.": "Silinen simülatörler, uygulamaları ve verileri geri yüklenemez.",
+  "Done.": "Tamamlandı.",
+  "Erase selected": "Seçilenleri sıfırla",
+  "No simulators were found.": "Simülatör bulunamadı.",
+  "Simulator cleanup in progress…": "Simülatör temizliği sürüyor…",
+  "Xcode simulator devices. Preview before erasing or deleting; only shut-down simulators can be changed.": "Xcode simülatör cihazları. Sıfırlamadan veya silmeden önce önizleyin; yalnızca kapalı simülatörler değiştirilebilir.",
+  "Xcode simulators: sizes, erase and delete": "Xcode simülatörleri: boyutlar, sıfırlama ve silme",
+  "freed": "boşaltıldı",
+  "simulators": "simülatör",
+  "Erase selected simulators": "Seçilen simülatörleri sıfırla",
+  "Delete selected simulators": "Seçilen simülatörleri sil",
+  "Simulator cleanup failed.": "Simülatör temizliği başarısız oldu.",
+  "Simulator tooling is unavailable.": "Simülatör araçları kullanılamıyor."
 }

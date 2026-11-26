@@ -98,8 +98,9 @@ def sweep(root, root_ids, *, min_idle_days=0, platform=None, env=None, cancel=No
     return {"items": results, "unreadable": unreadable, "visited": visited, "cancelled": False}
 
 
-def simulators(root, *, platform=None, env=None, run=subprocess.run):
+def simulators(root, *, platform=None, env=None, run=None):
     """List Xcode simulator devices with availability; no shell or guessed paths."""
+    run = run or subprocess.run
     if (platform or platform_id()) != "macos":
         return {"available": False, "reason": "Xcode simulators require macOS", "devices": []}
     try:
