@@ -118,6 +118,7 @@ const CARDS: { group: string; cards: OverviewCard[] }[] = [
       { id: "privileged", title: "Privileged actions", description: "System maintenance through the desktop's own elevation", icon: <WrenchIcon size={18} />, target: "scan/", onTab: true, available: false, note: "Check availability on the Advanced scan page" },
       { id: "projects", title: "Projects deep scan", description: "Marker-verified build artifacts and projects", icon: <CubeTransparentIcon size={18} />, target: "scan/", onTab: true },
       { id: "simulators", title: "Simulators", description: "Xcode simulators: sizes, erase and delete", icon: <PuzzlePieceIcon size={18} />, target: "scan-simulators", onTab: false },
+      { id: "emulators", title: "Android emulators", description: "AVDs on this computer: sizes, wipe and delete", icon: <PuzzlePieceIcon size={18} />, target: "scan-emulators", onTab: false },
       { id: "relocation", title: "Relocation", description: "Move a cache to another volume behind a symlink", icon: <ArrowsClockwiseIcon size={18} />, target: "relocation/", onTab: true },
       { id: "storage", title: "Volumes", description: "Every local volume, capacity and pressure", icon: <HardDrivesIcon size={18} />, target: "overview-storage", onTab: false },
     ],

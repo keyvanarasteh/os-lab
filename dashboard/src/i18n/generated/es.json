@@ -3352,5 +3352,19 @@
   "iOS Simulator setup": "Configuración del simulador iOS",
   "off the system disk.": "fuera del disco del sistema.",
   "unavailable simulators": "simuladores no disponibles",
-  "· nothing has been moved yet": "· todavía no se ha movido nada"
+  "· nothing has been moved yet": "· todavía no se ha movido nada",
+  "AVDs on this computer. Preview before wiping or deleting; only shut-down emulators can be changed.": "AVD en este equipo. Previsualice antes de borrar o eliminar; solo se pueden cambiar emuladores apagados.",
+  "AVDs on this computer: sizes, wipe and delete": "AVD en este equipo: tamaños, borrado y eliminación",
+  "Android emulator cleanup in progress…": "Limpieza de emuladores Android en curso…",
+  "Android emulator setup": "Configuración del emulador Android",
+  "Android emulators": "Emuladores Android",
+  "Checking Android emulators…": "Comprobando emuladores Android…",
+  "Delete unavailable emulators": "Eliminar emuladores no disponibles",
+  "Deleted emulators and their apps and data cannot be restored.": "Los emuladores eliminados y sus apps y datos no se pueden restaurar.",
+  "No Android emulators were found.": "No se encontraron emuladores Android.",
+  "This computer has Android Virtual Devices. Unavailable AVDs can be deleted through a previewed avdmanager action.": "Este equipo tiene Android Virtual Devices. Los AVD no disponibles se pueden eliminar con una acción avdmanager previsualizada.",
+  "Wipe selected data": "Borrar datos seleccionados",
+  "Wipes userdata, cache and snapshots. The AVD definition stays.": "Borra userdata, caché e instantáneas. La definición AVD se conserva.",
+  "emulators": "emuladores",
+  "unavailable emulators": "emuladores no disponibles"
 }

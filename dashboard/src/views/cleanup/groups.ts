@@ -7,6 +7,7 @@ export type CatalogGroup = { id: string; label: string; hint: string; match: Reg
 
 export const CATALOG_GROUPS: CatalogGroup[] = [
   { id: "apple", label: "Xcode & Apple", hint: "Derived data, simulators, device support, CocoaPods", match: /xcode|coresimulator|cocoapods|device-support/ },
+  { id: "android", label: "Android", hint: "Emulator images and AVD data", match: /android-avd/ },
   { id: "javascript", label: "Node & JavaScript", hint: "npm, pnpm, yarn, bun, deno and tool caches", match: /\.(npm|pnpm|yarn|bun|deno|nvm|jest|eslint|prettier|turbo|nx|playwright)$/ },
   { id: "python", label: "Python", hint: "pip, poetry, uv, pyenv and model caches", match: /\.(pip|poetry|uv|pyenv|virtualenvwrapper|rembg-models)$/ },
   { id: "jvm", label: "Java & JVM", hint: "Gradle, Maven, Ivy, Coursier", match: /\.(gradle|maven|ivy2|coursier)$/ },

@@ -3352,5 +3352,19 @@
   "iOS Simulator setup": "إعداد محاكي iOS",
   "off the system disk.": "خارج قرص النظام.",
   "unavailable simulators": "محاكيات غير متاحة",
-  "· nothing has been moved yet": "· لم يُنقل شيء بعد"
+  "· nothing has been moved yet": "· لم يُنقل شيء بعد",
+  "AVDs on this computer. Preview before wiping or deleting; only shut-down emulators can be changed.": "أجهزة AVD على هذا الحاسوب. عاين قبل المسح أو الحذف؛ يمكن تغيير المحاكيات المتوقفة فقط.",
+  "AVDs on this computer: sizes, wipe and delete": "أجهزة AVD على هذا الحاسوب: الأحجام والمسح والحذف",
+  "Android emulator cleanup in progress…": "تنظيف محاكي أندرويد جارٍ…",
+  "Android emulator setup": "إعداد محاكي أندرويد",
+  "Android emulators": "محاكيات أندرويد",
+  "Checking Android emulators…": "جارٍ فحص محاكيات أندرويد…",
+  "Delete unavailable emulators": "حذف المحاكيات غير المتاحة",
+  "Deleted emulators and their apps and data cannot be restored.": "لا يمكن استعادة المحاكيات المحذوفة وتطبيقاتها وبياناتها.",
+  "No Android emulators were found.": "لم يُعثر على محاكيات أندرويد.",
+  "This computer has Android Virtual Devices. Unavailable AVDs can be deleted through a previewed avdmanager action.": "يحوي هذا الحاسوب أجهزة أندرويد افتراضية. يمكن حذف أجهزة AVD غير المتاحة عبر إجراء avdmanager معاين.",
+  "Wipe selected data": "مسح البيانات المحددة",
+  "Wipes userdata, cache and snapshots. The AVD definition stays.": "يمسح بيانات المستخدم والذاكرة المؤقتة واللقطات. يبقى تعريف AVD.",
+  "emulators": "محاكيات",
+  "unavailable emulators": "محاكيات غير متاحة"
 }

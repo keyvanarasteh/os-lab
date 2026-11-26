@@ -589,6 +589,22 @@ export interface CleanupSimulatorResult {
   kind: "simulators"; actionId: string; status: "completed" | "failed"; error?: string;
   candidateCount: number; devices: CleanupSimulatorDevice[]; command: string[]; output?: string; bytesFreed: number;
 }
+/** CLA-01: Android emulator (AVD) inventory on macOS, Linux and Windows. */
+export interface CleanupEmulatorDevice {
+  id: string; name: string | null; runtime: string; path?: string; state: string; available: boolean; sizeBytes: number | null;
+}
+export interface CleanupEmulatorAction { id: string; risk: string; needsSelection: boolean; defaultSelected: boolean; command: string[] }
+export interface CleanupEmulators {
+  available: boolean; reason: string; folder?: string; source?: string; devices: CleanupEmulatorDevice[]; actions: CleanupEmulatorAction[];
+}
+export interface CleanupEmulatorPreview {
+  previewId: string; actionId: string; risk: string; candidateCount: number; bytes: number;
+  devices: CleanupEmulatorDevice[]; command: string[]; expiresAt: number;
+}
+export interface CleanupEmulatorResult {
+  kind: "emulators"; actionId: string; status: "completed" | "failed"; error?: string;
+  candidateCount: number; devices: CleanupEmulatorDevice[]; command: string[]; output?: string; bytesFreed: number;
+}
 /** CLS-02: where the iOS Simulator devices folder lives and what to suggest next. */
 export interface CleanupSimulatorStorageConfig { destination: string | null; suggest: boolean; floorBytes: number }
 export interface CleanupSimulatorStorage {
@@ -601,7 +617,7 @@ export interface CleanupSimulatorStorage {
   suggestion?: { action: "move" | "reconnect" | "setup" | null; reason: string };
 }
 export interface CleanupAuxJob<T> {
-  id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "relocation-plan" | "relocation-run" | "simulator-run"; state: "running" | "done" | "cancelled" | "failed";
+  id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "relocation-plan" | "relocation-run" | "simulator-run" | "emulator-run"; state: "running" | "done" | "cancelled" | "failed";
   progress: Record<string, string | number> | null;
   result: T | null; error: string | null;
 }
@@ -1002,6 +1018,10 @@ export const api = {
   cleanupSimulatorPreview: (actionId: string, deviceIds?: string[]) =>
     post<CleanupSimulatorPreview>("/api/cleanup/simulators/preview", deviceIds ? { actionId, deviceIds } : { actionId }),
   cleanupSimulatorRun: (previewId: string) => post<CleanupAuxJob<CleanupSimulatorResult>>("/api/cleanup/simulators/run", { previewId }),
+  cleanupEmulators: () => call<CleanupEmulators>("/api/cleanup/emulators"),
+  cleanupEmulatorPreview: (actionId: string, deviceIds?: string[]) =>
+    post<CleanupEmulatorPreview>("/api/cleanup/emulators/preview", deviceIds ? { actionId, deviceIds } : { actionId }),
+  cleanupEmulatorRun: (previewId: string) => post<CleanupAuxJob<CleanupEmulatorResult>>("/api/cleanup/emulators/run", { previewId }),
   cleanupVMScan: () => post<CleanupAuxJob<CleanupVMInventory>>("/api/cleanup/vms/scan"),
   cleanupCrossLeftovers: () => post<CleanupAuxJob<CleanupCrossLeftovers>>("/api/cleanup/leftovers/scan"),
   cleanupAuxJob: <T>(id: string) => call<CleanupAuxJob<T>>(`/api/cleanup/jobs/${encodeURIComponent(id)}`),

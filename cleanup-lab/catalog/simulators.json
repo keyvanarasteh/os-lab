@@ -3,6 +3,27 @@
   "family": "simulators",
   "entries": [
     {
+      "id": "simulators.android-avd",
+      "name": "Android emulator images",
+      "category": "simulator",
+      "risk": "high",
+      "hint": "Per-AVD emulator data under this account. Typed delete and wipe run through avdmanager; the Relocation tab (CLA-02) moves the folder off the OS disk.",
+      "impact": "Cleaning this folder as a catalog path is disabled: it would destroy every AVD. Use Android emulators on Advanced scan to delete or wipe one AVD at a time.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "owningProcesses": ["emulator", "emulator.exe", "qemu-system-x86_64", "qemu-system-aarch64"],
+      "toolName": "emulator",
+      "cacheEnv": ["ANDROID_AVD_HOME"],
+      "paths": {
+        "macos": ["~/.android/avd"],
+        "linux": ["~/.android/avd"],
+        "windows": ["~/.android/avd"]
+      },
+      "cleanable": false,
+      "note": "CLA-01: inventory and typed avdmanager actions. Relocation of this folder is CLA-02."
+    },
+    {
       "id": "simulators.coresimulator-devices",
       "name": "iOS Simulator devices",
       "category": "simulator",

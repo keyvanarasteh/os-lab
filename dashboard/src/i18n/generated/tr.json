@@ -3352,5 +3352,19 @@
   "iOS Simulator setup": "iOS Simülatör kurulumu",
   "off the system disk.": "sistem diskinden taşındı.",
   "unavailable simulators": "kullanılamayan simülatörler",
-  "· nothing has been moved yet": "· henüz hiçbir şey taşınmadı"
+  "· nothing has been moved yet": "· henüz hiçbir şey taşınmadı",
+  "AVDs on this computer. Preview before wiping or deleting; only shut-down emulators can be changed.": "Bu bilgisayardaki AVD'ler. Silmeden veya veriyi silmeden önce önizleyin; yalnızca kapatılmış emülatörler değiştirilebilir.",
+  "AVDs on this computer: sizes, wipe and delete": "Bu bilgisayardaki AVD'ler: boyut, veri silme ve silme",
+  "Android emulator cleanup in progress…": "Android emülatör temizliği sürüyor…",
+  "Android emulator setup": "Android emülatör kurulumu",
+  "Android emulators": "Android emülatörleri",
+  "Checking Android emulators…": "Android emülatörleri denetleniyor…",
+  "Delete unavailable emulators": "Kullanılamayan emülatörleri sil",
+  "Deleted emulators and their apps and data cannot be restored.": "Silinen emülatörler ile uygulamaları ve verileri geri getirilemez.",
+  "No Android emulators were found.": "Android emülatörü bulunamadı.",
+  "This computer has Android Virtual Devices. Unavailable AVDs can be deleted through a previewed avdmanager action.": "Bu bilgisayarda Android sanal aygıtları var. Kullanılamayan AVD'ler önizlemeli bir avdmanager eylemiyle silinebilir.",
+  "Wipe selected data": "Seçilen veriyi sil",
+  "Wipes userdata, cache and snapshots. The AVD definition stays.": "Kullanıcı verisini, önbelleği ve anlık görüntüleri siler. AVD tanımı kalır.",
+  "emulators": "emülatör",
+  "unavailable emulators": "kullanılamayan emülatörler"
 }

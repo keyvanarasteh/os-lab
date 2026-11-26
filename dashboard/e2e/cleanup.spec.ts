@@ -43,6 +43,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await page.goto("/cleanup/");
   await expect(page.getByRole("heading", { name: "Cleanup Lab" }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "iOS Simulator setup" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Android emulator setup" })).toHaveCount(0);
   // CLNP-21/22: the overview — storage hero first, then the renamed review section.
   await expect(page.getByRole("heading", { name: "This computer's storage" })).toBeVisible();
   await expect(page.getByText("50% used", { exact: false })).toBeVisible();
@@ -64,7 +65,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   expect(calls.find((call) => call.path === "/api/cleanup/preferences")?.body).toMatchObject({ suggestion: { mode: "extended" } });
   // Every ability stays one click away: the All tools row lists them all.
   await options.locator("summary", { hasText: "All tools" }).click();
-  for (const tool of ["Quick cleanup", "Advanced scan", "Results", "Leftovers", "History", "Bookmarks", "Space Explorer", "Background monitor", "Desktop widgets", "Permissions", "Containers & VMs", "Package review", "Privileged actions", "Projects deep scan", "Simulators", "Relocation", "Volumes"]) {
+  for (const tool of ["Quick cleanup", "Advanced scan", "Results", "Leftovers", "History", "Bookmarks", "Space Explorer", "Background monitor", "Desktop widgets", "Permissions", "Containers & VMs", "Package review", "Privileged actions", "Projects deep scan", "Simulators", "Android emulators", "Relocation", "Volumes"]) {
     await expect(options.getByRole("button", { name: new RegExp(`^${tool}`) })).toHaveCount(1);
   }
   await expect(page.getByRole("heading", { name: "Clean", exact: true })).toBeVisible();
@@ -463,4 +464,49 @@ test("macOS dashboard shows the iOS Simulator setup card with move and delete ac
   await card.getByRole("button", { name: "Confirm" }).click();
   await expect(card.getByText("Done.", { exact: false })).toBeVisible();
   expect(posts.find((call) => call.path === "/api/cleanup/simulators/run")?.body).toEqual({ previewId: "sim-1" });
+});
+
+test("dashboard shows the Android emulator setup card with delete unavailable", async ({ page }) => {
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  const devices = [
+    { id: "Pixel_7", name: "Pixel_7", runtime: "android-34", path: "/tmp/avd/Pixel_7.avd", state: "Shutdown", available: true, sizeBytes: 4_000_000_000 },
+    { id: "Old_8", name: "Old_8", runtime: "android-28", path: "/tmp/avd/Old_8.avd", state: "Shutdown", available: false, sizeBytes: null }
+  ];
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().postDataJSON?.() ?? {};
+    if (route.request().method() === "POST") posts.push({ path, body });
+    let data: unknown = {};
+    if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/monitor") data = { enabled: false, running: false, intervalSeconds: 300, cooldownSeconds: 3600, volumes: [], state: { volumes: {}, events: [], lastEvaluationAt: null, lastError: null }, activeWarnings: [], configError: null, checkedAt: 1 };
+    else if (path === "/api/cleanup/volumes") data = { platform: "linux", threshold: 0.9, volumes: [], homeVolume: null, warnings: [], error: null };
+    else if (path === "/api/cleanup/bookmarks") data = { bookmarks: [], error: null };
+    else if (path === "/api/cleanup/permissions") data = { platform: "linux", permissions: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "linux", entries: [] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+    else if (path === "/api/cleanup/history") data = { entries: [], total: 0, verified: true };
+    else if (path === "/api/cleanup/preferences") data = { suggestion: { mode: "auto", include: [], exclude: [], minEntryBytes: 1048576, targetFreeBytes: null }, configError: null };
+    else if (path === "/api/cleanup/simulator-storage") data = { available: false, reason: "iOS Simulator storage is macOS only" };
+    else if (path === "/api/cleanup/simulators") data = { available: false, reason: "Xcode simulators require macOS", devices: [], actions: [] };
+    else if (path === "/api/cleanup/emulators") data = { available: true, reason: "", folder: "/tmp/avd", source: "default", devices, actions: [] };
+    else if (path === "/api/cleanup/emulators/preview") data = { previewId: "emu-1", actionId: body.actionId, risk: "low", candidateCount: 1, bytes: 0, devices: [devices[1]], command: ["avdmanager", "delete", "avd", "-n", "Old_8"], expiresAt: Date.now() / 1000 + 600 };
+    else if (path === "/api/cleanup/emulators/run") data = { id: "job-emu", kind: "emulator-run", state: "running", progress: null, result: null, error: null };
+    else if (path === "/api/cleanup/jobs/job-emu") data = { id: "job-emu", kind: "emulator-run", state: "done", progress: null, result: { kind: "emulators", actionId: "emulators.delete-unavailable", status: "completed", candidateCount: 1, devices: [devices[1]], command: ["avdmanager", "delete", "avd", "-n", "Old_8"], bytesFreed: 0 }, error: null };
+    else if (path === "/api/host") data = { host: { os: "linux", osPretty: "Linux", arch: "x64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: true, usable: true }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/");
+  const card = page.locator("#emulator-setup");
+  await expect(card.getByRole("heading", { name: "Android emulator setup" })).toBeVisible();
+  await expect(card.getByText("2 emulators", { exact: false })).toBeVisible();
+  await expect(card.getByText("1 unavailable emulators", { exact: false })).toBeVisible();
+  await card.getByRole("button", { name: "Delete unavailable emulators" }).click();
+  await expect(card.getByText("Deleted emulators and their apps and data cannot be restored.")).toBeVisible();
+  expect(posts.filter((call) => call.path === "/api/cleanup/emulators/run")).toHaveLength(0);
+  await card.getByRole("button", { name: "Confirm" }).click();
+  await expect(card.getByText("Done.", { exact: false })).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/emulators/run")?.body).toEqual({ previewId: "emu-1" });
 });
