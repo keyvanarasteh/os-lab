@@ -3352,5 +3352,19 @@
   "iOS Simulator setup": "راه‌اندازی شبیه‌ساز iOS",
   "off the system disk.": "از دیسک سیستم.",
   "unavailable simulators": "شبیه‌سازهای در دسترس نیست",
-  "· nothing has been moved yet": "· هنوز چیزی جابه‌جا نشده"
+  "· nothing has been moved yet": "· هنوز چیزی جابه‌جا نشده",
+  "AVDs on this computer. Preview before wiping or deleting; only shut-down emulators can be changed.": "AVDهای این رایانه. پیش از پاک‌کردن یا حذف، پیش‌نمایش بگیرید؛ فقط شبیه‌سازهای خاموش تغییر می‌کنند.",
+  "AVDs on this computer: sizes, wipe and delete": "AVDهای این رایانه: اندازه، پاک‌کردن و حذف",
+  "Android emulator cleanup in progress…": "پاکسازی شبیه‌ساز اندروید در جریان است…",
+  "Android emulator setup": "راه‌اندازی شبیه‌ساز اندروید",
+  "Android emulators": "شبیه‌سازهای اندروید",
+  "Checking Android emulators…": "در حال بررسی شبیه‌سازهای اندروید…",
+  "Delete unavailable emulators": "حذف شبیه‌سازهای در دسترس نیست",
+  "Deleted emulators and their apps and data cannot be restored.": "شبیه‌سازهای حذف‌شده و برنامه‌ها و داده‌هایشان بازیابی نمی‌شوند.",
+  "No Android emulators were found.": "هیچ شبیه‌ساز اندرویدی پیدا نشد.",
+  "This computer has Android Virtual Devices. Unavailable AVDs can be deleted through a previewed avdmanager action.": "این رایانه دستگاه مجازی اندروید دارد. AVDهای در دسترس نیست را می‌توان با اقدام پیش‌نمایش‌شده avdmanager حذف کرد.",
+  "Wipe selected data": "پاک‌کردن داده‌های انتخاب‌شده",
+  "Wipes userdata, cache and snapshots. The AVD definition stays.": "داده‌کاربر، کش و اسنپ‌شات را پاک می‌کند. تعریف AVD می‌ماند.",
+  "emulators": "شبیه‌ساز",
+  "unavailable emulators": "شبیه‌سازهای در دسترس نیست"
 }

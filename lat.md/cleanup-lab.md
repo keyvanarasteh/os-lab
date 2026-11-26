@@ -307,6 +307,32 @@ runtimes a booted device uses, reports how many devices use it, and runs
 digest re-check and audit record. The card lists runtimes by size with a
 Managed by Xcode badge and a per-row Delete.
 
+## Android emulators
+
+CLA-01 lists and cleans Android Virtual Devices on macOS, Linux and Windows.
+
+[[cleanup-lab/engine/cleanup_lab/emulators.py]] reads `*.ini` under
+`ANDROID_AVD_HOME` or `~/.android/avd`. Each AVD has a name, `target`, resolved
+`path=`, size, and `Shutdown`/`Running` (lock files or qemu/emulator processes).
+`GET /api/cleanup/emulators` returns that inventory plus three actions:
+`emulators.delete-unavailable` (low), `emulators.wipe-data` (medium; userdata,
+cache and snapshots inside the AVD folder) and `emulators.delete-avds` (high;
+`avdmanager delete avd -n <name>`). Names must match `[A-Za-z0-9._-]+`, at most
+100, and every selected AVD must be `Shutdown`. Delete requires `avdmanager` on
+`PATH`. Wipe never follows a symlink and refuses a folder outside the AVD home.
+Preview fingerprints id, state, availability, runtime and path; `POST
+/api/cleanup/emulators/preview` is single-use for ten minutes;
+`POST /api/cleanup/emulators/run` re-previews, refuses a changed digest, and
+appends `kind: "emulators"` to the audit history.
+
+The dashboard `#scan-emulators` card on Advanced scan lists AVDs with size and
+state, previews the command, and History renders emulator runs as their own
+rows. `#emulator-setup` on `/cleanup/` appears when any AVD exists and can
+delete unavailable ones with progress and a report. Catalog entry
+`simulators.android-avd` is relocation-only (`cleanable: false`) so a later
+move can take the folder off the OS disk. docker-android volumes stay in
+android-lab.
+
 ## Simulator storage
 
 CLS-02 sets up where the iOS Simulator devices folder lives and when to suggest moving it.
@@ -565,7 +591,8 @@ into a compact main view and a Settings tab.
 The main view keeps only the
 cleaning actions and the stats around them: the storage hero, the iOS Simulator
 setup card when this Mac still has devices on the system disk (or a missing
-disk, an interrupted move, or unavailable simulators), the Quick clean
+disk, an interrupted move, or unavailable simulators), the Android emulator
+setup card when any AVD exists, the Quick clean
 card (one confirmed Trash run over the bookmarks flagged for quick clean; with
 none flagged it runs the Clean card's Scan & review on the recommended set,
 CUX-02, which also serves the widget intent), the Clean card (one **Scan & review**

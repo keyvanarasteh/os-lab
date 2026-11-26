@@ -108,7 +108,7 @@ class LoadTest(unittest.TestCase):
         self.assertEqual(ids[10:12], ["browser.chrome.cache", "browser.chrome.history"])
         self.assertEqual(ids[-12], "simulators.coresimulator-devices")
         self.assertEqual(ids[-11:], ['system.user-caches', 'system.user-logs', 'system.trash', 'system.temp', 'system.local-temp', 'system.shared-temp', 'system.crash-reports-system', 'system.crash-reports', 'system.font-caches', 'system.shared-font-caches', 'system.spotlight-index'])
-        self.assertEqual(len(ids), 92)
+        self.assertEqual(len(ids), 93)
         self.assertEqual({entry["family"] for entry in entries}, {"agents", "browser", "developers", "system", "simulators"})
         self.assertEqual({entry["file"] for entry in entries}, {"agents.json", "browser.json", "developers.json", "system.json", "simulators.json"})
 
