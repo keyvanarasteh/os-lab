@@ -704,8 +704,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                   <QuickCleanCard bare bookmarks={bookmarks} busy={busy} canWork={canWork} measured={measured} refusals={quickRefusals}
                     onQuickClean={runQuickClean} settingsHref={link("settings/")} />
                 </CareRow>
-                <CareRow id="cleanup-monitor" title="Alerts" attention={!!monitor?.activeWarnings.length}
-                  summary={!monitor?.enabled ? <span>off</span> : monitor.activeWarnings.length
+                <CareRow id="cleanup-monitor" title="Alerts" attention={!!monitor?.activeWarnings?.length}
+                  summary={!monitor?.enabled ? <span>off</span> : monitor.activeWarnings?.length
                     ? <><span dir="ltr" className="tabular-nums">{monitor.activeWarnings.length}</span> <span>{monitor.activeWarnings.some((w) => w.level === "critical") ? "low-space critical" : "low-space warning"}</span></>
                     : <span>on, disk ok</span>}>
                   <MonitorStatsCard bare monitor={monitor} volumes={volumes} settingsHref={link("settings/")} reload={monitorReload} />

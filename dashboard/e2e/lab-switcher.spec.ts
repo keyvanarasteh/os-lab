@@ -29,10 +29,13 @@ async function mockApi(page: Page) {
       : path === "/api/jobs" ? { jobs: [] }
       : path === "/api/content/status" || path === "/api/content/check" ? { installed: false, offline: true, updateAvailable: false }
       : /^\/api\/labs\/[a-z]+\/monitor$/.test(path) ? { lab: path.split("/")[3], state: "stopped", containers: [] }
-      // Cleanup Lab's island throws on a partial `{ logs: [] }` status (reasons.map) and blanks the page.
+      // Cleanup Lab's island throws on a partial `{ logs: [] }` body and blanks the page.
       : path === "/api/cleanup/status" ? { state: "ready", reasons: [], requirements: [], capabilities: [] }
       : path === "/api/cleanup/catalog" ? { platform: "macos", entries: [] }
       : path === "/api/cleanup/jobs" ? { jobs: [] }
+      : path === "/api/cleanup/monitor" ? { enabled: false, running: false, intervalSeconds: 300, cooldownSeconds: 3600, volumes: [], state: { volumes: {}, events: [], lastEvaluationAt: null, lastError: null }, activeWarnings: [], configError: null, checkedAt: 1 }
+      : path === "/api/cleanup/volumes" ? { platform: "macos", threshold: 0.9, volumes: [], homeVolume: "/", warnings: [], error: null }
+      : path.startsWith("/api/cleanup/") ? { entries: [], jobs: [], bookmarks: [], permissions: [], roots: [], volumes: [], activeWarnings: [] }
       : { logs: [] };
     await route.fulfill({ json: body });
   });
