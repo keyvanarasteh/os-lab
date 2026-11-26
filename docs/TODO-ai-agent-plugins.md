@@ -47,8 +47,8 @@ name, PR or command output).
 - [x] AIP-31 Server `instructions` under 4,096 characters — proof: `test_mcp_plugin.py`
 - [x] AIP-32 Result-size hints for tools that can pass 50,000 characters — proof: `test_mcp_plugin.py`
 - [x] AIP-33 Plugin status widget — proof: `test_mcp_ui_hosts.py`
-- [ ] AIP-34 `/mcp/` page and `mcp-guides.ts`, all seven locales
-- [ ] AIP-35 `lat.md` MCP sections, `lat check`, `npm run check`, `npm run test:i18n`, e2e
+- [x] AIP-34 `/mcp/` page and `mcp-guides.ts`, all seven locales — proof: #385, `test:i18n`, CI browser tests
+- [x] AIP-35 `lat.md` MCP sections, `lat check`, `npm run check`, `npm run test:i18n`, e2e — proof: #385 CI `check` and browser jobs
 
 ## Phase 5 — Claude Desktop
 
@@ -63,6 +63,13 @@ name, PR or command output).
 - [x] AIP-52 `plugin_updates` for Claude Code, Claude Desktop and the published version — proof: `test_mcp_plugin.py`
 - [x] AIP-53 Session check: older extension, and an opt-in daily published-version check — proof: `test_mcp_plugin.py`
 - [ ] AIP-54 Proof: install and update the extension in a real Claude Desktop
+
+## Phase 7 — plugin cards on the MCP page
+
+- [ ] AIP-60 Console API: status and updates, preview, apply
+- [ ] AIP-61 MCP page cards: check, install and update for Claude Code and Claude Desktop
+- [ ] AIP-62 Browser tests and all seven locales
+- [ ] AIP-63 CI: plugin checks and an isolated CLI round trip on Linux, macOS and Windows
 
 ## Follow-ups
 
