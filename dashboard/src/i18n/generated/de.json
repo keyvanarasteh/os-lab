@@ -3336,5 +3336,21 @@
   "Attach the local os-lab stdio MCP server; tool groups and safety rules": "Den lokalen os-lab-stdio-MCP-Server anbinden; Werkzeuggruppen und Sicherheitsregeln",
   "(). It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "(). Es stellt 66 Werkzeuge in vier Gruppen bereit. Cleanup- und Web-Sec-Werkzeuge werden in macos_task abgelehnt.",
   "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "Es stellt 66 Werkzeuge in vier Gruppen bereit. Cleanup- und Web-Sec-Werkzeuge werden in macos_task abgelehnt.",
-  "usage unknown": "Nutzung unbekannt"
+  "usage unknown": "Nutzung unbekannt",
+  "A previous move was interrupted. Resume it before starting a new one.": "Ein vorheriger Umzug wurde unterbrochen. Setzen Sie ihn fort, bevor Sie einen neuen starten.",
+  "Clean finished": "Bereinigung abgeschlossen",
+  "Cleanup progress": "Bereinigungsfortschritt",
+  "Connect another disk to move simulators off the system disk.": "Schließen Sie ein anderes Laufwerk an, um Simulatoren vom Systemlaufwerk zu verschieben.",
+  "Connect the disk that holds your simulators before opening Simulator.": "Schließen Sie das Laufwerk mit Ihren Simulatoren an, bevor Sie Simulator öffnen.",
+  "Items on other volumes go to that volume's Trash, not always the Dock one.": "Elemente auf anderen Volumes landen im Papierkorb dieses Volumes, nicht immer in dem im Dock.",
+  "Move simulators off the system disk": "Simulatoren vom Systemlaufwerk verschieben",
+  "Moved": "Verschoben",
+  "Moving simulators…": "Simulatoren werden verschoben…",
+  "On this Mac, simulators should live on a non-system disk. Unavailable simulators can be deleted through a previewed simctl action.": "Auf diesem Mac sollten Simulatoren auf einem Nicht-Systemlaufwerk liegen. Nicht verfügbare Simulatoren lassen sich über eine vorgesehene simctl-Aktion löschen.",
+  "Simulator devices are still on the system disk. Move them to another disk; runtimes stay managed by macOS.": "Simulatorgeräte liegen noch auf dem Systemlaufwerk. Verschieben Sie sie auf ein anderes Laufwerk; Runtimes bleiben von macOS verwaltet.",
+  "freed.": "freigegeben.",
+  "iOS Simulator setup": "iOS-Simulator-Einrichtung",
+  "off the system disk.": "vom Systemlaufwerk.",
+  "unavailable simulators": "nicht verfügbare Simulatoren",
+  "· nothing has been moved yet": "· es wurde noch nichts verschoben"
 }

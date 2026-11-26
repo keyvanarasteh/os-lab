@@ -581,28 +581,43 @@ def _run_walks(pending, walk_one, *, workers):
 # ── Verification: the plan expires when the items change ────────────────────
 
 
-def verify_plan(plan, *, cancel=None, clock=None):
+def verify_plan(plan, *, cancel=None, clock=None, progress_callback=None):
     """Re-measure every ready item right before the run; any change expires the plan.
 
     Returns ``{path: measure}`` — the numbers the run credits when an item is
     really removed. Raises :class:`PlanError` (``expired`` / ``stale`` /
-    ``cancelled``) without touching anything.
+    ``cancelled``) without touching anything. ``progress_callback`` receives
+    ``phase=verifying`` ticks so a long re-walk is visible before any move.
     """
     clock = time.time if clock is None else clock
     if plan.mode not in MODES:
         raise PlanError("The plan names an unknown mode.", "plan-invalid")
     if plan.expires_at < clock():
         raise PlanError("This plan expired; build a new one.", "expired")
+    ready = [item for item in plan.payload["items"] if item["status"] == "ready"]
+    progress = {
+        "phase": "verifying",
+        "itemsDone": 0,
+        "itemsTotal": len(ready),
+        "currentPath": "",
+        "bytesRemoved": 0,
+    }
+
+    def emit():
+        if progress_callback is not None:
+            progress_callback(dict(progress))
+
+    emit()
     measures = {}
-    for item in plan.payload["items"]:
-        if item["status"] != "ready":
-            continue
+    for item in ready:
         if _cancelled(cancel):
             raise PlanError("The clean was cancelled before anything was removed.", "cancelled")
+        path = item["path"]
+        progress["currentPath"] = path
+        emit()
         fresh = fingerprint_path(item["path"], cancel=cancel)
         if fresh is None:
             raise PlanError("The clean was cancelled before anything was removed.", "cancelled")
-        path = item["path"]
         if fresh["kind"] == "missing":
             raise PlanError(
                 "The plan expired: {0} is gone since it was confirmed. Build a new plan.".format(path),
@@ -619,6 +634,8 @@ def verify_plan(plan, *, cancel=None, clock=None):
                 "stale",
             )
         measures[path] = fresh
+        progress["itemsDone"] += 1
+        emit()
     return measures
 
 

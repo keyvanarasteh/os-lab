@@ -3336,5 +3336,21 @@
   "Attach the local os-lab stdio MCP server; tool groups and safety rules": "Attacher le serveur MCP stdio os-lab local ; groupes d’outils et règles de sécurité",
   "(). It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "(). Il expose 66 outils en quatre groupes. Les outils Cleanup et Web Sec sont refusés dans macos_task.",
   "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "Il expose 66 outils en quatre groupes. Les outils Cleanup et Web Sec sont refusés dans macos_task.",
-  "usage unknown": "usage inconnu"
+  "usage unknown": "usage inconnu",
+  "A previous move was interrupted. Resume it before starting a new one.": "Un déplacement précédent a été interrompu. Reprenez-le avant d’en commencer un autre.",
+  "Clean finished": "Nettoyage terminé",
+  "Cleanup progress": "Progression du nettoyage",
+  "Connect another disk to move simulators off the system disk.": "Connectez un autre disque pour déplacer les simulateurs hors du disque système.",
+  "Connect the disk that holds your simulators before opening Simulator.": "Connectez le disque qui contient vos simulateurs avant d’ouvrir Simulator.",
+  "Items on other volumes go to that volume's Trash, not always the Dock one.": "Les éléments sur d’autres volumes vont dans la corbeille de ce volume, pas toujours celle du Dock.",
+  "Move simulators off the system disk": "Déplacer les simulateurs hors du disque système",
+  "Moved": "Déplacé",
+  "Moving simulators…": "Déplacement des simulateurs…",
+  "On this Mac, simulators should live on a non-system disk. Unavailable simulators can be deleted through a previewed simctl action.": "Sur ce Mac, les simulateurs doivent vivre sur un disque hors système. Les simulateurs indisponibles peuvent être supprimés via une action simctl prévisualisée.",
+  "Simulator devices are still on the system disk. Move them to another disk; runtimes stay managed by macOS.": "Les appareils simulateur sont encore sur le disque système. Déplacez-les vers un autre disque ; macOS continue de gérer les runtimes.",
+  "freed.": "libéré.",
+  "iOS Simulator setup": "Configuration du simulateur iOS",
+  "off the system disk.": "hors du disque système.",
+  "unavailable simulators": "simulateurs indisponibles",
+  "· nothing has been moved yet": "· rien n’a encore été déplacé"
 }

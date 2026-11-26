@@ -3336,5 +3336,21 @@
   "Attach the local os-lab stdio MCP server; tool groups and safety rules": "Yerel os-lab stdio MCP sunucusunu bağlayın; araç grupları ve güvenlik kuralları",
   "(). It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "(). Dört grupta 66 araç sunar. Cleanup ve Web Sec araçları macos_task içinde reddedilir.",
   "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "Dört grupta 66 araç sunar. Cleanup ve Web Sec araçları macos_task içinde reddedilir.",
-  "usage unknown": "kullanım bilinmiyor"
+  "usage unknown": "kullanım bilinmiyor",
+  "A previous move was interrupted. Resume it before starting a new one.": "Önceki bir taşıma yarıda kaldı. Yenisine başlamadan önce onu sürdürün.",
+  "Clean finished": "Temizlik bitti",
+  "Cleanup progress": "Temizleme ilerlemesi",
+  "Connect another disk to move simulators off the system disk.": "Simülatörleri sistem diskinden taşımak için başka bir disk bağlayın.",
+  "Connect the disk that holds your simulators before opening Simulator.": "Simülatör'ü açmadan önce simülatörlerinizin bulunduğu diski bağlayın.",
+  "Items on other volumes go to that volume's Trash, not always the Dock one.": "Diğer birimlerdeki öğeler o birimin Çöp'üne gider; her zaman Dock'taki Çöp'e değil.",
+  "Move simulators off the system disk": "Simülatörleri sistem diskinden taşı",
+  "Moved": "Taşındı",
+  "Moving simulators…": "Simülatörler taşınıyor…",
+  "On this Mac, simulators should live on a non-system disk. Unavailable simulators can be deleted through a previewed simctl action.": "Bu Mac'te simülatörler sistem diski dışında tutulmalıdır. Kullanılamayan simülatörler önizlemeli bir simctl eylemiyle silinebilir.",
+  "Simulator devices are still on the system disk. Move them to another disk; runtimes stay managed by macOS.": "Simülatör aygıtları hâlâ sistem diskinde. Bunları başka bir diske taşıyın; çalışma zamanlarını macOS yönetmeye devam eder.",
+  "freed.": "boşaltıldı.",
+  "iOS Simulator setup": "iOS Simülatör kurulumu",
+  "off the system disk.": "sistem diskinden taşındı.",
+  "unavailable simulators": "kullanılamayan simülatörler",
+  "· nothing has been moved yet": "· henüz hiçbir şey taşınmadı"
 }

@@ -26,7 +26,7 @@ function actionFor(entry: CleanupRelocationEntry): RelocationAction | null {
 interface PendingPlan { plan: CleanupRelocationPlan; plannedAt: number }
 
 /** The confirm dialog: names the entry, the destination and the symlink fact before anything moves. */
-function RelocationConfirmDialog({
+export function RelocationConfirmDialog({
   pending, busy, error, onRun, onClose
 }: {
   pending: PendingPlan; busy: boolean; error: string; onRun: () => void; onClose: () => void;

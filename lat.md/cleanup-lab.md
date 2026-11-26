@@ -318,20 +318,23 @@ suggest, and a system-disk free-space floor (default 20 GiB). Its read-only
 status reports the folder as `local`, `linked` (the folder or a parent such as
 `~/Library/Developer/CoreSimulator` is a symlink to another volume),
 `disk-missing` (that volume is unplugged) or `missing`, and a suggestion:
-`move` when the folder is local, a destination is saved and connected, and the
-home volume is below the floor; `reconnect` when the disk is missing.
-`GET /api/cleanup/simulator-storage` returns it and `POST` saves
-`{destination, suggest, floorBytes}`. On a fresh monitor warning the console
-also sends one desktop notification with the suggestion
-(`notify.send_message`, fixed argv).
+`setup` when the folder is local and another volume is connected; `move` when
+a destination is saved and connected and the home volume is below the floor;
+`reconnect` when the disk is missing. `GET /api/cleanup/simulator-storage`
+returns it and `POST` saves `{destination, suggest, floorBytes}`. On a fresh
+monitor warning the console sends one desktop notification for `move` and
+`reconnect` (`notify.send_message`, fixed argv). `setup` does not notify.
 
 Nothing moves on its own. The Relocation tab's `#simulator-storage` card
 ([[dashboard/src/views/cleanup/simulator-storage-card.tsx]]) saves the
 settings, warns about removable disks, and its Move now asks the Relocation
 card to plan `simulators.coresimulator-devices` to the saved disk, which opens
-the CLN-27 confirm dialog. The overview shows a one-line notice while a
-suggestion is active. `ios-lab/mac/setup-mac.sh` reports where the devices
-live and points to this card. Runtimes stay system-managed.
+the CLN-27 confirm dialog. The Cleanup dashboard auto-checks on macOS: its
+`#simulator-setup` card appears when devices are still local, the linked disk
+is missing, a move was interrupted, or unavailable simulators exist. Move,
+Resume and Delete unavailable run those same preview → confirm flows in the
+card, with progress and a report. `ios-lab/mac/setup-mac.sh` reports where the
+devices live and points to Simulator storage. Runtimes stay system-managed.
 
 ## Cleaner Pro (CLNP)
 
@@ -550,14 +553,19 @@ documented in [[docs/debug-widget-build.md]].
 confirmation, progress and a result summary.
 
 Its confirmation opens the shared native dialog (focus containment,
-Escape/backdrop close, focus return) that
-lists ready items with sizes and skipped items with their reasons.
+Escape/backdrop close, focus return) that lists ready items with sizes and
+skipped items with their reasons. The dialog stays open through the run: it
+shows verify-then-clean progress (a re-walk of every path, so Finder Trash
+stays empty until that finishes), Stop, and the result. Trash is the default;
+**Delete permanently instead** rebuilds the same ids as `mode: delete`.
 
 [[dashboard/src/views/cleanup/pages.tsx]] splits the dashboard at `/cleanup/`
 into a compact main view and a Settings tab.
 
 The main view keeps only the
-cleaning actions and the stats around them: the storage hero, the Quick clean
+cleaning actions and the stats around them: the storage hero, the iOS Simulator
+setup card when this Mac still has devices on the system disk (or a missing
+disk, an interrupted move, or unavailable simulators), the Quick clean
 card (one confirmed Trash run over the bookmarks flagged for quick clean; with
 none flagged it runs the Clean card's Scan & review on the recommended set,
 CUX-02, which also serves the widget intent), the Clean card (one **Scan & review**
@@ -580,14 +588,14 @@ Cancel and progress in one sticky toolbar under the page top bar, with the
 selected measured size beside the count, so a scan starts without scrolling
 past the 68-entry grid.
 
-Its confirmation opens the shared native dialog (focus containment,
-Escape/backdrop close, focus return) that lists ready items with sizes and
-skipped items with their reasons.
+Its confirmation is the same dialog: it stays open for verify/clean progress
+and can rebuild the plan as permanent delete.
 
 The recommended preset uses default-selected, nonprivileged entries outside
 high/privacy/credentials risk. The extended preset adds other low/medium risk
-entries. Both use the same expiring Trash plan. Detailed catalog selection and
-delete mode remain at `/cleanup/scan/`, where entries are selectable cards
+entries. Both use the same expiring Trash plan. Detailed catalog selection
+stays at `/cleanup/scan/`; permanent delete is an explicit choice on the
+confirm dialog (and the scan page Mode select). Scan entries are selectable cards
 carrying only decision info — category icon, risk badge, measured size and a
 relative size bar — sorted largest-first once a scan exists or safest-first
 (default-selected, then low to high risk) otherwise. Hints, impacts, resolved
@@ -602,9 +610,9 @@ category results at `/cleanup/results/`, skipped/failed and unreadable items at
 `/cleanup/leftovers/`, and verified audit records at `/cleanup/history/`.
 
 The typed client is in [[dashboard/src/lib/api.ts]]. Each action shows its own
-error; the confirm step names the planned item count, size and mode, and a
-changed selection, expired plan or used plan requires a new preview. Trash is
-the default.
+error; the confirm step names the planned item count, size and mode, stays
+open for verify/clean progress, and a changed selection, expired plan or used
+plan requires a new preview. Trash is the default.
 
 The local app polls only while a job runs. Public Pages renders the routes without
 engine calls or destructive controls. All eight route sets are built, including

@@ -672,7 +672,7 @@ class CleanupJobStore:
             job.progress = dict(payload)
 
         try:
-            measures = clean.verify_plan(plan, cancel=job.cancel)
+            measures = clean.verify_plan(plan, cancel=job.cancel, progress_callback=update)
             result = clean.execute_plan(
                 plan, measures, cancel=job.cancel, progress_callback=update
             )

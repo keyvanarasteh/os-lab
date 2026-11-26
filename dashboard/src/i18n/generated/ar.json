@@ -3336,5 +3336,21 @@
   "Attach the local os-lab stdio MCP server; tool groups and safety rules": "اربط خادم MCP stdio المحلي لـ os-lab؛ مجموعات الأدوات وقواعد السلامة",
   "(). It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "(). يعرض 66 أداة في أربع مجموعات. تُرفض أدوات Cleanup وWeb Sec داخل macos_task.",
   "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "يعرض 66 أداة في أربع مجموعات. تُرفض أدوات Cleanup وWeb Sec داخل macos_task.",
-  "usage unknown": "الاستخدام غير معروف"
+  "usage unknown": "الاستخدام غير معروف",
+  "A previous move was interrupted. Resume it before starting a new one.": "توقفت عملية نقل سابقة. استأنفها قبل بدء عملية جديدة.",
+  "Clean finished": "انتهى التنظيف",
+  "Cleanup progress": "تقدم التنظيف",
+  "Connect another disk to move simulators off the system disk.": "وصِّل قرصًا آخر لنقل المحاكيات خارج قرص النظام.",
+  "Connect the disk that holds your simulators before opening Simulator.": "وصِّل القرص الذي يحفظ محاكياتك قبل فتح Simulator.",
+  "Items on other volumes go to that volume's Trash, not always the Dock one.": "العناصر على وحدات تخزين أخرى تذهب إلى مهملات تلك الوحدة، وليس دائمًا مهملات Dock.",
+  "Move simulators off the system disk": "انقل المحاكيات خارج قرص النظام",
+  "Moved": "نُقل",
+  "Moving simulators…": "جارٍ نقل المحاكيات…",
+  "On this Mac, simulators should live on a non-system disk. Unavailable simulators can be deleted through a previewed simctl action.": "على هذا الـ Mac يجب أن تعيش المحاكيات على قرص غير قرص النظام. يمكن حذف المحاكيات غير المتاحة عبر إجراء simctl معاين.",
+  "Simulator devices are still on the system disk. Move them to another disk; runtimes stay managed by macOS.": "أجهزة المحاكي ما زالت على قرص النظام. انقلها إلى قرص آخر؛ تبقى أزمنة التشغيل بإدارة macOS.",
+  "freed.": "حُرّر.",
+  "iOS Simulator setup": "إعداد محاكي iOS",
+  "off the system disk.": "خارج قرص النظام.",
+  "unavailable simulators": "محاكيات غير متاحة",
+  "· nothing has been moved yet": "· لم يُنقل شيء بعد"
 }

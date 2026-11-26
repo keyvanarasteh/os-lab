@@ -3336,5 +3336,21 @@
   "Attach the local os-lab stdio MCP server; tool groups and safety rules": "Collega il server MCP stdio locale di os-lab; gruppi di strumenti e regole di sicurezza",
   "(). It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "(). Espone 66 strumenti in quattro gruppi. Gli strumenti Cleanup e Web Sec sono rifiutati in macos_task.",
   "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "Espone 66 strumenti in quattro gruppi. Gli strumenti Cleanup e Web Sec sono rifiutati in macos_task.",
-  "usage unknown": "utilizzo sconosciuto"
+  "usage unknown": "utilizzo sconosciuto",
+  "A previous move was interrupted. Resume it before starting a new one.": "Uno spostamento precedente è stato interrotto. Riprendilo prima di iniziarne uno nuovo.",
+  "Clean finished": "Pulizia completata",
+  "Cleanup progress": "Avanzamento della pulizia",
+  "Connect another disk to move simulators off the system disk.": "Collega un altro disco per spostare i simulatori dal disco di sistema.",
+  "Connect the disk that holds your simulators before opening Simulator.": "Collega il disco che contiene i simulatori prima di aprire Simulator.",
+  "Items on other volumes go to that volume's Trash, not always the Dock one.": "Gli elementi su altri volumi vanno nel Cestino di quel volume, non sempre in quello del Dock.",
+  "Move simulators off the system disk": "Sposta i simulatori dal disco di sistema",
+  "Moved": "Spostato",
+  "Moving simulators…": "Spostamento dei simulatori…",
+  "On this Mac, simulators should live on a non-system disk. Unavailable simulators can be deleted through a previewed simctl action.": "Su questo Mac i simulatori devono stare su un disco non di sistema. I simulatori non disponibili si possono eliminare con un’azione simctl anteprima.",
+  "Simulator devices are still on the system disk. Move them to another disk; runtimes stay managed by macOS.": "I dispositivi del simulatore sono ancora sul disco di sistema. Spostali su un altro disco; i runtime restano gestiti da macOS.",
+  "freed.": "liberato.",
+  "iOS Simulator setup": "Configurazione del simulatore iOS",
+  "off the system disk.": "dal disco di sistema.",
+  "unavailable simulators": "simulatori non disponibili",
+  "· nothing has been moved yet": "· non è stato ancora spostato nulla"
 }

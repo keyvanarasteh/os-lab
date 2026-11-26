@@ -3336,5 +3336,21 @@
   "Attach the local os-lab stdio MCP server; tool groups and safety rules": "سرور MCP stdio محلی os-lab را وصل کنید؛ گروه‌های ابزار و قواعد ایمنی",
   "(). It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "(). ۶۶ ابزار در چهار گروه. ابزارهای Cleanup و Web Sec داخل macos_task رد می‌شوند.",
   "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "۶۶ ابزار در چهار گروه. ابزارهای Cleanup و Web Sec داخل macos_task رد می‌شوند.",
-  "usage unknown": "میزان استفاده نامعلوم"
+  "usage unknown": "میزان استفاده نامعلوم",
+  "A previous move was interrupted. Resume it before starting a new one.": "جابه‌جایی قبلی نیمه‌کاره ماند. پیش از شروع جابه‌جایی تازه آن را ادامه دهید.",
+  "Clean finished": "پاک‌سازی تمام شد",
+  "Cleanup progress": "پیشرفت پاک‌سازی",
+  "Connect another disk to move simulators off the system disk.": "برای انتقال شبیه‌سازها از دیسک سیستم، دیسک دیگری وصل کنید.",
+  "Connect the disk that holds your simulators before opening Simulator.": "پیش از باز کردن Simulator، دیسکی را که شبیه‌سازها روی آن هستند وصل کنید.",
+  "Items on other volumes go to that volume's Trash, not always the Dock one.": "موارد روی جلدهای دیگر به زباله‌دان همان جلد می‌روند، نه همیشه زباله‌دان Dock.",
+  "Move simulators off the system disk": "شبیه‌سازها را از دیسک سیستم منتقل کن",
+  "Moved": "جابه‌جا شد",
+  "Moving simulators…": "در حال انتقال شبیه‌سازها…",
+  "On this Mac, simulators should live on a non-system disk. Unavailable simulators can be deleted through a previewed simctl action.": "در این مک، شبیه‌سازها باید روی دیسکی غیر از دیسک سیستم باشند. شبیه‌سازهای در دسترس‌نبوده را می‌توان با یک اقدام پیش‌نمایش‌شدهٔ simctl حذف کرد.",
+  "Simulator devices are still on the system disk. Move them to another disk; runtimes stay managed by macOS.": "دستگاه‌های شبیه‌ساز هنوز روی دیسک سیستم هستند. آن‌ها را به دیسک دیگری منتقل کنید؛ زمان‌اجراها را macOS مدیریت می‌کند.",
+  "freed.": "آزاد شد.",
+  "iOS Simulator setup": "راه‌اندازی شبیه‌ساز iOS",
+  "off the system disk.": "از دیسک سیستم.",
+  "unavailable simulators": "شبیه‌سازهای در دسترس نیست",
+  "· nothing has been moved yet": "· هنوز چیزی جابه‌جا نشده"
 }

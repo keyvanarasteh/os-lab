@@ -598,7 +598,7 @@ export interface CleanupSimulatorStorage {
   home?: { mountPoint: string; freeBytes: number | null; totalBytes: number | null } | null;
   config?: CleanupSimulatorStorageConfig; configError?: string | null;
   destinations?: { mountPoint: string; name?: string | null; kind: string; freeBytes: number; totalBytes: number | null }[];
-  suggestion?: { action: "move" | "reconnect" | null; reason: string };
+  suggestion?: { action: "move" | "reconnect" | "setup" | null; reason: string };
 }
 export interface CleanupAuxJob<T> {
   id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "relocation-plan" | "relocation-run" | "simulator-run"; state: "running" | "done" | "cancelled" | "failed";

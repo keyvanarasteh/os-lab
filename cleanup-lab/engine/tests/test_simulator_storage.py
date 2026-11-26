@@ -37,7 +37,7 @@ class SimulatorStorageTests(unittest.TestCase):
         report = self.status()
         self.assertEqual(report['state'], 'local')
         self.assertEqual([d['mountPoint'] for d in report['destinations']], [str(self.external)])
-        self.assertIsNone(report['suggestion']['action'])
+        self.assertEqual(report['suggestion']['action'], 'setup')
 
     def test_low_system_disk_suggests_move_to_saved_destination(self):
         storage.save({'destination': str(self.external)}, env=self.env, platform='macos',
@@ -47,10 +47,16 @@ class SimulatorStorageTests(unittest.TestCase):
         title, message = storage.notification(report)
         self.assertIn(str(self.external), message)
         self.rows[0]['freeBytes'] = 50 * GIB
-        self.assertIsNone(self.status()['suggestion']['action'])
+        self.assertEqual(self.status()['suggestion']['action'], 'setup')
 
     def test_suggestions_can_be_turned_off(self):
         storage.save({'destination': str(self.external), 'suggest': False}, env=self.env, platform='macos')
+        report = self.status()
+        self.assertEqual(report['suggestion']['action'], 'setup')
+        self.assertIsNone(storage.notification(report))
+
+    def test_local_without_another_disk_has_no_suggestion(self):
+        self.rows = [self.rows[0]]
         self.assertIsNone(self.status()['suggestion']['action'])
 
     def test_linked_and_disconnected_states(self):
