@@ -21,6 +21,7 @@ from __future__ import annotations
 import time
 
 import cleanup_api
+import mcp_cleanup_aux
 import mcp_ui
 import oslab
 
@@ -163,6 +164,7 @@ TOOLS = [
                 "Cleanup Lab settings app: permissions, bookmarks, monitor and suggestion preferences (dashboard Settings UX).",
                 _obj(), read_only=True, idempotent=True, resource_uri=A["settings"]),
 ]
+TOOLS += mcp_cleanup_aux.TOOLS
 NAMES = {tool["name"] for tool in TOOLS}
 
 # Tools that attach a UI resource — call() adds structuredContent + _meta.
@@ -319,4 +321,6 @@ def _dispatch(api, name, args):
             "preferences": api.get("/api/cleanup/preferences", {}),
             "widget": api.get("/api/cleanup/widget", {}),
         }
+    if name in mcp_cleanup_aux.NAMES:
+        return mcp_cleanup_aux._dispatch(api, name, args)
     raise oslab.PlanError("Unknown tool {0}".format(name), code="INVALID_ARGS")
