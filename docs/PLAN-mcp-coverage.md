@@ -38,17 +38,17 @@ Contributors open PRs that flip `pending` → `verified` and set `proof`.
 
 | Lab | Dashboard / API surface | MCP today | TODO |
 | --- | --- | --- | --- |
-| **Android Lab** | `/api/labs/android…`, Frida inventory, lab jobs | **status / frida / plan** | Widgets/apps; job observe polish |
-| **iOS Lab** | `/api/labs/ios/devices\|simulator\|resources\|screenshot` | **observe + plan** | Widgets/apps; keep device drive confirm-gated on dashboard |
+| **Android Lab** | `/api/labs/android…`, Frida inventory, lab jobs | **status / frida / plan / overview app** | Per-tool widgets; job observe polish |
+| **iOS Lab** | `/api/labs/ios/devices\|simulator\|resources\|screenshot` | **observe + plan / overview app** | Per-tool widgets; keep device drive confirm-gated on dashboard |
 | **Linux Lab** | labctl / linux-lab scripts, readiness | **status / plan** | Doctor depth; scripted actions only through plan/start |
-| **Web Lab** | `/api/web/*` | **status / overview / windows / engine start·stop** | Injections/profiles tools; widgets/apps |
-| **Source Lab** | `/api/source/*` | **status / readiness / candidates / runtime / plan** | Analyzer job observe; widgets/apps |
+| **Web Lab** | `/api/web/*` | **status / overview / windows / engine start·stop / overview app** | Injections/profiles tools; per-tool widgets |
+| **Source Lab** | `/api/source/*` | **status / readiness / candidates / runtime / plan / overview app** | Analyzer job observe; per-tool widgets |
 | **Firewall Lab** | content/companies (mostly static) | **catalog / company / guides** | Keep content-only; no network mutate |
-| **Cleanup Lab (extra)** | explorer … custom-entries | **aux tools shipped** | Widget proofs; more host UX |
-| **macOS Lab (extra)** | deep session, audit, focused | **focused / audit / sessions** | Optional observe widgets; **no arm tool** (deliberate) |
-| **Windows Apps (extra)** | dashboard has click/input/elements | **read-only by design** | Keep RO; document as `n/a` for input |
-| **Web Sec** | full workbench | **present** | Widgets/apps still `none` |
-| **Cleanup widgets/apps** | first batch shipped | **pending proof** | Contributors verify hosts render UI |
+| **Cleanup Lab (extra)** | explorer … custom-entries | **aux tools + widgets/apps + host proofs** | More host UX polish |
+| **macOS Lab (extra)** | deep session, audit, focused | **focused / audit / sessions + apps/control widgets** | Fuller MCP app; **no arm tool** (deliberate) |
+| **Windows Apps (extra)** | dashboard has click/input/elements | **read-only by design** | Keep RO; input `n/a` |
+| **Web Sec** | full workbench | **tools + status/review/report widgets** | Fuller workbench MCP app |
+| **Cleanup widgets/apps** | first batch shipped | **host proofs verified** (`test_mcp_ui_hosts.py`) | Optional further host UX |
 
 ## TODO checklist (track in this PR / follow-ups)
 
