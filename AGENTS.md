@@ -13,6 +13,7 @@ Run the relevant checks for the area changed. Dashboard changes use `npm run che
 These failed master e2e (and release follow-up) after 0.4.9 and will fail the next page, spec, or mock the same way. Details live in [`lat.md/dashboard.md`](lat.md/dashboard.md), [`lat.md/ux-readiness.md`](lat.md/ux-readiness.md) and [`lat.md/tooling.md`](lat.md/tooling.md).
 
 - TopBar and PageHead both render the page title as `h1`. Scope Playwright headings to `main`, or use `.first()`.
+- After a successful clean the confirm dialog stays open with a report, so it has two Close controls: the header `aria-label="Close"` icon and the footer `Close` button. Scope to `dialog.locator("footer")`.
 - A focused lab replaces the OS Lab sidebar group with that lab's items. Cleanup focus lists Dashboard, Space Explorer, and the other `cleanupNavItems()` leaves — there is no button named "Cleanup Lab". iOS focus is one "iOS Lab" button. The Switch lab footer unmounts while the sidebar is collapsed.
 - `client:only` islands unmount on a throw (Playwright screenshot is a white page). Guard `.map` / `.length` on API fields (`reasons ?? []`, `activeWarnings?.length`). An e2e `mockApi` catch-all of `{ logs: [] }` must stub every `/api/<lab>/` path the island fetches; copy the Cleanup stubs in `dashboard/e2e/lab-switcher.spec.ts`.
 - A new spec file belongs in `dashboard/e2e/affected.json` or the map test fails.

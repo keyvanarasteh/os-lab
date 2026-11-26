@@ -86,7 +86,9 @@ flow and the public Turkish `/os-lab/tr/cleanup/` route without engine calls.
 A white full-page screenshot after a lab switch means the `client:only`
 island threw (partial API mock or unguarded `.map` / `.length`). Heading
 locators that match both TopBar and PageHead fail strict mode; scope to
-`main`. After Cleanup focus, assert Space Explorer (a sidebar button), not
+`main`. The stay-open confirm dialog has two Close controls (header icon
+and footer button); scope to `dialog.locator("footer")`. After Cleanup
+focus, assert Space Explorer (a sidebar button), not
 a "Cleanup Lab" button. Activate a highlighted switcher option with
 `click()`; Enter on the native dialog races focus. `toHaveCount(0)` on a
 missing lab name also passes on a blank page, so keep a positive locator.

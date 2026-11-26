@@ -43,7 +43,10 @@ TopBar and PageHead both render the page title as `h1`; Playwright heading
 locators are strict.
 
 Scope to `main` or use `.first()` ([[dashboard/e2e/mcp.spec.ts]],
-[[dashboard/src/shell/top-bar.tsx]]). Lab pages are `client:only` React
+[[dashboard/src/shell/top-bar.tsx]]). After a successful clean the confirm
+dialog stays open, so `getByRole('button', { name: 'Close' })` matches the
+header icon and the footer button; scope to `dialog.locator("footer")`
+([[dashboard/e2e/cleanup.spec.ts]]). Lab pages are `client:only` React
 islands; a throw during fetch unmounts the whole island (a white
 screenshot). Guard array reads (`reasons ?? []`, `activeWarnings?.length`).
 E2e `mockApi` catch-alls that return `{ logs: [] }` stub every
