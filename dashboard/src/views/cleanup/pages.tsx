@@ -682,8 +682,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
       {PUBLIC ? <Section title="Local app required"><p>The Cleanup Lab runs in the local app. Install and open os-lab on your computer to scan and clean.</p></Section> :
         loading ? <p role="status">Loading cleanup readiness…</p> : loadError ? <Status value={{ ok: false, text: loadError }} /> : <>
           {status?.state !== "ready" && <Section title="Readiness" description={status?.state === "needs-setup" ? "Setup needed before scanning" : "Unavailable on this system"}>
-            {status?.reasons.map((reason) => <p key={reason}>{reason}</p>)}
-            {status?.requirements.filter((item) => !item.found).map((item) => <p key={item.id}>{item.label}: {item.hint}</p>)}
+            {(status?.reasons ?? []).map((reason) => <p key={reason}>{reason}</p>)}
+            {(status?.requirements ?? []).filter((item) => !item.found).map((item) => <p key={item.id}>{item.label}: {item.hint}</p>)}
             <button type="button" className="iux-btn mt-3" onClick={() => { setLoading(true); void api.cleanupStatus().then(setStatus).catch((error) => setLoadError(errorText(error))).finally(() => setLoading(false)); }}>Re-check</button>
           </Section>}
           {page === "" && <>
