@@ -63,6 +63,20 @@ class EmulatorStorageTests(unittest.TestCase):
         self.rows = [self.rows[0]]
         self.assertIsNone(self.status()["suggestion"]["action"])
 
+    def test_cryptex_mounts_are_not_offered_and_volumes_sort_first(self):
+        cryptex = "/private/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.Cryptex"
+        projects = "/Volumes/Fast"
+        self.rows = [
+            {"mountPoint": "/", "kind": "root", "isHome": True, "freeBytes": 5 * GIB, "totalBytes": 500 * GIB},
+            {"mountPoint": cryptex, "name": "", "kind": "internal", "isHome": False,
+             "freeBytes": 80 * GIB, "totalBytes": 90 * GIB},
+            {"mountPoint": projects, "name": "Fast", "kind": "internal", "isHome": False,
+             "freeBytes": 400 * GIB, "totalBytes": 1000 * GIB},
+        ]
+        report = self.status("linux")
+        self.assertEqual([item["mountPoint"] for item in report["destinations"]], [projects])
+        self.assertEqual(report["suggestion"]["action"], "setup")
+
     def test_linked_and_disconnected_states(self):
         store = self.external / "oslab-caches" / storage.ENTRY_ID
         store.mkdir(parents=True)

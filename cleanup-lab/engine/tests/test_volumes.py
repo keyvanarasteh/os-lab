@@ -245,6 +245,49 @@ class InventoryTest(unittest.TestCase):
         self.assertEqual(mounts, sorted(mounts))
 
 
+class StoreDestinationsTest(unittest.TestCase):
+    def test_cryptex_preboot_and_system_volumes_are_not_offered(self):
+        rows = [
+            {"mountPoint": "/", "kind": "root", "freeBytes": 5 * 1024 ** 3, "name": ""},
+            {"mountPoint": "/private/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.Cryptex",
+             "kind": "internal", "freeBytes": 80 * 1024 ** 3, "name": ""},
+            {"mountPoint": "/System/Volumes/Data", "kind": "internal", "freeBytes": 40 * 1024 ** 3, "name": "Macintosh HD"},
+            {"mountPoint": "/Volumes/Preboot", "kind": "internal", "freeBytes": 1 * 1024 ** 3, "name": "Preboot"},
+            {"mountPoint": "/Volumes/Projects", "kind": "internal", "freeBytes": 200 * 1024 ** 3, "name": "Projects"},
+            {"mountPoint": "/Volumes/Scratch", "kind": "removable", "freeBytes": 50 * 1024 ** 3, "name": "Scratch"},
+        ]
+        offered = volumes.store_destinations(rows, home_mount="/", platform="macos")
+        self.assertEqual([row["mountPoint"] for row in offered],
+                         ["/Volumes/Projects", "/Volumes/Scratch"])
+
+    def test_default_pick_is_the_volumes_disk_with_the_most_free_space(self):
+        rows = [
+            {"mountPoint": "/private/var/run/com.apple.security.cryptexd/mnt/x",
+             "kind": "internal", "freeBytes": 900, "name": ""},
+            {"mountPoint": "/Volumes/Small", "kind": "internal", "freeBytes": 10, "name": "Small"},
+            {"mountPoint": "/Volumes/Big", "kind": "internal", "freeBytes": 90, "name": "Big"},
+        ]
+        offered = volumes.store_destinations(rows, platform="macos")
+        self.assertEqual(offered[0]["mountPoint"], "/Volumes/Big")
+
+    def test_linux_media_mounts_rank_ahead_of_other_internals(self):
+        rows = [
+            {"mountPoint": "/opt/data", "kind": "internal", "freeBytes": 80, "name": ""},
+            {"mountPoint": "/mnt/fast", "kind": "internal", "freeBytes": 40, "name": "fast"},
+        ]
+        offered = volumes.store_destinations(rows, home_mount="/", platform="linux")
+        self.assertEqual([row["mountPoint"] for row in offered], ["/mnt/fast", "/opt/data"])
+
+    def test_relocation_keeps_root_after_user_disks(self):
+        rows = [
+            {"mountPoint": "C:\\", "kind": "root", "freeBytes": 50, "name": "Windows"},
+            {"mountPoint": "D:\\", "kind": "internal", "freeBytes": 200, "name": "Data"},
+        ]
+        offered = volumes.store_destinations(
+            rows, home_mount="C:\\", platform="windows", include_root=True, exclude_home=False)
+        self.assertEqual([row["mountPoint"] for row in offered], ["D:\\", "C:\\"])
+
+
 class CliTest(unittest.TestCase):
     REPORT = {
         "platform": "linux",

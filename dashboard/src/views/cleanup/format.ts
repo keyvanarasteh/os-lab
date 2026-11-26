@@ -15,6 +15,26 @@ export function riskTone(risk: string): "success" | "warning" | "danger" | undef
   return risk === "low" ? "success" : risk === "medium" ? "warning" : risk === "high" ? "danger" : undefined;
 }
 
+/** Volume picker label: disk name, else the last path component. */
+export function volumeLabel(mountPoint: string, name?: string | null): string {
+  if (name) return name;
+  const trimmed = mountPoint.replace(/[\\/]+$/, "");
+  const base = trimmed.split(/[\\/]/).pop();
+  return base || mountPoint;
+}
+
+/** Saved or current mount only when the engine still offers it; else the ranked default. */
+export function preferredMount(
+  destinations: { mountPoint: string }[] | undefined,
+  saved?: string | null,
+  current?: string,
+): string {
+  const mounts = new Set((destinations ?? []).map((item) => item.mountPoint));
+  if (current && mounts.has(current)) return current;
+  if (saved && mounts.has(saved)) return saved;
+  return destinations?.[0]?.mountPoint ?? "";
+}
+
 /** Spoken label for a catalog risk class; unknown values fall back to "High risk". */
 export function riskLabel(risk: string): string {
   const labels: Record<string, string> = {

@@ -369,8 +369,23 @@ class StatusTest(FakeCatalogBase):
         ]
         dests = rl.destinations(platform="windows", rows=rows,
                                 usage_fn=lambda mount_point: (100, 50))
-        self.assertEqual([item["mountPoint"] for item in dests], ["C:\\", "D:\\"])
-        self.assertEqual([item["kind"] for item in dests], ["root", "internal"])
+        self.assertEqual([item["mountPoint"] for item in dests], ["D:\\", "C:\\"])
+        self.assertEqual([item["kind"] for item in dests], ["internal", "root"])
+
+    def test_destinations_omit_macos_system_mounts(self):
+        rows = [
+            {"mountPoint": "/", "name": "", "device": "/dev/disk3s1s1", "filesystem": "apfs", "kind": "root"},
+            {"mountPoint": "/private/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.Cryptex",
+             "name": "", "device": "com.apple.os.update", "filesystem": "apfs", "kind": "internal"},
+            {"mountPoint": "/Volumes/Preboot", "name": "Preboot", "device": "/dev/disk3s4",
+             "filesystem": "apfs", "kind": "internal"},
+            {"mountPoint": "/Volumes/Projects", "name": "Projects", "device": "/dev/disk4s1",
+             "filesystem": "apfs", "kind": "internal"},
+        ]
+        dests = rl.destinations(
+            platform="macos", rows=rows,
+            usage_fn=lambda mount: (1000, 400 if mount.endswith("Projects") else 50))
+        self.assertEqual([item["mountPoint"] for item in dests], ["/Volumes/Projects", "/"])
 
 
 if __name__ == "__main__":

@@ -37,7 +37,6 @@ GIB = 1024 ** 3
 DEFAULT_FLOOR = 20 * GIB
 MIN_FLOOR = 1 * GIB
 MAX_FLOOR = 2048 * GIB
-DESTINATION_KINDS = ("internal", "removable")
 SDK_ENV = ("ANDROID_SDK_ROOT", "ANDROID_HOME")
 
 
@@ -234,8 +233,8 @@ def status(root, *, platform=None, env=None, inventory=None):
                 "config": config, "configError": loaded["configError"], "destinations": [],
                 "suggestion": {"action": None, "reason": ""}}
     state, target, volume = location(folder, rows, home, platform)
-    offered = [row for row in rows if row.get("kind") in DESTINATION_KINDS and isinstance(row.get("freeBytes"), int)
-               and (home is None or row["mountPoint"] != home["mountPoint"])]
+    offered = volumes.store_destinations(
+        rows, home_mount=home["mountPoint"] if home else None, platform=platform)
     destination = next((row for row in offered if row["mountPoint"] == config["destination"]), None)
     return {
         "available": True, "reason": "", "entryId": ENTRY_ID,
