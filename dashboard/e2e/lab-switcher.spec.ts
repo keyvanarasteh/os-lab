@@ -34,12 +34,7 @@ async function mockApi(page: Page) {
   });
 }
 
-async function clearFocus(page: Page) {
-  await page.addInitScript(() => window.localStorage.removeItem("oslab.sidebar.activeLab"));
-}
-
 test.beforeEach(async ({ page }) => {
-  await clearFocus(page);
   await mockApi(page);
 });
 
@@ -76,11 +71,12 @@ test("the sidebar card opens the switcher and keyboard picks a lab", async ({ pa
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
   await expect(switcher.getByRole("option", { name: /Cleanup Lab/ })).toHaveAttribute("aria-selected", "true");
+  await switcher.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/cleanup\/$/);
-  const switchLab = page.getByRole("button", { name: "Switch lab" });
-  await expect(switchLab).toBeVisible();
-  await expect(switchLab).toContainText("Cleanup Lab");
+  await expect(page.getByRole("heading", { name: "Cleanup Lab" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cleanup Lab" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Android Lab" })).toHaveCount(0);
 });
 
 test("a direct link to a lab page re-focuses the sidebar and All labs restores the list", async ({ page }) => {
