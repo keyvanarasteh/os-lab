@@ -39,3 +39,4 @@ Several agents work on os-lab at once, each in its own worktree. These rules kee
 - Rebase on `origin/master` at the start of each work phase, not only at the end. Only one agent lands work on master at a time, in the order the user chooses.
 - Check `reservations/` and the remote branches before choosing a task ID.
 - Run at most two or three heavy agents at once on a laptop.
+- In addition to the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and [landing steps](CONTRIBUTING.md#landing-a-branch), add one activity label (`ACTIVE` / `ON-HOLD`) and one priority (`CRITICAL` / `PRIORITY-LEVEL-HIGH` / `MID` / `LOW`) for triage — see [docs/plans/pr-labels.md](docs/plans/pr-labels.md). This does not replace reservations, checks, or template sections.

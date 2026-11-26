@@ -1,6 +1,11 @@
 <!--
 Thanks for contributing to os-lab! Please fill out the sections below.
 Keep PRs focused — one logical change per PR is easier to review and merge.
+
+Optional triage labels (do not replace the sections below):
+  Activity: ACTIVE | ON-HOLD
+  Priority: CRITICAL | PRIORITY-LEVEL-HIGH | MID | LOW
+  See docs/plans/pr-labels.md
 -->
 
 ## Summary
