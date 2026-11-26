@@ -103,3 +103,6 @@ win-lab/winapps-policy.json
 .cache-build/
 # Output of scripts/claude-plugin.py bundle
 /build/
+
+# Derived build output (for example Xcode DerivedData kept in the checkout)
+.derived/

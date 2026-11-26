@@ -66,8 +66,8 @@ name, PR or command output).
 
 ## Phase 7 — plugin cards on the MCP page
 
-- [ ] AIP-60 Console API: status and updates, preview, apply
-- [ ] AIP-61 MCP page cards: check, install and update for Claude Code and Claude Desktop
+- [x] AIP-60 Console API: status and updates, preview, apply — proof: #390, `test_mcp_plugin.py` console API tests
+- [x] AIP-61 MCP page cards: check, install and update for Claude Code and Claude Desktop — proof: #390, `mcp-plugin-cards.tsx`
 - [ ] AIP-62 Browser tests and all seven locales
 - [ ] AIP-63 CI: plugin checks and an isolated CLI round trip on Linux, macOS and Windows
 
@@ -75,4 +75,4 @@ name, PR or command output).
 
 - [ ] Share one plan-and-token implementation with #317 once it lands
 - [ ] Try the plugin and the session check on Windows and Linux
-- [ ] Watch the SessionStart check fire in a live session (only run directly so far)
+- [x] Watch the SessionStart check fire in a live session (only run directly so far) — proof: `claude -p --debug-file` showed `SessionStart:startup` status 0 with the setup message (macOS, 2026-11-26)
