@@ -55,8 +55,8 @@ An address from configuration describes where a service would answer; it does no
 
 [[dashboard/src/views/contribute-modal.tsx]] and [[dashboard/src/views/gap-modal.tsx]] use native modal dialogs for focus containment and Escape handling. The Cleanup Lab dashboard keeps a compact Quick clean / Clean main view and
 moves the cards and the tools hub to a Settings tab
-([[dashboard/src/views/cleanup/pages.tsx]]). Its confirmation dialog follows
-the same recipe, and the cleanup cards keep decisions (name, risk, size, selection) on the card while hints, impacts, paths, sources and privilege notes live in the hover/focus popover from [[dashboard/src/views/cleanup/info-popover.tsx]]. [[dashboard/src/views/health-page.tsx#PlatformTabs]] and [[dashboard/src/views/firewall-company-page.tsx]] connect selected tabs to panels and support arrow keys. Shared `.iux-btn` controls and marked exceptions gain larger targets on coarse pointers.
+([[dashboard/src/views/cleanup/pages.tsx]]). Its confirmation dialog
+([[dashboard/src/views/cleanup/confirm-dialog.tsx]]) follows the same recipe as a near full-screen sheet (full screen on phones): a fixed header and action bar around a scrolling bento grid of space to free, ready and skipped counts, the Trash or delete mode, the ready items by size, and skipped items merged by name and reason with a count. The cleanup cards keep decisions (name, risk, size, selection) on the card while hints, impacts, paths, sources and privilege notes live in the hover/focus popover from [[dashboard/src/views/cleanup/info-popover.tsx]]. [[dashboard/src/views/health-page.tsx#PlatformTabs]] and [[dashboard/src/views/firewall-company-page.tsx]] connect selected tabs to panels and support arrow keys. Shared `.iux-btn` controls and marked exceptions gain larger targets on coarse pointers.
 
 ## Public and local navigation
 

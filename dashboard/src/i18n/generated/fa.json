@@ -3254,5 +3254,9 @@
   "Web Sec Lab bulk validation of up to 20 targets": "اعتبارسنجی گروهی تا ۲۰ هدف در Web Sec Lab",
   "Web Sec Lab history: stored runs, favourites and statistics": "تاریخچهٔ Web Sec Lab: اجراهای ذخیره‌شده، علاقه‌مندی‌ها و آمار",
   "Web Sec Lab monitor: recurring passive scans and regression alerts": "پایشگر Web Sec Lab: اسکن‌های غیرفعال دوره‌ای و هشدار پسرفت",
-  "Web Sec Lab: compare two runs of a target": "Web Sec Lab: مقایسهٔ دو اجرای یک هدف"
+  "Web Sec Lab: compare two runs of a target": "Web Sec Lab: مقایسهٔ دو اجرای یک هدف",
+  "Review what will be removed before running.": "پیش از اجرا، مواردی را که حذف می‌شوند بررسی کنید.",
+  "Space to free": "فضای قابل آزادسازی",
+  "Items can be restored from the Trash.": "موارد را می‌توان از سطل زباله بازگرداند.",
+  "Size to move to Trash": "حجم انتقال به سطل زباله"
 }

@@ -5,7 +5,6 @@ import { TopBar } from "../../shell/top-bar";
 import { Badge, Empty, PageHead, Section, Status } from "../../components/ui";
 import { api, usePoll, type CleanupEntry, type CleanupHistory, type CleanupJob, type CleanupMonitorStatus, type CleanupPermissions, type CleanupPermission, type CleanupPlan, type CleanupResult, type CleanupScan, type CleanupStatus } from "../../lib/api";
 import { localeFromPath, localePath } from "../../i18n/paths";
-import { keepModalFocus } from "../modal-focus";
 import { InfoPopover } from "./info-popover";
 import { EntryMenu, type EntryMenuItem, type EntryMenuState } from "./entry-menu";
 import { CategoryIcon, PrivilegeMarker, StatusIcon } from "./icons";
@@ -23,6 +22,7 @@ import { SuggestionSettings } from "./suggestion-settings";
 import { ScanCard } from "./scan-card";
 import { PermissionGuide } from "./permission-guide";
 import { CatalogPage } from "./catalog-page";
+import { ConfirmDialog, PathSource } from "./confirm-dialog";
 import { CATALOG_GROUPS, groupIdOf } from "./groups";
 import { publishGroupBytes } from "./group-icon";
 import type { BookmarksPayload, CleanupVolume, CleanupWidgetSnapshot } from "../../lib/api";
@@ -62,7 +62,6 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : S
 const isScan = (job: CleanupJob): job is CleanupJob & { result: CleanupScan } => job.kind === "scan" && !!job.result;
 const isPlan = (job: CleanupJob): job is CleanupJob & { result: CleanupPlan } => job.kind === "plan" && !!job.result;
 const isClean = (job: CleanupJob): job is CleanupJob & { result: CleanupResult } => job.kind === "clean" && !!job.result;
-const PathSource = ({ source }: { source?: string }) => <span className="text-(--iux-muted-foreground)">Source: <code translate="no">{source || "catalog"}</code></span>;
 
 const CATEGORY_LABEL: Record<string, string> = { system: "System", browser: "Browsers", developer: "Developer" };
 const CATEGORY_ORDER = ["system", "browser", "developer"];
@@ -187,75 +186,6 @@ function PermissionsCard({ permissions }: { permissions: CleanupPermissions | nu
 
 function permissionName(id: string, permissions: CleanupPermissions): string {
   return permissions.permissions.find((record) => record.id === id)?.name ?? id;
-}
-
-/** Plan confirmation: a real dialog with focus containment, listing what will and will not be cleaned. */
-function ConfirmDialog({
-  plan, planUsed, now, busy, error, onRun, onClose
-}: {
-  plan: CleanupPlan; planUsed: boolean; now: number; busy: boolean; error: string;
-  onRun: () => void; onClose: () => void;
-}) {
-  const box = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    box.current?.showModal();
-    box.current?.focus();
-    return () => {
-      if (box.current?.open) box.current.close();
-      document.body.style.overflow = previousOverflow;
-      prev?.focus();
-    };
-  }, []);
-  const ready = plan.items.filter((item) => item.status === "ready");
-  const skipped = plan.items.filter((item) => item.status !== "ready");
-  const expired = plan.expiresAt <= now;
-  const blocked = expired || planUsed || !ready.length || busy;
-  return <dialog ref={box} tabIndex={-1} aria-labelledby="cleanup-confirm-title"
-    className="iux-dialog m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl p-5"
-    onClose={onClose} onKeyDown={keepModalFocus}
-    onMouseDown={(event) => {
-      const rect = event.currentTarget.getBoundingClientRect();
-      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
-        event.preventDefault();
-        onClose();
-      }
-    }}>
-    <h2 id="cleanup-confirm-title" className="text-sm font-semibold">Confirm cleanup</h2>
-    <p className="mt-2 text-sm"><span dir="ltr" className="font-semibold tabular-nums">{plan.totals.ready}</span> <span>items</span> · <span dir="ltr" className="tabular-nums">{bytes(plan.totals.bytes)}</span></p>
-    <p className="mt-1 text-sm font-medium">{plan.mode === "trash" ? "Move to Trash" : "Delete permanently"}</p>
-    {plan.mode === "delete" && <p className="mt-1 text-xs text-(--iux-danger)">Deleting permanently cannot be undone.</p>}
-    {ready.length ? <div className="iux-scroll mt-3 max-h-56 divide-y divide-(--iux-border) overflow-auto rounded-md border border-(--iux-border)">
-      {ready.map((item, index) => <div key={`${item.entryId}-${index}`} className="px-3 py-2 text-sm">
-        <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-medium">{item.entryName}</span>
-          <span dir="ltr" className="tabular-nums">{bytes(item.sizeBytes)}</span>
-        </div>
-        <p className="break-all text-xs text-(--iux-muted-foreground)" translate="no">{item.path}</p>
-        <PathSource source={item.source} />
-      </div>)}
-    </div> : <div className="mt-3"><Empty>Nothing is ready to clean.</Empty></div>}
-    {skipped.length > 0 && <div className="mt-3 text-sm">
-      <p className="text-xs font-medium text-(--iux-muted-foreground)">Skipped</p>
-      {skipped.map((item, index) => <div key={`${item.entryId}-${index}`} className="mt-1 flex gap-2">
-        <span className="mt-0.5"><StatusIcon status={item.status} /></span>
-        <div className="min-w-0">
-          <p className="truncate font-medium">{item.entryName}</p>
-          <p className="text-xs text-(--iux-muted-foreground)">{item.reason || itemStatusLabel(item.status)}</p>
-        </div>
-      </div>)}
-    </div>}
-    {planUsed ? <p className="mt-3 text-sm">This plan was already run. Build a new plan.</p>
-      : expired ? <p className="mt-3 text-sm">This plan expired. Build a new plan.</p>
-      : <p className="mt-3 text-xs text-(--iux-muted-foreground)">expires in {Math.max(0, Math.ceil(plan.expiresAt - now))} seconds</p>}
-    {error && <Status value={{ ok: false, text: error }} />}
-    <div className="mt-4 flex gap-2">
-      <button type="button" className="iux-btn" data-variant="primary" disabled={blocked} onClick={onRun}>Run clean</button>
-      <button type="button" className="iux-btn" onClick={onClose}>Back</button>
-    </div>
-  </dialog>;
 }
 
 /**
