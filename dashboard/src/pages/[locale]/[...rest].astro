@@ -10,6 +10,7 @@ import LabPage from "../../views/lab-page";
 import HealthPage from "../../views/health-page";
 import ContributePage from "../../views/contribute-page";
 import HowToUsePage from "../../views/how-to-use-page";
+import McpPage from "../../views/mcp-page";
 import FeedbackPage from "../../views/feedback-page";
 import { ContentInfoPage } from "../../views/content-info-page";
 import { LegalDocPage, LegalIndexPage } from "../../views/legal-page";
@@ -25,7 +26,7 @@ export function getStaticPaths() {
   const labs = ["android", "windows", "linux", "ios", "macos", "source"];
   const androidPages = ["", "analytics", "console", "providers", "sitemap", "workflows"];
   const sourcePages = ["", "analyzer", "evidence", "deep-analysis", "pipeline", "brain", "sources", "settings/runtime"];
-  const routes = [...CLEANUP_PAGES.map(page => page ? `cleanup/${page}` : "cleanup"), "source/docs", ...SOURCE_DOCS.map(doc => `source/docs/${doc.slug}`),...sourcePages.map(page => page ? `source/${page}` : "source"),"", "jobs", "contribute", "how-to-use", "feedback", "content", "health", "legal", ...LEGAL_DOCS.map((doc) => `legal/${doc.slug}`), ...labs.map((lab) => `labs/${lab}`), ...androidPages.map((page) => page ? `android/${page}` : "android")];
+  const routes = [...CLEANUP_PAGES.map(page => page ? `cleanup/${page}` : "cleanup"), "source/docs", ...SOURCE_DOCS.map(doc => `source/docs/${doc.slug}`),...sourcePages.map(page => page ? `source/${page}` : "source"),"", "jobs", "contribute", "how-to-use", "mcp", "feedback", "content", "health", "legal", ...LEGAL_DOCS.map((doc) => `legal/${doc.slug}`), ...labs.map((lab) => `labs/${lab}`), ...androidPages.map((page) => page ? `android/${page}` : "android")];
   return FIREWALL_LOCALES.filter((locale) => locale !== "en").flatMap((locale) =>
     routes.map((rest) => ({ params: { locale, rest } }))
   );
@@ -48,13 +49,14 @@ const sourceEntry = sourceDoc && Object.entries(sourceFiles).find(([path]) => pa
 const sourceHtml = sourceEntry ? sourceDocHtml(await sourceEntry[1].compiledContent(), locale) : "";
 const sourcePage = sourceDoc ? null : rest === "source" ? "" : rest.startsWith("source/") ? rest.slice(7) : null;
 const cleanupPage = rest === "cleanup" ? "" : rest.startsWith("cleanup/") ? rest.slice(8) as CleanupPageId : null;
-const title = cleanupPage !== null ? "Cleanup Lab" : sourceDoc ? `Source Lab · ${sourceDoc.title}` : sourcePage !== null ? "Source Lab" : rest === "" ? "This computer" : rest === "jobs" ? "Jobs" : rest === "contribute" ? "Contribute" : rest === "how-to-use" ? "How to use" : rest === "feedback" ? "Feedback" : rest === "content" ? "Content updates" : rest === "health" ? "Health check" : doc ? doc.title : rest === "legal" ? "Legal" : lab ? labTitle[lab] : androidTitle[rest] ?? "os-lab";
+const title = cleanupPage !== null ? "Cleanup Lab" : sourceDoc ? `Source Lab · ${sourceDoc.title}` : sourcePage !== null ? "Source Lab" : rest === "" ? "This computer" : rest === "jobs" ? "Jobs" : rest === "contribute" ? "Contribute" : rest === "how-to-use" ? "How to use" : rest === "mcp" ? "MCP servers" : rest === "feedback" ? "Feedback" : rest === "content" ? "Content updates" : rest === "health" ? "Health check" : doc ? doc.title : rest === "legal" ? "Legal" : lab ? labTitle[lab] : androidTitle[rest] ?? "os-lab";
 ---
 <Base title={title} description={doc?.description} lang={locale}>
   {rest === "" && <HostPage client:only="react" />}
   {rest === "jobs" && <JobsPage client:only="react" />}
   {rest === "contribute" && <ContributePage html={contributeHtml} client:only="react" />}
   {rest === "how-to-use" && <HowToUsePage client:only="react" />}
+  {rest === "mcp" && <McpPage client:only="react" />}
   {rest === "feedback" && <FeedbackPage client:only="react" />}
   {rest === "content" && <ContentInfoPage html={contentHtml} client:only="react" />}
   {rest === "health" && <HealthPage client:only="react" />}

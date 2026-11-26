@@ -98,6 +98,7 @@ export function sectionHref(id: string): string {
   if (id === "legal") return localized("/legal/");
   if (id === "contribute") return localized("/contribute/");
   if (id.startsWith("how-to-use")) return localized("/how-to-use/");
+  if (id === "mcp") return localized("/mcp/");
   if (id === "feedback") return localized("/feedback/");
   if (id === "content") return localized("/content/");
   if (id.startsWith("cleanup-")) {
@@ -214,6 +215,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
         { id: "source-overview", label: "Source Lab", icon: LAB_ICON.source() },
         { id: "cleanup-dashboard", label: "Cleanup Lab", icon: <BroomIcon size={16} /> },
         { id: "feedback", label: "Feedback", icon: <ChatCircleTextIcon size={16} /> },
+        { id: "mcp", label: "MCP servers", icon: <PlugsIcon size={16} /> },
         { id: "repo", label: "Repository", icon: <BookOpenIcon size={16} /> },
         HOW_TO_USE_ITEM
       ]
@@ -374,6 +376,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
         },
         { id: "contribute", label: "Contribute", icon: <GitPullRequestIcon size={16} /> },
         { id: "feedback", label: "Feedback", icon: <ChatCircleTextIcon size={16} /> },
+        { id: "mcp", label: "MCP servers", icon: <PlugsIcon size={16} /> },
         { id: "repo", label: "Repository", icon: <BookOpenIcon size={16} /> },
         HOW_TO_USE_ITEM
       ]
@@ -412,6 +415,7 @@ function buildMeta(): Record<string, SpotlightMeta> {
     contribute: { description: "How to set up, test, rebuild, open a pull request and view roadmap TODOs", aliases: ["contribute", "contributing", "pull request", "pr", "development", "tests", "todos", "roadmap", "pentesting", "firewall", "tasks"] },
     "how-to-use": howToUse,
     "how-to-use-guide": howToUse,
+    mcp: { description: "Attach the local os-lab stdio MCP server; tool groups and safety rules", aliases: ["mcp", "agent", "claude", "tools", "stdio"] },
     feedback: { description: "Report issues, suggest features, and share feedback", aliases: ["feedback", "bug", "issue", "request", "suggestion", "help"] },
     "legal-terms": { description: "Licence, authorized use, OS licences, no warranty", aliases: ["legal", "terms", "license", "warranty", "liability"] },
     "legal-acceptable-use": { description: "Supported and unsupported use, responsible disclosure", aliases: ["legal", "aup", "policy", "disclosure"] },
