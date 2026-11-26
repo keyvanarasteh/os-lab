@@ -320,7 +320,10 @@ routes).
 It describes the one stdio server `console/mcp_server.py` (`os-lab-macos`, or
 `os-lab-windows` on Windows), fills setup snippets for Claude Code, Claude
 Desktop and `make -C ios-lab mac-mcp` from `GET /api/host` `host.root`
-(placeholder `<repo>` when the console is offline), and lists the four tool
+(placeholder `<repo>` when the console is offline). The commands start with
+`host.pythonExecutable`, the console's own interpreter, so os-lab.app's managed
+Python is used and none need be on `PATH`; command-line paths are quoted when
+they hold spaces ([[dashboard/src/lib/mcp-guides.ts#shellArg]]). The page lists the four tool
 groups with their safety rules. Cleanup and Web Sec tools stay refused inside
 `macos_task`. [[scripts/deploy-page.sh]] keeps the route on public Pages.
 

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge, CopyButton, Modal, Section, Skeleton, Status, type Tone } from "../components/ui";
 import { api, type HostPluginHost, type HostPluginPlan, type HostPluginState, type HostPluginUpdates } from "../lib/api";
-import { hostPluginSnippet } from "../lib/mcp-guides";
+import { hostPluginSnippet, scriptCommand } from "../lib/mcp-guides";
 
 type Note = { ok: boolean; text: string } | null;
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -47,7 +47,7 @@ function Terminal({ command }: { command: string }) {
   );
 }
 
-function HostCard({ host, title, description, root }: { host: HostPluginHost; title: string; description: string; root?: string }) {
+function HostCard({ host, title, description, root, python }: { host: HostPluginHost; title: string; description: string; root?: string; python?: string | null }) {
   const [state, setState] = useState<HostPluginState | null>(null);
   const [updates, setUpdates] = useState<HostPluginUpdates | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -90,7 +90,7 @@ function HostCard({ host, title, description, root }: { host: HostPluginHost; ti
   if (loadError) {
     return (
       <Section id={`mcp-${host}-cards`} title={`Install as a ${title} plugin`} description="Connect the local console to check the plugin from this page. Install runs in a terminal.">
-        <Terminal command={hostPluginSnippet(host, root)} />
+        <Terminal command={hostPluginSnippet(host, root, python)} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Action label="Try again" onClick={() => void refresh()} />
           <span className="text-xs text-(--iux-muted-foreground)">{loadError}</span>
@@ -135,13 +135,13 @@ function HostCard({ host, title, description, root }: { host: HostPluginHost; ti
       {duplicates.length ? <p className="text-sm text-(--iux-muted-foreground)">Other MCP entries also run this server: <span translate="no">{duplicates.join(", ")}</span></p> : null}
       {state.doctor.checks.filter((row) => !row.ok).map((row) => <Status key={row.name} value={{ ok: false, text: row.fix ?? row.detail }} />)}
       <Status value={note} />
-      <Terminal command={terminalCommand?.replace(/^python3 scripts/, `python3 ${root ?? "<repo>"}/scripts`) ?? hostPluginSnippet(host, root)} />
+      <Terminal command={terminalCommand ? scriptCommand(terminalCommand, root, python) : hostPluginSnippet(host, root, python)} />
 
       {plan ? (
         <Modal title="Review the change" description="Nothing has changed yet. Run the terminal command after you approve." onClose={() => setPlan(null)}>
           <div className="flex flex-col gap-3">
             {plan.commands.map((command) => <Terminal key={command} command={command} />)}
-            <Terminal command={plan.terminalCommand ?? `python3 ${root ?? "<repo>"}/scripts/${host}-plugin.py ${plan.action}`} />
+            <Terminal command={plan.terminalCommand ?? scriptCommand(`python3 scripts/${host}-plugin.py ${plan.action}`, root, python)} />
             {[...(plan.manual ?? []), ...(plan.warnings ?? [])].map((text) => <p key={text} className="text-sm text-(--iux-muted-foreground)">{text}</p>)}
             <div className="flex flex-wrap justify-end gap-2">
               <Action label="Close" onClick={() => setPlan(null)} />
@@ -153,11 +153,11 @@ function HostCard({ host, title, description, root }: { host: HostPluginHost; ti
   );
 }
 
-export function McpHostPluginCards({ root }: { root?: string }) {
+export function McpHostPluginCards({ root, python }: { root?: string; python?: string | null }) {
   return (
     <div id="mcp-host-plugin-cards" className="flex flex-col gap-6">
       {HOSTS.map((row) => (
-        <HostCard key={row.id} host={row.id} title={row.title} description={row.description} root={root} />
+        <HostCard key={row.id} host={row.id} title={row.title} description={row.description} root={root} python={python} />
       ))}
     </div>
   );

@@ -36,6 +36,8 @@ export interface HostInfo {
   runtime: string | null;
   xcode: { installed: boolean; iosRuntime: boolean; iosDevice: boolean; developerDir?: string | null; xcodeApp?: string | null } | null;
   python: string;
+  /** Absent on a console older than this field. */
+  pythonExecutable?: string | null;
   root: string;
   tools: HostTool[];
   providers: HostProvider[];
