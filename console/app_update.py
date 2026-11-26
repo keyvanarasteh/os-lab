@@ -59,6 +59,52 @@ def default_fetch(url: str, limit: int) -> bytes:
     return data
 
 
+def default_download(url: str, limit: int, progress: Optional[Callable[[int, Optional[int]], None]] = None) -> bytes:
+    """Like ``default_fetch`` but streamed, reporting (received, total) so the page can show progress."""
+    req = urllib.request.Request(url, headers={"User-Agent": "os-lab-updater"})
+    with urllib.request.urlopen(req, timeout=60) as response:
+        if response.status != 200:
+            raise AppUpdateError(f"{url} answered {response.status}")
+        length = response.headers.get("Content-Length")
+        total = int(length) if length and length.isdigit() else None
+        if total is not None and total > limit:
+            raise AppUpdateError(f"{url} is larger than {limit} bytes")
+        chunks, received = [], 0
+        while True:
+            chunk = response.read(256 * 1024)
+            if not chunk:
+                break
+            received += len(chunk)
+            if received > limit:
+                raise AppUpdateError(f"{url} is larger than {limit} bytes")
+            chunks.append(chunk)
+            if progress:
+                progress(received, total)
+    return b"".join(chunks)
+
+
+def busy_work(lab_jobs: list, cleanup_jobs: list) -> list:
+    """Running work that closing the app would cut off: lab jobs and Cleanup Lab jobs.
+
+    The page waits for this list to empty before it asks the desktop app to quit
+    for an update, and shows each entry with its progress meanwhile.
+    """
+    busy = []
+    for job in lab_jobs or []:
+        if isinstance(job, dict) and job.get("state") == "running":
+            busy.append({"id": str(job.get("id", "")), "kind": "lab", "label": job.get("label") or job.get("action") or "Lab job",
+                         "lab": job.get("lab"), "startedAt": job.get("startedAt"), "progress": None})
+    for job in cleanup_jobs or []:
+        if isinstance(job, dict) and job.get("state") == "running":
+            progress = job.get("progress") if isinstance(job.get("progress"), dict) else {}
+            done = progress.get("itemsDone", progress.get("pathsDone"))
+            total = progress.get("itemsTotal", progress.get("pathsTotal"))
+            ratio = done / total if isinstance(done, (int, float)) and isinstance(total, (int, float)) and total > 0 else None
+            busy.append({"id": str(job.get("id", "")), "kind": "cleanup", "label": "Cleanup Lab: {0}".format(job.get("kind") or "job"),
+                         "lab": "cleanup", "startedAt": job.get("startedAt"), "progress": ratio})
+    return busy
+
+
 def _machine() -> str:
     import platform
 
@@ -151,10 +197,13 @@ class AppUpdateStore:
         fetch: Optional[Callable[[str, int], bytes]] = None,
         opener: Optional[Callable[[str, str], None]] = None,
         download_dir: Optional[str] = None,
+        download: Optional[Callable[..., bytes]] = None,
     ) -> None:
         self.version = (version if version is not None else os.environ.get("OSLAB_APP_VERSION") or "").strip()
         self.feed_url = (feed_url or os.environ.get("OSLAB_APP_UPDATE_URL") or DEFAULT_FEED).rstrip("/")
         self.fetch = fetch or default_fetch
+        # The installer is streamed for progress; an injected fetch (tests) stays the source.
+        self.download = download or (default_download if fetch is None else (lambda url, limit, progress=None: self.fetch(url, limit)))
         self.opener = opener or default_opener
         self.download_dir = download_dir or os.environ.get("OSLAB_APP_UPDATE_DIR") or os.path.join(os.path.expanduser("~"), ".oslab", "app-updates")
         self.kind = package_kind()
@@ -250,16 +299,24 @@ class AppUpdateStore:
         with self._lock:
             if self._install and self._install.get("phase") in ("downloading", "opening"):
                 return self.state()
-            self._install = {"phase": "downloading", "error": None, "path": None, "version": self._latest}
+            self._install = {"phase": "downloading", "error": None, "path": None, "version": self._latest,
+                             "received": 0, "total": None}
+            # Answer with the state as it is now: a fast worker may finish before we return.
+            started = self.state()
         threading.Thread(target=self._install_worker, daemon=True).start()
-        return self.state()
+        return started
 
     def _install_worker(self) -> None:
         try:
             asset = self._release or {}
             url, name = asset.get("url", ""), asset.get("name", "")
             _check_url(url)
-            data = self.fetch(url, MAX_ASSET)
+            def progress(received: int, total: Optional[int]) -> None:
+                with self._lock:
+                    if self._install and self._install.get("phase") == "downloading":
+                        self._install = {**self._install, "received": received, "total": total}
+
+            data = self.download(url, MAX_ASSET, progress)
             digest = hashlib.sha256(data).hexdigest()
             checksum = self.fetch(url + ".sha256", MAX_SHA).decode("utf-8").strip()
             expected = checksum.split()[0].lower() if checksum else ""
@@ -272,10 +329,12 @@ class AppUpdateStore:
             if self.kind == "appimage":
                 os.chmod(path, 0o755)
             with self._lock:
-                self._install = {"phase": "opening", "error": None, "path": path, "version": self._latest}
+                self._install = {"phase": "opening", "error": None, "path": path, "version": self._latest,
+                                 "received": len(data), "total": len(data)}
             self.opener(path, self.kind)
             with self._lock:
-                self._install = {"phase": "done", "error": None, "path": path, "version": self._latest}
+                self._install = {"phase": "done", "error": None, "path": path, "version": self._latest,
+                                 "received": len(data), "total": len(data), "openedAt": int(time.time())}
         except Exception as error:  # a failed update must never crash the console
             with self._lock:
                 self._install = {"phase": "error", "error": str(error), "path": None, "version": self._latest}

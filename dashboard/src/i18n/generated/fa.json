@@ -3292,5 +3292,20 @@
   "The system disk is below your free-space floor. Move the simulators to free space.": "فضای آزاد دیسک سیستم کمتر از حد تعیین‌شده است. شبیه‌سازها را منتقل کنید تا فضا آزاد شود.",
   "This disk can be unplugged. Simulator cannot start while it is disconnected.": "این دیسک جداشدنی است. تا زمانی که وصل نباشد Simulator اجرا نمی‌شود.",
   "Simulator disk is not connected": "دیسک شبیه‌سازها وصل نیست",
-  "Move iOS simulators off the system disk": "شبیه‌سازهای iOS را از دیسک سیستم منتقل کنید"
+  "Move iOS simulators off the system disk": "شبیه‌سازهای iOS را از دیسک سیستم منتقل کنید",
+  "App updates install from the os-lab desktop app.": "به‌روزرسانی‌های برنامه از برنامه دسکتاپ os-lab نصب می‌شوند.",
+  "Check again": "بررسی دوباره",
+  "Close now": "اکنون بستن",
+  "Close now stops the running work.": "«اکنون بستن» کارهای در حال اجرا را متوقف می‌کند.",
+  "Close when idle": "بستن پس از اتمام کارها",
+  "Don't close": "نبند",
+  "Quit os-lab when you are ready, so the installer can replace it.": "هر زمان آماده بودید از os-lab خارج شوید تا نصب‌کننده آن را جایگزین کند.",
+  "The installer is open.": "نصب‌کننده باز است.",
+  "Update checks are switched off on this computer.": "بررسی به‌روزرسانی روی این رایانه خاموش است.",
+  "Waiting for running work to finish before closing": "در انتظار پایان کارهای در حال اجرا پیش از بستن",
+  "os-lab closes so the update can finish in": "os-lab برای تکمیل به‌روزرسانی بسته می‌شود تا",
+  "os-lab is up to date.": "os-lab به‌روز است.",
+  "Downloading update": "در حال دانلود به‌روزرسانی",
+  "Update ready to install": "به‌روزرسانی آماده نصب است",
+  "Updates": "به‌روزرسانی‌ها"
 }

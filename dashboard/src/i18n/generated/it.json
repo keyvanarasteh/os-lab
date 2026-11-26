@@ -3292,5 +3292,20 @@
   "The system disk is below your free-space floor. Move the simulators to free space.": "Il disco di sistema è sotto la soglia di spazio libero. Sposta i simulatori per liberare spazio.",
   "This disk can be unplugged. Simulator cannot start while it is disconnected.": "Questo disco può essere scollegato. Simulator non si avvia finché è scollegato.",
   "Simulator disk is not connected": "Il disco dei simulatori non è collegato",
-  "Move iOS simulators off the system disk": "Sposta i simulatori iOS fuori dal disco di sistema"
+  "Move iOS simulators off the system disk": "Sposta i simulatori iOS fuori dal disco di sistema",
+  "App updates install from the os-lab desktop app.": "Gli aggiornamenti si installano dall'app desktop di os-lab.",
+  "Check again": "Controlla di nuovo",
+  "Close now": "Chiudi ora",
+  "Close now stops the running work.": "Chiudi ora interrompe il lavoro in corso.",
+  "Close when idle": "Chiudi quando inattivo",
+  "Don't close": "Non chiudere",
+  "Quit os-lab when you are ready, so the installer can replace it.": "Chiudi os-lab quando sei pronto, così il programma di installazione può sostituirlo.",
+  "The installer is open.": "Il programma di installazione è aperto.",
+  "Update checks are switched off on this computer.": "I controlli degli aggiornamenti sono disattivati su questo computer.",
+  "Waiting for running work to finish before closing": "In attesa che il lavoro in corso finisca prima di chiudere",
+  "os-lab closes so the update can finish in": "os-lab si chiude per completare l'aggiornamento tra",
+  "os-lab is up to date.": "os-lab è aggiornato.",
+  "Downloading update": "Download dell'aggiornamento",
+  "Update ready to install": "Aggiornamento pronto per l'installazione",
+  "Updates": "Aggiornamenti"
 }

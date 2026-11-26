@@ -16,7 +16,6 @@ import { AppShell, LAB_ICON, labHref } from "../shell/app-shell";
 import { TopBar } from "../shell/top-bar";
 import { MinimalistHero } from "../apk-lab/components";
 import { Badge, Empty, IconButton, Modal, Skeleton } from "../components/ui";
-import { AppUpdatePanel } from "./app-update-panel";
 import { ContentPanel } from "./content-panel";
 import { localeFromPath, localePath } from "../i18n/paths";
 import { formatBytes, hostStore, type HostInfo, type LabStatus } from "../lib/api";
@@ -250,7 +249,6 @@ export default function HostPage() {
                 </Modal>
               ) : null}
 
-              <AppUpdatePanel />
 
               <ContentPanel />
 

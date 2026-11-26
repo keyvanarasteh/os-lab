@@ -928,8 +928,16 @@ export interface AppUpdateState {
     error: string | null;
     path: string | null;
     version?: string;
+    /** Bytes downloaded so far and the installer's size when the server sent it. */
+    received?: number;
+    total?: number | null;
+    /** When the installer was handed to the operating system (seconds). */
+    openedAt?: number;
   } | null;
+  /** Running work that closing the app would cut off (GET /api/app/update only). */
+  busy?: AppBusyWork[];
 }
+export interface AppBusyWork { id: string; kind: "lab" | "cleanup"; label: string; lab: string | null; startedAt: number | null; progress: number | null }
 
 export const api = {
   cleanupStatus: () => call<CleanupStatus>("/api/cleanup/status"),

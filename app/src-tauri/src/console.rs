@@ -251,6 +251,34 @@ pub fn post_action(port: u16, path: &str) -> Result<String, String> {
     }
 }
 
+/// `GET <path>` over a plain socket like `post_action`; returns the body of a 2xx answer.
+pub fn get_body(port: u16, path: &str) -> Result<String, String> {
+    if !path.starts_with("/api/") {
+        return Err(format!("refused {path}: reads must target the console API"));
+    }
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_millis(800))
+        .map_err(|e| format!("Could not reach the console: {e}"))?;
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
+    let req = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-OSLab: 1\r\nConnection: close\r\n\r\n");
+    stream.write_all(req.as_bytes()).map_err(|e| format!("Could not send the request: {e}"))?;
+    let mut raw = Vec::new();
+    stream.read_to_end(&mut raw).map_err(|e| format!("Could not read the response: {e}"))?;
+    let text = String::from_utf8_lossy(&raw).to_string();
+    let (head, body) = text.split_once("\r\n\r\n").unwrap_or((text.as_str(), ""));
+    let ok = head.split_whitespace().nth(1).and_then(|code| code.parse::<u16>().ok()).is_some_and(|code| (200..300).contains(&code));
+    if ok { Ok(body.trim().to_string()) } else { Err(format!("Unexpected response from the console: {}", head.lines().next().unwrap_or(""))) }
+}
+
+/// Whether the console reports an opened installer (and, unless forced, no running work), so the
+/// app may quit for an update. Pure, so the rule is testable without a console.
+pub fn may_quit_for_update(state: &serde_json::Value, force: bool) -> bool {
+    let opened = state.pointer("/install/phase").and_then(|v| v.as_str()) == Some("done");
+    let idle = state.get("busy").and_then(|v| v.as_array()).map(|items| items.is_empty()).unwrap_or(false);
+    opened && (force || idle)
+}
+
 /// The first Python supported by every bundled lab. On Windows the `py` launcher comes first.
 pub fn find_python(data_dir: &Path) -> Result<String, String> {
     let managed = crate::python_runtime::saved_python(data_dir);
@@ -361,6 +389,18 @@ mod tests {
             assert_eq!(healthy(port), want, "{reply}");
             handle.join().unwrap();
         }
+    }
+
+    #[test]
+    fn quitting_for_an_update_needs_an_opened_installer_and_idle_work_unless_forced() {
+        let opened_idle = serde_json::json!({"install": {"phase": "done"}, "busy": []});
+        let opened_busy = serde_json::json!({"install": {"phase": "done"}, "busy": [{"id": "a"}]});
+        let downloading = serde_json::json!({"install": {"phase": "downloading"}, "busy": []});
+        assert!(may_quit_for_update(&opened_idle, false));
+        assert!(!may_quit_for_update(&opened_busy, false));
+        assert!(may_quit_for_update(&opened_busy, true));
+        assert!(!may_quit_for_update(&downloading, true));
+        assert!(!may_quit_for_update(&serde_json::json!({}), true));
     }
 
     #[test]

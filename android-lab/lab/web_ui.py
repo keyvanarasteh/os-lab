@@ -778,9 +778,21 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(501, {"error": "The app update module (console/app_update.py) is not installed"})
             return
         if path == "/api/app/update":
-            self._json(200, APP.state())
+            # The page waits for this work to finish before it closes the app for an update.
+            self._json(200, {**APP.state(), "busy": self._busy_work()})
         else:
             self._json(404, {"error": "Not found"})
+
+    def _busy_work(self) -> list:
+        try:
+            lab_jobs = JOBS.list() if JOBS else []
+        except Exception:
+            lab_jobs = []
+        try:
+            cleanup_jobs = cleanup_api.JOBS.list() if cleanup_api else []
+        except Exception:
+            cleanup_jobs = []
+        return app_updates.busy_work(lab_jobs, cleanup_jobs)
 
     def _app_post(self, path: str):
         if not APP:

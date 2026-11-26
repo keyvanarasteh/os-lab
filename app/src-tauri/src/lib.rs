@@ -406,6 +406,19 @@ fn open_external(app: &AppHandle, url: &url::Url) {
     }
 }
 
+fn quit_for_update(app: &AppHandle, force: bool) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let Some(port) = app.state::<Console>().running_url().and_then(|u| url::Url::parse(&u).ok()?.port()) else { return };
+        let Ok(body) = console::get_body(port, "/api/app/update") else { return };
+        let Ok(state) = serde_json::from_str::<serde_json::Value>(&body) else { return };
+        if console::may_quit_for_update(&state, force) {
+            // RunEvent::Exit stops the console child, as on any other quit.
+            app.exit(0);
+        }
+    });
+}
+
 fn build_window(app: &AppHandle, settings: Option<&str>) -> tauri::Result<()> {
     if let Some(old) = app.get_webview_window("main") {
         let _ = old.destroy();
@@ -423,6 +436,14 @@ fn build_window(app: &AppHandle, settings: Option<&str>) -> tauri::Result<()> {
         .inner_size(1280.0, 840.0)
         .min_inner_size(420.0, 560.0)
         .on_navigation(move |url| {
+            // The dashboard asks to close for an update by navigating here. Only this window can ask,
+            // and the console must confirm the installer was opened (and that nothing is running,
+            // unless the user chose Close now) before the app quits.
+            if url.scheme() == "oslab" && url.host_str() == Some("app") && url.path() == "/quit-for-update" {
+                let force = url.query_pairs().any(|(key, value)| key == "force" && value == "1");
+                quit_for_update(&nav, force);
+                return false;
+            }
             if is_internal(url) {
                 true
             } else {

@@ -3292,5 +3292,20 @@
   "The system disk is below your free-space floor. Move the simulators to free space.": "قرص النظام أقل من الحد الأدنى للمساحة الحرة. انقل المحاكيات لتحرير مساحة.",
   "This disk can be unplugged. Simulator cannot start while it is disconnected.": "يمكن فصل هذا القرص. لا يمكن تشغيل Simulator أثناء فصله.",
   "Simulator disk is not connected": "قرص المحاكيات غير متصل",
-  "Move iOS simulators off the system disk": "انقل محاكيات iOS خارج قرص النظام"
+  "Move iOS simulators off the system disk": "انقل محاكيات iOS خارج قرص النظام",
+  "App updates install from the os-lab desktop app.": "تُثبَّت تحديثات التطبيق من تطبيق os-lab لسطح المكتب.",
+  "Check again": "تحقّق مجددًا",
+  "Close now": "أغلق الآن",
+  "Close now stops the running work.": "«أغلق الآن» يوقف العمل الجاري.",
+  "Close when idle": "أغلق عند الخمول",
+  "Don't close": "لا تُغلق",
+  "Quit os-lab when you are ready, so the installer can replace it.": "أغلق os-lab عندما تكون جاهزًا ليتمكن المثبّت من استبداله.",
+  "The installer is open.": "المثبّت مفتوح.",
+  "Update checks are switched off on this computer.": "عمليات التحقق من التحديثات متوقفة على هذا الكمبيوتر.",
+  "Waiting for running work to finish before closing": "بانتظار انتهاء العمل الجاري قبل الإغلاق",
+  "os-lab closes so the update can finish in": "يُغلق os-lab لإكمال التحديث خلال",
+  "os-lab is up to date.": "os-lab محدَّث.",
+  "Downloading update": "جارٍ تنزيل التحديث",
+  "Update ready to install": "التحديث جاهز للتثبيت",
+  "Updates": "التحديثات"
 }
