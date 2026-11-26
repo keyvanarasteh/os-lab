@@ -3292,5 +3292,20 @@
   "The system disk is below your free-space floor. Move the simulators to free space.": "Sistem diski boş alan sınırınızın altında. Yer açmak için simülatörleri taşıyın.",
   "This disk can be unplugged. Simulator cannot start while it is disconnected.": "Bu disk çıkarılabilir. Disk bağlı değilken Simulator başlatılamaz.",
   "Simulator disk is not connected": "Simülatör diski bağlı değil",
-  "Move iOS simulators off the system disk": "iOS simülatörlerini sistem diskinden taşıyın"
+  "Move iOS simulators off the system disk": "iOS simülatörlerini sistem diskinden taşıyın",
+  "App updates install from the os-lab desktop app.": "Uygulama güncellemeleri os-lab masaüstü uygulamasından kurulur.",
+  "Check again": "Yeniden denetle",
+  "Close now": "Şimdi kapat",
+  "Close now stops the running work.": "Şimdi kapat, çalışan işleri durdurur.",
+  "Close when idle": "Boşta olunca kapat",
+  "Don't close": "Kapatma",
+  "Quit os-lab when you are ready, so the installer can replace it.": "Hazır olduğunuzda os-lab'den çıkın, böylece yükleyici onu değiştirebilir.",
+  "The installer is open.": "Yükleyici açık.",
+  "Update checks are switched off on this computer.": "Bu bilgisayarda güncelleme denetimleri kapalı.",
+  "Waiting for running work to finish before closing": "Kapatmadan önce çalışan işlerin bitmesi bekleniyor",
+  "os-lab closes so the update can finish in": "Güncellemenin tamamlanabilmesi için os-lab şu süre içinde kapanacak:",
+  "os-lab is up to date.": "os-lab güncel.",
+  "Downloading update": "Güncelleme indiriliyor",
+  "Update ready to install": "Güncelleme kurulmaya hazır",
+  "Updates": "Güncellemeler"
 }

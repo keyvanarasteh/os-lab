@@ -291,3 +291,23 @@ Regenerate it after those sources change; `--check` detects stale output.
 Every lab in the full OS Lab list and the ⌘L switcher, including Web Sec Lab, has its own icon, and a focused lab's pages each have their own.
 
 [[dashboard/src/shell/app-shell.tsx]] keeps lab icons in `LAB_ICON` (Android logo, code for Source, app window for Windows Apps, Linux logo, shield for Web Sec) and page icons in `PAGE_ICON`; Cleanup Lab pages set theirs in `cleanupNavItems`. A child's own icon wins, then `PAGE_ICON`, then the lab's icon.
+
+## App updates
+
+The update center lives in the layout, so the app update is checked and installed from every page, not only This computer.
+
+[[dashboard/src/views/update-modal.tsx]] is mounted once by the app shell. On load it reads
+`GET /api/app/update` and the content pack and opens on its own for a new version ("Later"
+remembers the offered versions). The top bar's update button
+([[dashboard/src/shell/top-bar.tsx]], shared state in [[dashboard/src/views/update-store.ts]])
+reopens it and checks again, shows a dot for a waiting update and the download percentage.
+
+[[console/app_update.py]] streams the installer (`received`/`total` in `install`), checks its
+SHA-256 and hands it to the operating system. `GET /api/app/update` adds `busy`: running lab
+jobs and Cleanup Lab jobs (`app_update.busy_work`). Once the installer is open the center starts
+the close flow: with nothing busy it counts down five seconds and navigates to
+`oslab://app/quit-for-update`; with work running it lists that work with progress and waits.
+Close now adds `?force=1`; Don't close stops the flow. The desktop app handles that URL only from
+its own window ([[app/src-tauri/src/lib.rs#quit_for_update]]): it asks the console again and quits
+only when the installer was opened and, unless forced, nothing is busy
+([[app/src-tauri/src/console.rs#may_quit_for_update]]). The console child stops on exit as usual.

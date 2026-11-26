@@ -20,7 +20,8 @@
       "health-and-content.spec.ts",
       "lab-switcher.spec.ts",
       "cleanup.spec.ts",
-      "source.spec.ts"
+      "source.spec.ts",
+      "app-update.spec.ts"
     ],
     "routes": ["/", "/health/", "/cleanup/", "/source/", "/labs/ios/"]
   },
@@ -48,7 +49,8 @@
     { "paths": ["src/views/content-*.tsx", "src/pages/content.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/content/"] },
     { "paths": ["src/views/contribute-*.tsx", "src/pages/contribute.astro"], "specs": ["health-and-content.spec.ts"], "routes": ["/contribute/"] },
     { "paths": ["src/views/legal-page.tsx", "src/lib/legal.ts", "src/pages/legal/**", "../docs/legal/**"], "specs": ["health-and-content.spec.ts"], "routes": ["/legal/privacy/", "/legal/terms/"] },
-    { "paths": ["src/views/ios-*.tsx", "src/views/macos-*.tsx", "src/views/lab-page.tsx", "src/views/modal-focus.ts", "src/views/update-modal.tsx", "src/views/app-update-panel.tsx", "src/pages/labs/**"], "specs": ["health-and-content.spec.ts", "lab-switcher.spec.ts"], "routes": ["/labs/ios/", "/labs/macos/", "/labs/android/"] },
+    { "paths": ["src/views/update-modal.tsx", "src/views/app-update-panel.tsx"], "specs": ["app-update.spec.ts"], "routes": ["/", "/jobs/"] },
+    { "paths": ["src/views/ios-*.tsx", "src/views/macos-*.tsx", "src/views/lab-page.tsx", "src/views/modal-focus.ts", "src/pages/labs/**"], "specs": ["health-and-content.spec.ts", "lab-switcher.spec.ts"], "routes": ["/labs/ios/", "/labs/macos/", "/labs/android/"] },
     { "paths": ["src/views/public-home.tsx", "src/views/not-found-page.tsx", "src/pages/index.astro", "src/pages/404.astro"], "specs": ["health-and-content.spec.ts", "lab-switcher.spec.ts"], "routes": ["/"] },
 
     { "paths": ["src/i18n/generated/*.json"], "smoke": true, "locales": "from-file-name" },

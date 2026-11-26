@@ -119,3 +119,42 @@ def test_unsupported_without_a_running_version(monkeypatch):
     store = app_update.AppUpdateStore(version="")
     assert store.supported() is False
     assert store.state()["updateAvailable"] is False
+
+
+def test_install_reports_download_progress(store, tmp_path, monkeypatch):
+    store, opened, payload, served = store
+    seen = []
+
+    def download(url, limit, progress=None):
+        data = served[url]
+        progress(len(data) // 2, len(data))
+        seen.append(store.state()["install"]["received"])
+        progress(len(data), len(data))
+        return data
+
+    store.download = download
+    store.check()
+    first = store.install()
+    assert first["installing"] is True and first["install"]["received"] == 0
+    for _ in range(200):
+        state = store.state()
+        if state["install"]["phase"] in ("done", "error"):
+            break
+        import time
+
+        time.sleep(0.01)
+    assert state["install"]["phase"] == "done"
+    assert seen == [len(payload) // 2]
+    assert state["install"]["received"] == state["install"]["total"] == len(payload)
+    assert state["install"]["openedAt"]
+
+
+def test_busy_work_lists_running_lab_and_cleanup_jobs():
+    lab = [{"id": "a", "label": "Start Android", "lab": "android", "state": "running"},
+           {"id": "b", "label": "Old", "state": "done"}]
+    cleanup = [{"id": "c", "kind": "clean", "state": "running", "progress": {"itemsDone": 1, "itemsTotal": 4}},
+               {"id": "d", "kind": "scan", "state": "failed", "progress": {}}]
+    busy = app_update.busy_work(lab, cleanup)
+    assert [item["id"] for item in busy] == ["a", "c"]
+    assert busy[1]["progress"] == 0.25
+    assert app_update.busy_work([], []) == []
