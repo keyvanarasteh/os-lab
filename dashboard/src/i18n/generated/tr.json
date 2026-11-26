@@ -3448,5 +3448,16 @@
   "Preview install": "Kurulumu önizle",
   "Preview update": "Güncellemeyi önizle",
   "Preview uninstall": "Kaldırmayı önizle",
-  "Nothing has changed yet. Run the terminal command after you approve.": "Henüz hiçbir şey değişmedi. Onaydan sonra terminal komutunu çalıştırın."
+  "Nothing has changed yet. Run the terminal command after you approve.": "Henüz hiçbir şey değişmedi. Onaydan sonra terminal komutunu çalıştırın.",
+  "ZCode": "ZCode",
+  "Grok Build": "Grok Build",
+  "Project .cursor/mcp.json plus the Cursor plugin package.": "Proje .cursor/mcp.json dosyası ve Cursor eklenti paketi.",
+  "Project .zcode/mcp.json plus the ZCode plugin package.": "Proje .zcode/mcp.json dosyası ve ZCode eklenti paketi.",
+  "Marketplace entry and project .grok/mcp.json.": "Marketplace girişi ve proje .grok/mcp.json dosyası.",
+  "Install as a Cursor plugin": "Cursor eklentisi olarak kur",
+  "Install as a ZCode plugin": "ZCode eklentisi olarak kur",
+  "Install as a Grok Build plugin": "Grok Build eklentisi olarak kur",
+  "Cursor plugin": "Cursor eklentisi",
+  "ZCode plugin": "ZCode eklentisi",
+  "Grok Build plugin": "Grok Build eklentisi"
 }

@@ -36,7 +36,10 @@ export type McpGroupId =
   | "source"
   | "firewall"
   | "plugin"
-  | "codex-plugin";
+  | "codex-plugin"
+  | "cursor-plugin"
+  | "zcode-plugin"
+  | "grok-plugin";
 
 export interface McpGroup {
   id: McpGroupId;
@@ -485,7 +488,35 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "codex_plugin_apply", safety: "confirm", summary: "Refuses MCP writes; terminal helper applies plans.", engineUsage: pending(), widget: none(), app: none() },
       { name: "codex_plugin_verify", safety: "read-only", summary: "Start the installed server and compare its tools.", engineUsage: pending(), widget: none(), app: none() }
     ]
-  }
+  },
+  ...(["cursor", "zcode", "grok"] as const).map((host) => {
+    const title = host === "cursor" ? "Cursor" : host === "zcode" ? "ZCode" : "Grok Build";
+    const prefix = `${host}_plugin_`;
+    return {
+      id: `${host}-plugin` as McpGroupId,
+      title: `${title} plugin`,
+      platform: "all hosts",
+      docs: `lat.md/${host}-plugin.md, console/host_plugin.py`,
+      engineUsage: { status: "verified" as const, proof: "android-lab/lab/tests/test_host_plugins.py" },
+      widgets: { status: "verified" as const, proof: "android-lab/lab/tests/test_host_plugins.py" },
+      apps: none(),
+      rules: [
+        "Install, update and uninstall are previewed, then run only from an interactive terminal.",
+        `MCP and console apply refuse writes; use scripts/${host}-plugin.py.`,
+        "Commands write the project MCP config; callers pick an action only."
+      ],
+      tools: [
+        { name: `${prefix}requirements`, safety: "read-only" as ToolSafety, summary: `${title} plugin requirement catalog with sources.`, engineUsage: pending(), widget: none(), app: none() },
+        { name: `${prefix}doctor`, safety: "read-only" as ToolSafety, summary: `Python and ${title} package readiness.`, engineUsage: pending(), widget: none(), app: none() },
+        { name: `${prefix}status`, safety: "read-only" as ToolSafety, summary: "Install state and duplicate MCP entries.", engineUsage: pending(), widget: pending(), app: none() },
+        { name: `${prefix}updates`, safety: "read-only" as ToolSafety, summary: `Update check for the ${title} plugin.`, engineUsage: pending(), widget: none(), app: none() },
+        { name: `${prefix}check`, safety: "read-only" as ToolSafety, summary: "Check the plugin against every catalog rule.", engineUsage: pending(), widget: none(), app: none() },
+        { name: `${prefix}plan`, safety: "read-only" as ToolSafety, summary: "Preview install, update or uninstall commands.", engineUsage: pending(), widget: none(), app: none() },
+        { name: `${prefix}apply`, safety: "confirm" as ToolSafety, summary: "Refuses MCP writes; terminal helper applies plans.", engineUsage: pending(), widget: none(), app: none() },
+        { name: `${prefix}verify`, safety: "read-only" as ToolSafety, summary: "Start the installed server and compare its tools.", engineUsage: pending(), widget: none(), app: none() }
+      ]
+    };
+  })
 ];
 
 /** Remaining gaps after the first widget/app batches. See docs/PLAN-mcp-coverage.md. */
@@ -504,4 +535,9 @@ export function claudePluginSnippet(root?: string): string {
 /** Install the repo as a Codex plugin: marketplace add plus plugin add, interactive only. */
 export function codexPluginSnippet(root?: string): string {
   return `python3 ${root ?? "<repo>"}/scripts/codex-plugin.py install`;
+}
+
+/** Install the repo as a Cursor / ZCode / Grok Build plugin via project MCP config. */
+export function hostPluginSnippet(host: "cursor" | "zcode" | "grok", root?: string): string {
+  return `python3 ${root ?? "<repo>"}/scripts/${host}-plugin.py install`;
 }

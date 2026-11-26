@@ -206,6 +206,48 @@
         "status": "none",
         "proof": null
       }
+    },
+    "cursor-plugin": {
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widgets": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode-plugin": {
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widgets": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok-plugin": {
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widgets": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
     }
   },
   "tools": {
@@ -2643,6 +2685,366 @@
       "engineUsage": {
         "status": "verified",
         "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cursor_plugin_requirements": {
+      "section": "cursor-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cursor_plugin_doctor": {
+      "section": "cursor-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cursor_plugin_status": {
+      "section": "cursor-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cursor_plugin_updates": {
+      "section": "cursor-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cursor_plugin_check": {
+      "section": "cursor-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cursor_plugin_plan": {
+      "section": "cursor-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cursor_plugin_apply": {
+      "section": "cursor-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cursor_plugin_verify": {
+      "section": "cursor-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode_plugin_requirements": {
+      "section": "zcode-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode_plugin_doctor": {
+      "section": "zcode-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode_plugin_status": {
+      "section": "zcode-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode_plugin_updates": {
+      "section": "zcode-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode_plugin_check": {
+      "section": "zcode-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode_plugin_plan": {
+      "section": "zcode-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode_plugin_apply": {
+      "section": "zcode-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "zcode_plugin_verify": {
+      "section": "zcode-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok_plugin_requirements": {
+      "section": "grok-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok_plugin_doctor": {
+      "section": "grok-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok_plugin_status": {
+      "section": "grok-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok_plugin_updates": {
+      "section": "grok-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok_plugin_check": {
+      "section": "grok-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok_plugin_plan": {
+      "section": "grok-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok_plugin_apply": {
+      "section": "grok-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "grok_plugin_verify": {
+      "section": "grok-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_host_plugins.py"
       },
       "widget": {
         "status": "none",

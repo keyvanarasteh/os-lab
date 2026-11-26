@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "os-lab": {
+      "command": "python3",
+      "args": [
+        "<REPO>/plugins/grok/os-lab/launcher.py"
+      ],
+      "env": {
+        "OSLAB_ROOT": "<REPO>"
+      }
+    }
+  }
+}

@@ -26,8 +26,12 @@ test("MCP guides page shows the four tool groups and fills the repo path", async
   await expect(page.locator("#mcp-planned")).toBeVisible();
   await expect(page.locator("#mcp-claude-plugin").getByText("python3 /Volumes/Projects/iQ/os-lab/scripts/claude-plugin.py install")).toBeVisible();
   await expect(page.locator("#mcp-codex-cards").getByText("python3 /Volumes/Projects/iQ/os-lab/scripts/codex-plugin.py install")).toBeVisible();
+  await expect(page.locator("#mcp-cursor-cards").getByText("python3 /Volumes/Projects/iQ/os-lab/scripts/cursor-plugin.py install")).toBeVisible();
+  await expect(page.locator("#mcp-zcode-cards").getByText("python3 /Volumes/Projects/iQ/os-lab/scripts/zcode-plugin.py install")).toBeVisible();
+  await expect(page.locator("#mcp-grok-cards").getByText("python3 /Volumes/Projects/iQ/os-lab/scripts/grok-plugin.py install")).toBeVisible();
   await expect(page.locator("#mcp-plugin").getByText("plugin_apply", { exact: true })).toBeVisible();
   await expect(page.locator("#mcp-codex-plugin").getByText("codex_plugin_apply", { exact: true })).toBeVisible();
+  await expect(page.locator("#mcp-cursor-plugin").getByText("cursor_plugin_apply", { exact: true })).toBeVisible();
   await expect(page.getByText("macos_stop", { exact: true })).toBeVisible();
   await expect(page.getByText("macos_request_access", { exact: true })).toBeVisible();
   await expect(page.getByText("cleanup_clean", { exact: true })).toBeVisible();
@@ -86,6 +90,9 @@ test("MCP plugin cards fall back to the terminal command without the console", a
   const codex = page.locator("#mcp-codex-cards");
   await expect(codex.getByText("scripts/codex-plugin.py install")).toBeVisible();
   await expect(codex.getByRole("button", { name: "Try again" })).toBeVisible();
+  const cursor = page.locator("#mcp-cursor-cards");
+  await expect(cursor.getByText("scripts/cursor-plugin.py install")).toBeVisible();
+  await expect(cursor.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
 test("MCP Codex plugin cards preview install commands without applying", async ({ page }) => {
@@ -114,6 +121,16 @@ test("MCP Codex plugin cards preview install commands without applying", async (
       token: "c1", action: "install", commands: ["codex plugin marketplace add /repo"],
       warnings: [], terminalCommand: "python3 scripts/codex-plugin.py install"
     };
+    else if (path === "/api/cursor-plugin" || path === "/api/zcode-plugin" || path === "/api/grok-plugin") {
+      const host = path.split("/")[2].replace("-plugin", "");
+      body = {
+        host,
+        checkoutVersion: "0.1.0",
+        terminalCommand: `python3 scripts/${host}-plugin.py install`,
+        doctor: { ready: true, checks: [] },
+        install: { cli: null, installed: false, duplicates: [] }
+      };
+    }
     await route.fulfill({ json: body });
   });
   await page.goto("/mcp/");
@@ -124,5 +141,61 @@ test("MCP Codex plugin cards preview install commands without applying", async (
   await expect(dialog.getByText("codex plugin marketplace add /repo")).toBeVisible();
   await expect(dialog.getByText("scripts/codex-plugin.py install")).toBeVisible();
   expect(posts.map((post) => post.path)).not.toContain("/api/codex-plugin/apply");
+  await dialog.getByRole("button", { name: "Close" }).click();
+});
+
+test("MCP host plugin cards preview Cursor install without applying", async ({ page }) => {
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (route.request().method() === "POST") posts.push({ path, body: route.request().postDataJSON() });
+    let body: unknown = {};
+    if (path === "/api/host") body = HOST;
+    else if (path === "/api/health") body = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") body = { jobs: [] };
+    else if (path === "/api/logs") body = { logs: [] };
+    else if (path === "/api/claude-plugin") body = {
+      checkoutVersion: "0.2.0",
+      doctor: { ready: true, checks: [] },
+      code: { cli: "2.1.332", installed: [], duplicates: [] },
+      desktop: { app: { installed: true }, extension: { installed: false, version: null, updateAvailable: false, duplicates: [] } }
+    };
+    else if (path === "/api/codex-plugin") body = {
+      checkoutVersion: "0.2.0",
+      terminalCommand: "python3 scripts/codex-plugin.py install",
+      doctor: { ready: true, checks: [] },
+      codex: { cli: "/usr/bin/codex", installed: false, duplicates: [] }
+    };
+    else if (path === "/api/cursor-plugin") body = {
+      host: "cursor",
+      checkoutVersion: "0.1.0",
+      terminalCommand: "python3 scripts/cursor-plugin.py install",
+      doctor: { ready: true, checks: [] },
+      install: { cli: null, installed: false, duplicates: [] }
+    };
+    else if (path === "/api/cursor-plugin/preview") body = {
+      token: "h1", action: "install",
+      commands: ["python3 scripts/cursor-plugin.py install  # writes .cursor/mcp.json"],
+      warnings: [], terminalCommand: "python3 scripts/cursor-plugin.py install"
+    };
+    else if (path === "/api/zcode-plugin" || path === "/api/grok-plugin") {
+      const host = path.includes("zcode") ? "zcode" : "grok";
+      body = {
+        host,
+        checkoutVersion: "0.1.0",
+        terminalCommand: `python3 scripts/${host}-plugin.py install`,
+        doctor: { ready: true, checks: [] },
+        install: { cli: null, installed: false, duplicates: [] }
+      };
+    }
+    await route.fulfill({ json: body });
+  });
+  await page.goto("/mcp/");
+  const card = page.locator("#mcp-card-cursor");
+  await expect(card.getByText("Not installed")).toBeVisible();
+  await card.getByRole("button", { name: "Preview install" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("scripts/cursor-plugin.py install")).toBeVisible();
+  expect(posts.map((post) => post.path)).not.toContain("/api/cursor-plugin/apply");
   await dialog.getByRole("button", { name: "Close" }).click();
 });

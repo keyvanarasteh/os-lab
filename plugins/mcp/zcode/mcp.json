@@ -3,8 +3,15 @@
     "os-lab": {
       "transport": "stdio",
       "command": "python3",
-      "args": ["<REPO>/console/mcp_server.py"],
-      "skills": ["<REPO>/console/mcp_skills"]
+      "args": [
+        "<REPO>/plugins/zcode/os-lab/launcher.py"
+      ],
+      "env": {
+        "OSLAB_ROOT": "<REPO>"
+      },
+      "skills": [
+        "<REPO>/plugins/zcode/os-lab/skills"
+      ]
     }
   }
 }
