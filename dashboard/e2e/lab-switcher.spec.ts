@@ -29,6 +29,10 @@ async function mockApi(page: Page) {
       : path === "/api/jobs" ? { jobs: [] }
       : path === "/api/content/status" || path === "/api/content/check" ? { installed: false, offline: true, updateAvailable: false }
       : /^\/api\/labs\/[a-z]+\/monitor$/.test(path) ? { lab: path.split("/")[3], state: "stopped", containers: [] }
+      // Cleanup Lab's island throws on a partial `{ logs: [] }` status (reasons.map) and blanks the page.
+      : path === "/api/cleanup/status" ? { state: "ready", reasons: [], requirements: [], capabilities: [] }
+      : path === "/api/cleanup/catalog" ? { platform: "macos", entries: [] }
+      : path === "/api/cleanup/jobs" ? { jobs: [] }
       : { logs: [] };
     await route.fulfill({ json: body });
   });
