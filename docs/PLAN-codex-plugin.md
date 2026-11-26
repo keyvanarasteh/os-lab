@@ -1,7 +1,7 @@
 # Codex plugin: complete local integration plan
 
 Branch: `codex/ai-agent-plugin-plan`. Implementation checklist: [TODO-codex-plugin.md](TODO-codex-plugin.md).
-Status: planning draft; no Codex plugin is implemented by this branch.
+Status: implementation in progress. The package, generated skills, basic requirement checks, terminal-only install preview, MCP management surface and isolated CLI proof are on this branch. The TODO tracks remaining coverage.
 
 ## Goal
 
@@ -90,7 +90,7 @@ The Claude TODO still leaves its `/mcp/` dashboard work, some documentation chec
 
 ## Delivery sequence
 
-Keep each stage reviewable. Do not merge this plan branch as if it shipped the plugin.
+Keep each stage reviewable. This draft PR contains implementation in progress; the unchecked TODO items remain gates before it is ready to merge.
 
 | Stage | Deliverable | Gate |
 | --- | --- | --- |

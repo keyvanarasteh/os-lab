@@ -10,7 +10,7 @@ by the server (`prompts/list`, `tools/list`, `resources/list`).
 | --- | --- | --- |
 | Claude Desktop | `claude-desktop/` | `claude_desktop_config.json` fragment |
 | Claude Code | `claude-code/` | `.mcp.json` + skill pointers |
-| Codex | `codex/` | `config.toml` fragment |
+| Codex | `codex/` | Legacy `config.toml` fragment; the installable local plugin is in [`plugins/codex/os-lab/`](../codex/os-lab/) |
 | Cursor | `cursor/` | `.cursor/mcp.json` fragment |
 | OpenCode | `opencode/` | `opencode.json` MCP block |
 | Zcode | `zcode/` | stdio MCP entry |

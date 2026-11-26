@@ -20,7 +20,9 @@ sit behind console/winapps_guard.py: an agent sees only apps on the allowlist
 call and refusal lands in the guard's audit log. There is no arm tool and no input tool.
 
 The plugin_* tools check and set up os-lab as a Claude plugin (console/claude_plugin.py): changes
-are previewed, need a one-use token and confirm:true, and removals run only from a terminal.
+are previewed, need a one-use token and confirm:true, and removals run only from a terminal. The
+codex_plugin_* tools do the same for the Codex plugin (console/codex_plugin.py); install previews
+are terminal-only and MCP apply refuses agent writes.
 
 Run: python3 console/mcp_server.py   (or `make -C ios-lab mac-mcp`)
 """
@@ -45,6 +47,7 @@ import mcp_firewall  # noqa: E402
 import mcp_plugin  # noqa: E402
 import mcp_ui  # noqa: E402
 import mcp_prompts  # noqa: E402
+import mcp_codex_plugin  # noqa: E402
 import winapps  # noqa: E402
 import winapps_guard  # noqa: E402
 
@@ -62,8 +65,11 @@ INSTRUCTIONS = (
     "tool), and tools with a confirm argument need the user's approval first. Never set confirm: true "
     "without it.\n"
     "- Web Sec scans outside the declared scope are refused.\n"
-    "- For setup problems call plugin_doctor, then plugin_status. To change the installation call "
-    "plugin_plan, show its commands, and only after approval plugin_apply."
+    "- For Claude plugin setup call plugin_doctor, then plugin_status. To change that installation "
+    "call plugin_plan, show its commands, and only after approval plugin_apply.\n"
+    "- For Codex plugin setup call codex_plugin_doctor and codex_plugin_status, preview with "
+    "codex_plugin_plan, then run the shown installation in an interactive terminal. "
+    "codex_plugin_apply refuses agent writes."
 )
 # Tools whose JSON can pass the 50,000 characters after which Claude Code saves results to a file.
 LARGE_RESULTS = ("macos_get_app_state", "macos_menubar", "websec_report", "cleanup_catalog")
@@ -342,6 +348,7 @@ TOOLS += mcp_web.TOOLS
 TOOLS += mcp_source.TOOLS
 TOOLS += mcp_firewall.TOOLS
 TOOLS += mcp_plugin.TOOLS
+TOOLS += mcp_codex_plugin.TOOLS
 for _tool in TOOLS:
     if _tool["name"] in LARGE_RESULTS:
         _tool["_meta"] = {**_tool.get("_meta", {}), "anthropic/maxResultSizeChars": 200000}
@@ -474,6 +481,8 @@ def tool_call(name: str, args: dict) -> dict:
     """One tool invocation against the same surface the panel drives. Returns MCP content."""
     if name.startswith("winapps_"):
         return win_tool_call(name, args)
+    if name in mcp_codex_plugin.NAMES:
+        return mcp_codex_plugin.call(name, args, REPO_ROOT)
     if name in mcp_cleanup.NAMES:
         return mcp_cleanup.call(name, args, REPO_ROOT)
     if name in mcp_websec.NAMES:
@@ -588,6 +597,7 @@ def run_task(args: dict) -> dict:
                 (mcp_android, "android"), (mcp_ios, "ios"), (mcp_linux, "linux"),
                 (mcp_web, "web"), (mcp_source, "source"), (mcp_firewall, "firewall"),
                 (mcp_plugin, "plugin"),
+                (mcp_codex_plugin, "Codex plugin"),
             ):
                 if str(tool) in _mod.NAMES:
                     raise oslab.PlanError(f"{_label} tools are not available inside macos_task", code="INVALID_ARGS")
@@ -630,10 +640,14 @@ def handle(message: dict) -> dict | None:
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": listed_tools()}}
     if method == "resources/list":
-        return {"jsonrpc": "2.0", "id": message_id, "result": {"resources": mcp_ui.list_resources() + [{
-            "uri": mcp_plugin.RESOURCE_URI, "name": "Claude plugin requirements",
-            "description": "Every Claude plugin requirement os-lab checks, with sources.",
-            "mimeType": "application/json"}]}}
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"resources": mcp_ui.list_resources() + [
+            {"uri": mcp_plugin.RESOURCE_URI, "name": "Claude plugin requirements",
+             "description": "Every Claude plugin requirement os-lab checks, with sources.",
+             "mimeType": "application/json"},
+            {"uri": mcp_codex_plugin.RESOURCE_URI, "name": "Codex plugin requirements",
+             "description": "Every Codex plugin requirement os-lab checks, with sources.",
+             "mimeType": "application/json"},
+        ]}}
     if method == "resources/templates/list":
         return {"jsonrpc": "2.0", "id": message_id, "result": {"resourceTemplates": []}}
     if method == "resources/read":
@@ -644,6 +658,10 @@ def handle(message: dict) -> dict | None:
                 "uri": uri, "mimeType": "application/json",
                 "text": json.dumps(mcp_plugin.engine.requirements())}]}}
         try:
+            if uri == mcp_codex_plugin.RESOURCE_URI:
+                return {"jsonrpc": "2.0", "id": message_id, "result": {"contents": [{
+                    "uri": uri, "mimeType": "application/json",
+                    "text": json.dumps(mcp_codex_plugin.engine.requirements())}]}}
             return {"jsonrpc": "2.0", "id": message_id, "result": mcp_ui.read_resource(str(uri))}
         except KeyError:
             return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32002, "message": f"Resource not found: {uri}"}}
