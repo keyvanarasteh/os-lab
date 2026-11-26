@@ -720,7 +720,7 @@ export interface CleanupRelocationEntry {
   relocatable: boolean; interrupted: boolean;
 }
 export interface CleanupRelocationDestination {
-  mountPoint: string; freeBytes: number; totalBytes: number; kind: string;
+  mountPoint: string; freeBytes: number; totalBytes: number; kind: string; name?: string;
 }
 export interface CleanupRelocationStatus {
   platform: string;

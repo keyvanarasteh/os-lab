@@ -23,6 +23,10 @@ mount tables and never touch a real disk:
 
 A drive whose Windows type is unknown is hidden, like a container action whose
 engine does not answer: the inventory reports what it can prove.
+
+Relocation and simulator/emulator setup pick **user store** volumes from this
+inventory: cryptex, Preboot, Recovery, and other system mounts stay listed for
+disk pressure but are never offered as a move destination.
 """
 from __future__ import annotations
 
@@ -36,6 +40,14 @@ import subprocess
 import time
 
 from . import paths
+
+#: Volume kinds a cache or simulator store may live on (never ``unknown``).
+STORE_KINDS = ("internal", "removable")
+#: Apple system volume names that ``diskutil`` still reports as Internal.
+SYSTEM_VOLUME_BASENAMES = frozenset({
+    "Preboot", "Recovery", "VM", "Update", "iSCPreboot", "xarts", "Hardware",
+    "Cryptexes", "UpdatePreboot",
+})
 
 #: A volume above this used fraction carries a pressure warning.
 PRESSURE_THRESHOLD = 0.90
@@ -446,3 +458,66 @@ def inventory(platform=None, env=None, *, rows=None, usage_fn=None, purgeable_fn
         "volumes": volumes,
         "warnings": warnings,
     }
+
+
+def is_system_mount(mount, name="", platform="linux"):
+    """True when ``mount`` is an Apple/system image, not a user data disk."""
+    if platform == "windows" or not mount:
+        return False
+    path = mount.replace("\\", "/")
+    lower = path.lower()
+    if "cryptexd" in lower or path.startswith("/System/Cryptexes"):
+        return True
+    if path.startswith("/private/var/run/"):
+        return True
+    if path.startswith("/System/Volumes/"):
+        return True
+    base = path.rstrip("/").rsplit("/", 1)[-1]
+    if base in SYSTEM_VOLUME_BASENAMES or (name or "") in SYSTEM_VOLUME_BASENAMES:
+        return True
+    if base.startswith("com.apple.") or "timemachine" in lower:
+        return True
+    return False
+
+
+def _store_rank(volume, platform):
+    """``/Volumes`` (and typical Linux media mounts) before other internals; root last."""
+    mount = volume.get("mountPoint") or ""
+    path = mount.replace("\\", "/")
+    root_penalty = 1 if volume.get("kind") == "root" else 0
+    if platform == "windows":
+        group = 0
+    elif path.startswith("/Volumes/"):
+        group = 0
+    elif path.startswith("/mnt/") or path.startswith("/media/") or path.startswith("/run/media/"):
+        group = 1
+    else:
+        group = 2
+    return (root_penalty, group, -(volume.get("freeBytes") or 0), path.lower())
+
+
+def store_destinations(rows, *, home_mount=None, platform="linux", include_root=False,
+                       exclude_home=True):
+    """Volumes a CLN-27 store may live on, ranked for the default picker.
+
+    The inventory still lists system mounts for pressure; this list is what
+    relocation, simulator storage and emulator storage offer. ``/Volumes/…``
+    with the most free space sorts first so the dashboard does not default to
+    a cryptex path that happens to sort before ``/Volumes``.
+    """
+    allowed = ("root",) + STORE_KINDS if include_root else STORE_KINDS
+    offered = []
+    for row in rows or ():
+        kind = row.get("kind")
+        mount = row.get("mountPoint") or ""
+        if kind not in allowed or not mount:
+            continue
+        if not isinstance(row.get("freeBytes"), int):
+            continue
+        if exclude_home and home_mount and mount == home_mount:
+            continue
+        if is_system_mount(mount, row.get("name") or "", platform):
+            continue
+        offered.append(row)
+    offered.sort(key=lambda row: _store_rank(row, platform))
+    return offered

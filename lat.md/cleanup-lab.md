@@ -205,7 +205,18 @@ and pseudo filesystems are filtered before any capacity call; Windows
 enumerates drives through kernel32, Linux reads `/proc/self/mountinfo`, and
 macOS parses the fixed `mount` probe plus an optional fixed `diskutil info
 -plist` probe. An unreadable volume carries an `error` instead of failing the
-probe. The `/cleanup/` volumes card is the dashboard layer's part: the storage card shows the
+probe.
+
+Relocation and the simulator/emulator setup pickers use
+`volumes.store_destinations`: `internal` and `removable` user disks (relocation
+also lists `root`). Cryptex mounts under
+`/private/var/run/com.apple.security.cryptexd`, `/System/Volumes/*`, Preboot /
+Recovery / VM / Update, and `com.apple.*` Time Machine volumes stay in the
+inventory for pressure and are never offered as a move target. The default pick
+is a `/Volumes/…` disk with the most free space, not the first path in mount
+order.
+
+The `/cleanup/` volumes card is the dashboard layer's part: the storage card shows the
 home volume as the hero, and the other volumes as a closed "Other volumes" section of display-only
 cards (name, mount path, used/free bar, sizes, kind) grouped into Disks (open), System,
 Simulators and devices, and Temporary. Mounts reporting the same device collapse into one card
@@ -256,7 +267,7 @@ The dashboard layer is the `/cleanup/relocation/` tab
 ([[dashboard/src/views/cleanup/relocation-card.tsx]]): one row per relocatable
 entry with its path, a Local folder / Linked / Interrupted chip (the status
 payload reports relocatable and interrupted; link detail appears on the plan),
-a destination select fed by the volume inventory, and the plan preview behind
+a destination select fed by `volumes.store_destinations` (user disks only), and the plan preview behind
 the confirm dialog that names the entry, the destination and the symlink fact
 before anything moves. A run shows per-step progress with a Cancel that stops
 between steps; a completed move shows the store path, a failure says the
@@ -332,6 +343,7 @@ rows. CLA-02 relocates `simulators.android-avd` with CLN-27 to
 junction; macOS and Linux use a symlink. Do not write `ANDROID_AVD_HOME`.
 [[cleanup-lab/engine/cleanup_lab/emulator_storage.py]] stores the destination
 and floor; `GET/POST /api/cleanup/emulator-storage` is the setup API.
+The destination list is `volumes.store_destinations` (no cryptex or Preboot).
 `#emulator-setup` on `/cleanup/` appears when the AVD folder is still local,
 the linked disk is missing, a move was interrupted, or unavailable AVDs
 exist, and hides when there is no SDK and no AVD folder. The Relocation tab

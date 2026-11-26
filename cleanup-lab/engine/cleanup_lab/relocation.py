@@ -380,15 +380,21 @@ def status(root, *, platform=None, env=None):
 
 
 def destinations(platform=None, env=None, *, rows=None, usage_fn=None):
-    """The local volumes a store may live on, with their free space (CLN-28's inventory)."""
+    """The local volumes a store may live on, with their free space (CLN-28's inventory).
+
+    System mounts (cryptex, Preboot, ``/System/Volumes/*``) are listed by the
+    inventory for pressure and omitted here so a plan cannot target them.
+    """
     platform = platform or paths.platform_id()
     env = os.environ if env is None else env
     report = volumes.inventory(platform, env, rows=rows, usage_fn=usage_fn)
     return [
         {"mountPoint": volume["mountPoint"], "freeBytes": volume["freeBytes"],
-         "totalBytes": volume["totalBytes"], "kind": volume["kind"]}
-        for volume in report["volumes"]
-        if volume["kind"] in ("root", "internal", "removable") and volume["freeBytes"] is not None
+         "totalBytes": volume["totalBytes"], "kind": volume["kind"],
+         "name": volume.get("name") or ""}
+        for volume in volumes.store_destinations(
+            report["volumes"], home_mount=report.get("homeVolume"),
+            platform=platform, include_root=True, exclude_home=False)
     ]
 
 

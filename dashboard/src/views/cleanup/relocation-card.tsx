@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge, Empty, Section, Status } from "../../components/ui";
 import { api, usePoll, type CleanupAuxJob, type CleanupRelocationEntry, type CleanupRelocationPlan, type CleanupRelocationRun, type CleanupRelocationStatus } from "../../lib/api";
 import { keepModalFocus } from "../modal-focus";
-import { bytes } from "./format";
+import { bytes, preferredMount, volumeLabel } from "./format";
 
 const PUBLIC = import.meta.env.PUBLIC_SITE_MODE === "pages";
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -90,10 +90,11 @@ export function RelocationCard({ now, request, onChanged }: { now: number; reque
   const [actionError, setActionError] = useState("");
   const [planningFor, setPlanningFor] = useState<string | null>(null);
 
-  // Default the destination to the first listed volume; the user still confirms it on every plan.
+  // Default to the engine's ranked user disk; drop a stale system-mount selection.
   useEffect(() => {
-    if (!destination && status?.destinations.length) setDestination(status.destinations[0].mountPoint);
-  }, [status, destination]);
+    if (!status?.destinations.length) return;
+    setDestination((current) => preferredMount(status.destinations, null, current));
+  }, [status]);
 
   useEffect(() => {
     if (planJob?.state !== "running") return;
@@ -195,7 +196,7 @@ export function RelocationCard({ now, request, onChanged }: { now: number; reque
           {!destination && <option value="">Destination</option>}
           {status.destinations.map((item) =>
             <option key={item.mountPoint} value={item.mountPoint}>
-              {item.mountPoint} · {bytes(item.freeBytes)} free
+              {volumeLabel(item.mountPoint, item.name)} · {bytes(item.freeBytes)} free
             </option>)}
         </select>
         {!status.destinations.length && <span className="text-sm text-(--iux-muted-foreground)">No other volume with free space was found.</span>}

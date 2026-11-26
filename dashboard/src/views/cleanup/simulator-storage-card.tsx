@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Section, Status } from "../../components/ui";
 import { api, type CleanupAuxJob, type CleanupRelocationPlan, type CleanupRelocationRun, type CleanupSimulatorPreview, type CleanupSimulatorResult, type CleanupSimulators, type CleanupSimulatorStorage } from "../../lib/api";
-import { bytes, riskLabel, riskTone } from "./format";
+import { bytes, preferredMount, riskLabel, riskTone, volumeLabel } from "./format";
 import { RelocationConfirmDialog } from "./relocation-card";
 import { simulatorActionLabel } from "./simulators-card";
 
@@ -33,7 +33,7 @@ export function SimulatorStorageCard({ onMove, refreshKey = 0 }: { onMove: (entr
   function apply(value: CleanupSimulatorStorage) {
     setReport(value);
     if (value.config) {
-      setDestination(value.config.destination ?? value.destinations?.[0]?.mountPoint ?? "");
+      setDestination(preferredMount(value.destinations, value.config.destination));
       setSuggest(value.config.suggest);
       setFloorGiB(Math.round(value.config.floorBytes / GIB));
     }
@@ -83,7 +83,7 @@ export function SimulatorStorageCard({ onMove, refreshKey = 0 }: { onMove: (entr
             onChange={(event) => { setDestination(event.target.value); setSaved(false); }}>
             {!report.destinations?.length && <option value="">No other disk is connected</option>}
             {report.destinations?.map((item) => <option key={item.mountPoint} value={item.mountPoint}>
-              {item.name || item.mountPoint} · {bytes(item.freeBytes)} free
+              {volumeLabel(item.mountPoint, item.name)} · {bytes(item.freeBytes)} free
             </option>)}
           </select>
         </label>
@@ -152,7 +152,7 @@ export function SimulatorSetupCard() {
   function load() {
     void api.cleanupSimulatorStorage().then((value) => {
       setReport(value);
-      setDestination((current) => current || value.config?.destination || value.destinations?.[0]?.mountPoint || "");
+      setDestination((current) => preferredMount(value.destinations, value.config?.destination, current));
     }).catch((reason) => setError(errorText(reason)));
     void api.cleanupSimulators().then(setInventory).catch(() => setInventory(null));
     void api.cleanupRelocation().then((status) => {
@@ -264,7 +264,7 @@ export function SimulatorSetupCard() {
         <select className="iux-input mt-1 w-full max-w-md" value={destination} disabled={working}
           onChange={(event) => setDestination(event.target.value)}>
           {report.destinations.map((item) => <option key={item.mountPoint} value={item.mountPoint}>
-            {item.name || item.mountPoint} · {bytes(item.freeBytes)} free
+            {volumeLabel(item.mountPoint, item.name)} · {bytes(item.freeBytes)} free
           </option>)}
         </select>
       </label>}
