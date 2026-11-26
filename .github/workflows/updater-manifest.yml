@@ -6,7 +6,11 @@ name: updater-manifest
 # watches for a release whose five signed assets are all present, builds the feed, verifies
 # every signature, uploads it and marks that release as GitHub Latest. It is idempotent and
 # never downgrades the feed, so a partial upload of a newer version is simply skipped until
-# the next run. The schedule is the safety net; a manual run can pin a version.
+# the next run.
+#
+# Auto-promote: release-linux / release-win / release-mac call this via workflow_call after
+# each successful publish (GITHUB_TOKEN cannot start sibling workflows from release: events).
+# The schedule remains the safety net; workflow_dispatch can pin a version.
 
 on:
   schedule:
@@ -19,13 +23,20 @@ on:
         description: Publish this version instead of auto-detecting
         required: false
         type: string
+  workflow_call:
+    inputs:
+      version:
+        description: Publish this version instead of auto-detecting (empty = detect latest complete)
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
   group: updater-manifest
-  cancel-in-progress: true
+  # Platform release jobs may finish close together; do not cancel a sibling promote.
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -55,8 +66,8 @@ jobs:
   notify:
     # Optional Telegram report: define the TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID
     # repository secrets to enable it. Without them the send step skips silently.
-    # The 20-minute scheduled safety-net runs stay quiet; only manual runs and
-    # release events report, so the feed work itself stays out of the chat.
+    # The 20-minute scheduled safety-net runs stay quiet; only manual runs,
+    # release events, and workflow_call promotes from platform releases report.
     if: ${{ always() && github.event_name != 'schedule' }}
     needs: [publish]
     runs-on: ubuntu-latest

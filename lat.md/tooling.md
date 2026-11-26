@@ -109,9 +109,11 @@ holding that branch. Merge from the main clone, then
 `scripts/worktree.sh rm`.
 
 GitHub Actions does not start a second workflow from an event
-`GITHUB_TOKEN` created, so an `app-v*` tag still needs
-`gh workflow run updater-manifest.yml -f version=…` after the installers
-exist (see [app/RELEASE_CI.md](../app/RELEASE_CI.md)).
+`GITHUB_TOKEN` created, so `release:` on [[.github/workflows/updater-manifest.yml]]
+alone never sees platform uploads. Each of `release-linux`, `release-win` and
+`release-mac` therefore calls that workflow via `workflow_call` after a
+successful publish; `--detect-latest --allow-none` promotes only when the
+asset set is complete (see [app/RELEASE_CI.md](../app/RELEASE_CI.md)).
 
 ## Tests
 
