@@ -430,7 +430,8 @@ export const MCP_GROUPS: McpGroup[] = [
 
 /** Remaining gaps after the first widget/app batches. See docs/PLAN-mcp-coverage.md. */
 export const MCP_PLANNED_SECTIONS: { id: string; title: string; engineUsage: VerifySlot; widgets: VerifySlot; apps: VerifySlot; note: string }[] = [
-  { id: "websec-apps", title: "Web Sec MCP Apps", engineUsage: pending(), widgets: pending(), apps: none(), note: "status/review/report widgets shipped; fuller workbench app still open." },
-  { id: "macos-apps", title: "macOS MCP Apps", engineUsage: pending(), widgets: pending(), apps: none(), note: "apps/control widgets shipped. No arm tool (n/a)." },
-  { id: "lab-widgets", title: "Lab MCP widgets", engineUsage: pending(), widgets: none(), apps: pending(), note: "android/ios/web/source overview apps shipped; per-tool widgets still open." }
+  { id: "websec-apps", title: "Web Sec MCP Apps", engineUsage: pending(), widgets: pending(), apps: none(), note: "Follow-up: fuller workbench app. See docs/PLAN-mcp-coverage.md remaining checklist." },
+  { id: "macos-apps", title: "macOS MCP Apps", engineUsage: pending(), widgets: pending(), apps: none(), note: "Follow-up: fuller macOS app. No arm tool (n/a)." },
+  { id: "lab-widgets", title: "Lab MCP widgets", engineUsage: pending(), widgets: none(), apps: pending(), note: "Follow-up: per-tool widgets + lab depth gaps in docs/PLAN-mcp-coverage.md." },
+  { id: "verification-flips", title: "Verification proofs", engineUsage: pending(), widgets: pending(), apps: pending(), note: "Contributor flips pending→verified with proof in console/mcp_verification.json." }
 ];
