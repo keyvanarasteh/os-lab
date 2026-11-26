@@ -33,6 +33,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import oslab  # noqa: E402
 import mcp_cleanup  # noqa: E402
 import mcp_websec  # noqa: E402
+import mcp_android  # noqa: E402
+import mcp_ios  # noqa: E402
+import mcp_linux  # noqa: E402
+import mcp_web  # noqa: E402
+import mcp_source  # noqa: E402
+import mcp_firewall  # noqa: E402
 import mcp_ui  # noqa: E402
 import mcp_prompts  # noqa: E402
 import winapps  # noqa: E402
@@ -280,6 +286,12 @@ TOOLS = [
 
 TOOLS += mcp_cleanup.TOOLS  # CUX-10: the Cleanup Lab tools share this server and its error shape
 TOOLS += mcp_websec.TOOLS  # the Web Sec Lab workbench, on the same console API and scope guard
+TOOLS += mcp_android.TOOLS
+TOOLS += mcp_ios.TOOLS
+TOOLS += mcp_linux.TOOLS
+TOOLS += mcp_web.TOOLS
+TOOLS += mcp_source.TOOLS
+TOOLS += mcp_firewall.TOOLS
 
 
 def _window_point(window_id: int, args: dict) -> tuple[int, int, dict]:
@@ -412,6 +424,18 @@ def tool_call(name: str, args: dict) -> dict:
         return mcp_cleanup.call(name, args, REPO_ROOT)
     if name in mcp_websec.NAMES:
         return mcp_websec.call(name, args, REPO_ROOT)
+    if name in mcp_android.NAMES:
+        return mcp_android.call(name, args, REPO_ROOT)
+    if name in mcp_ios.NAMES:
+        return mcp_ios.call(name, args, REPO_ROOT)
+    if name in mcp_linux.NAMES:
+        return mcp_linux.call(name, args, REPO_ROOT)
+    if name in mcp_web.NAMES:
+        return mcp_web.call(name, args, REPO_ROOT)
+    if name in mcp_source.NAMES:
+        return mcp_source.call(name, args, REPO_ROOT)
+    if name in mcp_firewall.NAMES:
+        return mcp_firewall.call(name, args, REPO_ROOT)
     if name == "macos_apps":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_windows())}]}
     if name == "macos_get_app_state":
@@ -488,6 +512,12 @@ def run_task(args: dict) -> dict:
                 raise oslab.PlanError("cleanup tools are not available inside macos_task", code="INVALID_ARGS")
             if str(tool) in mcp_websec.NAMES:
                 raise oslab.PlanError("web sec tools are not available inside macos_task", code="INVALID_ARGS")
+            for _mod, _label in (
+                (mcp_android, "android"), (mcp_ios, "ios"), (mcp_linux, "linux"),
+                (mcp_web, "web"), (mcp_source, "source"), (mcp_firewall, "firewall"),
+            ):
+                if str(tool) in _mod.NAMES:
+                    raise oslab.PlanError(f"{_label} tools are not available inside macos_task", code="INVALID_ARGS")
             result = tool_call(str(tool), step_args if isinstance(step_args, dict) else {})
             row["ok"] = True
             row["result"] = result["content"][0]["text"][:2000]
@@ -515,7 +545,7 @@ def handle(message: dict) -> dict | None:
                 "extensions": {"io.modelcontextprotocol/ui": {"mimeTypes": [mcp_ui.RESOURCE_MIME]}},
             },
             "serverInfo": {"name": "os-lab-windows" if sys.platform == "win32" else "os-lab-macos",
-                           "version": "0.4.0"}}}
+                           "version": "0.5.0"}}}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":
