@@ -267,6 +267,25 @@ Tests: [[scripts/session_scribe/tests/test_session_scribe.py]] · Report: [[scri
 
 Contribution flow, coding conventions and the authorization stance.
 
+[[docs/contribution-pipeline.html]] is the visual reference for this section: eight
+phases from claim to deploy, how a pull request selects its own checks, the job
+graph of [[.github/workflows/dashboard-e2e.yml]], the four deploy surfaces after a
+merge, and a route matrix showing which routes the local console and GitHub Pages
+serve and in which locales. It is a standalone page, not part of the dashboard
+build.
+
+[[docs/e2e-coverage.html]] maps the three dashboard verification layers against
+each other: the e2e selection flow and its `none`/`some`/`full` classifications,
+the twelve specs with their routes and loop expansion, which routes have a spec
+versus only a crawl, and what `npm run check` does and does not see. Its counts and
+timings were measured, not estimated; it also records the gaps — `console/**`
+selects no e2e spec, and five route families have no behaviour test.
+
+Its last section covers the MCP surface in [[console/mcp_server.py]]: stdio, so no
+TCP port and no collision with the e2e runner or the console, but also no unit
+test, no spec, and no pipeline step that even compiles it. That module can click
+and type into a host window, which makes it the largest untested surface here.
+
 They are in [[CONTRIBUTING.md]], step by step from setup to pull request, and
 the [[dashboard]] renders the same file at `/contribute/`. Contributions must not
 add vendor binaries or proprietary media (see [[legal#Google platform-tools]]).

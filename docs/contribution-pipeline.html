@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>os-lab contribution pipeline — task to live route</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --paper:       #F5F6F8;
+    --paper-2:     #EDEFF3;
+    --ink:         #171C24;
+    --muted:       #5B6472;
+    --soft:        #8A93A1;
+    --rule:        rgba(23,28,36,0.12);
+    --rule-solid:  rgba(23,28,36,0.22);
+    --signal:      #4EA8FF;
+    --signal-deep: #1B6FAE;
+    --signal-tint: rgba(78,168,255,0.10);
+    --font-sans:  'Geist', system-ui, sans-serif;
+    --font-serif: 'Instrument Serif', serif;
+    --font-mono:  'Geist Mono', ui-monospace, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 4rem 2rem 5rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .frame { max-width: 1180px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.65rem;
+  }
+
+  h1 {
+    font-family: var(--font-serif);
+    font-size: clamp(2rem, 3.6vw + 0.6rem, 3rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+    margin-bottom: 1.1rem;
+  }
+
+  .lead {
+    font-size: 1.02rem;
+    line-height: 1.65;
+    color: var(--muted);
+    max-width: 64ch;
+  }
+
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--soft);
+    margin-top: 1.4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+  }
+  .meta code { color: var(--muted); }
+
+  section { margin-top: 4.5rem; }
+
+  .sec-num {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    color: var(--soft);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-family: var(--font-serif);
+    font-size: 1.72rem;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin-bottom: 0.7rem;
+  }
+
+  .sub {
+    font-size: 0.94rem;
+    line-height: 1.62;
+    color: var(--muted);
+    max-width: 70ch;
+    margin-bottom: 1.8rem;
+  }
+
+  svg { width: 100%; height: auto; display: block; }
+
+  .figure-note {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.65;
+    color: var(--soft);
+    margin-top: 1rem;
+    padding-left: 0.85rem;
+    border-left: 2px solid var(--rule-solid);
+  }
+  .figure-note b { color: var(--muted); font-weight: 500; }
+
+  /* ---- tables ---- */
+  .table-wrap { margin-top: 0.5rem; overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  th {
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    font-weight: 500;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--soft);
+    text-align: left;
+    padding: 0 0.85rem 0.55rem;
+    border-bottom: 1px solid var(--rule-solid);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.62rem 0.85rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--muted);
+  }
+
+  td:first-child { color: var(--ink); }
+
+  tr:last-child td { border-bottom: none; }
+
+  code, .m {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  td code { color: var(--ink); }
+
+  .yes { color: var(--signal-deep); font-weight: 500; }
+  .no  { color: var(--soft); }
+
+  .tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid var(--rule-solid);
+    border-radius: 3px;
+    color: var(--muted);
+  }
+
+  /* ---- cards ---- */
+  .cards {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr 0.95fr;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .card {
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.15rem 1.25rem;
+  }
+
+  .card .eyebrow { font-size: 0.6rem; margin-bottom: 0.55rem; }
+
+  .card h3 {
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.35;
+    margin-bottom: 0.5rem;
+  }
+
+  .card p, .card li {
+    font-size: 0.8rem;
+    line-height: 1.62;
+    color: var(--muted);
+  }
+
+  .card ul { list-style: none; }
+  .card li { padding-left: 0.85rem; position: relative; }
+  .card li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0.58em;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--soft);
+  }
+
+  .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 0.45rem;
+    vertical-align: baseline;
+  }
+  .dot.ink    { background: var(--ink); }
+  .dot.signal { background: var(--signal); }
+  .dot.soft   { background: var(--soft); }
+
+  footer {
+    margin-top: 4.5rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule-solid);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    line-height: 1.8;
+    color: var(--soft);
+  }
+
+  footer a { color: var(--muted); }
+
+  .sources { margin-top: 0.9rem; }
+  .sources li {
+    list-style: none;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    line-height: 1.9;
+    color: var(--soft);
+  }
+  .sources code { font-size: 0.68rem; color: var(--muted); }
+
+  @media (max-width: 760px) {
+    body { padding: 2.5rem 1rem 3.5rem; }
+    .cards { grid-template-columns: 1fr; }
+    table { font-size: 0.76rem; }
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <p class="eyebrow">os-lab · contribution pipeline</p>
+  <h1>From a claimed task to a live route</h1>
+  <p class="lead">
+    Every change in os-lab takes the same eight-step path, crosses the same five pull-request
+    workflows, and leaves through one of four deploy surfaces. These four figures show the
+    sequence, the selection logic inside the PR gate, the job graph of the heavy workflow, and the
+    post-merge fan-out; the tables after them give the variations each phase actually supports.
+  </p>
+  <p class="meta">
+    Derived from the repository at <code>4390b4b</code> · every command, path filter, shard rule and
+    route listed here was read from the file that owns it, not inferred from convention.
+  </p>
+
+  <!-- ============================================================ 01 SPINE -->
+  <section>
+    <p class="sec-num">01 · the spine</p>
+    <h2>Eight phases, one branch at a time</h2>
+    <p class="sub">
+      A branch is only ever in one phase. The rule that keeps parallel agents from colliding is not
+      in the diagram — it is the ownership of master: exactly one branch lands at a time, in the
+      order the maintainer chooses.
+    </p>
+
+    <svg viewBox="0 0 1440 344" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="spine-title spine-desc">
+      <title id="spine-title">The os-lab contribution spine: eight phases from claiming a task to deploying</title>
+      <desc id="spine-desc">A left-to-right chain of eight phases — claim, isolate, fix, prove, rebase, pull request, merge, deploy — where a failed check or a review comment returns the branch to the fix phase, and the prove phase is marked as the focal gate.</desc>
+      <defs>
+        <marker id="spine-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5B6472"/></marker>
+      </defs>
+
+      <rect width="1440" height="344" fill="#F5F6F8"/>
+
+      <!-- arrows first -->
+      <line x1="180" y1="116" x2="204" y2="116" stroke="#5B6472" stroke-width="1" marker-end="url(#spine-arrow)"/>
+      <line x1="356" y1="116" x2="380" y2="116" stroke="#5B6472" stroke-width="1" marker-end="url(#spine-arrow)"/>
+      <line x1="532" y1="116" x2="556" y2="116" stroke="#5B6472" stroke-width="1" marker-end="url(#spine-arrow)"/>
+      <line x1="708" y1="116" x2="732" y2="116" stroke="#5B6472" stroke-width="1" marker-end="url(#spine-arrow)"/>
+      <line x1="884" y1="116" x2="908" y2="116" stroke="#5B6472" stroke-width="1" marker-end="url(#spine-arrow)"/>
+      <line x1="1060" y1="116" x2="1084" y2="116" stroke="#5B6472" stroke-width="1" marker-end="url(#spine-arrow)"/>
+      <line x1="1236" y1="116" x2="1260" y2="116" stroke="#5B6472" stroke-width="1" marker-end="url(#spine-arrow)"/>
+      <path d="M 984,160 V 200 Q 984,208 976,208 H 464 Q 456,208 456,200 V 160"
+            fill="none" stroke="#5B6472" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#spine-arrow)"/>
+
+      <!-- return label: mask bottom 198, connector at 208 → 10px gap -->
+      <rect x="679" y="186" width="82" height="12" rx="2" fill="#F5F6F8"/>
+      <text x="720" y="196" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace"
+            text-anchor="middle" letter-spacing="0.06em">CHANGES REQUESTED</text>
+
+      <!-- phase chips -->
+      <rect x="92" y="40" width="24" height="16" rx="2" fill="#EDEFF3"/>
+      <text x="104" y="52" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">01</text>
+      <rect x="268" y="40" width="24" height="16" rx="2" fill="#EDEFF3"/>
+      <text x="280" y="52" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">02</text>
+      <rect x="444" y="40" width="24" height="16" rx="2" fill="#EDEFF3"/>
+      <text x="456" y="52" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">03</text>
+      <rect x="620" y="40" width="24" height="16" rx="2" fill="#EDEFF3"/>
+      <text x="632" y="52" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">04</text>
+      <rect x="796" y="40" width="24" height="16" rx="2" fill="#EDEFF3"/>
+      <text x="808" y="52" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">05</text>
+      <rect x="972" y="40" width="24" height="16" rx="2" fill="#EDEFF3"/>
+      <text x="984" y="52" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">06</text>
+      <rect x="1148" y="40" width="24" height="16" rx="2" fill="#EDEFF3"/>
+      <text x="1160" y="52" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">07</text>
+      <rect x="1324" y="40" width="24" height="16" rx="2" fill="#EDEFF3"/>
+      <text x="1336" y="52" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">08</text>
+
+      <!-- nodes -->
+      <rect x="28" y="72" width="152" height="88" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="204" y="72" width="152" height="88" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="380" y="72" width="152" height="88" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="556" y="72" width="152" height="88" rx="6" fill="#4EA8FF" fill-opacity="0.10" stroke="#4EA8FF" stroke-width="1.2"/>
+      <rect x="732" y="72" width="152" height="88" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="908" y="72" width="152" height="88" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="1084" y="72" width="152" height="88" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="1260" y="72" width="152" height="88" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+
+      <!-- node names -->
+      <text x="104" y="100" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Claim</text>
+      <text x="280" y="100" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Isolate</text>
+      <text x="456" y="100" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Fix</text>
+      <text x="632" y="100" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Prove</text>
+      <text x="808" y="100" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Rebase</text>
+      <text x="984" y="100" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Pull request</text>
+      <text x="1160" y="100" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Merge</text>
+      <text x="1336" y="100" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Deploy</text>
+
+      <!-- node mono -->
+      <text x="104" y="124" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">reservations/&lt;id&gt;</text>
+      <text x="280" y="124" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">worktree.sh new</text>
+      <text x="456" y="124" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">src/ + tests</text>
+      <text x="632" y="124" fill="#1B6FAE" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">run-tests.sh --changed</text>
+      <text x="808" y="124" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">rebase origin/master</text>
+      <text x="984" y="124" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">gh pr create</text>
+      <text x="1160" y="124" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">gh pr merge</text>
+      <text x="1336" y="124" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">deploy-page.sh</text>
+
+      <!-- gate tags -->
+      <text x="104" y="142" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">TASK ID IS FREE</text>
+      <text x="280" y="142" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CACHES LINKED</text>
+      <text x="456" y="142" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">FAILURE REPRODUCED</text>
+      <text x="632" y="142" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">LOCAL CHECKS GREEN</text>
+      <text x="808" y="142" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">MASTER HELD</text>
+      <text x="984" y="142" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">GATED BY CI</text>
+      <text x="1160" y="142" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">DIST PR LANDS</text>
+      <text x="1336" y="142" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">FOUR SURFACES</text>
+
+      <!-- legend -->
+      <line x1="28" y1="264" x2="1412" y2="264" stroke="rgba(23,28,36,0.12)" stroke-width="0.8"/>
+      <text x="28" y="284" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+      <line x1="120" y1="280" x2="152" y2="280" stroke="#5B6472" stroke-width="1"/>
+      <text x="162" y="284" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">FORWARD STEP</text>
+      <line x1="300" y1="280" x2="332" y2="280" stroke="#5B6472" stroke-width="1" stroke-dasharray="5,4"/>
+      <text x="342" y="284" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">RETURN TO FIX</text>
+      <rect x="500" y="274" width="16" height="12" rx="2" fill="#4EA8FF" fill-opacity="0.10" stroke="#4EA8FF" stroke-width="1.2"/>
+      <text x="526" y="284" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">FOCAL PHASE</text>
+    </svg>
+
+    <p class="figure-note">
+      <b>Phase 4 is where the cost sits.</b> <code>run-tests.sh --changed</code> maps changed paths to
+      12 stages; <code>scripts/e2e.sh</code> maps them to specs, routes and locales. Both read the same
+      <code>changed-files.sh</code> base, so a branch never runs what it did not touch.
+    </p>
+  </section>
+
+  <!-- ==================================================== 02 PR SELECTION -->
+  <section>
+    <p class="sec-num">02 · the pull-request gate</p>
+    <h2>How a pull request picks its own checks</h2>
+    <p class="sub">
+      Nothing runs the whole suite for a one-file change. Two selectors read the same change set and
+      route it to different machinery: the Python and shell stages to the left, the browser suite to
+      the right. Every workflow a change triggers still has to report before the branch is landed.
+    </p>
+
+    <svg viewBox="0 0 1280 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="select-title select-desc">
+      <title id="select-title">Change selection: one change set feeding unit stages, e2e selection and shards</title>
+      <desc id="select-desc">A changed-files node on the left routes to two selectors — the unit stage map and the e2e affected map — which feed sharded Playwright runs, and every path converges on the single reported verdict the landing order waits for.</desc>
+      <defs>
+        <marker id="sel-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5B6472"/></marker>
+      </defs>
+
+      <rect width="1280" height="520" fill="#F5F6F8"/>
+
+      <!-- arrows -->
+      <path d="M 240,252 H 304 Q 312,252 312,244 V 172 Q 312,164 320,164 H 360"
+            fill="none" stroke="#5B6472" stroke-width="1" marker-end="url(#sel-arrow)"/>
+      <path d="M 240,300 H 320 Q 328,300 328,308 V 396 Q 328,404 336,404 H 360"
+            fill="none" stroke="#5B6472" stroke-width="1" marker-end="url(#sel-arrow)"/>
+      <line x1="608" y1="404" x2="688" y2="404" stroke="#5B6472" stroke-width="1" marker-end="url(#sel-arrow)"/>
+      <path d="M 608,144 H 1096 Q 1104,144 1104,152 V 200"
+            fill="none" stroke="#5B6472" stroke-width="1" marker-end="url(#sel-arrow)"/>
+      <path d="M 888,404 H 1176 Q 1184,404 1184,396 V 376"
+            fill="none" stroke="#5B6472" stroke-width="1" marker-end="url(#sel-arrow)"/>
+
+      <!-- nodes -->
+      <rect x="40" y="224" width="200" height="104" rx="6" fill="#5B6472" fill-opacity="0.10" stroke="#8A93A1" stroke-width="1"/>
+      <rect x="360" y="112" width="248" height="104" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="360" y="352" width="248" height="104" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="688" y="352" width="200" height="104" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="1000" y="200" width="240" height="176" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+
+      <!-- text -->
+      <text x="140" y="270" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Changed files</text>
+      <text x="140" y="292" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">changed-files.sh</text>
+      <text x="140" y="310" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">base → HEAD + untracked</text>
+
+      <text x="484" y="158" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Unit stages</text>
+      <text x="484" y="180" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">run-tests.sh --changed</text>
+      <text x="484" y="198" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">12 stages, path-mapped</text>
+
+      <text x="484" y="398" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">e2e selection</text>
+      <text x="484" y="420" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">affected.mjs --stdin</text>
+      <text x="484" y="438" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">specs · routes · locales</text>
+
+      <text x="788" y="398" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Shards</text>
+      <text x="788" y="420" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">playwright --shard</text>
+      <text x="788" y="438" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">1 · 2 · 4 by size</text>
+
+      <text x="1120" y="238" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Reported to land</text>
+      <text x="1120" y="268" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">unit</text>
+      <text x="1120" y="290" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">dashboard-e2e</text>
+      <text x="1120" y="312" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">content · firewall-lab</text>
+      <text x="1120" y="342" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">all must report green</text>
+    </svg>
+
+    <p class="figure-note">
+      <b>The verdict is not one job.</b> <code>unit</code>, <code>dashboard-e2e</code>,
+      <code>content</code> and <code>firewall-lab</code> each report independently; a change touching
+      <code>console/**</code> or a requirements file selects <em>every</em> unit stage, which is the
+      case the fan-in exists for.
+    </p>
+  </section>
+
+  <!-- ==================================================== 03 E2E INTERNALS -->
+  <section>
+    <p class="sec-num">03 · inside the heavy workflow</p>
+    <h2><code>dashboard-e2e</code>, job by job</h2>
+    <p class="sub">
+      This is the only workflow that starts browsers, so it guards its own cost. <code>plan</code>
+      refuses a pull request that commits <code>dashboard/dist</code> and decides whether the browser
+      job runs at all; <code>check</code> runs in parallel and never waits for it.
+    </p>
+
+    <svg viewBox="0 0 1280 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="e2e-title e2e-desc">
+      <title id="e2e-title">Job graph of the dashboard-e2e workflow</title>
+      <desc id="e2e-desc">A trigger node starts two tracks: a check job that always runs the typecheck, translations and tooling tests, and a plan job that rejects committed dist changes, picks specs and shards, then either feeds the browser shards into a report job or short-circuits to a not-run outcome.</desc>
+      <defs>
+        <marker id="e2e-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5B6472"/></marker>
+      </defs>
+
+      <rect width="1280" height="600" fill="#F5F6F8"/>
+
+      <!-- arrows -->
+      <path d="M 424,160 V 208 Q 424,216 416,216 H 184 Q 176,216 176,224 V 256"
+            fill="none" stroke="#5B6472" stroke-width="1" marker-end="url(#e2e-arrow)"/>
+      <line x1="520" y1="160" x2="520" y2="256" stroke="#5B6472" stroke-width="1" marker-end="url(#e2e-arrow)"/>
+      <line x1="592" y1="280" x2="648" y2="280" stroke="#5B6472" stroke-width="1" marker-end="url(#e2e-arrow)"/>
+      <line x1="888" y1="280" x2="944" y2="280" stroke="#5B6472" stroke-width="1" marker-end="url(#e2e-arrow)"/>
+      <line x1="424" y1="368" x2="424" y2="440" stroke="#5B6472" stroke-width="1"
+            stroke-dasharray="4,3" marker-end="url(#e2e-arrow)"/>
+
+      <!-- nodes -->
+      <rect x="352" y="80" width="240" height="80" rx="6" fill="#5B6472" fill-opacity="0.10" stroke="#8A93A1" stroke-width="1"/>
+      <rect x="56" y="256" width="240" height="112" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="352" y="256" width="240" height="112" rx="6" fill="#4EA8FF" fill-opacity="0.10" stroke="#4EA8FF" stroke-width="1.2"/>
+      <rect x="648" y="256" width="240" height="112" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="944" y="256" width="240" height="112" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="352" y="440" width="240" height="80" rx="6" fill="#F5F6F8" stroke="#171C24" stroke-opacity="0.20" stroke-dasharray="4,3"/>
+
+      <!-- text -->
+      <text x="472" y="114" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Trigger</text>
+      <text x="472" y="138" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">PR or master push</text>
+
+      <text x="176" y="288" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">check</text>
+      <text x="176" y="312" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">astro sync · tsc</text>
+      <text x="176" y="332" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">i18n + tooling tests</text>
+
+      <text x="472" y="288" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">plan</text>
+      <text x="472" y="312" fill="#1B6FAE" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">dist guard</text>
+      <text x="472" y="332" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">specs + shards</text>
+
+      <text x="768" y="288" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">browser</text>
+      <text x="768" y="312" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">npm ci · build</text>
+      <text x="768" y="332" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">shard i of N</text>
+
+      <text x="1064" y="288" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">report</text>
+      <text x="1064" y="312" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">merge blob reports</text>
+      <text x="1064" y="332" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">upload on failure</text>
+
+      <text x="472" y="474" fill="#5B6472" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Skipped</text>
+      <text x="472" y="496" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">mode: none → run=false</text>
+    </svg>
+
+    <p class="figure-note">
+      <b>Shard count is derived, not configured.</b> A PR gets 1 shard for a small spec set, 2 once
+      four or more specs are affected, and master runs the whole suite across 4. The
+      <code>report</code> job uploads an HTML report only when <code>browser</code> did not succeed.
+    </p>
+  </section>
+
+  <!-- ==================================================== 04 AFTER MERGE -->
+  <section>
+    <p class="sec-num">04 · after the merge</p>
+    <h2>Four deploy surfaces, only three of them in CI</h2>
+    <p class="sub">
+      A merge to master is not a deploy. Two workflows publish on a master push; the update feed is
+      the near miss — it starts on a release event and a 20-minute cron, never on the push itself. The
+      public site is the only surface outside CI, built and force-pushed from a maintainer's machine.
+    </p>
+
+    <svg viewBox="0 0 1080 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="deploy-title deploy-desc">
+      <title id="deploy-title">Four deploy surfaces and what starts each</title>
+      <desc id="deploy-desc">Three deploy surfaces are started by a master push — the dist rebuild that opens and merges its own pull request, the signed content release, and the app update feed, which actually starts on a release event plus a twenty-minute cron. The public Pages site is the fourth and only starts from a maintainer's machine.</desc>
+      <defs>
+        <marker id="dep-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5B6472"/></marker>
+        <marker id="dep-arrow-manual" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4EA8FF"/></marker>
+      </defs>
+
+      <rect width="1080" height="560" fill="#F5F6F8"/>
+
+      <!-- edges: one per trigger, each its own y -->
+      <line x1="168" y1="144" x2="376" y2="144" stroke="#5B6472" stroke-width="1" marker-end="url(#dep-arrow)"/>
+      <line x1="168" y1="248" x2="376" y2="248" stroke="#5B6472" stroke-width="1" marker-end="url(#dep-arrow)"/>
+      <line x1="168" y1="352" x2="376" y2="352" stroke="#5B6472" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#dep-arrow)"/>
+      <line x1="168" y1="456" x2="376" y2="456" stroke="#4EA8FF" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#dep-arrow-manual)"/>
+
+      <!-- trigger column: master push covers the first two rows only -->
+      <rect x="56" y="104" width="112" height="184" rx="6" fill="#171C24" fill-opacity="0.05" stroke="#5B6472" stroke-opacity="0.55"/>
+      <text x="112" y="188" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">master</text>
+      <text x="112" y="210" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">origin push</text>
+
+      <rect x="56" y="312" width="112" height="80" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <text x="112" y="340" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">release</text>
+      <text x="112" y="358" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">published</text>
+      <text x="112" y="374" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">+ 20m cron</text>
+
+      <rect x="56" y="416" width="112" height="80" rx="6" fill="#4EA8FF" fill-opacity="0.06" stroke="#4EA8FF" stroke-opacity="0.50" stroke-dasharray="4,4"/>
+      <text x="112" y="444" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">manual</text>
+      <text x="112" y="462" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">a maintainer</text>
+      <text x="112" y="478" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">machine</text>
+
+      <!-- surface rows -->
+      <rect x="376" y="104" width="640" height="80" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="376" y="208" width="640" height="80" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="376" y="312" width="640" height="80" rx="6" fill="#FFFFFF" stroke="#5B6472" stroke-opacity="0.55"/>
+      <rect x="376" y="416" width="640" height="80" rx="6" fill="#4EA8FF" fill-opacity="0.10" stroke="#4EA8FF" stroke-width="1.2"/>
+
+      <text x="396" y="136" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Dist rebuild</text>
+      <text x="396" y="156" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace">dashboard-dist.yml</text>
+      <text x="396" y="172" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace">→ opens build/dist-&lt;sha&gt; PR, then merges it</text>
+
+      <text x="396" y="240" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Signed content</text>
+      <text x="396" y="260" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace">content.yml · Ed25519</text>
+      <text x="396" y="276" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace">→ releases content-latest and content-&lt;seq&gt;</text>
+
+      <text x="396" y="344" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Update feed</text>
+      <text x="396" y="364" fill="#5B6472" font-size="9" font-family="'Geist Mono', monospace">updater-manifest.yml</text>
+      <text x="396" y="380" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace">→ app-updates/latest.json, every signature verified</text>
+
+      <text x="396" y="448" fill="#171C24" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Public Pages</text>
+      <text x="396" y="468" fill="#1B6FAE" font-size="9" font-family="'Geist Mono', monospace">scripts/deploy-page.sh</text>
+      <text x="396" y="484" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace">→ orphan commit, force-push gh-pages</text>
+
+      <!-- legend -->
+      <line x1="56" y1="520" x2="1016" y2="520" stroke="rgba(23,28,36,0.12)" stroke-width="0.8"/>
+      <text x="56" y="540" fill="#5B6472" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+      <line x1="148" y1="536" x2="180" y2="536" stroke="#5B6472" stroke-width="1"/>
+      <text x="190" y="540" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">MASTER PUSH</text>
+      <line x1="340" y1="536" x2="372" y2="536" stroke="#5B6472" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="382" y="540" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">OTHER TRIGGER</text>
+      <line x1="532" y1="536" x2="564" y2="536" stroke="#4EA8FF" stroke-width="1.2" stroke-dasharray="5,4"/>
+      <text x="574" y="540" fill="#8A93A1" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">MANUAL, OUTSIDE CI</text>
+    </svg>
+
+    <p class="figure-note">
+      <b>The public site is a filter, not a mirror.</b> <code>deploy-page.sh</code> copies the build and
+      deletes everything the allowlist does not name, so the Pages copy keeps
+      <code>firewall</code>, <code>source</code>, <code>cleanup</code>, <code>how-to-use</code>,
+      <code>contribute</code>, <code>legal</code> and <code>feedback</code> — and drops every
+      console-backed route.
+    </p>
+  </section>
+
+  <!-- ==================================================== VARIATIONS -->
+  <section>
+    <p class="sec-num">05 · variations</p>
+    <h2>What each phase actually supports</h2>
+    <p class="sub">
+      The same eight phases produce different command sets depending on what changed. These are the
+      branches the pipeline takes, quoted from the scripts that implement them.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <caption class="eyebrow" style="text-align:left;padding-bottom:0.6rem">Check set by area changed</caption>
+        <thead>
+          <tr><th>Area changed</th><th>Local command</th><th>What it covers</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Dashboard</td>
+            <td><code>npm run check</code> · <code>test:i18n</code> · <code>build</code></td>
+            <td>Typecheck, all seven locales, the production build</td>
+          </tr>
+          <tr>
+            <td>Dashboard, browser</td>
+            <td><code>npm run test:e2e</code></td>
+            <td>Playwright against its own build; ask before running</td>
+          </tr>
+          <tr>
+            <td>Knowledge graph</td>
+            <td><code>lat check</code></td>
+            <td>Node links and graph integrity after editing <code>lat.md/</code></td>
+          </tr>
+          <tr>
+            <td>Any lab or shared code</td>
+            <td><code>scripts/run-tests.sh --changed</code></td>
+            <td>Only the 12 stages the changed paths select; <code>--quick</code> narrows to unit suites</td>
+          </tr>
+          <tr>
+            <td>Selected e2e</td>
+            <td><code>scripts/e2e.sh --changed</code></td>
+            <td>Only the specs that cover the change, on a free port behind a machine lock</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap" style="margin-top:2.5rem">
+      <table>
+        <caption class="eyebrow" style="text-align:left;padding-bottom:0.6rem">e2e mode by kind of change</caption>
+        <thead>
+          <tr><th>Kind of change</th><th>Mode</th><th>Adds</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>One view</td>
+            <td><code>--changed</code></td>
+            <td>Affected specs only — the default</td>
+          </tr>
+          <tr>
+            <td>Layout or styles</td>
+            <td><code>--changed --crawl --widths desktop,phone</code></td>
+            <td>A full-page PNG per route at both widths</td>
+          </tr>
+          <tr>
+            <td>Translations</td>
+            <td><code>--changed --crawl --locales &lt;changed&gt;</code></td>
+            <td>A PNG per route in each changed locale</td>
+          </tr>
+          <tr>
+            <td>Shared shell or styling</td>
+            <td><code>--changed</code> + <code>--crawl</code></td>
+            <td>The smoke set, crawled</td>
+          </tr>
+          <tr>
+            <td>Before the PR, once</td>
+            <td><code>--full</code></td>
+            <td>The whole suite; 4 shards in CI, 2 browsers locally</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ==================================================== WORKFLOWS -->
+  <section>
+    <p class="sec-num">06 · the workflows</p>
+    <h2>Every workflow a pull request can start</h2>
+    <p class="sub">
+      Path filters are the reason a docs-only change does not start browsers. Two entries here never
+      run on a pull request at all; they run after merge or on a schedule.
+    </p>
+    <p class="sub" style="max-width:none">
+      <span class="tag">caveat</span>
+      As of this commit master has <em>no required checks or reviews</em> — <code>dashboard-dist.yml</code>
+      says so in the comment that lets it merge its own PR. The column below therefore records what a
+      workflow reports, not what the platform blocks; a red check stops a merge because contributors
+      and the landing order wait for it, not because branch protection enforces it.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Workflow</th><th>Fires on</th><th>Path filter</th><th>Enforces</th><th>Merge signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>unit.yml</code></td>
+            <td>PR · master push · dispatch</td>
+            <td class="no">none — always</td>
+            <td><code>run-tests.sh --changed</code>, timings to the summary</td>
+            <td>intended required</td>
+          </tr>
+          <tr>
+            <td><code>dashboard-e2e.yml</code></td>
+            <td>PR · master push</td>
+            <td><code>dashboard/**</code>, <code>docs/legal/**</code>, <code>changed-files.sh</code></td>
+            <td>dist guard, typecheck, i18n, tooling, affected specs in shards</td>
+            <td class="yes">claimed required</td>
+          </tr>
+          <tr>
+            <td><code>content.yml</code></td>
+            <td>PR · master push</td>
+            <td><code>firewall-lab/**</code>, <code>ios-lab/knowledge/**</code>, <code>docs/legal/**</code>, <code>hooks/**</code>, <code>content.py</code></td>
+            <td>Schema, pack build <code>--check</code>, verification report; signs only on master</td>
+            <td>convention</td>
+          </tr>
+          <tr>
+            <td><code>firewall-lab.yml</code></td>
+            <td>PR · master push · <code>feat/**</code></td>
+            <td><code>firewall-lab/**</code>, <code>dashboard/src/firewall/**</code></td>
+            <td>Catalog <code>--check</code>, seed freshness, <code>nft -c</code> and <code>bash -n</code> per branch</td>
+            <td>convention</td>
+          </tr>
+          <tr>
+            <td><code>release-linux/mac/win</code></td>
+            <td>PR on packaging inputs · tag <code>app-v*</code></td>
+            <td><code>app/**</code>, <code>dashboard/package*.json</code>, <code>astro.config.mjs</code>, <code>console/**</code></td>
+            <td>Builds installers; publishes only from a tag</td>
+            <td class="no">informational</td>
+          </tr>
+          <tr>
+            <td><code>dashboard-dist.yml</code></td>
+            <td>master push only</td>
+            <td><code>dashboard/**</code>, <code>docs/legal/**</code></td>
+            <td>Rebuilds <code>dist</code>, opens and merges <code>build/dist-&lt;sha&gt;</code></td>
+            <td class="no">after merge</td>
+          </tr>
+          <tr>
+            <td><code>updater-manifest.yml</code></td>
+            <td>cron <code>*/20</code> · release published</td>
+            <td class="no">n/a</td>
+            <td>Builds and verifies <code>app-updates/latest.json</code>; never downgrades</td>
+            <td class="no">none</td>
+          </tr>
+          <tr>
+            <td><code>mobile-sec-scan.yml</code></td>
+            <td class="no">dormant</td>
+            <td class="no">n/a</td>
+            <td>Kept for reference, disabled in <code>lat.md/tooling.md</code></td>
+            <td class="no">none</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ==================================================== ROUTES -->
+  <section>
+    <p class="sec-num">07 · routes</p>
+    <h2>Every route family, and which surface serves it</h2>
+    <p class="sub">
+      The dashboard is one static Astro build serving two very different audiences. The local console
+      serves every page; GitHub Pages keeps only what works without a backend. Locale counts come from
+      the routes that actually generate, not from the seven locale files.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Route family</th><th>Generated from</th><th>Local console</th><th>GitHub Pages</th><th>Locales</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>/</code></td>
+            <td><code>index.astro</code> — host page or public home</td>
+            <td class="yes">yes</td><td class="yes">yes</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/health/</code></td>
+            <td><code>health.astro</code></td>
+            <td class="yes">yes</td><td class="no">dropped</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/jobs/</code></td>
+            <td><code>[locale]/[...rest]</code></td>
+            <td class="yes">yes</td><td class="no">dropped</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/contribute/</code></td>
+            <td><code>contribute.astro</code> + <code>CONTRIBUTING.md</code></td>
+            <td class="yes">yes</td><td class="yes">yes</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/how-to-use/</code></td>
+            <td><code>how-to-use.astro</code></td>
+            <td class="yes">yes</td><td class="yes">yes</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/feedback/</code></td>
+            <td><code>feedback.astro</code></td>
+            <td class="yes">yes</td><td class="yes">yes</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/content/</code></td>
+            <td><code>[locale]/[...rest]</code> + <code>docs/CONTENT.md</code></td>
+            <td class="yes">yes</td><td class="no">dropped</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/legal/</code> + 4 documents</td>
+            <td><code>legal/[doc].astro</code> from <code>docs/legal/*.md</code></td>
+            <td class="yes">yes</td><td class="yes">yes</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/cleanup/</code> + 8 sub-pages</td>
+            <td><code>cleanup/[...page].astro</code></td>
+            <td class="yes">yes</td><td class="yes">yes, read-only</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/source/</code> + 7 sub-pages + docs</td>
+            <td><code>source/[...page].astro</code></td>
+            <td class="yes">yes</td><td class="yes">yes</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/firewall/</code> + 20 companies</td>
+            <td><code>firewall/[company].astro</code></td>
+            <td class="yes">yes</td><td class="yes">yes</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/labs/</code> — 8 lab ids</td>
+            <td><code>labs/[lab].astro</code></td>
+            <td class="yes">yes</td><td class="no">dropped</td><td>6 of 8</td>
+          </tr>
+          <tr>
+            <td><code>/android/</code> + 5 sub-pages</td>
+            <td><code>[locale]/[...rest]</code></td>
+            <td class="yes">yes</td><td class="no">dropped</td><td>7 + en</td>
+          </tr>
+          <tr>
+            <td><code>/web-lab/</code></td>
+            <td><code>web-lab/index.astro</code></td>
+            <td class="yes">yes</td><td class="no">dropped</td><td>en only</td>
+          </tr>
+          <tr>
+            <td><code>/404</code></td>
+            <td><code>404.astro</code></td>
+            <td class="yes">yes</td><td class="yes">yes</td><td>en only</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <p class="eyebrow">Locale surface</p>
+        <h3><span class="dot signal"></span>Eight locales, unevenly</h3>
+        <p>
+          <code>FIREWALL_LOCALES</code> is <code>en tr de fr es it fa ar</code>. The seven non-English
+          locales each get every route the shared <code>[locale]/[...rest]</code> enumerates —
+          including <code>/labs/</code> for six of the eight lab ids; <code>winapps</code> and
+          <code>web-lab</code> stay English only.
+        </p>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Pages allowlist</p>
+        <h3><span class="dot ink"></span>What survives the copy</h3>
+        <p>
+          <code>index</code>, <code>404</code>, <code>firewall</code>, <code>source</code>,
+          <code>cleanup</code>, <code>how-to-use</code>, <code>contribute</code>, <code>legal</code>,
+          <code>feedback</code>. Anything else is deleted from the published tree.
+        </p>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Stop rules</p>
+        <h3><span class="dot soft"></span>Three that bite</h3>
+        <ul>
+          <li>Never commit <code>dashboard/dist</code> — CI refuses the PR.</li>
+          <li>At most two or three heavy agents on a laptop.</li>
+          <li>One agent lands on master at a time.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    os-lab · contribution pipeline reference · generated from the repository at <code>4390b4b</code>
+    <ul class="sources">
+      <li>sequence · <code>CONTRIBUTING.md</code> (Landing a branch), <code>AGENTS.md</code></li>
+      <li>checks · <code>scripts/run-tests.sh</code>, <code>scripts/e2e.sh</code>, <code>dashboard/package.json</code></li>
+      <li>pull requests · <code>.github/workflows/{unit,dashboard-e2e,content,firewall-lab,release-*}.yml</code></li>
+      <li>after merge · <code>.github/workflows/{dashboard-dist,updater-manifest}.yml</code>, <code>scripts/deploy-page.sh</code></li>
+      <li>routes · <code>dashboard/src/pages/**</code>, <code>dashboard/e2e/affected.json</code></li>
+    </ul>
+  </footer>
+
+</div>
+</body>
+</html>
