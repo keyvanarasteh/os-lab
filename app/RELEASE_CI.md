@@ -34,7 +34,11 @@ SignPath-signed installer is signed again with the Tauri key, because Authentico
 bytes. Debian, RPM and DMG downloads also have detached signatures for manual verification;
 apt and dnf do not treat those as repository signatures. After every macOS, Windows and Linux
 asset is present on `app-v<version>`, run the
-`updater-manifest` workflow with that version. It verifies the SHA-256 files and refuses to
+`updater-manifest` workflow with that version
+(`gh workflow run updater-manifest.yml -f version=<version>`).
+A tag or GitHub Release created with `GITHUB_TOKEN` does not start other
+workflows, so this dispatch is required even when the workflow YAML lists
+`release` as a trigger. It verifies the SHA-256 files and refuses to
 publish a partial platform set. The feed is stored in the `app-updates` prerelease so content
 releases cannot accidentally become the app update endpoint. A release is not available through
 in-app update until this step succeeds.

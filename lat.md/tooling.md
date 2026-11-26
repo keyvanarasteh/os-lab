@@ -100,6 +100,19 @@ and the release workflows build installers on pull requests only when packaging
 inputs change. [[scripts/hooks/pre-push]] runs the quick changed suites before a
 push; `OSLAB_SKIP_PREPUSH=1` skips it.
 
+Local `npm run check` typecheck can fail on Vite `ImportMeta.env`,
+`import.meta.glob` and `?raw` while the GitHub typecheck job passes. Use the
+CI job as the merge gate.
+
+`gh pr merge --delete-branch` needs a checkout that is not the worktree
+holding that branch. Merge from the main clone, then
+`scripts/worktree.sh rm`.
+
+GitHub Actions does not start a second workflow from an event
+`GITHUB_TOKEN` created, so an `app-v*` tag still needs
+`gh workflow run updater-manifest.yml -f version=…` after the installers
+exist (see [app/RELEASE_CI.md](../app/RELEASE_CI.md)).
+
 ## Tests
 
 Android and Source Lab have independent automated test suites.

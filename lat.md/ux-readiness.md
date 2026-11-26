@@ -83,6 +83,14 @@ flow and the public Turkish `/os-lab/tr/cleanup/` route without engine calls.
 
 [[dashboard/e2e/health-and-content.spec.ts]] covers dependency actions, advanced details, run failures, and hydration across page types. [[dashboard/e2e/lab-switcher.spec.ts]] covers ⌘L, the sidebar card, focus following a direct link, the All-labs reset, and Spotlight keeping every lab. Dashboard type, translation, and static build checks complement browser tests. Public Pages links and locale switching are checked under `/os-lab/`.
 
+A white full-page screenshot after a lab switch means the `client:only`
+island threw (partial API mock or unguarded `.map` / `.length`). Heading
+locators that match both TopBar and PageHead fail strict mode; scope to
+`main`. After Cleanup focus, assert Space Explorer (a sidebar button), not
+a "Cleanup Lab" button. Activate a highlighted switcher option with
+`click()`; Enter on the native dialog races focus. `toHaveCount(0)` on a
+missing lab name also passes on a blank page, so keep a positive locator.
+
 [[dashboard/scripts/source-pages-smoke.mjs]] checks every Source route and guide
 across all eight locales below `/os-lab/`, including query-preserving language
 switches. Public pages must issue no engine calls or operation controls.
