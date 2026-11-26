@@ -3380,5 +3380,11 @@
   "Move emulators off the system disk": "شبیه‌سازها را از دیسک سیستم جابه‌جا کن",
   "Moving emulators…": "در حال جابه‌جایی شبیه‌سازها…",
   "Studio still opens these AVDs through a junction at the original path.": "استودیو این AVDها را همچنان از طریق junction در مسیر اصلی باز می‌کند.",
-  "Studio still opens these AVDs through a symlink at the original path.": "استودیو این AVDها را همچنان از طریق پیوند نمادین در مسیر اصلی باز می‌کند."
+  "Studio still opens these AVDs through a symlink at the original path.": "استودیو این AVDها را همچنان از طریق پیوند نمادین در مسیر اصلی باز می‌کند.",
+  "System images": "تصویرهای سیستم",
+  "Unused": "بدون استفاده",
+  "In use": "در حال استفاده",
+  "Uninstall unused image": "حذف تصویر بدون استفاده",
+  "Uninstall unused system images": "حذف تصویرهای سیستم بدون استفاده",
+  "sdkmanager will uninstall this package. AVDs that need it cannot start until you install it again.": "sdkmanager این بسته را حذف می‌کند. AVDهایی که به آن نیاز دارند تا نصب دوباره راه‌اندازی نمی‌شوند."
 }

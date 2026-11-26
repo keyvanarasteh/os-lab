@@ -3380,5 +3380,11 @@
   "Move emulators off the system disk": "Sacar los emuladores del disco del sistema",
   "Moving emulators…": "Moviendo emuladores…",
   "Studio still opens these AVDs through a junction at the original path.": "Studio sigue abriendo estos AVD mediante una unión en la ruta original.",
-  "Studio still opens these AVDs through a symlink at the original path.": "Studio sigue abriendo estos AVD mediante un enlace simbólico en la ruta original."
+  "Studio still opens these AVDs through a symlink at the original path.": "Studio sigue abriendo estos AVD mediante un enlace simbólico en la ruta original.",
+  "System images": "Imágenes del sistema",
+  "Unused": "Sin uso",
+  "In use": "En uso",
+  "Uninstall unused image": "Desinstalar imagen sin uso",
+  "Uninstall unused system images": "Desinstalar imágenes del sistema sin uso",
+  "sdkmanager will uninstall this package. AVDs that need it cannot start until you install it again.": "sdkmanager desinstalará este paquete. Los AVD que lo necesiten no arrancan hasta que lo vuelva a instalar."
 }

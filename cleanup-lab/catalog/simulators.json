@@ -24,6 +24,28 @@
       "note": "Relocation-only entry (CLN-27 / CLA-02): Move/Restore happen on the Relocation tab. Windows uses a directory junction; macOS and Linux use a symlink. Do not write ANDROID_AVD_HOME."
     },
     {
+      "id": "simulators.android-system-images",
+      "name": "Android SDK system images",
+      "category": "simulator",
+      "risk": "high",
+      "hint": "The system-images subfolder of the Android SDK. Unused packages uninstall through sdkmanager; the Relocation tab can move this subfolder only, never the whole SDK.",
+      "impact": "Cleaning this folder as a catalog path is disabled: it would remove every emulator image. Use Android emulators on Advanced scan to uninstall unused packages one at a time.",
+      "defaultSelected": false,
+      "needsPrivilege": false,
+      "detector": "tool",
+      "owningProcesses": ["emulator", "emulator.exe", "qemu-system-x86_64", "qemu-system-aarch64"],
+      "toolName": "emulator",
+      "cacheEnv": ["ANDROID_SDK_ROOT", "ANDROID_HOME"],
+      "envSuffix": "system-images",
+      "paths": {
+        "macos": ["~/Library/Android/sdk/system-images"],
+        "linux": ["~/Android/Sdk/system-images"],
+        "windows": ["~/AppData/Local/Android/Sdk/system-images"]
+      },
+      "cleanable": false,
+      "note": "Relocation-only entry (CLN-27 / CLA-03): Move/Restore replace $SDK/system-images with a symlink or Windows junction. Never relocate the whole SDK. Uninstall unused packages with sdkmanager --uninstall."
+    },
+    {
       "id": "simulators.coresimulator-devices",
       "name": "iOS Simulator devices",
       "category": "simulator",

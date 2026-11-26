@@ -3380,5 +3380,11 @@
   "Move emulators off the system disk": "Emülatörleri sistem diskinden taşı",
   "Moving emulators…": "Emülatörler taşınıyor…",
   "Studio still opens these AVDs through a junction at the original path.": "Studio bu AVD’leri özgün yoldaki bir junction üzerinden açmaya devam eder.",
-  "Studio still opens these AVDs through a symlink at the original path.": "Studio bu AVD’leri özgün yoldaki bir sembolik bağ üzerinden açmaya devam eder."
+  "Studio still opens these AVDs through a symlink at the original path.": "Studio bu AVD’leri özgün yoldaki bir sembolik bağ üzerinden açmaya devam eder.",
+  "System images": "Sistem görüntüleri",
+  "Unused": "Kullanılmayan",
+  "In use": "Kullanımda",
+  "Uninstall unused image": "Kullanılmayan görüntüyü kaldır",
+  "Uninstall unused system images": "Kullanılmayan sistem görüntülerini kaldır",
+  "sdkmanager will uninstall this package. AVDs that need it cannot start until you install it again.": "sdkmanager bu paketi kaldıracak. Buna ihtiyaç duyan AVD’ler yeniden yüklenene kadar başlayamaz."
 }

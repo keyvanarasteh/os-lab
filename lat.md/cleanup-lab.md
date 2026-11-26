@@ -337,6 +337,14 @@ the linked disk is missing, a move was interrupted, or unavailable AVDs
 exist, and hides when there is no SDK and no AVD folder. The Relocation tab
 hosts `#emulator-storage`. docker-android volumes stay in android-lab.
 
+CLA-03 lists installed `system-images;*` packages from `sdkmanager --list_installed`
+and uninstalls only packages no AVD still references.
+
+`config.ini` `image.sysdir.1=` maps to a `;`-separated package id.
+`emulators.uninstall-images` is a medium-risk, single-use preview through
+`sdkmanager --uninstall`. Catalog entry `simulators.android-system-images` is
+that SDK subfolder only (relocatable via CLN-27); the whole SDK never moves.
+
 ## Simulator storage
 
 CLS-02 sets up where the iOS Simulator devices folder lives and when to suggest moving it.

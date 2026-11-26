@@ -13,7 +13,8 @@ export function emulatorActionLabel(actionId: string): string {
   const labels: Record<string, string> = {
     "emulators.delete-unavailable": "Delete unavailable emulators",
     "emulators.wipe-data": "Wipe selected emulator data",
-    "emulators.delete-avds": "Delete selected emulators"
+    "emulators.delete-avds": "Delete selected emulators",
+    "emulators.uninstall-images": "Uninstall unused system images"
   };
   return labels[actionId] ?? actionId;
 }
@@ -49,10 +50,13 @@ export function EmulatorsCard({ now }: { now: number }) {
 
   const devices = useMemo(() => [...(inventory?.devices ?? [])].sort((a, b) =>
     Number(a.available) - Number(b.available) || (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0)), [inventory]);
+  const images = useMemo(() => [...(inventory?.images ?? [])].sort((a, b) =>
+    Number(!a.unused) - Number(!b.unused) || (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0)), [inventory]);
   const unavailable = devices.filter((item) => !item.available);
   const total = devices.reduce((sum, item) => sum + (item.sizeBytes ?? 0), 0);
   const unavailableBytes = unavailable.reduce((sum, item) => sum + (item.sizeBytes ?? 0), 0);
   const busy = pending || job?.state === "running";
+  const isImagePreview = preview?.actionId === "emulators.uninstall-images";
 
   async function loadPreview(actionId: string, deviceIds?: string[]) {
     setPending(true); setError(""); setPreview(null); setJob(null);
@@ -77,7 +81,7 @@ export function EmulatorsCard({ now }: { now: number }) {
   return <Section id="scan-emulators" title="Android emulators" description="AVDs on this computer. Preview before wiping or deleting; only shut-down emulators can be changed.">
     {loadError && <><Status value={{ ok: false, text: loadError }} /><button type="button" className="iux-btn mt-2" onClick={load}>Retry</button></>}
     {!inventory && !loadError && <p role="status">Checking Android emulators…</p>}
-    {inventory && !inventory.available && <p>{inventory.reason || "No Android emulator folder on this computer."}</p>}
+    {inventory && !inventory.available && images.length === 0 && <p>{inventory.reason || "No Android emulator folder on this computer."}</p>}
     {inventory?.available && <>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span><span dir="ltr" className="font-semibold tabular-nums">{devices.length}</span> <span>emulators</span></span>
@@ -113,18 +117,37 @@ export function EmulatorsCard({ now }: { now: number }) {
             </li>;
           })}
         </ul>}
-      {preview && <div className="mt-3 rounded-md border border-(--iux-border) p-3 text-sm">
+    </>}
+    {images.length > 0 && <div className="mt-4">
+      <h3 className="text-xs font-medium uppercase tracking-wide text-(--iux-muted-foreground)">System images</h3>
+      <ul className="mt-2 divide-y divide-(--iux-border) rounded-md border border-(--iux-border)">
+        {images.map((image) => <li key={image.id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium" translate="no">{image.name}</span>
+            <span className="block truncate text-xs text-(--iux-muted-foreground)" translate="no">{image.id}</span>
+          </span>
+          {image.unused ? <Badge>Unused</Badge> : <Badge tone="warning">In use</Badge>}
+          <span dir="ltr" className="w-20 shrink-0 text-end tabular-nums">{image.sizeBytes === null || image.sizeBytes === undefined ? "—" : bytes(image.sizeBytes)}</span>
+          <button type="button" className="iux-btn" disabled={busy || !image.unused}
+            onClick={() => void loadPreview("emulators.uninstall-images", [image.id])}>Uninstall unused image</button>
+        </li>)}
+      </ul>
+    </div>}
+    {inventory?.imageReason && <p className="mt-3 text-xs text-(--iux-muted-foreground)">{inventory.imageReason}</p>}
+    {preview && <div className="mt-3 rounded-md border border-(--iux-border) p-3 text-sm">
         <div className="flex flex-wrap items-center gap-2">
           <strong>{emulatorActionLabel(preview.actionId)}</strong>
           <Badge tone={riskTone(preview.risk)}>{riskLabel(preview.risk)}</Badge>
-          <span className="tabular-nums text-(--iux-muted-foreground)">{preview.candidateCount} <span>emulators</span> · <span dir="ltr">{bytes(preview.bytes)}</span></span>
+          <span className="tabular-nums text-(--iux-muted-foreground)">{isImagePreview ? null : <>{preview.candidateCount} <span>emulators</span> · </>}<span dir="ltr">{bytes(preview.bytes)}</span></span>
           <span className="ms-auto"><CopyButton text={preview.command.join(" ")} label="Copy command" /></span>
         </div>
         <p className="mt-1 break-all text-xs"><span className="font-medium text-(--iux-muted-foreground)">Command</span> <code translate="no">{preview.command.join(" ")}</code></p>
         <p className="mt-1 text-xs text-(--iux-muted-foreground)" translate="no">{preview.devices.map((item) => item.name ?? item.id).join(", ")}</p>
         {preview.actionId === "emulators.wipe-data"
           ? <p className="mt-1 text-xs">Wipes userdata, cache and snapshots. The AVD definition stays.</p>
-          : <p className="mt-1 text-xs text-(--iux-danger)">Deleted emulators and their apps and data cannot be restored.</p>}
+          : isImagePreview
+            ? <p className="mt-1 text-xs text-(--iux-danger)">sdkmanager will uninstall this package. AVDs that need it cannot start until you install it again.</p>
+            : <p className="mt-1 text-xs text-(--iux-danger)">Deleted emulators and their apps and data cannot be restored.</p>}
         {preview.expiresAt <= now ? <p className="mt-2">Preview expired. Preview again.</p> :
           <div className="mt-2 flex gap-2">
             <button type="button" className="iux-btn" data-variant="primary" disabled={busy || !preview.candidateCount} onClick={() => void run()}>Confirm</button>
@@ -134,7 +157,6 @@ export function EmulatorsCard({ now }: { now: number }) {
       {job?.state === "running" && <p className="mt-2" role="status">Android emulator cleanup in progress…</p>}
       {job?.state === "done" && job.result && <p className="mt-2" role="status">Done. <span dir="ltr">{bytes(job.result.bytesFreed)}</span> <span>freed</span></p>}
       {job?.state === "failed" && <Status value={{ ok: false, text: job.error || job.result?.error || "Android emulator cleanup failed." }} />}
-    </>}
     {error && <Status value={{ ok: false, text: error }} />}
   </Section>;
 }
