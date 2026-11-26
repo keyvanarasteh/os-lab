@@ -141,7 +141,8 @@ test("MCP Codex plugin cards preview install commands without applying", async (
   await expect(dialog.getByText("codex plugin marketplace add /repo")).toBeVisible();
   await expect(dialog.getByText("scripts/codex-plugin.py install")).toBeVisible();
   expect(posts.map((post) => post.path)).not.toContain("/api/codex-plugin/apply");
-  await dialog.getByRole("button", { name: "Close" }).click();
+  await dialog.getByRole("button", { name: "Close" }).last().click();
+  await expect(dialog).toHaveCount(0);
 });
 
 test("MCP host plugin cards preview Cursor install without applying", async ({ page }) => {
@@ -195,7 +196,10 @@ test("MCP host plugin cards preview Cursor install without applying", async ({ p
   await expect(card.getByText("Not installed")).toBeVisible();
   await card.getByRole("button", { name: "Preview install" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("scripts/cursor-plugin.py install")).toBeVisible();
+  // The dialog shows the planned step and the command to run it, which share the script name.
+  await expect(dialog.getByText("# writes .cursor/mcp.json")).toBeVisible();
+  await expect(dialog.getByText("python3 scripts/cursor-plugin.py install", { exact: true })).toBeVisible();
   expect(posts.map((post) => post.path)).not.toContain("/api/cursor-plugin/apply");
-  await dialog.getByRole("button", { name: "Close" }).click();
+  await dialog.getByRole("button", { name: "Close" }).last().click();
+  await expect(dialog).toHaveCount(0);
 });
