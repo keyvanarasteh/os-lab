@@ -1,6 +1,7 @@
 {
   "version": 1,
   "reviewedOn": "2026-11-26",
+  "note": "Checked against the quoted doc text, except two limits seen only in a page summary: the SessionStart hook types and the 500000 / 50000 character result limits.",
   "sources": {
     "manifest": "https://code.claude.com/docs/en/plugins-reference",
     "cli": "https://code.claude.com/docs/en/plugins/cli-reference",
@@ -13,7 +14,7 @@
   },
   "requirements": [
     {"id": "manifest.name", "area": "manifest", "severity": "error", "usage": "used", "check": "manifest_name", "source": "manifest", "rule": "plugin.json has a name without spaces, '@', ':' or path separators."},
-    {"id": "manifest.reserved-name", "area": "manifest", "severity": "error", "usage": "used", "check": "manifest_reserved", "source": "manifest", "rule": "The name does not impersonate Anthropic (claude-, anthropic-, cc-plugin- prefixes)."},
+    {"id": "manifest.reserved-name", "area": "manifest", "severity": "error", "usage": "used", "check": "manifest_reserved", "source": "manifest", "rule": "The name does not impersonate Anthropic (claude-, anthropic-, anthropics-, cc-plugin- prefixes, reserved exact names, official beside claude or anthropic)."},
     {"id": "manifest.metadata", "area": "manifest", "severity": "warning", "usage": "used", "check": "manifest_metadata", "source": "manifest", "rule": "description, author.name, version and license are set."},
     {"id": "manifest.paths", "area": "manifest", "severity": "error", "usage": "used", "check": "manifest_paths", "source": "manifest", "rule": "Component paths start with './', stay inside the plugin, contain no '..' and exist."},
     {"id": "manifest.keys", "area": "manifest", "severity": "warning", "usage": "used", "check": "manifest_keys", "source": "manifest", "rule": "No unknown top-level keys."},
@@ -29,7 +30,7 @@
     {"id": "mcp.config", "area": "mcp", "severity": "error", "usage": "used", "check": "mcp_config", "source": "manifest", "rule": ".mcp.json declares servers with a command, and bundled files are referenced through ${CLAUDE_PLUGIN_ROOT}."},
     {"id": "mcp.tool-name", "area": "mcp", "severity": "error", "usage": "used", "check": "mcp_tool_names", "source": "mcp", "rule": "mcp__plugin_<plugin>_<server>__<tool> is at most 128 characters."},
     {"id": "mcp.schema-names", "area": "mcp", "severity": "error", "usage": "used", "check": "mcp_schema_names", "source": "mcp", "rule": "Top-level input property names are 1-64 letters, digits, '_', '.' or '-'."},
-    {"id": "mcp.description-length", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_descriptions", "source": "mcp", "rule": "Tool descriptions and server instructions fit 4096 characters."},
+    {"id": "mcp.description-length", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_descriptions", "source": "mcp", "rule": "Server instructions and tool descriptions fit 4096 characters (tools loaded through tool search may use 16384)."},
     {"id": "mcp.instructions", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_instructions", "source": "mcp", "rule": "The server sends instructions."},
     {"id": "mcp.result-size", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_result_size", "source": "mcp", "rule": "anthropic/maxResultSizeChars is at most 500000; larger text results are saved to a file after 50000 characters."},
     {"id": "mcp.annotations", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_annotations", "source": "mcp", "rule": "Every tool declares readOnlyHint."},

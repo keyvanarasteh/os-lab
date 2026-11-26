@@ -31,7 +31,8 @@ def change(args) -> int:
     if args.command in engine.TERMINAL_ONLY and not interactive:
         print("{0} needs an interactive terminal".format(args.command), file=sys.stderr)
         return 2
-    preview = engine.plan(ROOT, args.command, args.scope, args.name)
+    check = None if args.auto_check is None else args.auto_check == "on"
+    preview = engine.plan(ROOT, args.command, args.scope, args.name, update_check=check)
     print("This will run:")
     for command in preview["commands"]:
         print("  " + command)
@@ -73,8 +74,6 @@ def main(argv=None) -> int:
     parser.add_argument("--no-cli", action="store_true", help="check: skip rules that need Claude Code")
     parser.add_argument("--out", help="bundle: output file (default build/os-lab.mcpb)")
     args = parser.parse_args(argv)
-    if args.auto_check:
-        os.environ["OSLAB_UPDATE_CHECK"] = "true" if args.auto_check == "on" else "false"
     try:
         if args.command == "build":
             drift = engine.skill_drift(ROOT) if args.check else engine.build_skills(ROOT)

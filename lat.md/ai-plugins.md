@@ -53,6 +53,16 @@ The session start check stays silent when healthy. It reports a missing checkout
 Desktop extension, and with the `update_check` option (off by default) a newer published
 version, asked for at most once a day.
 
+## MCP page cards
+
+The `/mcp/` page checks, installs and updates the plugin through the local console, with the same preview and token as the tools.
+
+[[console/claude_plugin_api.py#handle]] serves `/api/claude-plugin`; every POST needs the
+`X-OSLab` header, and removals are refused with the terminal command. The cards in
+[[dashboard/src/views/mcp-plugin-cards.tsx]] show Claude Code, Claude Desktop and update
+state, open the planned commands in a dialog and apply only after Confirm. Without the
+console they show the terminal command instead.
+
 ## Server surface
 
 [[console/mcp_plugin.py]] adds the `plugin_*` tools, the resource `oslab://plugin/requirements` and a status widget; they are refused inside `macos_task`.

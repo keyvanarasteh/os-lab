@@ -37,6 +37,8 @@ TOOLS = [
                 common.obj({
                     "action": {"type": "string", "enum": list(engine.ACTIONS)},
                     "scope": _SCOPE,
+                    "updateCheck": {"type": "boolean",
+                                    "description": "install and configure: the daily update check"},
                     "name": {"type": "string", "enum": list(engine.DUPLICATE_NAMES),
                              "description": "remove-duplicate only"},
                 }, ["action"]), read_only=True),
@@ -77,8 +79,10 @@ def _dispatch(name, args, root):
         common.check(args, ["area", "useCli"])
         return engine.check(root, args.get("area"), use_cli=args.get("useCli") is not False)
     if name == "plugin_plan":
-        common.check(args, ["action", "scope", "name"], ["action"])
-        return engine.plan(root, args["action"], args.get("scope") or "user", args.get("name"))
+        common.check(args, ["action", "scope", "name", "updateCheck"], ["action"])
+        check = args.get("updateCheck")
+        return engine.plan(root, args["action"], args.get("scope") or "user", args.get("name"),
+                           update_check=check if isinstance(check, bool) else None)
     if name == "plugin_apply":
         common.check(args, ["token", "confirm"], ["token"])
         return engine.apply(root, args["token"], args.get("confirm") is True, audience="agent")

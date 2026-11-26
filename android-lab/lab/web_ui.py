@@ -68,6 +68,10 @@ try:
 except ImportError:
     websec_api = None
 try:
+    import claude_plugin_api  # noqa: E402  (console/claude_plugin_api.py: the MCP page's plugin cards)
+except ImportError:
+    claude_plugin_api = None
+try:
     import winapps  # noqa: E402  (console/winapps.py: native Windows app mirror and guarded UIA control)
 except ImportError:
     winapps = None
@@ -274,6 +278,9 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/app/update"):
             self._app_get(path)
+            return
+        if path.startswith("/api/claude-plugin"):
+            self._claude_plugin("GET", path)
             return
         if path == "/api/frida/inventory":
             self._frida_get(urllib.parse.parse_qs(parsed.query))
@@ -714,6 +721,9 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/app/update"):
             self._app_post(path)
             return
+        if path.startswith("/api/claude-plugin"):
+            self._claude_plugin("POST", path)
+            return
         if path.startswith("/api/cleanup"):
             self._cleanup_post(path)
             return
@@ -733,6 +743,17 @@ class LabHttpHandler(BaseHTTPRequestHandler):
                 self._json(400, {"error": str(e), "code": getattr(e, "code", None), "retry": getattr(e, "retry", None)})
             return
         self._android_post()
+
+    def _claude_plugin(self, method: str, path: str):
+        """The os-lab Claude plugin: state, update check, previewed changes (console/claude_plugin_api.py)."""
+        if not claude_plugin_api:
+            self._json(501, {"error": "The Claude plugin module (console/claude_plugin_api.py) is not installed"})
+            return
+        try:
+            data = self._read_json() if method == "POST" else None
+            self._json(*claude_plugin_api.handle(REPO_ROOT, method, path, data))
+        except (OSError, ValueError):
+            self._json(400, {"error": "Invalid Claude plugin request"})
 
     def _content_get(self, path: str, query: dict):
         """Content packs: what is installed, the companies, and the data files (see console/content.py)."""

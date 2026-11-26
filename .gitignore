@@ -98,3 +98,8 @@ win-lab/winapps-policy.json
 
 # Local scratch files
 .temp/
+
+# A shared cache root placed inside the checkout (OSLAB_CACHE_ROOT)
+.cache-build/
+# Output of scripts/claude-plugin.py bundle
+/build/

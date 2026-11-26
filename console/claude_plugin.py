@@ -423,7 +423,8 @@ def _check_manifest_name(ctx):
 def _check_manifest_reserved(ctx):
     name = str(ctx.manifest.get("name", ""))
     bad = name.startswith(("claude-", "anthropic-", "anthropics-", "cc-plugin-")) or \
-        name in ("claude", "anthropic", "anthropics", "claude-code", "claude-mods")
+        name in ("claude", "anthropic", "anthropics", "claude-code", "claude-mods") or \
+        ("official" in name and ("claude" in name or "anthropic" in name))
     return _verdict(["{0} is reserved".format(name)] if bad else [], name)
 
 
@@ -505,7 +506,11 @@ def _check_market_required(ctx):
 _RESERVED_MARKETS = (
     "claude-code-marketplace", "claude-code-plugins", "claude-plugins-official", "anthropic-marketplace",
     "anthropic-plugins", "agent-skills", "anthropic-agent-skills", "life-sciences", "knowledge-work-plugins",
-    "claude-community", "claude-plugins-community", "healthcare", "inline", "builtin", "skills-dir", "synced")
+    "claude-for-legal", "claude-for-financial-services", "financial-services-plugins", "first-party-plugins",
+    "claude-tag-plugins", "claude-community", "claude-plugins-community", "healthcare",
+    "anthropic-plugin-directory", "claude-plugin-directory", "inline", "builtin", "skills-dir", "synced",
+    "claude-plugin-test", "constructor", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable",
+    "toLocaleString", "toString", "valueOf")
 
 
 def _check_market_reserved(ctx):
@@ -758,22 +763,24 @@ def _python_command() -> str:
     return sys.executable
 
 
-def _configuration(root: str) -> list[str]:
+def _configuration(root: str, update_check: bool | None = None) -> list[str]:
     values = {"repo_path": os.path.realpath(root), "python_command": _python_command()}
     port = os.environ.get("OSLAB_CONSOLE_PORT", "")
     if port.isdigit() and 0 < int(port) < 65536:
         values["console_port"] = port
-    check = os.environ.get("OSLAB_UPDATE_CHECK", "")
-    if check in ("true", "false"):
-        values["update_check"] = check
+    if update_check is not None:
+        values["update_check"] = "true" if update_check else "false"
     return [part for key, value in values.items() for part in ("--config", "{0}={1}".format(key, value))]
 
 
-def _build_plan(root: str, action: str, scope: str, name: str | None) -> dict:
+def _build_plan(root: str, action: str, scope: str, name: str | None,
+                update_check: bool | None = None) -> dict:
     if action not in ACTIONS:
         raise PluginError("action must be one of: {0}".format(", ".join(ACTIONS)))
     if scope not in SCOPES:
         raise PluginError("scope must be one of: {0}".format(", ".join(SCOPES)))
+    if update_check is not None and action not in ("install", "configure"):
+        raise PluginError("updateCheck applies to install and configure only")
     if (action == "remove-duplicate") != bool(name):
         raise PluginError("name is required for remove-duplicate and refused for other actions")
     if action == "extension-install":
@@ -808,7 +815,7 @@ def _build_plan(root: str, action: str, scope: str, name: str | None) -> dict:
             if market is None:
                 commands.append(["plugin", "marketplace", "add", os.path.realpath(root), "--scope", scope, "--json"])
             # Installing an installed plugin only saves the options, so configure is the same call.
-            commands.append(["plugin", "install", PLUGIN_ID, "--scope", scope, *_configuration(root), "--json"])
+            commands.append(["plugin", "install", PLUGIN_ID, "--scope", scope, *_configuration(root, update_check), "--json"])
         else:
             if not here:
                 raise PluginError("The plugin is not installed in {0} scope".format(scope), "NOT_INSTALLED")
@@ -822,16 +829,17 @@ def _build_plan(root: str, action: str, scope: str, name: str | None) -> dict:
     if scope == "project":
         warnings.append("project scope writes .claude/settings.json in the checkout, which git can pick up")
     return {"action": action, "scope": scope, "name": name, "commands": commands, "warnings": warnings,
-            "manual": [], "program": "claude", "state": {"cli": _dotted(version), "marketplace": market, "installed": installed, "duplicates": found}}
+            "manual": [], "program": "claude", "updateCheck": update_check, "state": {"cli": _dotted(version), "marketplace": market, "installed": installed, "duplicates": found}}
 
 
 def _shown(built: dict, command: list[str]) -> str:
     return subprocess.list2cmdline(([built["program"]] if built["program"] else []) + command)
 
 
-def plan(root: str, action: str, scope: str = "user", name: str | None = None) -> dict:
+def plan(root: str, action: str, scope: str = "user", name: str | None = None,
+         update_check: bool | None = None) -> dict:
     """Preview one change and hand out a token that runs exactly it, once."""
-    built = _build_plan(root, action, scope, name)
+    built = _build_plan(root, action, scope, name, update_check)
     token = secrets.token_urlsafe(24)
     with _LOCK:
         now = time.time()
@@ -875,7 +883,8 @@ def apply(root: str, token: str, confirm: bool, audience: str = "agent") -> dict
         refuse("{0} runs only from a terminal: python3 scripts/claude-plugin.py {0} --scope {1}{2}".format(
             wanted["action"], wanted["scope"],
             " --name " + wanted["name"] if wanted["name"] else ""), "TERMINAL_ONLY")
-    current = _build_plan(root, wanted["action"], wanted["scope"], wanted["name"])
+    current = _build_plan(root, wanted["action"], wanted["scope"], wanted["name"],
+                          wanted.get("updateCheck"))
     if current != wanted:
         refuse("The installation changed since the preview; call plugin_plan again", "STALE_PLAN")
     desktop = wanted["action"] == "extension-install"
