@@ -23,7 +23,7 @@ function formatInterval(seconds: number): string {
 }
 
 export function MonitorBanner({ monitor, scanHref }: { monitor: CleanupMonitorStatus | null; scanHref: string }) {
-  if (!monitor?.enabled || !monitor.activeWarnings.length) return null;
+  if (!monitor?.enabled || !monitor.activeWarnings?.length) return null;
   return <div role="status" className="rounded-md border border-(--iux-warning)/50 bg-(--iux-warning)/10 p-3 text-sm">
     <p className="font-medium">Free space is running low</p>
     {monitor.activeWarnings.map((warning, index) => <p key={index} className="mt-1 text-xs">
