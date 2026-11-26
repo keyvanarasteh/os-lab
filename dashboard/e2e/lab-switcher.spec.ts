@@ -72,11 +72,15 @@ test("the sidebar card opens the switcher and keyboard picks a lab", async ({ pa
   await page.getByRole("button", { name: "Switch lab" }).click();
   const switcher = page.getByRole("dialog", { name: "Switch lab" });
   await expect(switcher).toBeVisible();
+  await expect(switcher.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
+  await expect(switcher.getByRole("option", { name: /Cleanup Lab/ })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/cleanup\/$/);
-  await expect(page.getByRole("button", { name: "Switch lab" })).toContainText("Cleanup Lab");
+  const switchLab = page.getByRole("button", { name: "Switch lab" });
+  await expect(switchLab).toBeVisible();
+  await expect(switchLab).toContainText("Cleanup Lab");
 });
 
 test("a direct link to a lab page re-focuses the sidebar and All labs restores the list", async ({ page }) => {

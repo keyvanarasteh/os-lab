@@ -12,7 +12,7 @@ test("MCP guides page shows the four tool groups and fills the repo path", async
     await route.fulfill({ json: body });
   });
   await page.goto("/mcp/");
-  await expect(page.getByRole("heading", { name: "MCP servers", exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("heading", { name: "MCP servers", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "MCP servers", exact: true })).toHaveAttribute("aria-current", "page");
   const setup = page.locator("#mcp-setup");
   await expect(setup.getByText("claude mcp add os-lab-macos -- python3 /Volumes/Projects/iQ/os-lab/console/mcp_server.py")).toBeVisible();
