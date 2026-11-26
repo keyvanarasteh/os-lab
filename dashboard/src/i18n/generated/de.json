@@ -3462,5 +3462,12 @@
   "Grok Build plugin": "Grok-Build-Plugin",
   "Apps keep writing here. Whatever is inside when the clean runs is removed.": "Apps schreiben hier laufend. Alles, was beim Bereinigen darin liegt, wird entfernt.",
   "Build a new plan": "Neuen Plan erstellen",
-  "Firewall Lab: search and filter every seeded firewall, its specs, alternatives and rules": "Firewall Lab: alle erfassten Firewalls mit Daten, Alternativen und Regeln durchsuchen und filtern"
+  "Firewall Lab: search and filter every seeded firewall, its specs, alternatives and rules": "Firewall Lab: alle erfassten Firewalls mit Daten, Alternativen und Regeln durchsuchen und filtern",
+  "Guarded tools, widgets and plugins for Claude, Codex, Cursor, ZCode and Grok.": "Abgesicherte Werkzeuge, Widgets und Plugins für Claude, Codex, Cursor, ZCode und Grok.",
+  "MCP and agent plugins": "MCP- und Agenten-Plugins",
+  "MCP guides": "MCP-Anleitungen",
+  "Portable source and package analysis with signed evidence workflows.": "Portable Quellcode- und Paketanalyse mit signierten Nachweisabläufen.",
+  "Requirements, installation, labs, MCP and plugin guides.": "Anforderungen, Installation, Labore sowie Anleitungen zu MCP und Plugins.",
+  "Scan, plan and confirm reclaimable disk space on the host.": "Freigebbaren Speicherplatz auf dem Rechner scannen, planen und bestätigen.",
+  "os-lab brings Android, iOS, Windows, Linux, macOS, Cleanup, Web Sec, Source, and firewall exercises into one local console — with a guarded MCP server and plugins for Claude, Codex, Cursor, ZCode and Grok. Install it on your own machine, then choose a lab.": "os-lab vereint Übungen zu Android, iOS, Windows, Linux, macOS, Cleanup, Web Sec, Source und Firewalls in einer lokalen Konsole – mit abgesichertem MCP-Server und Plugins für Claude, Codex, Cursor, ZCode und Grok. Auf dem eigenen Rechner installieren und dann ein Labor wählen."
 }
