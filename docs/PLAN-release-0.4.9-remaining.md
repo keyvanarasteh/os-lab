@@ -21,7 +21,7 @@ https://github.com/keyvanarasteh/os-lab/pull/350
 | #344 CLS-02 simulator storage | Merged |
 | #345 nav icons + Web Sec in lab list | Merged (review: unguarded `setJobs` on poll + catalog fallback) |
 | #346 CLS-03 simulator runtimes | Open, rebased onto `origin/master` (`1f835c56f`). **Do not merge until CI is green and Sourcery High threads are triaged.** |
-| Update center (`feat/app-update-everywhere`) | Rebased onto `origin/master` (`ecadbb584`). Open the PR if it is not open yet, wait for CI, merge. |
+| Update center (`feat/app-update-everywhere`) | **PR #351** opened. Rebased onto `origin/master` (`ecadbb584`). Wait for CI, merge. |
 | MCP guides page (this branch) | Research only. Build it here. |
 | Version bump 0.4.8 → 0.4.9 | Not started. After 1–3 merge. |
 | Tag `app-v0.4.9` | Already approved. Push only after the bump is on master. |
@@ -78,21 +78,16 @@ https://github.com/keyvanarasteh/os-lab/pull/346
 Merge: `gh pr merge 346 --merge --delete-branch`. Then
 `scripts/worktree.sh rm feat/cls-03-simulator-runtimes`.
 
-## 2. Update center on every page — `feat/app-update-everywhere` (critical)
+## 2. Update center on every page — PR #351 (critical)
+
+https://github.com/keyvanarasteh/os-lab/pull/351
 
 Worktree: `/Volumes/Projects/iQ/os-lab-worktrees/feat-app-update-everywhere`.
 Commit after rebase onto master: `ecadbb584`.
 
-If the PR is not open yet:
-
-```bash
-cd /Volumes/Projects/iQ/os-lab-worktrees/feat-app-update-everywhere
-git push --force-with-lease origin feat/app-update-everywhere
-# do not add app/src-tauri/resources/os-lab (local compile symlink)
-gh pr create --base master --head feat/app-update-everywhere \
-  --title "feat(app): update center on every page; close for the installer when idle" \
-  --body-file -   # use the commit message
-```
+If the PR somehow is not open, recreate it from that worktree (`gh pr create`
+with the commit message). Do not add `app/src-tauri/resources/os-lab` (local
+compile symlink).
 
 Contents:
 
@@ -216,8 +211,7 @@ browser jobs are the full-suite check.
 Continue 0.4.9 from draft PR #350 (critical).
 Plan: docs/PLAN-release-0.4.9-remaining.md
 1. If #346 CI is green and Sourcery High threads are triaged, merge it.
-2. If the update-center PR is open and green, merge it; if not open, push
-   feat/app-update-everywhere and open it.
+2. If #351 (update center) is green, merge it.
 3. Build the MCP guides page on feat/mcp-guides-page (this PR), then merge.
 4. Version bump 0.4.8 → 0.4.9, merge, push annotated tag app-v0.4.9
    (already approved).
