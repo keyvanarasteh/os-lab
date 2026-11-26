@@ -1,7 +1,7 @@
 {
   "name": "os-lab",
   "displayName": "OS Lab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Guarded MCP tools and skills for the os-lab security labs on this computer.",
   "author": { "name": "keyvanarasteh" },
   "homepage": "https://github.com/keyvanarasteh/os-lab",
