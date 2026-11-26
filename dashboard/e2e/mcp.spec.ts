@@ -1,11 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+/** The app shell reads the host fields, so every mocked console reports them. */
+const HOST = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "t", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/Volumes/Projects/iQ/os-lab", tools: [], providers: [] }, labs: [] };
+
 test("MCP guides page shows the four tool groups and fills the repo path", async ({ page }) => {
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};
     if (path === "/api/host") {
-      body = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "t", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/Volumes/Projects/iQ/os-lab", tools: [], providers: [] }, labs: [] };
+      body = HOST;
     } else if (path === "/api/health") body = { status: "ok", version: "test", console: true };
     else if (path === "/api/jobs") body = { jobs: [] };
     else if (path === "/api/logs") body = { logs: [] };
@@ -40,7 +43,8 @@ test("MCP plugin cards preview a change and run it only after Confirm", async ({
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === "POST") posts.push({ path, body: route.request().postDataJSON() });
     let body: unknown = {};
-    if (path === "/api/health") body = { status: "ok", version: "test", console: true };
+    if (path === "/api/host") body = HOST;
+    else if (path === "/api/health") body = { status: "ok", version: "test", console: true };
     else if (path === "/api/jobs") body = { jobs: [] };
     else if (path === "/api/logs") body = { logs: [] };
     else if (path === "/api/claude-plugin") body = {
