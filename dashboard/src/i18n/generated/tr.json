@@ -3335,5 +3335,6 @@
   "from the repo, or": "repodan, veya",
   "Attach the local os-lab stdio MCP server; tool groups and safety rules": "Yerel os-lab stdio MCP sunucusunu bağlayın; araç grupları ve güvenlik kuralları",
   "(). It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "(). Dört grupta 66 araç sunar. Cleanup ve Web Sec araçları macos_task içinde reddedilir.",
-  "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "Dört grupta 66 araç sunar. Cleanup ve Web Sec araçları macos_task içinde reddedilir."
+  "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "Dört grupta 66 araç sunar. Cleanup ve Web Sec araçları macos_task içinde reddedilir.",
+  "usage unknown": "kullanım bilinmiyor"
 }

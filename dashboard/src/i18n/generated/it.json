@@ -3335,5 +3335,6 @@
   "from the repo, or": "dal repo, oppure",
   "Attach the local os-lab stdio MCP server; tool groups and safety rules": "Collega il server MCP stdio locale di os-lab; gruppi di strumenti e regole di sicurezza",
   "(). It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "(). Espone 66 strumenti in quattro gruppi. Gli strumenti Cleanup e Web Sec sono rifiutati in macos_task.",
-  "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "Espone 66 strumenti in quattro gruppi. Gli strumenti Cleanup e Web Sec sono rifiutati in macos_task."
+  "It exposes 66 tools in four groups. Cleanup and Web Sec tools are refused inside macos_task.": "Espone 66 strumenti in quattro gruppi. Gli strumenti Cleanup e Web Sec sono rifiutati in macos_task.",
+  "usage unknown": "utilizzo sconosciuto"
 }
