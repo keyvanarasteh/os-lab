@@ -303,6 +303,13 @@ TOOLS = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "macos_app_overview",
+        "description": "macOS Lab MCP App: visible windows, control/arm state and permission hints (dashboard Overview UX). Observe only — there is no arm tool.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "_meta": mcp_ui.ui_meta(mcp_ui.MACOS_APP["overview"]),
+        "annotations": mcp_ui.annotations(read_only=True, idempotent=True),
+    },
 ]
 
 
@@ -386,7 +393,7 @@ _STOP = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True
 _RO_NAMES = {
     "macos_apps", "macos_get_app_state", "macos_screenshot", "macos_windows", "macos_menubar",
     "macos_search", "macos_displays", "macos_capabilities", "macos_control_state",
-    "macos_focused", "macos_audit", "macos_sessions", "macos_permissions",
+    "macos_focused", "macos_audit", "macos_sessions", "macos_permissions", "macos_app_overview",
     "winapps_apps", "winapps_screenshot", "winapps_capabilities", "winapps_doctor", "winapps_audit",
 }
 _WR_NAMES = {
@@ -459,6 +466,16 @@ def tool_call(name: str, args: dict) -> dict:
         return mcp_source.call(name, args, REPO_ROOT)
     if name in mcp_firewall.NAMES:
         return mcp_firewall.call(name, args, REPO_ROOT)
+    if name == "macos_app_overview":
+        if args:
+            raise oslab.PlanError("Unexpected argument(s): {0}".format(", ".join(sorted(args))),
+                                  code="INVALID_ARGS")
+        return mcp_ui.result({
+            "apps": oslab.macos_windows(),
+            "control": oslab.macos_control_state(),
+            "permissions": oslab.macos_permissions(REPO_ROOT),
+            "note": "Arm from the dashboard; there is no macos_arm MCP tool.",
+        }, resource_uri=mcp_ui.MACOS_APP["overview"])
     if name == "macos_apps":
         return mcp_ui.result(oslab.macos_windows(), resource_uri=mcp_ui.MACOS_WIDGET["apps"])
     if name == "macos_get_app_state":
@@ -574,7 +591,7 @@ def handle(message: dict) -> dict | None:
                 "extensions": {"io.modelcontextprotocol/ui": {"mimeTypes": [mcp_ui.RESOURCE_MIME]}},
             },
             "serverInfo": {"name": "os-lab-windows" if sys.platform == "win32" else "os-lab-macos",
-                           "version": "0.5.0"}}}
+                           "version": "0.6.0"}}}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":

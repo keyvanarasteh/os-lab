@@ -1,7 +1,8 @@
 """Android Lab tools for the os-lab MCP server (read-only observe + Frida inventory).
 
 Mirrors the dashboard's readiness and the PENT-09 Frida inventory. Lab jobs still
-run through the console plan/start surface; this module does not arm or inject.
+run through the console plan/start surface; this module lists/polls them without
+arming or injecting.
 """
 from __future__ import annotations
 
@@ -10,10 +11,12 @@ import mcp_common as common
 import mcp_ui
 import oslab
 
+W = mcp_ui.ANDROID_WIDGET
+
 TOOLS = common.annotate_ro([
     mcp_ui.tool("android_status",
                 "Android Lab readiness: ready / needs-setup / unavailable, provider, reasons and available actions. Read-only.",
-                common.obj(), read_only=True, idempotent=True),
+                common.obj(), read_only=True, idempotent=True, resource_uri=W["status"]),
     mcp_ui.tool("android_frida_inventory",
                 "Read-only Frida device and process inventory (PENT-09). Lists only; never attaches or injects. TCP hosts must be loopback or private.",
                 common.obj({
@@ -22,14 +25,20 @@ TOOLS = common.annotate_ro([
                     "apps": {"type": "boolean", "default": False, "description": "List applications instead of all processes"},
                     "processes": {"type": "boolean", "default": True},
                     "filter": {"type": "string", "description": "Keep processes whose name/identifier contains this text"},
-                }), read_only=True),
+                }), read_only=True, resource_uri=W["frida"]),
     mcp_ui.tool("android_plan",
                 "Build a guarded labctl plan for an Android Lab action (status, start, stop, …) without running it. Read-only preview.",
                 common.obj({
                     "action": {"type": "string", "description": "Action id from android_status.actions"},
                     "profile": {"type": "string"},
                     "device": {"type": "string", "description": "Emulator device for resize/start when applicable"},
-                }, ["action"]), read_only=True),
+                }, ["action"]), read_only=True, resource_uri=W["plan"]),
+    mcp_ui.tool("android_jobs",
+                "List Android Lab console jobs (observe only; does not start or arm inject). Prefers the running console on OSLAB_CONSOLE_PORT.",
+                common.obj(), read_only=True, idempotent=True, resource_uri=W["jobs"]),
+    mcp_ui.tool("android_job",
+                "Poll one Android Lab console job by id (observe only). Prefers the running console on OSLAB_CONSOLE_PORT.",
+                common.obj({"jobId": {"type": "string"}}, ["jobId"]), read_only=True, idempotent=True, resource_uri=W["jobs"]),
     mcp_ui.tool("android_app_overview",
                 "Android Lab overview MCP App: readiness, provider and available actions (dashboard Overview UX).",
                 common.obj(), read_only=True, idempotent=True, resource_uri=mcp_ui.LAB_APP["android"]),
@@ -70,6 +79,12 @@ def _dispatch(name, args, root):
         if args.get("device"):
             request["device"] = args["device"]
         return oslab.plan(root, request)
+    if name == "android_jobs":
+        common.check(args, [])
+        return common.list_console_jobs(root, "android")
+    if name == "android_job":
+        common.check(args, ["jobId"], ["jobId"])
+        return common.get_console_job(root, args["jobId"], "android")
     if name == "android_app_overview":
         common.check(args, [])
         return {"status": common.lab_status(root, "android")}

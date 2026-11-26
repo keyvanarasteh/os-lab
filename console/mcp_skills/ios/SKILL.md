@@ -5,9 +5,9 @@ description: Use the os-lab MCP iOS Lab tools (ios_status, ios_simulator, ios_de
 
 # iOS Lab MCP
 
-Related MCP tools: `ios_status, ios_simulator, ios_devices, ios_device_check, ios_resources, ios_screenshot, ios_plan`.
+Related MCP tools: `ios_status, ios_simulator, ios_devices, ios_device_check, ios_resources, ios_screenshot, ios_plan, ios_app_overview`.
 
-See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
+Coverage checklist: docs/PLAN-mcp-coverage.md (remaining TODOs complete on this branch).
 
 ## Rules
 

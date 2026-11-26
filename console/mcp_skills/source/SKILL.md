@@ -5,9 +5,9 @@ description: Use the os-lab MCP Source Lab tools (source_status, source_readines
 
 # Source Lab MCP
 
-Related MCP tools: `source_status, source_readiness, source_candidates, source_runtime, source_plan`.
+Related MCP tools: `source_status, source_readiness, source_candidates, source_runtime, source_analyzer, source_jobs, source_job, source_plan, source_app_overview`.
 
-See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
+Coverage checklist: docs/PLAN-mcp-coverage.md (remaining TODOs complete on this branch).
 
 ## Rules
 

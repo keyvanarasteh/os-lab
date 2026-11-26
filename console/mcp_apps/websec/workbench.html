@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Web Sec workbench</title>
+<style>*{box-sizing:border-box}body{margin:0;font:14px/1.45 var(--font-sans,system-ui,sans-serif);color:var(--color-text-primary,#1c1c1a);background:var(--color-background-primary,#f7f6f2);padding:12px}h1{font-size:16px;margin:0 0 8px}h2{font-size:13px;margin:12px 0 6px;color:var(--color-text-secondary,#5c5c56)}.muted{color:var(--color-text-secondary,#5c5c56);font-size:12px}.row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--color-border-tertiary,#e6e4dc)}.chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--color-background-secondary,#ebe9e2);font-size:12px}.ok{background:#d9f0df}.warn{background:#fde8c8}.bad{background:#f8d4d4}button{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--color-border-primary,#cfcabf);background:var(--color-background-primary,#fff);cursor:pointer}button.primary{background:#1c1c1a;color:#fff;border-color:#1c1c1a}ul{margin:0;padding-left:18px}pre{white-space:pre-wrap;font-size:11px}.empty{padding:16px;color:var(--color-text-secondary,#5c5c56)}.hero{padding:8px 0 12px}.hero .title{font-size:22px;font-weight:700;letter-spacing:-0.02em}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:480px){.grid{grid-template-columns:1fr}}.card{padding:10px;border:1px solid var(--color-border-tertiary,#e6e4dc);border-radius:12px}</style>
+</head>
+<body>
+<main id="root"><p class="muted">Waiting for data…</p></main>
+<!-- MCP_BRIDGE -->
+<script>
+
+window.__oslabUi.onUpdate(function (s) {
+  var d = s.output || {};
+  var status = d.status || {};
+  var prefs = d.preferences || {};
+  var hist = d.history || {};
+  var runs = hist.runs || hist.items || hist.history || [];
+  if (!Array.isArray(runs)) runs = [];
+  var ready = status.readiness || status.state || status.status || "unknown";
+  var cls = ready === "ready" ? "ok" : ready === "needs-setup" ? "warn" : "bad";
+  document.getElementById("root").innerHTML = "<div class=\"hero\"><div class=\"muted\">Web Sec Lab</div>"
+    + "<div class=\"title\">Workbench</div><span class=\"chip "+cls+"\">"+ready+"</span></div>"
+    + "<div class=\"grid\">"
+    + "<div class=\"card\"><h2>Review</h2><p class=\"muted\">Scope-checked plan before a scan.</p>"
+    + "<button class=\"primary\" id=\"review\">Open review</button></div>"
+    + "<div class=\"card\"><h2>Monitor</h2><p class=\"muted\">Passive scheduled checks.</p>"
+    + "<button id=\"monitor\">Refresh monitor</button></div>"
+    + "</div>"
+    + "<h2>Recent history</h2>"+(runs.slice(0,6).map(function(r){return "<div class=\"row\"><span>"+(r.target||r.name||"?")+"</span><span class=\"chip\">"+(r.grade||r.score||"—")+"</span></div>";}).join("")||"<p class=\"muted\">No runs yet</p>")
+    + "<h2>Preferences</h2><pre class=\"muted\">"+JSON.stringify(prefs,null,2)+"</pre>";
+  document.getElementById("review").onclick = function(){
+    var t = (prefs.scan && prefs.scan.target) || "";
+    if (!t) { alert("Set a target in preferences or call websec_review with a target."); return; }
+    window.__oslabUi.callTool("websec_review", {target: t});
+  };
+  document.getElementById("monitor").onclick = function(){ window.__oslabUi.callTool("websec_monitor", {}); };
+});
+
+</script>
+</body>
+</html>

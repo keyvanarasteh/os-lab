@@ -23,12 +23,13 @@ def test_new_lab_tools_are_listed():
     listed = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})["result"]["tools"]
     names = {tool["name"] for tool in listed}
     for expected in (
-        "android_status", "android_frida_inventory", "android_plan",
+        "android_status", "android_frida_inventory", "android_plan", "android_jobs", "android_job",
         "ios_status", "ios_simulator", "ios_devices", "ios_resources", "ios_plan",
-        "linux_status", "linux_plan",
-        "web_status", "web_engine_start", "web_engine_stop",
-        "source_status", "source_candidates", "source_plan",
+        "linux_status", "linux_doctor", "linux_plan",
+        "web_status", "web_engine_start", "web_engine_stop", "web_injections", "web_profiles",
+        "source_status", "source_candidates", "source_plan", "source_analyzer", "source_jobs",
         "firewall_status", "firewall_catalog", "firewall_company", "firewall_guides",
+        "websec_app_workbench", "macos_app_overview",
     ):
         assert expected in names, expected
     assert all("annotations" in tool for tool in listed if tool["name"].startswith(

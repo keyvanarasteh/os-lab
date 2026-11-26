@@ -12,28 +12,30 @@ import mcp_common as common
 import mcp_ui
 import oslab
 
+W = mcp_ui.IOS_WIDGET
+
 TOOLS = common.annotate_ro([
     mcp_ui.tool("ios_status",
                 "iOS Lab readiness: ready / needs-setup / unavailable, provider, reasons and actions. Read-only.",
-                common.obj(), read_only=True, idempotent=True),
+                common.obj(), read_only=True, idempotent=True, resource_uri=W["status"]),
     mcp_ui.tool("ios_simulator",
                 "Installed iOS Simulator devices, runtimes and which are booted. Read-only; needs Xcode on macOS.",
-                common.obj(), read_only=True, idempotent=True),
+                common.obj(), read_only=True, idempotent=True, resource_uri=W["simulator"]),
     mcp_ui.tool("ios_devices",
                 "Real (paired or connected) iOS devices via xcrun devicectl. Read-only.",
-                common.obj(), read_only=True, idempotent=True),
+                common.obj(), read_only=True, idempotent=True, resource_uri=W["devices"]),
     mcp_ui.tool("ios_device_check",
                 "Reachability probe for one real-device UDID. Read-only.",
-                common.obj({"udid": {"type": "string"}}, ["udid"]), read_only=True),
+                common.obj({"udid": {"type": "string"}}, ["udid"]), read_only=True, resource_uri=W["devices"]),
     mcp_ui.tool("ios_resources",
                 "iOS Lab resource tips and tooling hints for this Mac. Read-only.",
-                common.obj(), read_only=True, idempotent=True),
+                common.obj(), read_only=True, idempotent=True, resource_uri=W["resources"]),
     mcp_ui.tool("ios_screenshot",
                 "PNG of a booted simulator (udid optional) or a real device (set real:true). Read-only capture.",
                 common.obj({
                     "udid": {"type": "string"},
                     "real": {"type": "boolean", "default": False, "description": "Capture a physical device instead of a simulator"},
-                }), read_only=True),
+                }), read_only=True, resource_uri=W["screenshot"]),
     mcp_ui.tool("ios_plan",
                 "Build a guarded labctl plan for an iOS Lab action without running it. Read-only preview.",
                 common.obj({
@@ -65,6 +67,7 @@ def call(name, args, root):
                 {"type": "image", "data": base64.b64encode(png).decode(), "mimeType": "image/png"},
             ],
             "structuredContent": {"ok": True, "bytes": len(png)},
+            "_meta": mcp_ui.ui_meta(W["screenshot"]),
         }
     return mcp_ui.result(_dispatch(name, args, root), resource_uri=_UI_FOR.get(name))
 
@@ -93,5 +96,8 @@ def _dispatch(name, args, root):
         return oslab.plan(root, request)
     if name == "ios_app_overview":
         common.check(args, [])
-        return {"status": common.lab_status(root, "ios")}
+        return {
+            "status": common.lab_status(root, "ios"),
+            "note": "Device drive stays confirm-gated on the dashboard; there is no MCP arm tool.",
+        }
     raise oslab.PlanError("Unknown tool {0}".format(name), code="INVALID_ARGS")

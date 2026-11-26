@@ -5,7 +5,7 @@ description: Use the os-lab MCP Web Sec Lab MCP tools (websec_*). Prefer guarded
 
 # Web Sec Lab MCP
 
-Related MCP tools: `websec_*`.
+Related MCP tools: `websec_* including websec_app_workbench`.
 
 Scope-guarded. Passive by default; active+confirm for intrusive.
 
