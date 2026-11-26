@@ -700,6 +700,12 @@ Write counterparts for every mutatable surface already on the dashboard: `cleanu
 
 First-batch widgets under [[console/mcp_widgets/cleanup/]] attach to status, volumes, catalog, monitor, permissions, bookmarks, history, widget, preferences, suggest, review and job via `_meta.ui.resourceUri`. Three MCP Apps under [[console/mcp_apps/cleanup/]] mirror the dashboard UX parts: overview (`cleanup_app_overview`), review (`cleanup_app_review`) and settings (`cleanup_app_settings`). Hosts without UI still get the JSON text fallback and `structuredContent`.
 
+#### MCP prompts, verification, skills, plugins
+
+[[console/mcp_prompts.py]] advertises standard prompts (`cleanup_review_flow`, `mcp_verify_tool`, `mcp_gap_plan`, …).
+
+[[console/mcp_verification.json]] holds per-tool and per-section `engineUsage` / widget / app slots (defaults `none`/`pending`, with a `proof` field for contributor PRs). Skills live in [[console/mcp_skills/]]; host scaffolds in [[plugins/mcp/]]. Gap inventory: [[docs/PLAN-mcp-coverage.md]].
+
 The tools take catalog ids, never paths or commands, and are refused inside `macos_task`. Tests: `android-lab/lab/tests/test_mcp_cleanup.py`.
 
 ### Advanced scan filter bar

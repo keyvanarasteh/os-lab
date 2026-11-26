@@ -1,0 +1,1353 @@
+{
+  "version": 1,
+  "schema": {
+    "status": [
+      "none",
+      "pending",
+      "verified",
+      "n/a"
+    ],
+    "fields": [
+      "engineUsage",
+      "widget|widgets",
+      "app|apps"
+    ],
+    "proof": "PR link, test name, or artifact path that proves the status"
+  },
+  "sections": {
+    "macos": {
+      "title": "macOS Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup": {
+      "title": "Cleanup Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widgets": {
+        "status": "pending",
+        "proof": null
+      },
+      "apps": {
+        "status": "pending",
+        "proof": null
+      }
+    },
+    "websec": {
+      "title": "Web Sec Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps": {
+      "title": "Windows Apps Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "android": {
+      "title": "Android Lab",
+      "engineUsage": {
+        "status": "none",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "ios": {
+      "title": "iOS Lab",
+      "engineUsage": {
+        "status": "none",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "linux": {
+      "title": "Linux Lab",
+      "engineUsage": {
+        "status": "none",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "web": {
+      "title": "Web Lab",
+      "engineUsage": {
+        "status": "none",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "source": {
+      "title": "Source Lab",
+      "engineUsage": {
+        "status": "none",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "firewall": {
+      "title": "Firewall Lab",
+      "engineUsage": {
+        "status": "none",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    }
+  },
+  "tools": {
+    "cleanup_app_overview": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/apps/overview.html"
+      }
+    },
+    "cleanup_app_review": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/apps/review.html"
+      }
+    },
+    "cleanup_app_settings": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/apps/settings.html"
+      }
+    },
+    "cleanup_bookmark_add": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_bookmark_remove": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_bookmark_update": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_bookmarks": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_catalog": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/catalog.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_clean": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_history": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/history.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_job": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/job.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_job_cancel": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_monitor": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_monitor_config": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_monitor_evaluate": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_permissions": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_permissions_open": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_permissions_reset": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_permissions_reveal_app": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_plan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_preferences": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/preferences.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_preferences_save": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/preferences.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_quick_clean_plan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_reveal": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_review": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_scan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_status": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/status.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_suggest": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/suggest.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_volumes": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/volumes.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_widget": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/widget.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_widget_refresh": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "pending",
+        "proof": null,
+        "resourceUri": "ui://os-lab/cleanup/widgets/widget.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_apps": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_capabilities": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_click": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_control_state": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_displays": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_get_app_state": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_key": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_menubar": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_paste": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_perform": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_permissions": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_request_access": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_screenshot": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_scroll": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_search": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_set_value": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_stop": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_task": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_type": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_windows": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_bulk": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_catalogue": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_clear_history": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_compare": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_delete_runs": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_favourite": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_guides": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_history": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_job": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_monitor": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_monitor_config": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_monitor_run": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_preferences": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_preferences_save": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_report": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_reports": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_review": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_scan": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_scan_cancel": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_stats": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_status": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_apps": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_audit": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_capabilities": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_doctor": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_screenshot": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    }
+  }
+}

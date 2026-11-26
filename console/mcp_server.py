@@ -34,6 +34,7 @@ import oslab  # noqa: E402
 import mcp_cleanup  # noqa: E402
 import mcp_websec  # noqa: E402
 import mcp_ui  # noqa: E402
+import mcp_prompts  # noqa: E402
 import winapps  # noqa: E402
 import winapps_guard  # noqa: E402
 
@@ -510,10 +511,11 @@ def handle(message: dict) -> dict | None:
             "capabilities": {
                 "tools": {"listChanged": False},
                 "resources": {"listChanged": False, "subscribe": False},
+                "prompts": {"listChanged": False},
                 "extensions": {"io.modelcontextprotocol/ui": {"mimeTypes": [mcp_ui.RESOURCE_MIME]}},
             },
             "serverInfo": {"name": "os-lab-windows" if sys.platform == "win32" else "os-lab-macos",
-                           "version": "0.3.0"}}}
+                           "version": "0.4.0"}}}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":
@@ -530,6 +532,14 @@ def handle(message: dict) -> dict | None:
             return {"jsonrpc": "2.0", "id": message_id, "result": mcp_ui.read_resource(str(uri))}
         except KeyError:
             return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32002, "message": f"Resource not found: {uri}"}}
+    if method == "prompts/list":
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"prompts": mcp_prompts.list_prompts()}}
+    if method == "prompts/get":
+        params = message.get("params") or {}
+        try:
+            return {"jsonrpc": "2.0", "id": message_id, "result": mcp_prompts.get_prompt(str(params.get("name")), params.get("arguments") or {})}
+        except KeyError:
+            return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32602, "message": f"Unknown prompt {params.get('name')}"}}
     if method == "tools/call":
         params = message.get("params") or {}
         try:

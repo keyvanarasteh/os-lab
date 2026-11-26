@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "os-lab": {
+      "transport": "stdio",
+      "command": "python3",
+      "args": ["<REPO>/console/mcp_server.py"],
+      "skills": ["<REPO>/console/mcp_skills"]
+    }
+  }
+}

@@ -61,6 +61,23 @@ def test_permissions_reset_needs_confirm(tmp_path, monkeypatch):
     assert failed and payload["code"] == "CONFIRM_REQUIRED"
 
 
+def test_prompts_and_verification_registry_are_advertised():
+    caps = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})["result"]["capabilities"]
+    assert "prompts" in caps
+    prompts = mcp_server.handle({"jsonrpc": "2.0", "id": 2, "method": "prompts/list"})["result"]["prompts"]
+    names = {item["name"] for item in prompts}
+    assert {"cleanup_review_flow", "mcp_coverage_status", "mcp_gap_plan", "mcp_verify_tool"} <= names
+    got = mcp_server.handle({"jsonrpc": "2.0", "id": 3, "method": "prompts/get",
+                             "params": {"name": "mcp_coverage_status", "arguments": {"section": "cleanup"}}})
+    text = got["result"]["messages"][0]["content"]["text"]
+    assert "cleanup" in text.lower()
+    import mcp_ui  # noqa: F401
+    from pathlib import Path
+    registry = json.loads(Path(mcp_server.REPO_ROOT, "console", "mcp_verification.json").read_text())
+    assert registry["tools"]["cleanup_review"]["engineUsage"]["status"] in ("none", "pending", "verified", "n/a")
+    assert registry["sections"]["android"]["engineUsage"]["status"] == "none"
+
+
 def test_review_scans_suggests_and_plans_but_never_cleans(tmp_path, monkeypatch):
     target = catalog_cache_target(tmp_path, monkeypatch)
     with open(os.path.join(target, "big.bin"), "wb") as handle:

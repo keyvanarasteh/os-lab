@@ -1,0 +1,4 @@
+# Append under your Codex config (e.g. ~/.codex/config.toml)
+[mcp_servers.os-lab]
+command = "python3"
+args = ["<REPO>/console/mcp_server.py"]

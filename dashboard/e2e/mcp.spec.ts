@@ -20,8 +20,13 @@ test("MCP guides page shows the four tool groups and fills the repo path", async
   await expect(page.locator("#mcp-cleanup")).toBeVisible();
   await expect(page.locator("#mcp-websec")).toBeVisible();
   await expect(page.locator("#mcp-winapps")).toBeVisible();
+  await expect(page.locator("#mcp-planned")).toBeVisible();
   await expect(page.getByText("macos_stop", { exact: true })).toBeVisible();
+  await expect(page.getByText("macos_request_access", { exact: true })).toBeVisible();
   await expect(page.getByText("cleanup_clean", { exact: true })).toBeVisible();
+  await expect(page.getByText("cleanup_app_overview", { exact: true })).toBeVisible();
   await expect(page.getByText("websec_scan", { exact: true })).toBeVisible();
   await expect(page.getByText("winapps_apps", { exact: true })).toBeVisible();
+  await expect(setup.getByText("Codex", { exact: true })).toBeVisible();
+  await expect(page.getByText("proof: —").first()).toBeVisible();
 });
