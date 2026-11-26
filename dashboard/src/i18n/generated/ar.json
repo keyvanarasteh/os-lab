@@ -3307,5 +3307,9 @@
   "os-lab is up to date.": "os-lab محدَّث.",
   "Downloading update": "جارٍ تنزيل التحديث",
   "Update ready to install": "التحديث جاهز للتثبيت",
-  "Updates": "التحديثات"
+  "Updates": "التحديثات",
+  "Managed by Xcode": "يديره Xcode",
+  "Runtimes": "بيئات التشغيل",
+  "Simulators that use this runtime become unavailable. Xcode can download the runtime again.": "تصبح المحاكيات التي تستخدم بيئة التشغيل هذه غير متاحة. يمكن لـ Xcode تنزيلها مجددًا.",
+  "Delete simulator runtime": "حذف بيئة تشغيل المحاكي"
 }

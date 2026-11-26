@@ -1301,6 +1301,8 @@ def test_simulator_cleanup_requires_single_use_preview_and_audits(tmp_path, monk
         if argv == ["xcrun", "simctl", "list", "-j", "devices"]:
             payload = {"devices": {"rt": [{"udid": gone, "name": "Old", "state": "Shutdown", "isAvailable": False}]}}
             return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+        if argv == ["xcrun", "simctl", "runtime", "list", "-j"]:
+            return SimpleNamespace(returncode=0, stdout="{}", stderr="")
         calls.append(argv)
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
@@ -1312,6 +1314,7 @@ def test_simulator_cleanup_requires_single_use_preview_and_audits(tmp_path, monk
     api = cleanup_api.CleanupAPI(REPO_ROOT)
     inventory = api.get("/api/cleanup/simulators", {})
     assert {a["id"] for a in inventory["actions"]} == set(simulators.ACTIONS)
+    assert inventory["runtimes"] == []
     for body in ({"actionId": "/bin/sh"}, {"actionId": "simulators.delete-unavailable", "argv": ["sh"]},
                  {"actionId": "simulators.delete-devices", "deviceIds": ["../../etc"]}):
         with pytest.raises(cleanup_api.CleanupError) as refused:
@@ -1328,6 +1331,39 @@ def test_simulator_cleanup_requires_single_use_preview_and_audits(tmp_path, monk
     with pytest.raises(cleanup_api.CleanupError) as reused:
         api.post("/api/cleanup/simulators/run", {"previewId": preview["previewId"]})
     assert reused.value.status == 409
+
+
+def test_simulator_runtimes_list_when_devices_fail(tmp_path, monkeypatch):
+    """CLS-03: runtime inventory is independent of device listing."""
+    from types import SimpleNamespace
+    import subprocess
+    real_run = subprocess.run
+    runtime_id = "D1D2D3D4-1111-2222-3333-444455556666"
+
+    def fake_run(argv, **kwargs):
+        if not argv or argv[0] != "xcrun":
+            return real_run(argv, **kwargs)
+        if argv == ["xcrun", "simctl", "list", "-j", "devices"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="simctl failed")
+        if argv == ["xcrun", "simctl", "runtime", "list", "-j"]:
+            payload = {runtime_id: {"identifier": runtime_id, "version": "15.0", "deletable": True,
+                                    "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-15-0",
+                                    "sizeBytes": 6_000_000_000}}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    from cleanup_lab import deep
+    monkeypatch.setattr(deep, "platform_id", lambda: "macos")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    inventory = api.get("/api/cleanup/simulators", {})
+    assert inventory["available"] is False
+    assert inventory["runtimes"][0]["id"] == runtime_id
+    with pytest.raises(cleanup_api.CleanupError) as refused:
+        api.post("/api/cleanup/simulators/preview", {"actionId": "simulators.delete-runtime", "deviceIds": [runtime_id]})
+    assert refused.value.status == 400
+    assert "Cannot check which simulators use this runtime" in str(refused.value)
 
 
 def test_simulator_storage_settings_accept_only_offered_volumes(tmp_path, monkeypatch):

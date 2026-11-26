@@ -3307,5 +3307,9 @@
   "os-lab is up to date.": "os-lab به‌روز است.",
   "Downloading update": "در حال دانلود به‌روزرسانی",
   "Update ready to install": "به‌روزرسانی آماده نصب است",
-  "Updates": "به‌روزرسانی‌ها"
+  "Updates": "به‌روزرسانی‌ها",
+  "Managed by Xcode": "مدیریت‌شده توسط Xcode",
+  "Runtimes": "ران‌تایم‌ها",
+  "Simulators that use this runtime become unavailable. Xcode can download the runtime again.": "شبیه‌سازهایی که از این ران‌تایم استفاده می‌کنند غیرقابل‌استفاده می‌شوند. Xcode می‌تواند ران‌تایم را دوباره دانلود کند.",
+  "Delete simulator runtime": "حذف ران‌تایم شبیه‌ساز"
 }

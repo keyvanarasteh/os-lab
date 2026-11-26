@@ -3307,5 +3307,9 @@
   "os-lab is up to date.": "os-lab est à jour.",
   "Downloading update": "Téléchargement de la mise à jour",
   "Update ready to install": "Mise à jour prête à installer",
-  "Updates": "Mises à jour"
+  "Updates": "Mises à jour",
+  "Managed by Xcode": "Géré par Xcode",
+  "Runtimes": "Runtimes",
+  "Simulators that use this runtime become unavailable. Xcode can download the runtime again.": "Les simulateurs qui utilisent ce runtime deviennent indisponibles. Xcode peut le retélécharger.",
+  "Delete simulator runtime": "Supprimer le runtime du simulateur"
 }

@@ -326,3 +326,38 @@ test("CLS-01 simulators: preview a fixed simctl action, confirm once, running de
   await expect.poll(() => posts.filter((call) => call.path === "/api/cleanup/simulators/preview").at(-1)?.body)
     .toEqual({ actionId: "simulators.erase-devices", deviceIds: ["A1B2C3D4-1111-2222-3333-444455556666"] });
 });
+
+test("CLS-03 simulator runtimes: Xcode-managed ones locked, one runtime per preview", async ({ page }) => {
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  const runtimes = [
+    { id: "D1D2D3D4-1111-2222-3333-444455556666", name: "iOS 15.0", version: "15.0", build: "19A339", runtime: "com.apple.CoreSimulator.SimRuntime.iOS-15-0", state: "Ready", deletable: true, lastUsedAt: null, kind: "Disk Image", sizeBytes: 6_000_000_000 },
+    { id: "E1E2E3E4-1111-2222-3333-444455556666", name: "iOS 18.0", version: "18.0", build: "22A3351", runtime: "com.apple.CoreSimulator.SimRuntime.iOS-18-0", state: "Ready", deletable: false, lastUsedAt: null, kind: "Bundled with Xcode", sizeBytes: 8_000_000_000 }
+  ];
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().postDataJSON?.() ?? {};
+    if (route.request().method() === "POST") posts.push({ path, body });
+    let data: unknown = {};
+    if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "macos", entries: [] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+    else if (path === "/api/cleanup/containers") data = { available: false, engine: null, reason: "Neither Docker nor Podman is responding.", actions: [] };
+    else if (path === "/api/cleanup/simulators") data = { available: true, reason: "", devices: [], actions: [], runtimes, runtimeReason: "" };
+    else if (path === "/api/cleanup/simulators/preview") data = { previewId: "rt-1", actionId: body.actionId, risk: "high", candidateCount: 1, bytes: 6_000_000_000, devices: [{ id: runtimes[0].id, name: "iOS 15.0", runtime: runtimes[0].runtime, state: "Ready", available: true, sizeBytes: 6_000_000_000 }], command: ["xcrun", "simctl", "runtime", "delete", runtimes[0].id], expiresAt: Date.now() / 1000 + 600 };
+    else if (path === "/api/host") data = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/scan/");
+  const card = page.locator("#scan-simulators");
+  const xcodeRow = card.locator("li", { hasText: "iOS 18.0" });
+  await expect(xcodeRow.getByText("Managed by Xcode")).toBeVisible();
+  await expect(xcodeRow.getByRole("button", { name: "Delete" })).toBeDisabled();
+  await card.locator("li", { hasText: "iOS 15.0" }).getByRole("button", { name: "Delete" }).click();
+  await expect(card.getByText(`xcrun simctl runtime delete ${runtimes[0].id}`)).toBeVisible();
+  await expect(card.getByText("Simulators that use this runtime become unavailable.", { exact: false })).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/simulators/preview")?.body).toEqual({ actionId: "simulators.delete-runtime", deviceIds: [runtimes[0].id] });
+  expect(posts.filter((call) => call.path === "/api/cleanup/simulators/run")).toHaveLength(0);
+});
