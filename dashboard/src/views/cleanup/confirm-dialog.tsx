@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { CheckCircleIcon, PauseCircleIcon, TrashIcon, WarningIcon, XIcon } from "@phosphor-icons/react";
 import { Empty, Status, keepModalFocus } from "../../components/ui";
-import type { CleanupPlan } from "../../lib/api";
+import type { CleanupJob, CleanupPlan, CleanupResult } from "../../lib/api";
 import { bytes, itemStatusLabel } from "./format";
 
 export const PathSource = ({ source }: { source?: string }) => <span className="text-(--iux-muted-foreground)">Source: <code translate="no">{source || "catalog"}</code></span>;
@@ -35,13 +35,16 @@ function Tile({ className = "", title, aside, children }: { className?: string; 
 /**
  * Plan confirmation: a near full-screen dialog with focus containment. A fixed
  * header and action bar frame a scrolling bento grid of the plan summary, the
- * items that will be cleaned and the items that will be left alone.
+ * items that will be cleaned and the items that will be left alone. The dialog
+ * stays open through verify and clean so a long run has visible progress.
  */
 export function ConfirmDialog({
-  plan, planUsed, now, busy, error, onRun, onClose
+  plan, planUsed, now, busy, error, job, result, onRun, onClose, onCancel, onChangeMode
 }: {
   plan: CleanupPlan; planUsed: boolean; now: number; busy: boolean; error: string;
-  onRun: () => void; onClose: () => void;
+  job?: CleanupJob | null; result?: CleanupResult | null;
+  onRun: () => void; onClose: () => void; onCancel?: () => void;
+  onChangeMode?: (mode: "trash" | "delete") => void;
 }) {
   const box = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -61,13 +64,26 @@ export function ConfirmDialog({
   const skippedCount = plan.items.length - ready.length;
   const largest = ready[0]?.sizeBytes ?? 0;
   const expired = plan.expiresAt <= now;
-  const blocked = expired || planUsed || !ready.length || busy;
+  const running = job?.state === "running";
+  const planning = running && job?.kind === "plan";
+  const cleaning = running && job?.kind === "clean";
+  const failed = job?.state === "failed" && (job.kind === "clean" || job.kind === "plan");
+  const done = !!result && result.planId === plan.planId && (job?.kind === "clean" ? job.state !== "running" : true);
+  const blocked = expired || planUsed || !ready.length || busy || running || done;
   const trash = plan.mode === "trash";
+  const phase = String(job?.progress?.phase ?? (planning ? "planning" : "verifying"));
+  const doneCount = Number(job?.progress?.itemsDone ?? job?.progress?.pathsDone ?? 0);
+  const totalCount = Number(job?.progress?.itemsTotal ?? job?.progress?.pathsTotal ?? 0);
+  const percent = totalCount > 0 ? Math.min(100, Math.round((doneCount / totalCount) * 100)) : 0;
+  const currentPath = String(job?.progress?.currentPath ?? "");
+  const working = planning || cleaning;
 
   return <dialog ref={box} tabIndex={-1} aria-labelledby="cleanup-confirm-title"
     className="iux-dialog m-auto h-dvh w-full flex-col overflow-y-auto open:flex sm:h-[calc(100dvh-3rem)] sm:w-[calc(100%-3rem)] sm:max-w-6xl sm:rounded-2xl"
-    onClose={onClose} onKeyDown={keepModalFocus}
+    onCancel={(event) => { if (working) event.preventDefault(); }}
+    onClose={() => { if (!working) onClose(); }} onKeyDown={keepModalFocus}
     onMouseDown={(event) => {
+      if (working) return;
       const rect = event.currentTarget.getBoundingClientRect();
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
         event.preventDefault();
@@ -79,7 +95,7 @@ export function ConfirmDialog({
         <h2 id="cleanup-confirm-title" className="text-base font-semibold">Confirm cleanup</h2>
         <p className="mt-0.5 text-xs text-(--iux-muted-foreground)">Review what will be removed before running.</p>
       </div>
-      <button type="button" className="iux-btn" data-variant="ghost" aria-label="Close" title="Close" onClick={onClose}>
+      <button type="button" className="iux-btn" data-variant="ghost" aria-label="Close" title="Close" onClick={onClose} disabled={working}>
         <XIcon size={16} aria-hidden="true" />
       </button>
     </header>
@@ -106,13 +122,39 @@ export function ConfirmDialog({
             <span className={trash ? "text-[#f36c21]" : "text-(--iux-danger)"}>
               {trash ? <TrashIcon size={22} aria-hidden="true" /> : <WarningIcon size={22} aria-hidden="true" />}
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{trash ? "Move to Trash" : "Delete permanently"}</p>
               {trash ? <p className="text-xs text-(--iux-muted-foreground)">Items can be restored from the Trash.</p>
                 : <p className="text-xs text-(--iux-danger)">Deleting permanently cannot be undone.</p>}
+              {onChangeMode && !working && !done && <button type="button" className="iux-btn mt-2" data-variant="ghost" disabled={busy}
+                onClick={() => onChangeMode(trash ? "delete" : "trash")}>
+                {trash ? "Delete permanently instead" : "Use Trash instead"}
+              </button>}
             </div>
           </div>
         </Tile>
+
+        {working && <Tile className="col-span-2 md:col-span-4" title={planning ? "Building the plan" : phase === "verifying" ? "Checking the plan" : trash ? "Moving to Trash" : "Deleting permanently"}>
+          <div className="h-1.5 overflow-hidden rounded-full bg-(--iux-muted)" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Cleanup progress">
+            <span className="block h-full rounded-full bg-[#f36c21] transition-[width]" style={{ width: `${percent}%` }} />
+          </div>
+          <p className="mt-2 text-sm" role="status" aria-live="polite">
+            <span dir="ltr" className="tabular-nums">{totalCount ? `${percent}% · ${doneCount} / ${totalCount}` : "Starting…"}</span>
+            {phase === "verifying" && <span className="text-(--iux-muted-foreground)"> · nothing has been moved yet</span>}
+          </p>
+          {currentPath && <p className="mt-1 truncate text-xs text-(--iux-muted-foreground)" dir="ltr" translate="no" title={currentPath}>{currentPath}</p>}
+        </Tile>}
+
+        {done && result && <Tile className="col-span-2 md:col-span-4" title="Clean finished">
+          <p className="text-sm">
+            <span dir="ltr" className="font-semibold tabular-nums">{bytes(result.totals.bytes)}</span>
+            {result.mode === "trash" ? " moved to Trash, not yet freed." : " deleted permanently."}
+          </p>
+          <p className="mt-1 text-xs text-(--iux-muted-foreground)">
+            {result.totals.trashed ? `${result.totals.trashed} trashed` : ""}{result.totals.deleted ? `${result.totals.trashed ? " · " : ""}${result.totals.deleted} deleted` : ""}
+            {result.totals.skipped ? ` · ${result.totals.skipped} skipped` : ""}{result.totals.failed ? ` · ${result.totals.failed} failed` : ""}
+          </p>
+        </Tile>}
 
         <Tile title="Ready to clean" className={`col-span-2 ${skipped.length ? "" : "md:col-span-4"}`}
           aside={<span dir="ltr" className="text-xs tabular-nums text-(--iux-muted-foreground)">{bytes(plan.totals.bytes)}</span>}>
@@ -148,13 +190,16 @@ export function ConfirmDialog({
 
     <footer className="flex shrink-0 flex-wrap items-center gap-3 border-t border-(--iux-border) px-5 py-3">
       <div className="min-w-0 flex-1 text-sm">
-        {error ? <Status value={{ ok: false, text: error }} />
+        {error || (failed && job?.error) ? <Status value={{ ok: false, text: error || job?.error || "The cleanup job failed." }} />
+          : working ? <p className="text-xs text-(--iux-muted-foreground)">{phase === "verifying" ? "Re-checking every path. Finder Trash stays empty until this finishes." : "Working through the plan."}</p>
+          : done ? <p className="text-xs text-(--iux-muted-foreground)">Items on other volumes go to that volume's Trash, not always the Dock one.</p>
           : planUsed ? <p>This plan was already run. Build a new plan.</p>
           : expired ? <p>This plan expired. Build a new plan.</p>
           : <p className="text-xs text-(--iux-muted-foreground)">expires in {Math.max(0, Math.ceil(plan.expiresAt - now))} seconds</p>}
       </div>
-      <button type="button" className="iux-btn" onClick={onClose}>Back</button>
-      <button type="button" className="iux-btn" data-variant="primary" disabled={blocked} onClick={onRun}>Run clean</button>
+      {working ? <button type="button" className="iux-btn" onClick={onCancel} disabled={!onCancel}>Stop</button>
+        : <button type="button" className="iux-btn" onClick={onClose}>{done || failed ? "Close" : "Back"}</button>}
+      {!done && <button type="button" className="iux-btn" data-variant="primary" disabled={blocked} onClick={onRun}>Run clean</button>}
     </footer>
   </dialog>;
 }

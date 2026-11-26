@@ -30,20 +30,24 @@ export type ScanCardProps = {
 
 export function ScanCard(props: ScanCardProps) {
   const { active, entries, measured, checked, setChecked, canWork, scanned, onScan, onScanReview, onCancel, onClean, groupHref, error, note } = props;
-  const running = active?.state === "running" && active.kind === "scan";
+  const running = active?.state === "running";
   const done = Number(active?.progress?.pathsDone ?? active?.progress?.itemsDone ?? 0);
   const total = Number(active?.progress?.pathsTotal ?? active?.progress?.itemsTotal ?? 0);
   const percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
   if (running) {
-    return <Section id="overview-review" title="Scanning your Mac" action={<span dir="ltr" className="text-xl font-semibold tabular-nums" aria-live="polite">{percent}%</span>}
-      description={String(active?.progress?.currentEntry || "Preparing…")}>
+    const phase = String(active?.progress?.phase ?? "");
+    const title = active.kind === "scan" ? "Scanning your Mac"
+      : active.kind === "plan" ? "Building the plan"
+      : phase === "verifying" ? "Checking the plan" : "Cleaning";
+    return <Section id="overview-review" title={title} action={<span dir="ltr" className="text-xl font-semibold tabular-nums" aria-live="polite">{percent}%</span>}
+      description={String(active?.progress?.currentEntry || (phase === "verifying" ? "Re-checking paths before anything is moved…" : "Preparing…"))}>
       <div className="h-1.5 overflow-hidden rounded-full bg-(--iux-muted)" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
         <span className="block h-full rounded-full bg-[#2f9e91] transition-[width]" style={{ width: `${percent}%` }} />
       </div>
       <p className="mt-3 truncate text-xs text-(--iux-muted-foreground)" dir="ltr" translate="no" title={String(active?.progress?.currentPath ?? "")}>{String(active?.progress?.currentPath ?? "…")}</p>
       <div className="mt-3 flex items-center gap-3">
-        <button type="button" className="iux-btn" onClick={onCancel}>Stop scan</button>
-        <span className="text-xs text-(--iux-muted-foreground)">Stopping keeps the results found so far.</span>
+        <button type="button" className="iux-btn" onClick={onCancel}>{active.kind === "scan" ? "Stop scan" : "Stop"}</button>
+        <span className="text-xs text-(--iux-muted-foreground)">{phase === "verifying" ? "Finder Trash stays empty until this step finishes." : "Stopping keeps the results found so far."}</span>
       </div>
     </Section>;
   }

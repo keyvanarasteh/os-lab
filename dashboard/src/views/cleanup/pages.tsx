@@ -17,7 +17,7 @@ import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
 import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
 import { RelocationCard, type RelocationRequest } from "./relocation-card";
-import { SimulatorStorageCard, SimulatorStorageNotice } from "./simulator-storage-card";
+import { SimulatorStorageCard, SimulatorSetupCard } from "./simulator-storage-card";
 import { WidgetsCard } from "./widgets-card";
 import { CareList, CareRow } from "./care-sections";
 import { SuggestionSettings } from "./suggestion-settings";
@@ -61,10 +61,10 @@ export function parseCleanupPath(pathname: string): CleanupPageId | null {
 }
 const PUBLIC = import.meta.env.PUBLIC_SITE_MODE === "pages";
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
-const isScan = (job: CleanupJob): job is CleanupJob & { result: CleanupScan } => job.kind === "scan" && !!job.result;
-const isPlan = (job: CleanupJob): job is CleanupJob & { result: CleanupPlan } => job.kind === "plan" && !!job.result;
+const isScan = (job: CleanupJob | null): job is CleanupJob & { result: CleanupScan } => !!job && job.kind === "scan" && !!job.result;
+const isPlan = (job: CleanupJob | null): job is CleanupJob & { result: CleanupPlan } => !!job && job.kind === "plan" && !!job.result;
 const isSimulatorRun = (result: object): result is CleanupSimulatorResult => (result as { kind?: string }).kind === "simulators";
-const isClean = (job: CleanupJob): job is CleanupJob & { result: CleanupResult } => job.kind === "clean" && !!job.result;
+const isClean = (job: CleanupJob | null): job is CleanupJob & { result: CleanupResult } => !!job && job.kind === "clean" && !!job.result;
 
 const CATEGORY_LABEL: Record<string, string> = { system: "System", browser: "Browsers", developer: "Developer" };
 const CATEGORY_ORDER = ["system", "browser", "developer"];
@@ -621,11 +621,20 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
     && latestPlan.mode === mode
     && [...planEntryIds].sort().join("\u0000") === [...selected].sort().join("\u0000");
 
-  async function start(action: () => Promise<CleanupJob>) {
-    setActionError(""); setSubmitting(true); setConfirm(false);
-    try { const job = await action(); setActive(job); setJobs((old) => [job, ...old]); }
+  async function start(action: () => Promise<CleanupJob>, opts?: { keepConfirm?: boolean }) {
+    setActionError(""); setSubmitting(true); if (!opts?.keepConfirm) setConfirm(false);
+    try { const job = await action(); setActive(job); setJobs((old) => [job, ...old.filter((row) => row.id !== job.id)]); }
     catch (error) { setActionError(errorText(error)); }
     finally { setSubmitting(false); }
+  }
+  function runConfirmedPlan(planId: string) {
+    void start(() => api.cleanupClean(planId), { keepConfirm: true });
+  }
+  function rebuildPlan(next: "trash" | "delete") {
+    setMode(next);
+    const ids = [...new Set(planJob?.request.entryIds ?? latestPlan?.items.map((item) => item.entryId) ?? [])];
+    if (!ids.length) return;
+    void start(() => api.cleanupPlan(ids, next), { keepConfirm: true });
   }
   async function cancel() {
     if (!active) return;
@@ -676,7 +685,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           </span>}
         </>} />
       {!PUBLIC && <MonitorBanner monitor={monitor} scanHref={link("scan/")} />}
-      {!PUBLIC && page === "" && <SimulatorStorageNotice href={link("relocation/#simulator-storage")} />}
+      {!PUBLIC && page === "" && <SimulatorSetupCard />}
       {(page !== "" || PUBLIC) && <nav aria-label="Cleanup pages" className="flex flex-wrap gap-2">{tabs.map((tab) =>
         <a key={tab.id} href={link(tab.path)} aria-current={page === tab.id ? "page" : undefined} className="iux-btn" data-variant={page === tab.id ? "primary" : "outline"}>{tab.label}</a>)}</nav>}
       {PUBLIC ? <Section title="Local app required"><p>The Cleanup Lab runs in the local app. Install and open os-lab on your computer to scan and clean.</p></Section> :
@@ -715,6 +724,8 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                 </CareRow>
               </CareList>
             </>}
+            {active?.state === "failed" && <Status value={{ ok: false, text: active.error || "The cleanup job failed." }} />}
+            {actionError && page === "" && <Status value={{ ok: false, text: actionError }} />}
             {latestClean && <Section title="Latest clean report" description={`${latestClean.totals.trashed} moved to Trash · ${latestClean.totals.skipped} skipped · ${latestClean.totals.failed} failed`}>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={latestClean.totals.trashed ? "success" : undefined}>{itemStatusLabel("trashed")} {latestClean.totals.trashed}</Badge>
@@ -737,10 +748,11 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
               <OverviewCards go={goCard} />
             </Section>
           </>}
-          {!PUBLIC && bookmarkConfirm && active && isPlan(active) &&
-            <ConfirmDialog plan={active.result} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
-              onRun={() => void start(() => api.cleanupClean(active.result.planId))}
-              onClose={() => { setBookmarkConfirm(false); }} />}
+          {!PUBLIC && bookmarkConfirm && latestPlan &&
+            <ConfirmDialog plan={latestPlan} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
+              job={active} result={isClean(active) ? active.result : null}
+              onRun={() => runConfirmedPlan(latestPlan.planId)} onCancel={() => void cancel()}
+              onChangeMode={rebuildPlan} onClose={() => { setBookmarkConfirm(false); }} />}
           {page === "scan" && <>
             <Section id="scan-entries" title="Scan" description="Choose catalog entries. Scanning only measures files; it does not remove them.">
               {!entries.length ? <Empty>No cleanup entries are available on this system.</Empty> : <>
@@ -850,9 +862,11 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
               {mode === "delete" && <p className="mt-2 text-sm">Deleting permanently cannot be undone.</p>}
               <div className="mt-3"><button type="button" className="iux-btn" data-variant="primary" disabled={!canWork || !selected.length} onClick={reviewAndClean}>Review & clean</button></div>
               {confirm && latestPlan && <ConfirmDialog plan={latestPlan} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
-                onRun={() => void start(() => api.cleanupClean(latestPlan.planId))} onClose={() => setConfirm(false)} />}
+                job={active} result={isClean(active) ? active.result : null}
+                onRun={() => runConfirmedPlan(latestPlan.planId)} onCancel={() => void cancel()}
+                onChangeMode={rebuildPlan} onClose={() => setConfirm(false)} />}
             </Section>
-            {latestClean && <Section title="Clean result" description={<span dir="ltr">{`${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not freed" : "deleted permanently"}`}</span>}>
+            {latestClean && <Section title="Clean result" description={<span dir="ltr">{`${bytes(latestClean.totals.bytes)} ${latestClean.mode === "trash" ? "moved to Trash, not yet freed." : "deleted permanently."}`}</span>}>
               <div className="flex flex-wrap gap-2">
                 <Badge tone={latestClean.totals.trashed ? "success" : undefined}>{itemStatusLabel("trashed")} {latestClean.totals.trashed}</Badge>
                 <Badge>{itemStatusLabel("deleted")} {latestClean.totals.deleted}</Badge>
@@ -870,7 +884,9 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
             onScan={(ids) => void start(() => api.cleanupScan(ids))}
             onReview={(ids) => { setSelected(ids); void start(() => api.cleanupPlan(ids, mode)); }} />}
           {(page === "" || page === "catalog") && !PUBLIC && confirm && latestPlan && <ConfirmDialog plan={latestPlan} planUsed={planUsed} now={now} busy={!!busy} error={actionError}
-            onRun={() => void start(() => api.cleanupClean(latestPlan.planId))} onClose={() => setConfirm(false)} />}
+            job={active} result={isClean(active) ? active.result : null}
+            onRun={() => runConfirmedPlan(latestPlan.planId)} onCancel={() => void cancel()}
+            onChangeMode={rebuildPlan} onClose={() => setConfirm(false)} />}
           {page === "results" && <>
             <Section id="results-categories" title="Results by category" description="Measurements from the latest scan in this console session.">
               {!latestScan ? <Empty>No scan results yet. Run a scan first.</Empty> : <>

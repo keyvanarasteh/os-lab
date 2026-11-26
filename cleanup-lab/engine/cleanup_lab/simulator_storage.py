@@ -8,9 +8,11 @@ dialog. This module adds the setup around it:
   (private JSON in the cleanup state folder, like the monitor's store);
 * a read-only **status**: the folder is on the system disk, linked to another
   volume, or linked to a volume that is not connected (Simulator then fails);
-* a **suggestion** the dashboard and the monitor show when the system disk is
-  below the floor and the folder still lives there. Nothing moves on its own:
-  a suggestion opens the existing plan → confirm → run flow.
+* a **suggestion**: ``setup`` when the folder is still on the system disk and
+  another volume can take it; ``move`` when a saved destination is connected
+  and the system disk is below the floor; ``reconnect`` when the linked disk
+  is missing. The dashboard auto-check uses all three. The monitor notifies
+  only for ``move`` and ``reconnect``. Nothing moves on its own.
 
 Runtimes (``/Library/Developer/CoreSimulator``) stay system-managed and are
 never relocated.
@@ -158,19 +160,25 @@ def location(folder, rows, home=None):
     return "local", folder, volume
 
 
-def suggestion(config, state, home, destination):
-    """What the page should offer next, from pure inputs; never acts by itself."""
+def suggestion(config, state, home, destination, offered=None):
+    """What the page should offer next, from pure inputs; never acts by itself.
+
+    ``setup`` means the devices folder is still on the system disk and another
+    volume can take it. ``move`` is the tighter monitor case (saved destination,
+    below the free-space floor). ``reconnect`` is a missing linked disk.
+    """
     if state == "disk-missing":
         return {"action": "reconnect", "reason": "The disk that holds the simulators is not connected."}
-    if state != "local" or not config["suggest"] or not config["destination"]:
+    if state != "local":
         return {"action": None, "reason": ""}
-    if destination is None:
-        return {"action": None, "reason": "The chosen disk is not connected."}
-    if home is None or not isinstance(home.get("freeBytes"), int):
-        return {"action": None, "reason": ""}
-    if home["freeBytes"] >= config["floorBytes"]:
-        return {"action": None, "reason": ""}
-    return {"action": "move", "reason": "The system disk is below the free-space floor."}
+    has_disk = bool(offered) if offered is not None else destination is not None
+    if (config["suggest"] and config["destination"] and destination is not None
+            and home is not None and isinstance(home.get("freeBytes"), int)
+            and home["freeBytes"] < config["floorBytes"]):
+        return {"action": "move", "reason": "The system disk is below the free-space floor."}
+    if has_disk:
+        return {"action": "setup", "reason": "Simulator devices are still on the system disk."}
+    return {"action": None, "reason": ""}
 
 
 def status(root, *, platform=None, env=None, inventory=None):
@@ -197,7 +205,7 @@ def status(root, *, platform=None, env=None, inventory=None):
         "config": config, "configError": loaded["configError"],
         "destinations": [{"mountPoint": row["mountPoint"], "name": row.get("name"), "kind": row["kind"],
                           "freeBytes": row["freeBytes"], "totalBytes": row.get("totalBytes")} for row in offered],
-        "suggestion": suggestion(config, state, home, destination),
+        "suggestion": suggestion(config, state, home, destination, offered),
     }
 
 

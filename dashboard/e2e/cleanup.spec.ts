@@ -29,7 +29,9 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
       jobs.unshift(job); data = job;
     } else if (path.startsWith("/api/cleanup/jobs/")) {
       const kind = path.split("/")[4].replace("job-", "");
-      data = { id: `job-${kind}`, kind, state: "done", request: calls.find((call) => call.path === `/api/cleanup/${kind}`)?.body ?? {}, progress: {}, result: kind === "scan" ? scan : kind === "plan" ? plan : result, error: null };
+      const lastPlan = [...calls].reverse().find((call) => call.path === "/api/cleanup/plan")?.body as { mode?: string } | undefined;
+      const planned = { ...plan, mode: lastPlan?.mode === "delete" ? "delete" : "trash", planId: lastPlan?.mode === "delete" ? "plan-delete" : plan.planId };
+      data = { id: `job-${kind}`, kind, state: "done", request: calls.find((call) => call.path === `/api/cleanup/${kind}`)?.body ?? {}, progress: {}, result: kind === "scan" ? scan : kind === "plan" ? planned : result, error: null };
       const index = jobs.findIndex((job) => job.id === `job-${kind}`);
       if (index >= 0) jobs[index] = data as Record<string, unknown>;
     } else if (path === "/api/host") data = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
@@ -40,6 +42,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   });
   await page.goto("/cleanup/");
   await expect(page.getByRole("heading", { name: "Cleanup Lab" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "iOS Simulator setup" })).toHaveCount(0);
   // CLNP-21/22: the overview — storage hero first, then the renamed review section.
   await expect(page.getByRole("heading", { name: "This computer's storage" })).toBeVisible();
   await expect(page.getByText("50% used", { exact: false })).toBeVisible();
@@ -73,7 +76,14 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   expect(calls.find((call) => call.path === "/api/cleanup/plan")?.body).toEqual({ entryIds: ["system.caches"], mode: "trash" });
   await expect(page.getByRole("dialog")).toContainText("1 items");
   await expect(page.getByRole("dialog")).toContainText("Move to Trash");
+  await page.getByRole("button", { name: "Delete permanently instead" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Delete permanently");
+  expect([...calls].reverse().find((call) => call.path === "/api/cleanup/plan")?.body).toEqual({ entryIds: ["system.caches"], mode: "delete" });
+  await page.getByRole("button", { name: "Use Trash instead" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Move to Trash");
   await page.getByRole("button", { name: "Run clean" }).click();
+  await expect(page.getByRole("dialog")).toContainText("moved to Trash, not yet freed.");
+  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
   await expect(page.getByText("moved to Trash, not yet freed.", { exact: false })).toBeVisible();
   expect(calls.filter((call) => call.path === "/api/cleanup/clean")[0].body).toEqual({ planId: "plan-1" });
   // CLNP-21: the Space Explorer capability card moved to Settings and still navigates its tab in place.
@@ -118,7 +128,9 @@ test("advanced scan sorts by size, reviews a plan and cleans typed", async ({ pa
       jobs.unshift(job); data = job;
     } else if (path.startsWith("/api/cleanup/jobs/")) {
       const kind = path.split("/")[4].replace("job-", "");
-      data = { id: `job-${kind}`, kind, state: "done", request: calls.find((call) => call.path === `/api/cleanup/${kind}`)?.body ?? {}, progress: {}, result: kind === "scan" ? scan : kind === "plan" ? plan : result, error: null };
+      const lastPlan = [...calls].reverse().find((call) => call.path === "/api/cleanup/plan")?.body as { mode?: string } | undefined;
+      const planned = { ...plan, mode: lastPlan?.mode === "delete" ? "delete" : "trash", planId: lastPlan?.mode === "delete" ? "plan-delete" : plan.planId };
+      data = { id: `job-${kind}`, kind, state: "done", request: calls.find((call) => call.path === `/api/cleanup/${kind}`)?.body ?? {}, progress: {}, result: kind === "scan" ? scan : kind === "plan" ? planned : result, error: null };
       const index = jobs.findIndex((job) => job.id === `job-${kind}`);
       if (index >= 0) jobs[index] = data as Record<string, unknown>;
     } else if (path === "/api/host") data = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
@@ -151,7 +163,8 @@ test("advanced scan sorts by size, reviews a plan and cleans typed", async ({ pa
   await expect(page.getByRole("dialog")).toContainText("1 items");
   await expect(page.getByRole("dialog")).toContainText("Move to Trash");
   await page.getByRole("button", { name: "Run clean" }).click();
-  await expect(page.getByText("moved to Trash, not freed")).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText("moved to Trash, not yet freed.");
+  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
   expect(calls.filter((call) => call.path === "/api/cleanup/clean")[0].body).toEqual({ planId: "plan-1" });
   await expect(page.getByText("Trashed 1")).toBeVisible();
 });
@@ -360,4 +373,94 @@ test("CLS-03 simulator runtimes: Xcode-managed ones locked, one runtime per prev
   await expect(card.getByText("Simulators that use this runtime become unavailable.", { exact: false })).toBeVisible();
   expect(posts.find((call) => call.path === "/api/cleanup/simulators/preview")?.body).toEqual({ actionId: "simulators.delete-runtime", deviceIds: [runtimes[0].id] });
   expect(posts.filter((call) => call.path === "/api/cleanup/simulators/run")).toHaveLength(0);
+});
+
+test("macOS dashboard shows the iOS Simulator setup card with move and delete actions", async ({ page }) => {
+  const GIB = 1024 ** 3;
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  const jobPolls: Record<string, number> = { p1: 0, r1: 0 };
+  const devices = [
+    { id: "B1B2C3D4-1111-2222-3333-444455556666", name: "iPhone 8", runtime: "com.apple.CoreSimulator.SimRuntime.iOS-15-0", state: "Shutdown", available: false, sizeBytes: 3_000_000_000 }
+  ];
+  const storage = {
+    available: true, reason: "", entryId: "simulators.coresimulator-devices",
+    folder: "/Users/test/Library/Developer/CoreSimulator/Devices", state: "local",
+    target: "/Users/test/Library/Developer/CoreSimulator/Devices",
+    volume: { mountPoint: "/", kind: "root" }, home: { mountPoint: "/", freeBytes: 40 * GIB, totalBytes: 500 * GIB },
+    config: { destination: null, suggest: true, floorBytes: 20 * GIB }, configError: null,
+    destinations: [{ mountPoint: "/Volumes/Ext", name: "Ext", kind: "internal", freeBytes: 900 * GIB, totalBytes: 1000 * GIB }],
+    suggestion: { action: "setup", reason: "Simulator devices are still on the system disk." }
+  };
+  const plan = {
+    action: "move", entryId: "simulators.coresimulator-devices", entryName: "iOS Simulator devices",
+    homePath: "/Users/test/Library/Developer/CoreSimulator/Devices",
+    storePath: "/Volumes/Ext/oslab-caches/simulators.coresimulator-devices",
+    destination: "/Volumes/Ext", files: 3, sizeBytes: 50, freeBytes: 900 * GIB,
+    state: "local_only", fingerprint: { files: 3, bytes: 50 },
+    steps: [], previewId: "prev-sim"
+  };
+  const run = {
+    entryId: "simulators.coresimulator-devices", action: "move", status: "completed",
+    homePath: plan.homePath, storePath: plan.storePath, bytesRelocated: 50, bytesRemoved: null,
+    cancelled: false, stepsDone: 6, stepsTotal: 6
+  };
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().postDataJSON?.() ?? {};
+    if (route.request().method() === "POST") posts.push({ path, body });
+    let data: unknown = {};
+    if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/monitor") data = { enabled: false, running: false, intervalSeconds: 300, cooldownSeconds: 3600, volumes: [], state: { volumes: {}, events: [], lastEvaluationAt: null, lastError: null }, activeWarnings: [], configError: null, checkedAt: 1 };
+    else if (path === "/api/cleanup/volumes") data = { platform: "macos", threshold: 0.9, volumes: [{ mountPoint: "/", name: "Macintosh HD", device: "/dev/disk1", filesystem: "apfs", kind: "root", totalBytes: 500_000_000_000, freeBytes: 250_000_000_000, usedBytes: 250_000_000_000, usage: 0.5, purgeableBytes: null, isHome: true, pressure: "ok", error: null }], homeVolume: "/", warnings: [], error: null };
+    else if (path === "/api/cleanup/bookmarks") data = { bookmarks: [], error: null };
+    else if (path === "/api/cleanup/permissions") data = { platform: "macos", permissions: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "macos", entries: [] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+    else if (path === "/api/cleanup/history") data = { entries: [], total: 0, verified: true };
+    else if (path === "/api/cleanup/preferences") data = { suggestion: { mode: "auto", include: [], exclude: [], minEntryBytes: 1048576, targetFreeBytes: null }, configError: null };
+    else if (path === "/api/cleanup/simulator-storage") data = storage;
+    else if (path === "/api/cleanup/simulators") data = { available: true, reason: "", devices, actions: [] };
+    else if (path === "/api/cleanup/simulators/preview") data = { previewId: "sim-1", actionId: body.actionId, risk: "low", candidateCount: 1, bytes: 3_000_000_000, devices, command: ["xcrun", "simctl", "delete", "unavailable"], expiresAt: Date.now() / 1000 + 600 };
+    else if (path === "/api/cleanup/simulators/run") data = { id: "job-sim", kind: "simulator-run", state: "running", progress: null, result: null, error: null };
+    else if (path === "/api/cleanup/jobs/job-sim") data = { id: "job-sim", kind: "simulator-run", state: "done", progress: null, result: { kind: "simulators", actionId: "simulators.delete-unavailable", status: "completed", candidateCount: 1, devices, command: ["xcrun", "simctl", "delete", "unavailable"], bytesFreed: 3_000_000_000 }, error: null };
+    else if (path === "/api/cleanup/relocation") data = { platform: "macos", entries: [{ entryId: "simulators.coresimulator-devices", name: "iOS Simulator devices", path: "/Users/test/Library/Developer/CoreSimulator/Devices", relocatable: true, interrupted: false }], destinations: [] };
+    else if (path === "/api/cleanup/relocation/plan") data = { id: "p1", kind: "relocation-plan", state: "running", progress: null, result: null, error: null };
+    else if (path === "/api/cleanup/relocation/run") data = { id: "r1", kind: "relocation-run", state: "running", progress: { step: "copy", stepsDone: 1, stepsTotal: 6 }, result: null, error: null };
+    else if (path === "/api/cleanup/jobs/p1") {
+      jobPolls.p1 += 1;
+      data = jobPolls.p1 === 1
+        ? { id: "p1", kind: "relocation-plan", state: "running", progress: null, result: null, error: null }
+        : { id: "p1", kind: "relocation-plan", state: "done", progress: null, result: plan, error: null };
+    } else if (path === "/api/cleanup/jobs/r1") {
+      jobPolls.r1 += 1;
+      data = jobPolls.r1 === 1
+        ? { id: "r1", kind: "relocation-run", state: "running", progress: { step: "copy", stepsDone: 1, stepsTotal: 6 }, result: null, error: null }
+        : { id: "r1", kind: "relocation-run", state: "done", progress: null, result: run, error: null };
+    } else if (path === "/api/host") data = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/");
+  const card = page.locator("#simulator-setup");
+  await expect(card.getByRole("heading", { name: "iOS Simulator setup" })).toBeVisible();
+  await expect(card.getByText("On the system disk", { exact: true })).toBeVisible();
+  await expect(card.getByText("Simulator devices are still on the system disk.", { exact: false })).toBeVisible();
+  await expect(card.getByText("1 unavailable simulators", { exact: false })).toBeVisible();
+  await card.getByRole("button", { name: "Move simulators off the system disk" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Confirm relocation")).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/simulator-storage")?.body).toMatchObject({ destination: "/Volumes/Ext" });
+  expect(posts.find((call) => call.path === "/api/cleanup/relocation/plan")?.body).toEqual({ action: "move", entryId: "simulators.coresimulator-devices", destination: "/Volumes/Ext" });
+  expect(posts.filter((call) => call.path === "/api/cleanup/relocation/run")).toHaveLength(0);
+  await dialog.getByRole("button", { name: "Run relocation" }).click();
+  await expect(card.getByText("Moved", { exact: false })).toBeVisible();
+  await expect(card.getByText("50 B", { exact: false }).first()).toBeVisible();
+  await card.getByRole("button", { name: "Delete unavailable simulators" }).click();
+  await expect(card.getByText("Deleted simulators and their apps and data cannot be restored.")).toBeVisible();
+  expect(posts.filter((call) => call.path === "/api/cleanup/simulators/run")).toHaveLength(0);
+  await card.getByRole("button", { name: "Confirm" }).click();
+  await expect(card.getByText("Done.", { exact: false })).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/simulators/run")?.body).toEqual({ previewId: "sim-1" });
 });

@@ -442,6 +442,17 @@ class CleanTests(unittest.TestCase):
             clean.verify_plan(plan)
         self.assertEqual(caught.exception.code, "stale")
 
+    def test_verify_plan_reports_progress(self):
+        self.write("Library/Caches/app/data.bin", 10)
+        plan = self.build([self.caches_entry()])
+        ticks = []
+        clean.verify_plan(plan, progress_callback=ticks.append)
+        self.assertGreaterEqual(len(ticks), 2)
+        self.assertEqual(ticks[0]["phase"], "verifying")
+        self.assertEqual(ticks[0]["itemsDone"], 0)
+        self.assertGreaterEqual(ticks[-1]["itemsTotal"], 1)
+        self.assertEqual(ticks[-1]["itemsDone"], ticks[-1]["itemsTotal"])
+
     def test_an_expired_plan_is_refused_by_the_clock(self):
         self.write("Library/Caches/app/data.bin", 10)
         plan = self.build([self.caches_entry()], clock=lambda: 1000.0)

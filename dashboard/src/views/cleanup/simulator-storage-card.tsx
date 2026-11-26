@@ -6,8 +6,10 @@
  */
 import { useEffect, useState } from "react";
 import { Badge, Section, Status } from "../../components/ui";
-import { api, type CleanupSimulatorStorage } from "../../lib/api";
-import { bytes } from "./format";
+import { api, type CleanupAuxJob, type CleanupRelocationPlan, type CleanupRelocationRun, type CleanupSimulatorPreview, type CleanupSimulatorResult, type CleanupSimulators, type CleanupSimulatorStorage } from "../../lib/api";
+import { bytes, riskLabel, riskTone } from "./format";
+import { RelocationConfirmDialog } from "./relocation-card";
+import { simulatorActionLabel } from "./simulators-card";
 
 const GIB = 1024 ** 3;
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -116,9 +118,195 @@ export function SimulatorStorageNotice({ href }: { href: string }) {
     return () => { alive = false; };
   }, []);
   const action = report?.suggestion?.action;
-  if (!report?.available || !action) return null;
+  if (!report?.available || (action !== "move" && action !== "reconnect")) return null;
   return <div role="status" className={`rounded-md border p-3 text-sm ${action === "reconnect" ? "border-(--iux-danger)/50 bg-(--iux-danger)/5" : "border-(--iux-warning)/50 bg-(--iux-warning)/10"}`}>
     <p className="font-medium">{action === "reconnect" ? "Simulator disk is not connected" : "Move iOS simulators off the system disk"}</p>
     <p className="mt-1 text-xs"><a className="underline" href={href}>Open Simulator storage</a></p>
   </div>;
+}
+
+type PendingPlan = { plan: CleanupRelocationPlan; plannedAt: number };
+
+/**
+ * Dashboard card: on macOS, check whether CoreSimulator still lives on the
+ * system disk, a linked disk is missing, a move was interrupted, or
+ * unavailable simulators can be deleted. Actions run the existing relocation
+ * and simctl preview → confirm flows and keep progress plus a report here.
+ */
+export function SimulatorSetupCard() {
+  const [report, setReport] = useState<CleanupSimulatorStorage | null>(null);
+  const [inventory, setInventory] = useState<CleanupSimulators | null>(null);
+  const [interrupted, setInterrupted] = useState(false);
+  const [destination, setDestination] = useState("");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState<PendingPlan | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [planJob, setPlanJob] = useState<CleanupAuxJob<CleanupRelocationPlan> | null>(null);
+  const [runJob, setRunJob] = useState<CleanupAuxJob<CleanupRelocationRun> | null>(null);
+  const [result, setResult] = useState<CleanupRelocationRun | null>(null);
+  const [preview, setPreview] = useState<CleanupSimulatorPreview | null>(null);
+  const [simJob, setSimJob] = useState<CleanupAuxJob<CleanupSimulatorResult> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(Date.now() / 1000);
+
+  function load() {
+    void api.cleanupSimulatorStorage().then((value) => {
+      setReport(value);
+      setDestination((current) => current || value.config?.destination || value.destinations?.[0]?.mountPoint || "");
+    }).catch((reason) => setError(errorText(reason)));
+    void api.cleanupSimulators().then(setInventory).catch(() => setInventory(null));
+    void api.cleanupRelocation().then((status) => {
+      setInterrupted(!!(status.entries ?? []).some((entry) => entry.entryId === "simulators.coresimulator-devices" && entry.interrupted));
+    }).catch(() => setInterrupted(false));
+  }
+  useEffect(load, []);
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now() / 1000), 1000); return () => window.clearInterval(timer); }, []);
+
+  useEffect(() => {
+    const job = planJob?.state === "running" ? planJob : runJob?.state === "running" ? runJob : simJob?.state === "running" ? simJob : null;
+    if (!job) return;
+    let alive = true;
+    const timer = window.setInterval(() => {
+      void api.cleanupAuxJob(job.id).then((next) => {
+        if (!alive) return;
+        if (job.kind === "relocation-plan") {
+          const typed = next as CleanupAuxJob<CleanupRelocationPlan>;
+          setPlanJob(typed);
+          if (typed.state === "done" && typed.result) {
+            setPending({ plan: typed.result, plannedAt: Math.floor(Date.now() / 1000) });
+            setConfirmOpen(true);
+          } else if (typed.state === "failed") setError(typed.error || "Planning the move failed.");
+        } else if (job.kind === "relocation-run") {
+          const typed = next as CleanupAuxJob<CleanupRelocationRun>;
+          setRunJob(typed);
+          if (typed.state === "failed") setError(typed.error || "The move failed. The original folder is still in place.");
+          if (typed.state !== "running") { setResult(typed.result); load(); }
+        } else {
+          const typed = next as CleanupAuxJob<CleanupSimulatorResult>;
+          setSimJob(typed);
+          if (typed.state !== "running") void api.cleanupSimulators().then(setInventory).catch(() => {});
+        }
+      }).catch((reason) => { if (alive) setError(errorText(reason)); });
+    }, 650);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [planJob?.id, planJob?.state, runJob?.id, runJob?.state, simJob?.id, simJob?.state]);
+
+  const unavailable = (inventory?.devices ?? []).filter((item) => !item.available);
+  const unavailableBytes = unavailable.reduce((sum, item) => sum + (item.sizeBytes ?? 0), 0);
+  const needsStorage = !!report?.available && (report.state === "local" || report.state === "disk-missing" || interrupted);
+  const needsCleanup = !!inventory?.available && unavailable.length > 0;
+  const working = busy || planJob?.state === "running" || runJob?.state === "running" || simJob?.state === "running";
+  const step = runJob?.progress as { step?: string; stepsDone?: number; stepsTotal?: number } | null | undefined;
+
+  if (!needsStorage && !needsCleanup) return null;
+
+  async function move(action: "move" | "resume") {
+    if (!report?.entryId || !destination) { setError("Choose a disk first."); return; }
+    setBusy(true); setError(""); setResult(null);
+    try {
+      if (action === "move") {
+        await api.cleanupSimulatorStorageSave({
+          destination, suggest: report.config?.suggest ?? true, floorBytes: report.config?.floorBytes ?? 20 * GIB
+        });
+      }
+      setPlanJob(await api.cleanupRelocationPlan(action, report.entryId, destination));
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setBusy(false); }
+  }
+
+  async function runMove() {
+    if (!pending) return;
+    setBusy(true); setError("");
+    try {
+      setRunJob(await api.cleanupRelocationRun(pending.plan.previewId));
+      setConfirmOpen(false); setPending(null); setPlanJob(null);
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setBusy(false); }
+  }
+
+  async function previewUnavailable() {
+    setBusy(true); setError(""); setPreview(null); setSimJob(null);
+    try { setPreview(await api.cleanupSimulatorPreview("simulators.delete-unavailable")); }
+    catch (reason) { setError(errorText(reason)); }
+    finally { setBusy(false); }
+  }
+
+  async function runUnavailable() {
+    if (!preview || preview.expiresAt <= now || !preview.candidateCount) return;
+    setBusy(true); setError("");
+    try { setSimJob(await api.cleanupSimulatorRun(preview.previewId)); setPreview(null); }
+    catch (reason) { setError(errorText(reason)); }
+    finally { setBusy(false); }
+  }
+
+  return <Section id="simulator-setup" title="iOS Simulator setup"
+    description="On this Mac, simulators should live on a non-system disk. Unavailable simulators can be deleted through a previewed simctl action.">
+    {error && <Status value={{ ok: false, text: error }} />}
+    {needsStorage && report && <>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {stateBadge(report)}
+        {report.home && <span className="ms-auto text-xs text-(--iux-muted-foreground)">
+          <span>System disk</span> · <span dir="ltr" className="tabular-nums">{bytes(report.home.freeBytes ?? 0)}</span> <span>free</span>
+        </span>}
+      </div>
+      {report.state === "disk-missing" && <p className="mt-3 rounded-md border border-(--iux-danger)/50 bg-(--iux-danger)/5 px-3 py-2 text-sm">
+        Connect the disk that holds your simulators before opening Simulator.
+      </p>}
+      {report.state === "local" && <p className="mt-3 rounded-md border border-(--iux-warning)/50 bg-(--iux-warning)/10 px-3 py-2 text-sm">
+        Simulator devices are still on the system disk. Move them to another disk; runtimes stay managed by macOS.
+      </p>}
+      {interrupted && <p className="mt-3 rounded-md border border-(--iux-warning)/50 bg-(--iux-warning)/10 px-3 py-2 text-sm">
+        A previous move was interrupted. Resume it before starting a new one.
+      </p>}
+      {report.state === "local" && !report.destinations?.length && <p className="mt-3 text-sm">Connect another disk to move simulators off the system disk.</p>}
+      {!!report.destinations?.length && report.state !== "disk-missing" && <label className="mt-3 block text-sm">
+        <span className="block text-xs font-medium text-(--iux-muted-foreground)">Disk for simulators</span>
+        <select className="iux-input mt-1 w-full max-w-md" value={destination} disabled={working}
+          onChange={(event) => setDestination(event.target.value)}>
+          {report.destinations.map((item) => <option key={item.mountPoint} value={item.mountPoint}>
+            {item.name || item.mountPoint} · {bytes(item.freeBytes)} free
+          </option>)}
+        </select>
+      </label>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {interrupted && <button type="button" className="iux-btn" data-variant="primary" disabled={working || !destination}
+          onClick={() => void move("resume")}>Resume interrupted move</button>}
+        {report.state === "local" && !!report.destinations?.length && !interrupted &&
+          <button type="button" className="iux-btn" data-variant="primary" disabled={working || !destination}
+            onClick={() => void move("move")}>Move simulators off the system disk</button>}
+      </div>
+    </>}
+    {needsCleanup && <div className="mt-4">
+      <p className="text-sm"><span dir="ltr" className="font-semibold tabular-nums">{unavailable.length}</span> unavailable simulators
+        {unavailableBytes > 0 && <> · <span dir="ltr" className="tabular-nums">{bytes(unavailableBytes)}</span></>}</p>
+      <button type="button" className="iux-btn mt-2" disabled={working} onClick={() => void previewUnavailable()}>Delete unavailable simulators</button>
+    </div>}
+    {preview && <div className="mt-3 rounded-md border border-(--iux-border) p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <strong>{simulatorActionLabel(preview.actionId)}</strong>
+        <Badge tone={riskTone(preview.risk)}>{riskLabel(preview.risk)}</Badge>
+        <span dir="ltr" className="tabular-nums">{bytes(preview.bytes)}</span>
+      </div>
+      <p className="mt-1 text-xs text-(--iux-danger)">Deleted simulators and their apps and data cannot be restored.</p>
+      {preview.expiresAt <= now ? <p className="mt-2">Preview expired. Preview again.</p> :
+        <div className="mt-2 flex gap-2">
+          <button type="button" className="iux-btn" data-variant="primary" disabled={working || !preview.candidateCount} onClick={() => void runUnavailable()}>Confirm</button>
+          <button type="button" className="iux-btn" onClick={() => setPreview(null)}>Cancel</button>
+        </div>}
+    </div>}
+    {(planJob?.state === "running" || runJob?.state === "running") && <p className="mt-3" role="status">
+      {planJob?.state === "running" ? "Planning the move…" : <>Moving simulators… {step?.stepsTotal ? <span dir="ltr" className="tabular-nums">({step.stepsDone ?? 0}/{step.stepsTotal} · {step.step ?? ""})</span> : null}</>}
+    </p>}
+    {simJob?.state === "running" && <p className="mt-3" role="status">Simulator cleanup in progress…</p>}
+    {result && <div className="mt-3 rounded-md border border-(--iux-border) p-3 text-sm" role="status">
+      {result.status === "completed" && !result.cancelled
+        ? <p>Moved <span dir="ltr" className="tabular-nums">{bytes(result.bytesRelocated)}</span> off the system disk.</p>
+        : <p>{result.status === "failed" ? "The move failed. The original folder is still in place." : "The move stopped."}</p>}
+      {result.storePath && <p className="mt-1 break-all text-xs text-(--iux-muted-foreground)" translate="no">{result.storePath}</p>}
+    </div>}
+    {simJob?.state === "done" && simJob.result && <p className="mt-3" role="status">Done. <span dir="ltr">{bytes(simJob.result.bytesFreed)}</span> freed.</p>}
+    {simJob?.state === "failed" && <Status value={{ ok: false, text: simJob.error || simJob.result?.error || "Simulator cleanup failed." }} />}
+    {pending && confirmOpen && <RelocationConfirmDialog pending={pending} busy={runJob?.state === "running"} error={error}
+      onRun={() => void runMove()} onClose={() => { setConfirmOpen(false); setPending(null); }} />}
+  </Section>;
 }
