@@ -3380,5 +3380,11 @@
   "Move emulators off the system disk": "انقل المحاكيات عن قرص النظام",
   "Moving emulators…": "جارٍ نقل المحاكيات…",
   "Studio still opens these AVDs through a junction at the original path.": "ما زال Studio يفتح أجهزة AVD هذه عبر وصلة junction في المسار الأصلي.",
-  "Studio still opens these AVDs through a symlink at the original path.": "ما زال Studio يفتح أجهزة AVD هذه عبر رابط رمزي في المسار الأصلي."
+  "Studio still opens these AVDs through a symlink at the original path.": "ما زال Studio يفتح أجهزة AVD هذه عبر رابط رمزي في المسار الأصلي.",
+  "System images": "صور النظام",
+  "Unused": "غير مستخدمة",
+  "In use": "قيد الاستخدام",
+  "Uninstall unused image": "إلغاء تثبيت الصورة غير المستخدمة",
+  "Uninstall unused system images": "إلغاء تثبيت صور النظام غير المستخدمة",
+  "sdkmanager will uninstall this package. AVDs that need it cannot start until you install it again.": "سيُلغي sdkmanager تثبيت هذه الحزمة. لا تبدأ أجهزة AVD التي تحتاجها حتى تثبّتها مجددًا."
 }

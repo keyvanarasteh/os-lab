@@ -376,6 +376,56 @@ test("CLS-03 simulator runtimes: Xcode-managed ones locked, one runtime per prev
   expect(posts.filter((call) => call.path === "/api/cleanup/simulators/run")).toHaveLength(0);
 });
 
+for (const os of ["linux", "macos", "windows"] as const) {
+  test(`CLA-03 unused system images uninstall on ${os} previews and does not run`, async ({ page }) => {
+    const posts: { path: string; body: Record<string, unknown> }[] = [];
+    const unused = "system-images;android-28;default;x86";
+    const used = "system-images;android-34;google_apis;arm64-v8a";
+    const images = [
+      { id: unused, name: "Intel x86 Atom System Image", version: "1", path: "/sdk/system-images/android-28/default/x86", sizeBytes: 800_000_000, avds: [], unused: true },
+      { id: used, name: "Google APIs ARM 64 v8a System Image", version: "2", path: "/sdk/system-images/android-34/google_apis/arm64-v8a", sizeBytes: 1_200_000_000, avds: ["Pixel_7"], unused: false }
+    ];
+    await page.route("**/api/**", async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      const body = route.request().postDataJSON?.() ?? {};
+      if (route.request().method() === "POST") posts.push({ path, body });
+      let data: unknown = {};
+      if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+      else if (path === "/api/cleanup/catalog") data = { platform: os, entries: [] };
+      else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+      else if (path === "/api/cleanup/simulators") data = { available: false, reason: "Xcode simulators require macOS", devices: [], actions: [], runtimes: [] };
+      else if (path === "/api/cleanup/emulator-storage") data = { available: false, reason: "No Android SDK or AVD folder on this computer" };
+      else if (path === "/api/cleanup/emulators") data = {
+        available: true, reason: "", folder: "/tmp/avd", source: "default", sdkRoot: "/sdk",
+        devices: [{ id: "Pixel_7", name: "Pixel_7", runtime: "android-34", path: "/tmp/avd/Pixel_7.avd", state: "Shutdown", available: true, sizeBytes: 4 }],
+        actions: [{ id: "emulators.uninstall-images", risk: "medium", needsSelection: true, defaultSelected: false, target: "images", command: ["sdkmanager", "--uninstall", "<package>"] }],
+        images, imageReason: ""
+      };
+      else if (path === "/api/cleanup/emulators/preview") data = {
+        previewId: "img-1", actionId: body.actionId, risk: "medium", candidateCount: 1, bytes: 800_000_000,
+        devices: [{ id: unused, name: "Intel x86 Atom System Image", runtime: unused, state: "Unused", available: true, sizeBytes: 800_000_000 }],
+        command: ["sdkmanager", "--uninstall", unused], expiresAt: Date.now() / 1000 + 600
+      };
+      else if (path === "/api/host") data = { host: { os, osPretty: os, arch: "x64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: true, usable: true }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+      else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+      else if (path === "/api/jobs") data = { jobs: [] };
+      else if (path === "/api/logs") data = { logs: [] };
+      await route.fulfill({ json: data });
+    });
+    await page.goto("/cleanup/scan/");
+    const card = page.locator("#scan-emulators");
+    await expect(card.getByRole("heading", { name: "System images" })).toBeVisible();
+    const usedRow = card.locator("li", { hasText: "Google APIs ARM 64 v8a System Image" });
+    await expect(usedRow.getByText("In use")).toBeVisible();
+    await expect(usedRow.getByRole("button", { name: "Uninstall unused image" })).toBeDisabled();
+    await card.locator("li", { hasText: "Intel x86 Atom System Image" }).getByRole("button", { name: "Uninstall unused image" }).click();
+    await expect(card.getByText(`sdkmanager --uninstall ${unused}`)).toBeVisible();
+    await expect(card.getByText("sdkmanager will uninstall this package.", { exact: false })).toBeVisible();
+    expect(posts.find((call) => call.path === "/api/cleanup/emulators/preview")?.body).toEqual({ actionId: "emulators.uninstall-images", deviceIds: [unused] });
+    expect(posts.filter((call) => call.path === "/api/cleanup/emulators/run")).toHaveLength(0);
+  });
+}
+
 test("macOS dashboard shows the iOS Simulator setup card with move and delete actions", async ({ page }) => {
   const GIB = 1024 ** 3;
   const posts: { path: string; body: Record<string, unknown> }[] = [];

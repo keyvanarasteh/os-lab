@@ -593,9 +593,16 @@ export interface CleanupSimulatorResult {
 export interface CleanupEmulatorDevice {
   id: string; name: string | null; runtime: string; path?: string; state: string; available: boolean; sizeBytes: number | null;
 }
-export interface CleanupEmulatorAction { id: string; risk: string; needsSelection: boolean; defaultSelected: boolean; command: string[] }
+export interface CleanupEmulatorAction { id: string; risk: string; needsSelection: boolean; defaultSelected: boolean; target?: "devices" | "images"; command: string[] }
+/** CLA-03: an installed sdkmanager system-images package. */
+export interface CleanupEmulatorImage {
+  id: string; name: string; version?: string; path?: string | null; sizeBytes: number | null;
+  avds: string[]; unused: boolean;
+}
 export interface CleanupEmulators {
-  available: boolean; reason: string; folder?: string; source?: string; devices: CleanupEmulatorDevice[]; actions: CleanupEmulatorAction[];
+  available: boolean; reason: string; folder?: string; source?: string; sdkRoot?: string | null;
+  devices: CleanupEmulatorDevice[]; actions: CleanupEmulatorAction[];
+  images?: CleanupEmulatorImage[]; imageReason?: string;
 }
 export interface CleanupEmulatorPreview {
   previewId: string; actionId: string; risk: string; candidateCount: number; bytes: number;

@@ -3380,5 +3380,11 @@
   "Move emulators off the system disk": "Emulatoren von der Systemplatte verschieben",
   "Moving emulators…": "Emulatoren werden verschoben…",
   "Studio still opens these AVDs through a junction at the original path.": "Studio öffnet diese AVDs weiter über einen Junction am ursprünglichen Pfad.",
-  "Studio still opens these AVDs through a symlink at the original path.": "Studio öffnet diese AVDs weiter über einen Symlink am ursprünglichen Pfad."
+  "Studio still opens these AVDs through a symlink at the original path.": "Studio öffnet diese AVDs weiter über einen Symlink am ursprünglichen Pfad.",
+  "System images": "Systemabbilder",
+  "Unused": "Unbenutzt",
+  "In use": "In Gebrauch",
+  "Uninstall unused image": "Unbenutztes Abbild deinstallieren",
+  "Uninstall unused system images": "Unbenutzte Systemabbilder deinstallieren",
+  "sdkmanager will uninstall this package. AVDs that need it cannot start until you install it again.": "sdkmanager deinstalliert dieses Paket. AVDs, die es brauchen, starten erst nach der Neuinstallation."
 }

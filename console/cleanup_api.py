@@ -1158,8 +1158,10 @@ class CleanupAPI:
             _query(query)
             emulators = _module(self.root, "emulators")
             inventory = emulators.inventory()
-            actions = emulators.actions() if inventory["available"] else []
-            return {**inventory, "actions": actions}
+            listed = emulators.images()
+            actions = emulators.actions() if inventory["available"] or listed["available"] else []
+            return {**inventory, "actions": actions, "images": listed["images"],
+                    "imageReason": listed["reason"], "sdkRoot": listed.get("sdkRoot")}
         if path == "/api/cleanup/history":
             _query(query)
             try:
