@@ -1,0 +1,35 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "os-lab",
+  "version": "0.2.0",
+  "description": "Guarded local MCP tools and lab workflows for os-lab.",
+  "author": {
+    "name": "keyvanarasteh",
+    "url": "https://github.com/keyvanarasteh"
+  },
+  "homepage": "https://github.com/keyvanarasteh/os-lab",
+  "repository": "https://github.com/keyvanarasteh/os-lab",
+  "license": "Apache-2.0",
+  "keywords": [
+    "security",
+    "mcp",
+    "labs"
+  ],
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "interface": {
+        "displayName": "OS Lab",
+        "shortDescription": "Guarded security lab tools on your computer",
+        "longDescription": "Use the local os-lab MCP server and focused lab skills for authorized security lab work.",
+        "developerName": "keyvanarasteh",
+        "category": "Developer Tools",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://github.com/keyvanarasteh/os-lab"
+      }
+    }
+  }
+}

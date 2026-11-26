@@ -997,12 +997,42 @@ export interface ClaudePluginUpdates {
 export interface ClaudePluginPlan { token: string; action: ClaudePluginAction; commands: string[]; manual: string[]; warnings: string[] }
 export interface ClaudePluginResult { ok: boolean; next: string; steps: { command: string; ok: boolean; message: string }[] }
 
+export type CodexPluginAction = "install" | "update" | "uninstall";
+export interface CodexPluginState {
+  checkoutVersion: string;
+  terminalCommand?: string;
+  doctor: { ready: boolean; checks: { name: string; ok: boolean; detail: string; fix?: string | null }[] };
+  codex: {
+    cli: string | null;
+    error?: string;
+    installed: boolean;
+    enabled?: boolean;
+    version?: string | null;
+    duplicates: { name: string; scope: string }[];
+  };
+}
+export interface CodexPluginUpdates {
+  updatesAvailable: string[];
+  published?: { version: string | null; updateAvailable: boolean | null; note?: string };
+}
+export interface CodexPluginPlan {
+  token: string;
+  action: CodexPluginAction;
+  commands: string[];
+  manual?: string[];
+  warnings?: string[];
+  terminalCommand?: string;
+}
+
 export const api = {
   claudePlugin: () => call<ClaudePluginState>("/api/claude-plugin"),
   claudePluginCheck: (online: boolean) => post<ClaudePluginUpdates>("/api/claude-plugin/check", { online }),
   claudePluginPreview: (action: ClaudePluginAction, updateCheck?: boolean) =>
     post<ClaudePluginPlan>("/api/claude-plugin/preview", updateCheck === undefined ? { action } : { action, updateCheck }),
   claudePluginApply: (token: string) => post<ClaudePluginResult>("/api/claude-plugin/apply", { token, confirm: true }),
+  codexPlugin: () => call<CodexPluginState>("/api/codex-plugin"),
+  codexPluginCheck: (online: boolean) => post<CodexPluginUpdates>("/api/codex-plugin/check", { online }),
+  codexPluginPreview: (action: CodexPluginAction) => post<CodexPluginPlan>("/api/codex-plugin/preview", { action }),
   cleanupStatus: () => call<CleanupStatus>("/api/cleanup/status"),
   cleanupCatalog: () => call<{ platform: string; entries: CleanupEntry[] }>("/api/cleanup/catalog"),
   cleanupHistory: () => call<CleanupHistory>("/api/cleanup/history"),

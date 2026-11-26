@@ -13,6 +13,11 @@ VERIFICATION_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mc
 
 PROMPTS = [
     {
+        "name": "codex_plugin_setup_flow",
+        "description": "Diagnose and preview local os-lab Codex plugin installation; installation runs only in a terminal.",
+        "arguments": [],
+    },
+    {
         "name": "cleanup_review_flow",
         "description": "One-click Cleanup Lab path: review (scan→suggest→Trash plan), show the plan, then clean only with confirm: true.",
         "arguments": [
@@ -84,6 +89,15 @@ def _messages(text: str) -> dict:
 
 def get_prompt(name: str, arguments: dict | None = None) -> dict:
     args = arguments if isinstance(arguments, dict) else {}
+    if name == "codex_plugin_setup_flow":
+        return _messages(
+            "Set up the os-lab Codex plugin.\n"
+            "1. Call codex_plugin_doctor, codex_plugin_status and codex_plugin_check.\n"
+            "2. Call codex_plugin_plan with action install; show its commands and warnings.\n"
+            "3. The user runs python3 scripts/codex-plugin.py install in an interactive terminal. "
+            "Do not call codex_plugin_apply to mutate installation state.\n"
+            "4. After installation, call codex_plugin_verify and report missing tools."
+        )
     if name == "cleanup_review_flow":
         extra = ""
         if args.get("entryIds"):

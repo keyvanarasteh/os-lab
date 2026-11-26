@@ -191,6 +191,21 @@
         "status": "none",
         "proof": null
       }
+    },
+    "codex-plugin": {
+      "title": "Codex plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widgets": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
     }
   },
   "tools": {
@@ -2508,6 +2523,126 @@
       "engineUsage": {
         "status": "verified",
         "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "codex_plugin_requirements": {
+      "section": "codex-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "codex_plugin_doctor": {
+      "section": "codex-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "codex_plugin_status": {
+      "section": "codex-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "codex_plugin_check": {
+      "section": "codex-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "codex_plugin_plan": {
+      "section": "codex-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "codex_plugin_apply": {
+      "section": "codex-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "codex_plugin_verify": {
+      "section": "codex-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "codex_plugin_updates": {
+      "section": "codex-plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_codex_plugin.py"
       },
       "widget": {
         "status": "none",
