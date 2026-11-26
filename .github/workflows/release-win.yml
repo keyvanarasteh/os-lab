@@ -190,12 +190,22 @@ jobs:
           }
           gh release upload $tag (Get-ChildItem ship).FullName --clobber
 
+  # Promote the in-app updater feed once all five signed assets exist.
+  # Empty version → detect-latest --allow-none (no-op while mac/linux still uploading).
+  promote-updater:
+    needs: windows
+    if: ${{ needs.windows.result == 'success' && github.event_name != 'pull_request' && (github.event_name == 'push' || inputs.publish) }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/updater-manifest.yml
+    secrets: inherit
+
   notify:
     # Optional Telegram report for real builds: define the TELEGRAM_BOT_TOKEN and
     # TELEGRAM_CHAT_ID repository secrets to enable it. Without them the send step
     # skips silently; pull-request dry runs never report.
     if: ${{ always() && github.event_name != 'pull_request' }}
-    needs: [windows]
+    needs: [windows, promote-updater]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -204,8 +214,8 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          NAMES: windows
-          RESULTS: ${{ needs.windows.result }}
+          NAMES: windows promote-updater
+          RESULTS: ${{ needs.windows.result }} ${{ needs.promote-updater.result }}
         if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
           set -euo pipefail

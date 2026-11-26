@@ -21,7 +21,7 @@ These failed master e2e (and release follow-up) after 0.4.9 and will fail the ne
 - The first paragraph of each `lat.md/` node stays under 250 characters (`lat check`).
 - Local `tsc` can fail on Vite `ImportMeta.env`, `import.meta.glob`, and `?raw` while the GitHub `dashboard-e2e` typecheck job passes. Use GitHub as the merge gate. `OSLAB_SKIP_PREPUSH=1` skips the hook when that local failure is the only block.
 - Merge with `gh pr merge --merge --delete-branch` from a checkout that is not the worktree still using the branch, then `scripts/worktree.sh rm`.
-- A tag or GitHub Release created with `GITHUB_TOKEN` does not start other workflows. After `app-v*` installers exist, dispatch `gh workflow run updater-manifest.yml -f version=…` ([`app/RELEASE_CI.md`](app/RELEASE_CI.md)).
+- A tag or GitHub Release created with `GITHUB_TOKEN` does not start sibling workflows. Platform release jobs call `updater-manifest` via `workflow_call` after upload (`--detect-latest --allow-none`); the 20-minute schedule and manual `gh workflow run updater-manifest.yml -f version=…` remain as fallbacks ([`app/RELEASE_CI.md`](app/RELEASE_CI.md)).
 
 ## Parallel agents
 

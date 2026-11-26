@@ -10,7 +10,7 @@ manually without publishing, to inspect its build artifacts.
 | `release-linux` | amd64 and arm64 Debian, RPM and AppImage packages, with SHA-256 files | yes |
 | `release-win` | x64 NSIS and MSI, with SHA-256 files | yes, unsigned until SignPath is configured |
 | `release-mac` | universal signed and notarized DMG, with SHA-256 file | after Apple secrets and `MACOS_RELEASE_CI_ENABLED=true` are set |
-| `updater-manifest` | signed artifact URLs for the in-app updater | manual, after all platform installers are published |
+| `updater-manifest` | signed artifact URLs for the in-app updater | automatic via `workflow_call` from each platform release after upload; cron safety net every 20 minutes; manual dispatch still available |
 
 The Linux workflow runs on pull requests touching app or dashboard files. It installs, launches
 under Xvfb, and removes each Debian package before publishing. Windows CI installs, launches and
@@ -32,16 +32,17 @@ the private key.
 The platform builds publish `.sig` files alongside their updater bundles. On Windows, the
 SignPath-signed installer is signed again with the Tauri key, because Authenticode changes its
 bytes. Debian, RPM and DMG downloads also have detached signatures for manual verification;
-apt and dnf do not treat those as repository signatures. After every macOS, Windows and Linux
-asset is present on `app-v<version>`, run the
-`updater-manifest` workflow with that version
-(`gh workflow run updater-manifest.yml -f version=<version>`).
-A tag or GitHub Release created with `GITHUB_TOKEN` does not start other
-workflows, so this dispatch is required even when the workflow YAML lists
-`release` as a trigger. It verifies the SHA-256 files and refuses to
-publish a partial platform set. The feed is stored in the `app-updates` prerelease so content
-releases cannot accidentally become the app update endpoint. A release is not available through
-in-app update until this step succeeds.
+apt and dnf do not treat those as repository signatures. After each of `release-mac`, `release-win` and `release-linux` uploads its
+assets, it calls `updater-manifest` through `workflow_call` (no extra PAT).
+That run uses `--detect-latest --allow-none`: incomplete platform sets are
+skipped, and the feed promotes only when all five signed updater assets are
+present. It never downgrades. A 20-minute schedule is the safety net.
+`release:` triggers alone are not enough — a tag or release edit created with
+`GITHUB_TOKEN` does not start sibling workflows. Manual
+`gh workflow run updater-manifest.yml -f version=<version>` still works when
+you need to pin or retry. The feed lives in the `app-updates` prerelease so
+content releases cannot become the app update endpoint. A release is not
+available through in-app update until this step succeeds.
 
 ## macOS signing setup
 
@@ -87,7 +88,8 @@ signature helps establish trust; SmartScreen reputation may still take time to b
 2. Set the intended version, then create and push `app-v<version>` on that exact commit.
 3. Inspect the workflow results and release assets. Do not mark the release complete until the
    macOS, Windows and Linux files and SHA-256 checks are present.
-4. Run `updater-manifest` for the new version and verify `app-updates/latest.json` contains all
-   five platform entries. Exercise the update from the previous app version on each OS.
+4. Confirm the `promote-updater` job on the last platform release (or the scheduled
+   `updater-manifest` run) published `app-updates/latest.json` with all five platform
+   entries. Exercise the update from the previous app version on each OS.
 5. Install and launch at least one file on each OS; record any platform limitation in the release
    notes and [INSTALL.md](INSTALL.md).
