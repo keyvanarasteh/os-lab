@@ -3258,5 +3258,20 @@
   "Review what will be removed before running.": "پیش از اجرا، مواردی را که حذف می‌شوند بررسی کنید.",
   "Space to free": "فضای قابل آزادسازی",
   "Items can be restored from the Trash.": "موارد را می‌توان از سطل زباله بازگرداند.",
-  "Size to move to Trash": "حجم انتقال به سطل زباله"
+  "Size to move to Trash": "حجم انتقال به سطل زباله",
+  "Confirm": "تأیید",
+  "Delete unavailable simulators": "حذف شبیه‌سازهای غیرقابل‌استفاده",
+  "Deleted simulators and their apps and data cannot be restored.": "شبیه‌سازهای حذف‌شده و برنامه‌ها و داده‌هایشان قابل بازگردانی نیستند.",
+  "Done.": "انجام شد.",
+  "Erase selected": "پاک‌سازی انتخاب‌شده‌ها",
+  "No simulators were found.": "هیچ شبیه‌سازی پیدا نشد.",
+  "Simulator cleanup in progress…": "پاک‌سازی شبیه‌سازها در حال انجام است…",
+  "Xcode simulator devices. Preview before erasing or deleting; only shut-down simulators can be changed.": "دستگاه‌های شبیه‌ساز Xcode. پیش از پاک‌سازی یا حذف پیش‌نمایش بگیرید؛ فقط شبیه‌سازهای خاموش قابل تغییرند.",
+  "Xcode simulators: sizes, erase and delete": "شبیه‌سازهای Xcode: اندازه، پاک‌سازی و حذف",
+  "freed": "آزاد شد",
+  "simulators": "شبیه‌ساز",
+  "Erase selected simulators": "پاک‌سازی شبیه‌سازهای انتخاب‌شده",
+  "Delete selected simulators": "حذف شبیه‌سازهای انتخاب‌شده",
+  "Simulator cleanup failed.": "پاک‌سازی شبیه‌سازها ناموفق بود.",
+  "Simulator tooling is unavailable.": "ابزارهای شبیه‌ساز در دسترس نیستند."
 }

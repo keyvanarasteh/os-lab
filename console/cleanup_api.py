@@ -57,6 +57,7 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "container-preview": CONTAINER_PREVIEW_KEYS, "container-prune": CONTAINER_PRUNE_KEYS,
               "privileged-preview": CONTAINER_PREVIEW_KEYS, "privileged-run": CONTAINER_PRUNE_KEYS,
               "relocation-plan": ("action", "entryId", "destination"), "relocation-run": ("previewId",),
+              "simulator-preview": ("actionId", "deviceIds"), "simulator-run": ("previewId",),
               "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "reminderSeconds", "notify", "volumes"),
               "entry-reveal": ("entryId",),
               "preferences": ("suggestion",),
@@ -386,6 +387,36 @@ class CleanupJobStore:
         except Exception as exc:
             result = {"actionId": plan.action_id, "engine": plan.engine, "status": "failed",
                       "error": "{0}: {1}".format(type(exc).__name__, exc), "bytesRemoved": None}
+        job.result = result
+        try:
+            _module(root, "history").append(result)
+            job.state = "done" if result["status"] == "completed" else "failed"
+            if job.state == "failed":
+                job.error = result.get("error")
+        except Exception as exc:
+            job.state = "failed"
+            job.error = "Audit history could not record the result: {0}".format(exc)
+        finally:
+            job.finishedAt = time.time()
+
+    def start_simulator_run(self, root, preview_id):
+        """CLS-01: run one confirmed simctl preview, audited like a container prune."""
+        try:
+            _module(root, "history").prepare()
+        except Exception as exc:
+            raise CleanupError(500, "Audit history is unavailable: {0}".format(exc)) from exc
+        plan = SIMULATOR_PREVIEWS.claim(preview_id)
+        job = CleanupJob("simulator-run", {"previewId": preview_id, "actionId": plan.action_id})
+        self._register(job)
+        return self._spawn(job, self._run_simulator_run, (root, job, plan))
+
+    def _run_simulator_run(self, root, job, plan):
+        try:
+            result = _module(root, "simulators").execute(root, plan)
+        except Exception as exc:
+            result = {"kind": "simulators", "actionId": plan.action_id, "status": "failed",
+                      "candidateCount": plan.count, "devices": list(plan.devices), "command": list(plan.argv),
+                      "error": "{0}: {1}".format(type(exc).__name__, exc), "bytesFreed": 0}
         job.result = result
         try:
             _module(root, "history").append(result)
@@ -766,6 +797,7 @@ PLANS = PlanStore()
 CONTAINER_PREVIEWS = PreviewStore()
 PRIVILEGED_PREVIEWS = PreviewStore("Privileged preview")
 RELOCATION_PREVIEWS = PreviewStore("Relocation preview")
+SIMULATOR_PREVIEWS = PreviewStore("Simulator preview")
 
 
 class RelocationPreview:
@@ -1060,7 +1092,8 @@ class CleanupAPI:
             return _module(self.root, "privilege").capabilities(self.root)
         if path == "/api/cleanup/simulators":
             _query(query)
-            return _module(self.root, "deep").simulators(self.root)
+            inventory = _module(self.root, "deep").simulators(self.root)
+            return {**inventory, "actions": _module(self.root, "simulators").actions() if inventory["available"] else []}
         if path == "/api/cleanup/history":
             _query(query)
             try:
@@ -1128,6 +1161,26 @@ class CleanupAPI:
             if not isinstance(preview_id, str) or not preview_id:
                 raise CleanupError(400, "previewId must name a confirmed preview")
             return JOBS.start_container_prune(self.root, preview_id)
+        if path == "/api/cleanup/simulators/preview":
+            _object_body(body, "simulator-preview")
+            action_id = body.get("actionId")
+            if not isinstance(action_id, str) or not action_id:
+                raise CleanupError(400, "actionId must name a simulator action")
+            device_ids = body.get("deviceIds")
+            try:
+                plan = _module(self.root, "simulators").preview(self.root, action_id, device_ids)
+            except Exception as exc:
+                raise CleanupError(400, str(exc)) from exc
+            preview_id = SIMULATOR_PREVIEWS.register(plan)
+            return {"previewId": preview_id, "actionId": plan.action_id, "risk": plan.risk,
+                    "candidateCount": plan.count, "bytes": plan.bytes, "devices": list(plan.devices),
+                    "command": list(plan.argv), "expiresAt": plan.created_at + 600}
+        if path == "/api/cleanup/simulators/run":
+            _object_body(body, "simulator-run")
+            preview_id = body.get("previewId")
+            if not isinstance(preview_id, str) or not preview_id:
+                raise CleanupError(400, "previewId must name a confirmed preview")
+            return JOBS.start_simulator_run(self.root, preview_id)
         if path == "/api/cleanup/privileged/preview":
             _object_body(body, "privileged-preview")
             action_id = body.get("actionId")

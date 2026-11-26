@@ -3258,5 +3258,20 @@
   "Review what will be removed before running.": "Revisa lo que se eliminará antes de ejecutar.",
   "Space to free": "Espacio a liberar",
   "Items can be restored from the Trash.": "Los elementos se pueden restaurar desde la Papelera.",
-  "Size to move to Trash": "Tamaño a mover a la Papelera"
+  "Size to move to Trash": "Tamaño a mover a la Papelera",
+  "Confirm": "Confirmar",
+  "Delete unavailable simulators": "Eliminar simuladores no disponibles",
+  "Deleted simulators and their apps and data cannot be restored.": "Los simuladores eliminados, sus apps y sus datos no se pueden restaurar.",
+  "Done.": "Hecho.",
+  "Erase selected": "Borrar contenido de los seleccionados",
+  "No simulators were found.": "No se encontraron simuladores.",
+  "Simulator cleanup in progress…": "Limpieza de simuladores en curso…",
+  "Xcode simulator devices. Preview before erasing or deleting; only shut-down simulators can be changed.": "Dispositivos de simulador de Xcode. Previsualiza antes de borrar o eliminar; solo se pueden cambiar simuladores apagados.",
+  "Xcode simulators: sizes, erase and delete": "Simuladores de Xcode: tamaños, borrado y eliminación",
+  "freed": "liberados",
+  "simulators": "simuladores",
+  "Erase selected simulators": "Borrar el contenido de los simuladores seleccionados",
+  "Delete selected simulators": "Eliminar los simuladores seleccionados",
+  "Simulator cleanup failed.": "La limpieza de simuladores falló.",
+  "Simulator tooling is unavailable.": "Las herramientas del simulador no están disponibles."
 }

@@ -1284,3 +1284,47 @@ def test_monitor_config_round_trips_the_new_alert_keys(tmp_path, monkeypatch):
     assert saved["reminderSeconds"] == 7200 and saved["notify"] is False
     assert saved["volumes"][0]["criticalFreeBytes"] == 1
     assert base["reminderSeconds"] == 86400 and base["notify"] is True
+
+
+def test_simulator_cleanup_requires_single_use_preview_and_audits(tmp_path, monkeypatch):
+    """CLS-01: fixed simctl argv, ids only, single-use preview, audited run."""
+    from types import SimpleNamespace
+    gone = "B1B2C3D4-1111-2222-3333-444455556666"
+    calls = []
+    import subprocess
+    real_run = subprocess.run
+
+    def fake_run(argv, **kwargs):
+        if not argv or argv[0] != "xcrun":
+            return real_run(argv, **kwargs)
+        assert kwargs["shell"] is False
+        if argv == ["xcrun", "simctl", "list", "-j", "devices"]:
+            payload = {"devices": {"rt": [{"udid": gone, "name": "Old", "state": "Shutdown", "isAvailable": False}]}}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+        calls.append(argv)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("OSLAB_CLEANUP_STATE", str(tmp_path / "private-state"))
+    from cleanup_lab import deep, simulators
+    monkeypatch.setattr(deep, "platform_id", lambda: "macos")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    inventory = api.get("/api/cleanup/simulators", {})
+    assert {a["id"] for a in inventory["actions"]} == set(simulators.ACTIONS)
+    for body in ({"actionId": "/bin/sh"}, {"actionId": "simulators.delete-unavailable", "argv": ["sh"]},
+                 {"actionId": "simulators.delete-devices", "deviceIds": ["../../etc"]}):
+        with pytest.raises(cleanup_api.CleanupError) as refused:
+            api.post("/api/cleanup/simulators/preview", body)
+        assert refused.value.status == 400
+    preview = api.post("/api/cleanup/simulators/preview", {"actionId": "simulators.delete-unavailable"})
+    assert preview["candidateCount"] == 1
+    assert preview["command"] == ["xcrun", "simctl", "delete", "unavailable"]
+    job = api.post("/api/cleanup/simulators/run", {"previewId": preview["previewId"]})
+    wait_for(job, "done")
+    assert calls == [["xcrun", "simctl", "delete", "unavailable"]]
+    history = api.get("/api/cleanup/history", {})
+    assert history["entries"][0]["result"]["kind"] == "simulators"
+    with pytest.raises(cleanup_api.CleanupError) as reused:
+        api.post("/api/cleanup/simulators/run", {"previewId": preview["previewId"]})
+    assert reused.value.status == 409

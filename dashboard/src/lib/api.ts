@@ -548,7 +548,7 @@ export interface CleanupJob {
   result: CleanupScan | CleanupPlan | CleanupResult | CleanupRelocationPlan | CleanupRelocationRun | null;
   error: string | null;
 }
-export interface CleanupHistory { entries: { id: number; result: CleanupResult | CleanupRelocationRun; hmac: string }[]; total: number; verified: boolean }
+export interface CleanupHistory { entries: { id: number; result: CleanupResult | CleanupRelocationRun | CleanupSimulatorResult; hmac: string }[]; total: number; verified: boolean }
 
 export interface CleanupContainerCapabilities {
   available: boolean; engine: "docker" | "podman" | null; reason: string;
@@ -567,8 +567,22 @@ export interface CleanupVMInventory {
   items: { id: string; name: string; path: string; sizeBytes: number; sizeOnDiskBytes: number | null; files: number; reportOnly: true }[];
   unavailable: { id: string; root: string | null; reason: string }[];
 }
+/** CLS-01: one simulator from `GET /api/cleanup/simulators`, and the fixed simctl actions. */
+export interface CleanupSimulatorDevice {
+  id: string; name: string | null; runtime: string; state: string | null; available: boolean; sizeBytes: number | null;
+}
+export interface CleanupSimulatorAction { id: string; risk: string; needsSelection: boolean; defaultSelected: false; command: string[] }
+export interface CleanupSimulators { available: boolean; reason: string; devices: CleanupSimulatorDevice[]; actions: CleanupSimulatorAction[] }
+export interface CleanupSimulatorPreview {
+  previewId: string; actionId: string; risk: string; candidateCount: number; bytes: number;
+  devices: CleanupSimulatorDevice[]; command: string[]; expiresAt: number;
+}
+export interface CleanupSimulatorResult {
+  kind: "simulators"; actionId: string; status: "completed" | "failed"; error?: string;
+  candidateCount: number; devices: CleanupSimulatorDevice[]; command: string[]; output?: string; bytesFreed: number;
+}
 export interface CleanupAuxJob<T> {
-  id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "relocation-plan" | "relocation-run"; state: "running" | "done" | "cancelled" | "failed";
+  id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "relocation-plan" | "relocation-run" | "simulator-run"; state: "running" | "done" | "cancelled" | "failed";
   progress: Record<string, string | number> | null;
   result: T | null; error: string | null;
 }
@@ -954,6 +968,10 @@ export const api = {
   cleanupExplorerSubtree: (rootId: string, relative: string) => post<CleanupExplorerJob>("/api/cleanup/explorer/subtree", { rootId, relative }),
   cleanupContainerPreview: (actionId: string) => post<CleanupContainerPreview>("/api/cleanup/containers/preview", { actionId }),
   cleanupContainerPrune: (previewId: string) => post<CleanupAuxJob<CleanupContainerResult>>("/api/cleanup/containers/prune", { previewId }),
+  cleanupSimulators: () => call<CleanupSimulators>("/api/cleanup/simulators"),
+  cleanupSimulatorPreview: (actionId: string, deviceIds?: string[]) =>
+    post<CleanupSimulatorPreview>("/api/cleanup/simulators/preview", deviceIds ? { actionId, deviceIds } : { actionId }),
+  cleanupSimulatorRun: (previewId: string) => post<CleanupAuxJob<CleanupSimulatorResult>>("/api/cleanup/simulators/run", { previewId }),
   cleanupVMScan: () => post<CleanupAuxJob<CleanupVMInventory>>("/api/cleanup/vms/scan"),
   cleanupCrossLeftovers: () => post<CleanupAuxJob<CleanupCrossLeftovers>>("/api/cleanup/leftovers/scan"),
   cleanupAuxJob: <T>(id: string) => call<CleanupAuxJob<T>>(`/api/cleanup/jobs/${encodeURIComponent(id)}`),

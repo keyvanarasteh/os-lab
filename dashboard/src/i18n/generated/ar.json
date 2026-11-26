@@ -3258,5 +3258,20 @@
   "Review what will be removed before running.": "راجع ما سيُزال قبل التشغيل.",
   "Space to free": "المساحة التي ستُحرَّر",
   "Items can be restored from the Trash.": "يمكن استعادة العناصر من سلة المهملات.",
-  "Size to move to Trash": "الحجم الذي سيُنقل إلى سلة المهملات"
+  "Size to move to Trash": "الحجم الذي سيُنقل إلى سلة المهملات",
+  "Confirm": "تأكيد",
+  "Delete unavailable simulators": "حذف المحاكيات غير المتاحة",
+  "Deleted simulators and their apps and data cannot be restored.": "لا يمكن استعادة المحاكيات المحذوفة وتطبيقاتها وبياناتها.",
+  "Done.": "تم.",
+  "Erase selected": "مسح المحدد",
+  "No simulators were found.": "لم يُعثر على أي محاكٍ.",
+  "Simulator cleanup in progress…": "جارٍ تنظيف المحاكيات…",
+  "Xcode simulator devices. Preview before erasing or deleting; only shut-down simulators can be changed.": "أجهزة محاكي Xcode. اعرض المعاينة قبل المسح أو الحذف؛ لا يمكن تغيير إلا المحاكيات المتوقفة.",
+  "Xcode simulators: sizes, erase and delete": "محاكيات Xcode: الأحجام والمسح والحذف",
+  "freed": "تم تحريرها",
+  "simulators": "محاكيات",
+  "Erase selected simulators": "مسح المحاكيات المحددة",
+  "Delete selected simulators": "حذف المحاكيات المحددة",
+  "Simulator cleanup failed.": "فشل تنظيف المحاكيات.",
+  "Simulator tooling is unavailable.": "أدوات المحاكي غير متاحة."
 }
