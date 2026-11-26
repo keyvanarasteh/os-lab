@@ -292,6 +292,32 @@ before a Confirm, and History renders simulator runs as their own rows. The
 overview's Simulators card scrolls to it. CoreSimulator caches stay a normal
 catalog entry; the devices folder itself stays relocation-only.
 
+## Simulator storage
+
+CLS-02 sets up where the iOS Simulator devices folder lives and when to suggest moving it.
+
+[[cleanup-lab/engine/cleanup_lab/simulator_storage.py]] keeps a private
+`simulator-storage.json` in the cleanup state folder: a destination volume
+(one of the offered non-home `internal`/`removable` volumes), whether to
+suggest, and a system-disk free-space floor (default 20 GiB). Its read-only
+status reports the folder as `local`, `linked` (the folder or a parent such as
+`~/Library/Developer/CoreSimulator` is a symlink to another volume),
+`disk-missing` (that volume is unplugged) or `missing`, and a suggestion:
+`move` when the folder is local, a destination is saved and connected, and the
+home volume is below the floor; `reconnect` when the disk is missing.
+`GET /api/cleanup/simulator-storage` returns it and `POST` saves
+`{destination, suggest, floorBytes}`. On a fresh monitor warning the console
+also sends one desktop notification with the suggestion
+(`notify.send_message`, fixed argv).
+
+Nothing moves on its own. The Relocation tab's `#simulator-storage` card
+([[dashboard/src/views/cleanup/simulator-storage-card.tsx]]) saves the
+settings, warns about removable disks, and its Move now asks the Relocation
+card to plan `simulators.coresimulator-devices` to the saved disk, which opens
+the CLN-27 confirm dialog. The overview shows a one-line notice while a
+suggestion is active. `ios-lab/mac/setup-mac.sh` reports where the devices
+live and points to this card. Runtimes stay system-managed.
+
 ## Cleaner Pro (CLNP)
 
 The cleaner-pro workstream (PR #214) adds five layers on top of the roadmap.

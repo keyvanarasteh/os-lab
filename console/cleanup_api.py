@@ -58,6 +58,7 @@ BODY_KEYS = {"scan": SCAN_KEYS, "deep-scan": DEEP_KEYS, "plan": PLAN_KEYS, "clea
               "privileged-preview": CONTAINER_PREVIEW_KEYS, "privileged-run": CONTAINER_PRUNE_KEYS,
               "relocation-plan": ("action", "entryId", "destination"), "relocation-run": ("previewId",),
               "simulator-preview": ("actionId", "deviceIds"), "simulator-run": ("previewId",),
+              "simulator-storage": ("destination", "suggest", "floorBytes"),
               "monitor-config": ("enabled", "intervalSeconds", "cooldownSeconds", "reminderSeconds", "notify", "volumes"),
               "entry-reveal": ("entryId",),
               "preferences": ("suggestion",),
@@ -983,6 +984,15 @@ class MonitorRunner:
                         _module(self.root, "notify").send_all(result.get("newEvents", []), enabled=config.get("notify", True))
                     except Exception:
                         pass
+                    # CLS-02: a fresh crossing also says where the simulators could go. Never moves anything.
+                    if config.get("notify", True) and any(event["kind"] in ("warning", "critical") for event in result.get("newEvents", [])):
+                        try:
+                            note = _module(self.root, "simulator_storage").notification(
+                                _module(self.root, "simulator_storage").status(self.root))
+                            if note:
+                                _module(self.root, "notify").send_message(*note)
+                        except Exception:
+                            pass
                     self._evaluate_bookmark_sizes()
                     publish_widget(self.root)  # CLW-04: monitor ticks refresh the widget
                     self.stop.wait(config["intervalSeconds"])
@@ -1090,6 +1100,9 @@ class CleanupAPI:
         if path == "/api/cleanup/privileged":
             _query(query)
             return _module(self.root, "privilege").capabilities(self.root)
+        if path == "/api/cleanup/simulator-storage":
+            _query(query)
+            return _module(self.root, "simulator_storage").status(self.root)
         if path == "/api/cleanup/simulators":
             _query(query)
             inventory = _module(self.root, "deep").simulators(self.root)
@@ -1204,6 +1217,17 @@ class CleanupAPI:
         if path == "/api/cleanup/relocation/plan":
             _object_body(body, "relocation-plan")
             return JOBS.start_relocation_plan(self.root, body)
+        if path == "/api/cleanup/simulator-storage":
+            _object_body(body, "simulator-storage")
+            storage = _module(self.root, "simulator_storage")
+            report = storage.status(self.root)
+            if not report["available"]:
+                raise CleanupError(409, report["reason"])
+            try:
+                storage.save(body, destinations=[item["mountPoint"] for item in report["destinations"]])
+            except storage.StorageConfigError as exc:
+                raise CleanupError(400, str(exc)) from exc
+            return storage.status(self.root)
         if path == "/api/cleanup/relocation/run":
             _object_body(body, "relocation-run")
             preview_id = body.get("previewId")

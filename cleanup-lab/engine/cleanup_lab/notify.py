@@ -48,7 +48,12 @@ def send(event, *, platform=None, run=subprocess.run, which=shutil.which):
     described = describe(event)
     if described is None:
         return {"status": "skipped", "reason": "not a warning event"}
-    argv = command(*described, platform=platform, which=which)
+    return send_message(*described, platform=platform, run=run, which=which)
+
+
+def send_message(title, message, *, platform=None, run=subprocess.run, which=shutil.which):
+    """One notification with fixed argv; the text is passed as arguments, never spliced."""
+    argv = command(title, message, platform=platform, which=which)
     if argv is None:
         return {"status": "skipped", "reason": "no notifier on this system"}
     try:

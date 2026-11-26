@@ -581,6 +581,17 @@ export interface CleanupSimulatorResult {
   kind: "simulators"; actionId: string; status: "completed" | "failed"; error?: string;
   candidateCount: number; devices: CleanupSimulatorDevice[]; command: string[]; output?: string; bytesFreed: number;
 }
+/** CLS-02: where the iOS Simulator devices folder lives and what to suggest next. */
+export interface CleanupSimulatorStorageConfig { destination: string | null; suggest: boolean; floorBytes: number }
+export interface CleanupSimulatorStorage {
+  available: boolean; reason: string; entryId?: string; folder?: string | null;
+  state?: "local" | "linked" | "disk-missing" | "missing"; target?: string | null;
+  volume?: { mountPoint: string; name?: string | null; kind?: string } | null;
+  home?: { mountPoint: string; freeBytes: number | null; totalBytes: number | null } | null;
+  config?: CleanupSimulatorStorageConfig; configError?: string | null;
+  destinations?: { mountPoint: string; name?: string | null; kind: string; freeBytes: number; totalBytes: number | null }[];
+  suggestion?: { action: "move" | "reconnect" | null; reason: string };
+}
 export interface CleanupAuxJob<T> {
   id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "relocation-plan" | "relocation-run" | "simulator-run"; state: "running" | "done" | "cancelled" | "failed";
   progress: Record<string, string | number> | null;
@@ -950,6 +961,9 @@ export const api = {
   cleanupRelocation: () => call<CleanupRelocationStatus>("/api/cleanup/relocation"),
   cleanupRelocationPlan: (action: "move" | "restore" | "relink" | "resume", entryId: string, destination: string) =>
     post<CleanupAuxJob<CleanupRelocationPlan>>("/api/cleanup/relocation/plan", { action, entryId, destination }),
+  cleanupSimulatorStorage: () => call<CleanupSimulatorStorage>("/api/cleanup/simulator-storage"),
+  cleanupSimulatorStorageSave: (config: Partial<CleanupSimulatorStorageConfig>) =>
+    post<CleanupSimulatorStorage>("/api/cleanup/simulator-storage", config),
   cleanupRelocationRun: (previewId: string) =>
     post<CleanupAuxJob<CleanupRelocationRun>>("/api/cleanup/relocation/run", { previewId }),
   /** CLW-02: the widget snapshot — builds and publishes in one call. */
