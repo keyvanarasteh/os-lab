@@ -2,13 +2,16 @@
 
 Optional **activity** and **priority** labels for open PRs on `keyvanarasteh/os-lab`. They help agents and maintainers triage parked vs in-rotation work. They do **not** replace os-lab's existing PR standards.
 
+Knowledge-graph entry (agents reading `lat.md/` first): [lat.md/tooling.md](../../lat.md/tooling.md) § Community and contribution → Pull request triage labels.
+
 ## What these labels do not change
 
 Keep following the repo as written:
 
-- [CONTRIBUTING.md](../../CONTRIBUTING.md) — one logical change per PR, reservations, checks, [landing a branch](../../CONTRIBUTING.md#landing-a-branch), Conventional Commits
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) — one logical change per PR, reservations, checks, [landing a branch](../../CONTRIBUTING.md#landing-a-branch), Conventional Commits, Step 8 triage labels
 - [.github/PULL_REQUEST_TEMPLATE.md](../../.github/PULL_REQUEST_TEMPLATE.md) — Summary, Type of change, Component, How was this tested, Proof, Checklist
 - [AGENTS.md](../../AGENTS.md) — worktrees, test limits, no `dashboard/dist` in PRs, rebase/landing order
+- [lat.md/tooling.md](../../lat.md/tooling.md) — CI, parallel work, and contribution process in the knowledge graph
 - Existing GitHub labels such as `bug`, `enhancement`, `documentation`, `good first issue`, `help wanted` — keep using them
 
 Do not add qLar-only body sections (`## Plan`, `## Todo`, `## Deploy`) to os-lab PRs unless a separate os-lab rule says so.

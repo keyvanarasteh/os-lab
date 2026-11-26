@@ -292,6 +292,23 @@ Issue and PR templates are in
 [[.github/ISSUE_TEMPLATE]] and [[.github/PULL_REQUEST_TEMPLATE.md]]; behavior
 expectations in [[CODE_OF_CONDUCT.md]].
 
+### Pull request triage labels
+
+Open PRs also carry optional **activity** and **priority** labels so agents and
+maintainers can see what is in rotation vs parked. Handbook:
+[[docs/plans/pr-labels.md]]. Agent entry points: [[AGENTS.md]] and the comment at
+the top of [[.github/PULL_REQUEST_TEMPLATE.md]].
+
+- Activity (one): `ACTIVE` or `ON-HOLD`
+- Priority (one): `CRITICAL`, `PRIORITY-LEVEL-HIGH`, `MID`, or `LOW`
+
+These supplement — they do not replace — the PR template sections, reservations,
+checks, or labels such as `bug` / `enhancement` / `documentation`. Do not rewrite
+os-lab PR bodies into qLar-only Plan/Todo/Deploy sections. Prefer `ACTIVE` + `MID`
+when opening a PR unless the task says otherwise; switch to `ON-HOLD` when work
+stops. Older `critical` / `important` labels migrate to `CRITICAL` /
+`PRIORITY-LEVEL-HIGH` (see the handbook).
+
 ## Security and licensing
 
 Private vulnerability reporting and the authorization-only scope.

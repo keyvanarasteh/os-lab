@@ -354,7 +354,12 @@ If a rebase leaves `dashboard/dist` changes in your branch, drop them with
 2. Push to your fork and open a pull request against `master`.
 3. Fill in the [pull request template](.github/PULL_REQUEST_TEMPLATE.md),
    including how you tested the change.
-4. Respond to review comments; maintainers merge once the checks pass and the
+4. Add one **activity** label (`ACTIVE` / `ON-HOLD`) and one **priority**
+   (`CRITICAL` / `PRIORITY-LEVEL-HIGH` / `MID` / `LOW`) for triage — see
+   [docs/plans/pr-labels.md](docs/plans/pr-labels.md) and
+   [lat.md/tooling.md](lat.md/tooling.md) (Community and contribution). This does
+   not replace the template sections or existing labels such as `enhancement`.
+5. Respond to review comments; maintainers merge once the checks pass and the
    review is done.
 
 ### Landing a branch
