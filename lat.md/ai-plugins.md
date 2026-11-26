@@ -14,7 +14,7 @@ serves only `plugin_doctor` and `plugin_status`, which say how to set the path.
 
 The `python_command` option picks the interpreter, since Windows often lacks `python3`. Lab
 skills are generated from `console/mcp_skills/` by `scripts/claude-plugin.py build`, and a
-check fails when they differ. The session check prints one line only when no checkout is found.
+check fails when they differ.
 
 ## Requirement checks
 
@@ -37,6 +37,21 @@ that duplicate the plugin are reported without their environment values.
 
 `confirm: true` comes from the model, so the client's permission prompt is the human gate for
 the tools; uninstall and duplicate removal need an interactive terminal.
+
+## Claude Desktop and updates
+
+In Claude Desktop the plugin is the `.mcpb` extension: [[console/claude_desktop.py#build_plan]] builds it and opens it, and the user confirms in the app.
+
+[[console/claude_desktop.py#extension_info]] reads the installed extension's version and finds
+duplicate entries in `claude_desktop_config.json`. [[console/claude_desktop.py#updates]]
+compares the checkout with the Claude Code installs and the extension; asked for `online`, it
+also reads the plugin version published on master. Neither Claude app is ever installed or
+updated, and the plugin itself changes only through a previewed plan. Opening the bundle is
+automatic on macOS only; elsewhere the plan gives the manual step.
+
+The session start check stays silent when healthy. It reports a missing checkout and an older
+Desktop extension, and with the `update_check` option (off by default) a newer published
+version, asked for at most once a day.
 
 ## Server surface
 

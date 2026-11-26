@@ -4,6 +4,8 @@
     scripts/claude-plugin.py doctor | status | check | verify
     scripts/claude-plugin.py build [--check]          generate the plugin's lab skills
     scripts/claude-plugin.py bundle [--out FILE]      Claude Desktop .mcpb
+    scripts/claude-plugin.py updates [--online]       Claude Code and Claude Desktop
+    scripts/claude-plugin.py extension-install        install or update in Claude Desktop
     scripts/claude-plugin.py install | update | configure | enable | disable [--scope S] [--yes]
     scripts/claude-plugin.py uninstall [--scope S]    asks in a terminal
     scripts/claude-plugin.py remove-duplicate --name N [--scope S]
@@ -20,6 +22,7 @@ import sys
 ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 sys.path.insert(0, os.path.join(ROOT, "console"))
 
+import claude_desktop as desktop  # noqa: E402
 import claude_plugin as engine  # noqa: E402
 
 
@@ -32,8 +35,17 @@ def change(args) -> int:
     print("This will run:")
     for command in preview["commands"]:
         print("  " + command)
+    for step in preview["manual"]:
+        print("by hand: " + step)
     for warning in preview["warnings"]:
         print("warning: " + warning)
+    if not preview["commands"]:
+        if args.command == "extension-install":
+            os.makedirs(os.path.dirname(desktop.bundle_path(ROOT)), exist_ok=True)
+            with open(desktop.bundle_path(ROOT), "wb") as handle:
+                handle.write(engine.build_mcpb(ROOT))
+            print("The bundle was built.")
+        return 0
     if not (args.yes and args.command not in engine.TERMINAL_ONLY):
         if not interactive:
             print("Nothing was changed. Run in a terminal, or add --yes.", file=sys.stderr)
@@ -50,14 +62,19 @@ def change(args) -> int:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=("doctor", "status", "check", "verify", "build", "bundle") + engine.ACTIONS)
+    parser.add_argument("command", choices=("doctor", "status", "check", "verify", "updates", "build", "bundle") + engine.ACTIONS)
     parser.add_argument("--scope", default="user", choices=engine.SCOPES)
     parser.add_argument("--name", choices=engine.DUPLICATE_NAMES)
     parser.add_argument("--yes", action="store_true", help="skip the question (not for removals)")
     parser.add_argument("--check", action="store_true", help="build: fail when generated files differ")
+    parser.add_argument("--online", action="store_true", help="updates: also ask for the published version")
+    parser.add_argument("--auto-check", choices=("on", "off"),
+                        help="install/configure: the daily update check at session start")
     parser.add_argument("--no-cli", action="store_true", help="check: skip rules that need Claude Code")
     parser.add_argument("--out", help="bundle: output file (default build/os-lab.mcpb)")
     args = parser.parse_args(argv)
+    if args.auto_check:
+        os.environ["OSLAB_UPDATE_CHECK"] = "true" if args.auto_check == "on" else "false"
     try:
         if args.command == "build":
             drift = engine.skill_drift(ROOT) if args.check else engine.build_skills(ROOT)
@@ -74,7 +91,11 @@ def main(argv=None) -> int:
             return 0
         if args.command in engine.ACTIONS:
             return change(args)
-        if args.command == "check":
+        if args.command == "updates":
+            report = desktop.updates(ROOT, online=args.online)
+        elif args.command == "status":
+            report = dict(engine.status(ROOT), claudeDesktop=desktop.status(ROOT))
+        elif args.command == "check":
             report = engine.check(ROOT, use_cli=not args.no_cli)
         else:
             report = getattr(engine, args.command)(ROOT)

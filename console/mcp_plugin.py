@@ -1,6 +1,7 @@
 """Claude plugin tools for the os-lab MCP server: requirements, checks, install and setup."""
 from __future__ import annotations
 
+import claude_desktop as desktop
 import claude_plugin as engine
 import mcp_common as common
 import mcp_ui
@@ -23,12 +24,16 @@ TOOLS = [
     mcp_ui.tool("plugin_status",
                 "The os-lab marketplace and plugin install state, plus hand-made MCP entries that duplicate it. Read-only.",
                 common.obj(), read_only=True, idempotent=True, resource_uri=W["status"]),
+    mcp_ui.tool("plugin_updates",
+                "Whether the os-lab plugin is current in Claude Code and Claude Desktop (extension). online: true also asks GitHub for the published version. Installs nothing. Read-only.",
+                common.obj({"online": {"type": "boolean", "description": "default false"}}),
+                read_only=True, idempotent=True, open_world=True),
     mcp_ui.tool("plugin_check",
                 "Check this checkout's Claude plugin against every catalog rule, including claude plugin validate. Read-only.",
                 common.obj({"area": _AREA, "useCli": {"type": "boolean", "description": "default true"}}),
                 read_only=True, idempotent=True),
     mcp_ui.tool("plugin_plan",
-                "Preview the exact claude commands to install, update, configure, enable, disable or uninstall the os-lab plugin, with a one-use token. Runs no change.",
+                "Preview the exact commands to install, update, configure, enable, disable or uninstall the os-lab plugin in Claude Code, or extension-install to install or update it in Claude Desktop, with a one-use token. Runs no change.",
                 common.obj({
                     "action": {"type": "string", "enum": list(engine.ACTIONS)},
                     "scope": _SCOPE,
@@ -64,7 +69,10 @@ def _dispatch(name, args, root):
         return engine.doctor(root)
     if name == "plugin_status":
         common.check(args, [])
-        return engine.status(root)
+        return dict(engine.status(root), claudeDesktop=desktop.status(root))
+    if name == "plugin_updates":
+        common.check(args, ["online"])
+        return desktop.updates(root, online=args.get("online") is True)
     if name == "plugin_check":
         common.check(args, ["area", "useCli"])
         return engine.check(root, args.get("area"), use_cli=args.get("useCli") is not False)

@@ -27,7 +27,8 @@ CATALOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "claude_
 OWN_SKILLS = ("doctor", "setup")
 MIN_CLI = (2, 1, 285)
 SCOPES = ("user", "project", "local")
-ACTIONS = ("install", "update", "configure", "enable", "disable", "uninstall", "remove-duplicate")
+ACTIONS = ("install", "update", "configure", "enable", "disable", "uninstall", "remove-duplicate",
+           "extension-install")
 TERMINAL_ONLY = ("uninstall", "remove-duplicate")
 DUPLICATE_NAMES = ("os-lab", "os-lab-macos", "os-lab-windows")
 PLAN_SECONDS = 600
@@ -285,6 +286,8 @@ def mcpb_manifest(root: str) -> dict:
     plugin = _read_json(os.path.join(plugin_dir(root), ".claude-plugin", "plugin.json"))
     options = plugin.get("userConfig", {})
     python = "${user_config.python_command}"
+    # The update check belongs to Claude Code's session start hook; a bundle has no hooks.
+    options = {key: value for key, value in options.items() if key != "update_check"}
     return {
         "manifest_version": "0.3",
         "name": PLUGIN,
@@ -760,6 +763,9 @@ def _configuration(root: str) -> list[str]:
     port = os.environ.get("OSLAB_CONSOLE_PORT", "")
     if port.isdigit() and 0 < int(port) < 65536:
         values["console_port"] = port
+    check = os.environ.get("OSLAB_UPDATE_CHECK", "")
+    if check in ("true", "false"):
+        values["update_check"] = check
     return [part for key, value in values.items() for part in ("--config", "{0}={1}".format(key, value))]
 
 
@@ -770,6 +776,11 @@ def _build_plan(root: str, action: str, scope: str, name: str | None) -> dict:
         raise PluginError("scope must be one of: {0}".format(", ".join(SCOPES)))
     if (action == "remove-duplicate") != bool(name):
         raise PluginError("name is required for remove-duplicate and refused for other actions")
+    if action == "extension-install":
+        if scope != "user":
+            raise PluginError("The Claude Desktop extension has no scope; leave it as user")
+        import claude_desktop  # imported late: it imports this module
+        return claude_desktop.build_plan(root)
     version = cli_version(root)
     if not version:
         raise PluginError("Claude Code is not installed or not on PATH", "CLI_MISSING")
@@ -811,7 +822,11 @@ def _build_plan(root: str, action: str, scope: str, name: str | None) -> dict:
     if scope == "project":
         warnings.append("project scope writes .claude/settings.json in the checkout, which git can pick up")
     return {"action": action, "scope": scope, "name": name, "commands": commands, "warnings": warnings,
-            "state": {"cli": _dotted(version), "marketplace": market, "installed": installed, "duplicates": found}}
+            "manual": [], "program": "claude", "state": {"cli": _dotted(version), "marketplace": market, "installed": installed, "duplicates": found}}
+
+
+def _shown(built: dict, command: list[str]) -> str:
+    return subprocess.list2cmdline(([built["program"]] if built["program"] else []) + command)
 
 
 def plan(root: str, action: str, scope: str = "user", name: str | None = None) -> dict:
@@ -826,7 +841,7 @@ def plan(root: str, action: str, scope: str = "user", name: str | None = None) -
     terminal = "python3 scripts/claude-plugin.py {0} --scope {1}{2}".format(
         action, scope, " --name " + name if name else "")
     return {"token": token, "expiresInSeconds": PLAN_SECONDS, "action": action, "scope": scope,
-            "commands": ["claude " + subprocess.list2cmdline(c) for c in built["commands"]],
+            "commands": [_shown(built, c) for c in built["commands"]], "manual": built["manual"],
             "warnings": built["warnings"], "terminalOnly": action in TERMINAL_ONLY, "terminalCommand": terminal}
 
 
@@ -863,12 +878,21 @@ def apply(root: str, token: str, confirm: bool, audience: str = "agent") -> dict
     current = _build_plan(root, wanted["action"], wanted["scope"], wanted["name"])
     if current != wanted:
         refuse("The installation changed since the preview; call plugin_plan again", "STALE_PLAN")
-    binary = _need_cli()
+    desktop = wanted["action"] == "extension-install"
+    program = [_need_cli()] if wanted["program"] else []
+    if desktop and wanted["commands"]:
+        import claude_desktop
+        path = claude_desktop.bundle_path(root)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(build_mcpb(root))
+    elif desktop:
+        refuse("Do this by hand: " + " ".join(wanted["manual"]), "MANUAL")
     steps = []
     for command in wanted["commands"]:
-        shown = "claude " + subprocess.list2cmdline(command)
+        shown = _shown(wanted, command)
         try:
-            reply = _run([binary, *command], root)
+            reply = _run([*program, *command], root)
         except PluginError as exc:
             steps.append({"command": shown, "ok": False, "message": str(exc)})
             break
@@ -889,7 +913,8 @@ def apply(root: str, token: str, confirm: bool, audience: str = "agent") -> dict
           {"audience": audience, "action": wanted["action"], "scope": wanted["scope"], "steps": steps})
     return {"ok": done, "action": wanted["action"], "scope": wanted["scope"], "steps": steps,
             "notRun": len(wanted["commands"]) - len(steps),
-            "next": "Restart Claude Code or run /reload-plugins, then verify." if done else
+            "next": ("Confirm the install in Claude Desktop, then check again with plugin_updates."
+                     if desktop else "Restart Claude Code or run /reload-plugins, then verify.") if done else
                     "Fix the failed step, then preview again."}
 
 
