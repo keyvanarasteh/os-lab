@@ -414,7 +414,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
       return () => { alive = false; };
     }
     if (page === "" || page === "results" || page === "leftovers") {
-      void api.cleanupJobs().then((recent) => { if (alive) setJobs(recent.jobs); })
+      void api.cleanupJobs().then((recent) => { if (alive) setJobs(recent.jobs ?? []); })
         .catch(() => { if (alive) { /* keep the session's jobs */ } });
     }
     return () => { alive = false; };
