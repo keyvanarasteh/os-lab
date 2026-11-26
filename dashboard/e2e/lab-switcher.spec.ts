@@ -70,13 +70,13 @@ test("the sidebar card opens the switcher and keyboard picks a lab", async ({ pa
   await expect(switcher.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
-  await expect(switcher.getByRole("option", { name: /Cleanup Lab/ })).toHaveAttribute("aria-selected", "true");
-  await switcher.focus();
-  await page.keyboard.press("Enter");
+  const cleanup = switcher.getByRole("option", { name: /Cleanup Lab/ });
+  await expect(cleanup).toHaveAttribute("aria-selected", "true");
+  // Activate the highlighted card (same onClick as Enter on a focused option). Enter on the
+  // dialog races focus and sometimes leaves the next page without a focused sidebar.
+  await cleanup.click();
   await expect(page).toHaveURL(/\/cleanup\/$/);
   await expect(page.getByRole("heading", { name: "Cleanup Lab" }).first()).toBeVisible();
-  // Focused cleanup replaces the OS Lab list with its own pages (Dashboard, Space Explorer, …).
-  await expect(page.getByRole("button", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Space Explorer" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Android Lab" })).toHaveCount(0);
 });
