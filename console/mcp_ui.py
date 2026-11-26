@@ -119,6 +119,7 @@ _UI_SECTIONS = (
     ("source", "apps", APP_ROOT),
     ("linux", "widgets", WIDGET_ROOT),
     ("plugin", "widgets", WIDGET_ROOT),
+    ("codex-plugin", "widgets", WIDGET_ROOT),
 )
 
 
@@ -232,6 +233,9 @@ LINUX_WIDGET = {
 }
 PLUGIN_WIDGET = {
     "status": "ui://os-lab/plugin/widgets/status.html",
+}
+CODEX_PLUGIN_WIDGET = {
+    "status": "ui://os-lab/codex-plugin/widgets/status.html",
 }
 LAB_APP = {
     "android": "ui://os-lab/android/apps/overview.html",

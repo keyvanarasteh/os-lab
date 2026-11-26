@@ -10,21 +10,22 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 
 PLUGIN_REL = os.path.join("plugins", "codex", "os-lab")
 MARKET_REL = os.path.join(".agents", "plugins", "marketplace.json")
 SOURCE_REL = os.path.join("console", "mcp_skills")
+CATALOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "codex_requirements.json")
 LABS = ("android", "cleanup", "firewall", "ios", "linux", "macos", "source", "web", "websec", "winapps")
 OWN_SKILLS = ("setup", "doctor")
 PLUGIN_ID = "os-lab@os-lab-local"
+ACTIONS = ("install", "update", "uninstall")
+TERMINAL_ONLY = ACTIONS
 PLAN_SECONDS = 600
+PUBLISHED_URL = ("https://raw.githubusercontent.com/keyvanarasteh/os-lab/master/"
+                 "plugins/codex/os-lab/plugin.json")
 _PLANS = {}
 _LOCK = threading.Lock()
-DOCS = {
-    "package": "https://developers.openai.com/plugins/build/plugins",
-    "skills": "https://developers.openai.com/plugins/build/skills",
-    "desktop": "https://developers.openai.com/plugins/deploy/desktop-only",
-}
 
 
 class PluginError(Exception):
@@ -86,28 +87,34 @@ def build_skills(root):
     return changed
 
 
+def catalog() -> dict:
+    return _json(CATALOG_PATH)
+
+
+def checkout_version(root: str) -> str:
+    return str(_json(os.path.join(plugin_dir(root), "plugin.json"))["version"])
+
+
 def requirements(area=None, usage=None):
-    rows = [
-        ("manifest.identity", "manifest", "used", "package", "Root plugin.json has a stable name, version and description."),
-        ("manifest.extension", "manifest", "used", "package", "OpenAI metadata and onboarding path are valid."),
-        ("marketplace.entry", "marketplace", "used", "package", "Repo marketplace has a contained local source and install policy."),
-        ("mcp.stdio", "mcp", "used", "desktop", "mcp.json declares one stdio server with a package-local launcher."),
-        ("skills.frontmatter", "skills", "used", "skills", "Every skill has a name and description on its first frontmatter block."),
-        ("skills.generated", "skills", "used", "skills", "The ten packaged lab skills match their sources."),
-        ("cache.contained", "cache", "used", "package", "No packaged symlink escapes the plugin root."),
-        ("distribution.readme", "distribution", "used", "package", "The package has a README and license."),
-        ("desktop.local", "desktop", "used", "desktop", "Local stdio plugin is tested in a desktop client."),
-        ("desktop.mcpb", "desktop", "n/a", "desktop", "Claude Desktop .mcpb is not a Codex package format."),
-    ]
-    areas = sorted({row[1] for row in rows})
+    data = catalog()
+    sources = data["sources"]
+    rows = data["requirements"]
+    areas = sorted({row["area"] for row in rows})
     if area and area not in areas:
         raise PluginError("Unknown area: " + area)
     if usage and usage not in ("used", "n/a"):
         raise PluginError("usage must be used or n/a")
-    selected = [{"id": ident, "area": section, "usage": use, "severity": "error" if use == "used" else "info",
-                 "rule": rule, "source": DOCS[source], "reviewedOn": "2026-11-26"}
-                for ident, section, use, source, rule in rows if
-                (not area or section == area) and (not usage or use == usage)]
+    selected = []
+    for row in rows:
+        if area and row["area"] != area:
+            continue
+        if usage and row["usage"] != usage:
+            continue
+        selected.append({
+            "id": row["id"], "area": row["area"], "usage": row["usage"], "severity": row["severity"],
+            "rule": row["rule"], "check": row["check"], "source": sources[row["source"]],
+            "reviewedOn": data["reviewedOn"],
+        })
     return {"areas": areas, "count": len(selected), "requirements": selected}
 
 
@@ -118,81 +125,149 @@ def _path_inside(path, root):
         return False
 
 
-def _checks(root):
+def _readme_words(package: str) -> int:
+    try:
+        with open(os.path.join(package, "README.md"), encoding="utf-8") as handle:
+            return len(re.findall(r"\w+", handle.read()))
+    except OSError:
+        return 0
+
+
+def _run_check(name: str, root: str) -> tuple[str, str]:
     package = plugin_dir(root)
-    errors = {}
-    try:
-        manifest = _json(os.path.join(package, "plugin.json"))
-        if manifest.get("name") != "os-lab" or not re.fullmatch(r"\d+\.\d+\.\d+", str(manifest.get("version", ""))):
-            errors["manifest.identity"] = "Plugin name or version is invalid"
-        extension = manifest.get("extensions", {}).get("com.openai", {})
-        onboard = extension.get("onboardingSkill", "")
-        if not onboard.startswith("./") or ".." in onboard.split("/") or not os.path.isfile(os.path.join(package, onboard)):
-            errors["manifest.extension"] = "onboardingSkill is missing or escapes the package"
-    except (OSError, ValueError, AttributeError, TypeError) as exc:
-        errors["manifest.identity"] = str(exc)
-        errors["manifest.extension"] = "Cannot check without a valid manifest"
-    try:
-        market = _json(os.path.join(root, MARKET_REL))
-        entries = market.get("plugins", [])
-        valid = market.get("name") == "os-lab-local" and len(entries) == 1
-        entry = entries[0] if valid else {}
-        source = entry.get("source", {})
-        valid = valid and entry.get("name") == "os-lab" and source.get("source") == "local" and source.get("path") == "./plugins/codex/os-lab"
-        valid = valid and entry.get("policy", {}).get("installation") == "AVAILABLE" and bool(entry.get("policy", {}).get("authentication"))
-        if not valid:
-            errors["marketplace.entry"] = "Marketplace source or policy is invalid"
-    except (OSError, ValueError, AttributeError, TypeError) as exc:
-        errors["marketplace.entry"] = str(exc)
-    try:
-        mcp = _json(os.path.join(package, "mcp.json"))
-        server = mcp.get("mcpServers", {}).get("os-lab", {})
-        if server.get("type") != "stdio" or server.get("command") != "python3" or server.get("args") != ["${PLUGIN_ROOT}/launcher.py"]:
-            errors["mcp.stdio"] = "Local stdio launcher declaration is invalid"
-    except (OSError, ValueError, AttributeError, TypeError) as exc:
-        errors["mcp.stdio"] = str(exc)
-    for name in LABS + OWN_SKILLS:
-        path = os.path.join(package, "skills", name, "SKILL.md")
+    if name == "n/a":
+        return "n/a", "Not applicable for Codex"
+    if name == "manual":
+        return "manual", "Requires an isolated Codex desktop installation"
+    if name == "manifest_identity":
         try:
-            with open(path, encoding="utf-8") as handle:
-                text = handle.read()
-            header = text.split("---", 2)[1] if text.startswith("---\n") else ""
-            if not re.search(r"(?m)^name: .+$", header) or not re.search(r"(?m)^description: .+$", header):
-                errors["skills.frontmatter"] = "Invalid frontmatter in " + name
-        except OSError:
-            errors["skills.frontmatter"] = "Missing skill " + name
-    drift = skill_drift(root)
-    if drift:
-        errors["skills.generated"] = "; ".join(drift)
-    for base, dirs, files in os.walk(package, followlinks=False):
-        for name in dirs + files:
-            path = os.path.join(base, name)
-            if os.path.islink(path) and not _path_inside(path, package):
-                errors["cache.contained"] = "Symlink escapes package: " + os.path.relpath(path, package)
-    if not os.path.isfile(os.path.join(package, "README.md")) or not os.path.isfile(os.path.join(package, "LICENSE")):
-        errors["distribution.readme"] = "Packaged README or license is missing"
-    return errors
+            manifest = _json(os.path.join(package, "plugin.json"))
+            if manifest.get("name") != "os-lab" or not re.fullmatch(r"\d+\.\d+\.\d+", str(manifest.get("version", ""))):
+                return "fail", "Plugin name or version is invalid"
+            return "pass", "ok"
+        except (OSError, ValueError, TypeError) as exc:
+            return "fail", str(exc)
+    if name == "manifest_metadata":
+        try:
+            manifest = _json(os.path.join(package, "plugin.json"))
+            author = manifest.get("author") or {}
+            missing = [key for key in ("description", "homepage", "repository", "license") if not manifest.get(key)]
+            if not author.get("name"):
+                missing.append("author.name")
+            return ("fail", "Missing " + ", ".join(missing)) if missing else ("pass", "ok")
+        except (OSError, ValueError, TypeError) as exc:
+            return "fail", str(exc)
+    if name == "manifest_extension":
+        try:
+            manifest = _json(os.path.join(package, "plugin.json"))
+            extension = manifest.get("extensions", {}).get("com.openai", {})
+            onboard = extension.get("onboardingSkill", "")
+            iface = extension.get("interface") or {}
+            if not onboard.startswith("./") or ".." in onboard.split("/") or not os.path.isfile(os.path.join(package, onboard)):
+                return "fail", "onboardingSkill is missing or escapes the package"
+            if not iface.get("displayName") or not iface.get("shortDescription"):
+                return "fail", "OpenAI interface display fields are missing"
+            return "pass", "ok"
+        except (OSError, ValueError, AttributeError, TypeError) as exc:
+            return "fail", str(exc)
+    if name == "market_name":
+        try:
+            market = _json(os.path.join(root, MARKET_REL))
+            return ("pass", "ok") if market.get("name") == "os-lab-local" else ("fail", "Marketplace name is not os-lab-local")
+        except (OSError, ValueError, TypeError) as exc:
+            return "fail", str(exc)
+    if name == "market_entry":
+        try:
+            market = _json(os.path.join(root, MARKET_REL))
+            entries = market.get("plugins", [])
+            valid = market.get("name") == "os-lab-local" and len(entries) == 1
+            entry = entries[0] if valid else {}
+            source = entry.get("source", {})
+            valid = valid and entry.get("name") == "os-lab" and source.get("source") == "local"
+            valid = valid and source.get("path") == "./plugins/codex/os-lab"
+            valid = valid and entry.get("policy", {}).get("installation") == "AVAILABLE"
+            valid = valid and bool(entry.get("policy", {}).get("authentication"))
+            return ("pass", "ok") if valid else ("fail", "Marketplace source or policy is invalid")
+        except (OSError, ValueError, AttributeError, TypeError) as exc:
+            return "fail", str(exc)
+    if name == "mcp_stdio":
+        try:
+            mcp = _json(os.path.join(package, "mcp.json"))
+            server = mcp.get("mcpServers", {}).get("os-lab", {})
+            ok = (server.get("type") == "stdio" and server.get("command") == "python3"
+                  and server.get("args") == ["${PLUGIN_ROOT}/launcher.py"])
+            return ("pass", "ok") if ok else ("fail", "Local stdio launcher declaration is invalid")
+        except (OSError, ValueError, AttributeError, TypeError) as exc:
+            return "fail", str(exc)
+    if name == "mcp_annotations":
+        import mcp_codex_plugin
+        missing = [tool["name"] for tool in mcp_codex_plugin.TOOLS
+                   if "readOnlyHint" not in (tool.get("annotations") or {})]
+        return ("fail", "Missing readOnlyHint: " + ", ".join(missing)) if missing else ("pass", "ok")
+    if name == "mcp_instructions":
+        import mcp_server
+        text = mcp_server.INSTRUCTIONS
+        ok = "codex_plugin_doctor" in text and "codex_plugin_plan" in text
+        return ("pass", "ok") if ok else ("fail", "Initialize instructions omit Codex plugin tools")
+    if name == "skills_frontmatter":
+        for skill in LABS + OWN_SKILLS:
+            path = os.path.join(package, "skills", skill, "SKILL.md")
+            try:
+                with open(path, encoding="utf-8") as handle:
+                    text = handle.read()
+                header = text.split("---", 2)[1] if text.startswith("---\n") else ""
+                if not re.search(r"(?m)^name: .+$", header) or not re.search(r"(?m)^description: .+$", header):
+                    return "fail", "Invalid frontmatter in " + skill
+            except OSError:
+                return "fail", "Missing skill " + skill
+        return "pass", "ok"
+    if name == "skills_length":
+        long = []
+        for skill in LABS + OWN_SKILLS:
+            path = os.path.join(package, "skills", skill, "SKILL.md")
+            try:
+                with open(path, encoding="utf-8") as handle:
+                    if sum(1 for _ in handle) > 500:
+                        long.append(skill)
+            except OSError:
+                return "fail", "Missing skill " + skill
+        return ("fail", "Over 500 lines: " + ", ".join(long)) if long else ("pass", "ok")
+    if name == "skills_generated":
+        drift = skill_drift(root)
+        return ("fail", "; ".join(drift)) if drift else ("pass", "ok")
+    if name == "cache_contained":
+        for base, dirs, files in os.walk(package, followlinks=False):
+            for entry in dirs + files:
+                path = os.path.join(base, entry)
+                if os.path.islink(path) and not _path_inside(path, package):
+                    return "fail", "Symlink escapes package: " + os.path.relpath(path, package)
+        return "pass", "ok"
+    if name == "cli_available":
+        binary = shutil.which("codex")
+        # Missing CLI is skipped so package checks stay useful before Codex is installed.
+        return ("pass", binary) if binary else ("skipped", "Codex CLI is not on PATH")
+    if name == "readme":
+        if not os.path.isfile(os.path.join(package, "LICENSE")):
+            return "fail", "Packaged license is missing"
+        words = _readme_words(package)
+        return ("pass", "{0} words".format(words)) if words >= 40 else ("fail", "README is under 40 words")
+    return "fail", "Unknown check: " + name
 
 
 def check(root, area=None):
-    errors = _checks(root)
     rows = []
     for rule in requirements(area)["requirements"]:
-        ident = rule["id"]
-        if rule["usage"] == "n/a":
+        result, detail = _run_check(rule["check"], root)
+        if rule["usage"] == "n/a" and result != "n/a":
             result, detail = "n/a", rule["rule"]
-        elif ident == "desktop.local":
-            result, detail = "manual", "Requires an isolated Codex desktop installation"
-        elif ident in errors:
-            result, detail = "fail", errors[ident]
-        else:
-            result, detail = "pass", "ok"
-        entry = {"id": ident, "area": rule["area"], "result": result, "detail": detail, "source": rule["source"]}
+        entry = {"id": rule["id"], "area": rule["area"], "result": result, "detail": detail,
+                 "source": rule["source"]}
         if result == "fail":
             entry["fix"] = rule["rule"]
         rows.append(entry)
     return {"ok": all(row["result"] != "fail" for row in rows), "results": rows,
-            "summary": {state: sum(row["result"] == state for row in rows) for state in ("pass", "fail", "manual", "n/a")}}
+            "summary": {state: sum(row["result"] == state for row in rows)
+                        for state in ("pass", "fail", "manual", "n/a", "skipped")}}
 
 
 def _codex(*args):
@@ -208,10 +283,22 @@ def _codex(*args):
     return run.stdout
 
 
+def _version_key(version) -> tuple:
+    try:
+        return tuple(int(part) for part in str(version).split("."))
+    except (TypeError, ValueError):
+        return (0,)
+
+
 def status(root):
     """Read-only Codex installation state; never reads secret-bearing config values."""
-    found = {"pluginId": PLUGIN_ID, "checkout": os.path.realpath(root), "installed": False,
-             "marketplace": False, "duplicates": []}
+    found = {"pluginId": PLUGIN_ID, "checkout": os.path.realpath(root), "cli": shutil.which("codex"),
+             "installed": False, "marketplace": False, "duplicates": [], "checkoutVersion": None,
+             "manualConfig": None}
+    try:
+        found["checkoutVersion"] = checkout_version(root)
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
     try:
         data = json.loads(_codex("plugin", "list", "--available", "--json"))
         rows = data.get("installed", []) + data.get("available", [])
@@ -241,6 +328,10 @@ def status(root):
                         found["duplicates"].append({"name": name, "scope": "project" if path.startswith(root) else "user"})
             except (OSError, ValueError, TypeError):
                 continue
+    if found["duplicates"]:
+        found["manualConfig"] = ("Remove the manual plugins/mcp/codex/config.toml MCP entries named "
+                                 + ", ".join(sorted({row["name"] for row in found["duplicates"]}))
+                                 + " so only the plugin connection remains.")
     return found
 
 
@@ -253,27 +344,85 @@ def doctor(root):
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
     checkout, source, problem = module.find_checkout(here=path)
+    package_ok = check(root)["ok"]
+    cli = shutil.which("codex")
     checks = [
-        {"name": "python", "ok": sys.version_info >= (3, 8), "detail": sys.version.split()[0]},
-        {"name": "checkout", "ok": bool(checkout), "detail": checkout or problem, "source": source},
-        {"name": "package", "ok": check(root)["ok"], "detail": "package checks"},
+        {"name": "python", "ok": sys.version_info >= (3, 8), "detail": sys.version.split()[0],
+         "fix": None if sys.version_info >= (3, 8) else "Install Python 3.8 or newer"},
+        {"name": "cli", "ok": bool(cli), "detail": cli or "missing",
+         "fix": None if cli else "Install the Codex CLI and put it on PATH"},
+        {"name": "checkout", "ok": bool(checkout), "detail": checkout or problem, "source": source,
+         "fix": None if checkout else "Set OSLAB_ROOT to this repository"},
+        {"name": "package", "ok": package_ok, "detail": "package checks",
+         "fix": None if package_ok else "Run python3 scripts/codex-plugin.py check"},
     ]
     return {"ready": all(row["ok"] for row in checks), "platform": sys.platform, "checks": checks}
 
 
-def _install_steps(root, action):
-    if action != "install":
-        raise PluginError("Codex CLI 0.167.0 has no tested {0} operation here; use the Codex plugin browser".format(action),
-                          "UNSUPPORTED")
+def published_version(timeout: float = 5) -> tuple[str | None, str | None]:
+    request = urllib.request.Request(PUBLISHED_URL, headers={"User-Agent": "os-lab"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as reply:
+            version = str(json.loads(reply.read(200_000).decode("utf-8"))["version"])
+        if not re.match(r"^\d+(\.\d+)+$", version):
+            raise ValueError("unexpected version")
+        return version, None
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return None, "could not read the published version: {0}".format(type(exc).__name__)
+
+
+def updates(root, online: bool = False, timeout: float = 5) -> dict:
+    """Compare the checkout with the installed Codex plugin; online also asks GitHub."""
+    wanted = checkout_version(root)
+    result: dict = {"online": online, "checkoutVersion": wanted, "updatesAvailable": []}
+    if online:
+        latest, problem = published_version(timeout)
+        newer = bool(latest) and _version_key(wanted) < _version_key(latest)
+        result["published"] = {"version": latest, "updateAvailable": newer if latest else None}
+        if problem:
+            result["published"]["note"] = problem
+        if newer:
+            result["updatesAvailable"].append("checkout")
+            result["published"]["next"] = "Update the checkout (git pull), then reinstall the plugin."
     state = status(root)
-    if state["marketplace"] and not state.get("thisCheckout"):
+    result["codex"] = {
+        "cli": state.get("cli"),
+        "installed": state.get("installed"),
+        "version": state.get("version"),
+        "updateAvailable": bool(state.get("installed") and state.get("version")
+                                and _version_key(state.get("version")) < _version_key(wanted)),
+    }
+    if result["codex"]["updateAvailable"]:
+        result["updatesAvailable"].append("codex")
+        result["codex"]["next"] = "codex_plugin_plan with action update"
+    return result
+
+
+def _install_steps(root, action):
+    if action not in ACTIONS:
+        raise PluginError("action must be one of: {0}".format(", ".join(ACTIONS)), "UNSUPPORTED")
+    state = status(root)
+    if state["marketplace"] and state.get("thisCheckout") is False:
         raise PluginError("A marketplace entry named os-lab points to another source", "CONFLICT")
-    if state["installed"]:
-        raise PluginError("The plugin is already installed; inspect it in the plugin browser", "ALREADY_INSTALLED")
     steps = []
-    if not state["marketplace"]:
-        steps.append(["plugin", "marketplace", "add", os.path.realpath(root), "--json"])
-    steps.append(["plugin", "add", PLUGIN_ID, "--json"])
+    if action == "install":
+        if state["installed"]:
+            raise PluginError("The plugin is already installed; use update or the plugin browser",
+                              "ALREADY_INSTALLED")
+        if not state["marketplace"]:
+            steps.append(["plugin", "marketplace", "add", os.path.realpath(root), "--json"])
+        steps.append(["plugin", "add", PLUGIN_ID, "--json"])
+    elif action == "update":
+        if not state["installed"]:
+            raise PluginError("The plugin is not installed", "NOT_INSTALLED")
+        steps.append(["plugin", "remove", PLUGIN_ID, "--json"])
+        if not state["marketplace"]:
+            steps.append(["plugin", "marketplace", "add", os.path.realpath(root), "--json"])
+        steps.append(["plugin", "add", PLUGIN_ID, "--json"])
+    else:  # uninstall
+        if not state["installed"]:
+            raise PluginError("The plugin is not installed", "NOT_INSTALLED")
+        steps.append(["plugin", "remove", PLUGIN_ID, "--json"])
     return state, steps
 
 
@@ -290,16 +439,21 @@ def audit(root, event, detail):
 
 
 def plan(root, action):
-    """Preview a fixed local CLI install. The MCP tool cannot apply it."""
+    """Preview a fixed local CLI change. The MCP tool cannot apply it."""
     state, steps = _install_steps(root, action)
     token = secrets.token_urlsafe(24)
     with _LOCK:
-        _PLANS[token] = {"root": os.path.realpath(root), "state": state, "steps": steps,
+        _PLANS[token] = {"root": os.path.realpath(root), "action": action, "state": state, "steps": steps,
                          "expires": time.time() + PLAN_SECONDS}
+    warnings = []
+    if state.get("manualConfig"):
+        warnings.append(state["manualConfig"])
     audit(root, "planned", {"action": action, "steps": len(steps)})
     return {"action": action, "token": token, "expiresInSeconds": PLAN_SECONDS,
             "commands": ["codex " + " ".join(subprocess.list2cmdline([word]) for word in step) for step in steps],
-            "terminalOnly": True, "note": "Run python3 scripts/codex-plugin.py install in an interactive terminal."}
+            "manual": [], "warnings": warnings, "terminalOnly": True,
+            "terminalCommand": "python3 scripts/codex-plugin.py " + action,
+            "note": "Run python3 scripts/codex-plugin.py {0} in an interactive terminal.".format(action)}
 
 
 def _interactive():
@@ -315,27 +469,32 @@ def apply(root, token, confirm, audience="agent"):
     if not confirm:
         refuse("The preview needs explicit approval", "CONFIRM_REQUIRED")
     if audience != "terminal" or not _interactive():
-        refuse("Installation runs only in an interactive terminal", "TERMINAL_ONLY")
+        refuse("Codex plugin changes run only in an interactive terminal", "TERMINAL_ONLY")
     with _LOCK:
         held = _PLANS.pop(token, None)
     if not held or held["root"] != os.path.realpath(root) or held["expires"] < time.time():
         refuse("The preview expired or was already used", "STALE_PLAN")
-    current, steps = _install_steps(root, "install")
+    action = held.get("action", "install")
+    current, steps = _install_steps(root, action)
     if current != held["state"] or steps != held["steps"]:
         refuse("Codex installation state changed since the preview", "STALE_PLAN")
     results = []
     for step in steps:
         try:
             output = _codex(*step)
-            results.append({"command": "codex " + " ".join(step), "ok": True,
-                            "message": json.loads(output).get("pluginId", "ok")})
+            try:
+                message = json.loads(output).get("pluginId") or json.loads(output).get("status") or "ok"
+            except ValueError:
+                message = "ok"
+            results.append({"command": "codex " + " ".join(step), "ok": True, "message": message})
         except (PluginError, ValueError) as exc:
             results.append({"command": "codex " + " ".join(step), "ok": False, "message": str(exc)[:500]})
             break
     done = len(results) == len(steps) and all(row["ok"] for row in results)
-    audit(root, "applied" if done else "failed", {"action": "install", "completed": len(results),
+    audit(root, "applied" if done else "failed", {"action": action, "completed": len(results),
           "notRun": len(steps) - len(results)})
-    return {"ok": done, "steps": results, "notRun": len(steps) - len(results)}
+    return {"ok": done, "steps": results, "notRun": len(steps) - len(results),
+            "next": "Restart Codex or reopen the plugin browser, then verify."}
 
 
 def verify(root):

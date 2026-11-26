@@ -34,7 +34,8 @@ def test_package_checks_and_generated_skills():
     assert engine.skill_drift(ROOT) == []
     rows = engine.requirements()["requirements"]
     assert len({r["id"] for r in rows}) == len(rows)
-    assert all(r["source"].startswith("https://developers.openai.com/") for r in rows)
+    assert all(r["source"].startswith("https://") for r in rows)
+    assert engine.checkout_version(ROOT) == "0.2.0"
 
 
 def test_broken_marketplace_and_skill_are_reported(tmp_path):
@@ -207,3 +208,22 @@ def test_duplicate_config_reports_names_without_secret_values(tmp_path, monkeypa
     found = engine.status(ROOT)
     assert found["duplicates"] == [{"name": "os-lab", "scope": "user"}]
     assert "do-not-report-this" not in json.dumps(found)
+    assert "manual" in (found.get("manualConfig") or "").lower()
+
+
+def test_updates_and_console_api_refuse_apply(monkeypatch):
+    import codex_plugin_api as api
+    monkeypatch.setattr(engine, "status", lambda root: {
+        "cli": "/bin/codex", "installed": True, "enabled": True, "version": "0.1.0",
+        "marketplace": True, "thisCheckout": True, "duplicates": []})
+    monkeypatch.setattr(engine, "published_version", lambda timeout=5: ("0.2.0", None))
+    report = engine.updates(ROOT, online=True)
+    assert "codex" in report["updatesAvailable"] and report["published"]["updateAvailable"] is False
+    code, body = api.handle(ROOT, "GET", "/api/codex-plugin")
+    assert code == 200 and body["checkoutVersion"] == "0.2.0"
+    code, body = api.handle(ROOT, "POST", "/api/codex-plugin/apply", {"token": "x", "confirm": True})
+    assert code == 403 and body["code"] == "TERMINAL_ONLY"
+    listed = {tool["name"] for tool in __import__("mcp_server").TOOLS}
+    assert "codex_plugin_updates" in listed
+    resources = __import__("mcp_ui").list_resources()
+    assert any(row["uri"].endswith("codex-plugin/widgets/status.html") for row in resources)

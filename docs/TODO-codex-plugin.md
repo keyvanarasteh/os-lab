@@ -4,6 +4,8 @@ Companion to [PLAN-codex-plugin.md](PLAN-codex-plugin.md). Mark each completed i
 
 This checklist includes every implemented Claude plugin feature inspected at `feat/ai-agent-plugins` commit `e0ab48942`; the [parity table](PLAN-codex-plugin.md#claude-implementation-parity-audit) records the Codex counterpart or exclusion. Rebase on master only after the user confirms that the Claude branch merged.
 
+Status after Claude merge (#385/#388/#390): rebased; requirement catalog JSON, updates tool, console API, `/mcp/` cards, status widget, three-OS CI and verification proofs landed. Remaining unchecked Stage 0 desktop/live-host items stay documentation limits, not merge blockers.
+
 ## Stage 0: verify current client behavior
 
 - [x] Record `codex --version` and OS for the CLI proof environment — `codex-cli 0.167.0`, macOS, `test_codex_plugin.py`; desktop version remains open below.

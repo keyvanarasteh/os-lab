@@ -3439,5 +3439,14 @@
   "Install extension": "Erweiterung installieren",
   "Update extension": "Erweiterung aktualisieren",
   "Enable": "Aktivieren",
-  "Disable": "Deaktivieren"
+  "Disable": "Deaktivieren",
+  "Install as a Codex plugin": "Als Codex-Plugin installieren",
+  "Codex plugin": "Codex-Plugin",
+  "Codex CLI not found": "Codex-CLI nicht gefunden",
+  "Connect the local console to check the plugin from this page. Install runs in a terminal.": "Verbinden Sie die lokale Konsole, um das Plugin von dieser Seite zu prüfen. Die Installation läuft im Terminal.",
+  "Server and lab skills for the Codex CLI and desktop app.": "Server und Lab-Skills für die Codex-CLI und Desktop-App.",
+  "Preview install": "Installation Vorschau",
+  "Preview update": "Update Vorschau",
+  "Preview uninstall": "Deinstallation Vorschau",
+  "Nothing has changed yet. Run the terminal command after you approve.": "Noch nichts geändert. Führen Sie den Terminalbefehl nach der Freigabe aus."
 }

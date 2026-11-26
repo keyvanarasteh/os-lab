@@ -3439,5 +3439,14 @@
   "Install extension": "نصب افزونه دسکتاپ",
   "Update extension": "به‌روزرسانی افزونه دسکتاپ",
   "Enable": "فعال کردن",
-  "Disable": "غیرفعال کردن"
+  "Disable": "غیرفعال کردن",
+  "Install as a Codex plugin": "نصب به‌عنوان افزونه Codex",
+  "Codex plugin": "افزونه Codex",
+  "Codex CLI not found": "Codex CLI پیدا نشد",
+  "Connect the local console to check the plugin from this page. Install runs in a terminal.": "برای بررسی افزونه از این صفحه، کنسول محلی را وصل کنید. نصب در ترمینال اجرا می‌شود.",
+  "Server and lab skills for the Codex CLI and desktop app.": "سرور و مهارت‌های آزمایشگاه برای Codex CLI و برنامه دسکتاپ.",
+  "Preview install": "پیش‌نمایش نصب",
+  "Preview update": "پیش‌نمایش به‌روزرسانی",
+  "Preview uninstall": "پیش‌نمایش حذف",
+  "Nothing has changed yet. Run the terminal command after you approve.": "هنوز چیزی تغییر نکرده. پس از تأیید، دستور ترمینال را اجرا کنید."
 }

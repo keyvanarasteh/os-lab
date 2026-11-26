@@ -3439,5 +3439,14 @@
   "Install extension": "Uzantıyı kur",
   "Update extension": "Uzantıyı güncelle",
   "Enable": "Etkinleştir",
-  "Disable": "Devre dışı bırak"
+  "Disable": "Devre dışı bırak",
+  "Install as a Codex plugin": "Codex eklentisi olarak kur",
+  "Codex plugin": "Codex eklentisi",
+  "Codex CLI not found": "Codex CLI bulunamadı",
+  "Connect the local console to check the plugin from this page. Install runs in a terminal.": "Bu sayfadan eklentiyi denetlemek için yerel konsolu bağlayın. Kurulum terminalde çalışır.",
+  "Server and lab skills for the Codex CLI and desktop app.": "Codex CLI ve masaüstü uygulaması için sunucu ve laboratuvar becerileri.",
+  "Preview install": "Kurulumu önizle",
+  "Preview update": "Güncellemeyi önizle",
+  "Preview uninstall": "Kaldırmayı önizle",
+  "Nothing has changed yet. Run the terminal command after you approve.": "Henüz hiçbir şey değişmedi. Onaydan sonra terminal komutunu çalıştırın."
 }

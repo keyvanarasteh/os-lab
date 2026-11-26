@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Build, inspect and interactively install the local os-lab Codex plugin."""
+"""Build, inspect and interactively install the local os-lab Codex plugin.
+
+    scripts/codex-plugin.py doctor | status | check | verify | updates [--online]
+    scripts/codex-plugin.py build [--check]          generate the plugin's lab skills
+    scripts/codex-plugin.py requirements [--area A]
+    scripts/codex-plugin.py install | update | uninstall
+"""
 import argparse
 import json
 import os
@@ -12,9 +18,12 @@ import codex_plugin  # noqa: E402
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("build", "check", "doctor", "status", "requirements", "install", "verify"))
+    parser.add_argument("command", choices=(
+        "build", "check", "doctor", "status", "requirements", "updates",
+        "install", "update", "uninstall", "verify"))
     parser.add_argument("--check", action="store_true", help="build: report skill drift without writing")
     parser.add_argument("--area", help="check or requirements: one catalog area")
+    parser.add_argument("--online", action="store_true", help="updates: also ask GitHub for the published version")
     args = parser.parse_args(argv)
     try:
         if args.command == "build":
@@ -22,13 +31,15 @@ def main(argv=None):
             for line in changed:
                 print(line)
             return int(args.check and bool(changed))
-        if args.command == "install":
-            preview = codex_plugin.plan(ROOT, "install")
+        if args.command in ("install", "update", "uninstall"):
+            preview = codex_plugin.plan(ROOT, args.command)
             print("This will run:")
             for command in preview["commands"]:
                 print("  " + command)
+            for warning in preview.get("warnings") or []:
+                print("Warning: " + warning, file=sys.stderr)
             if not (sys.stdin.isatty() and sys.stdout.isatty()):
-                print("Nothing changed: installation requires an interactive terminal.", file=sys.stderr)
+                print("Nothing changed: this requires an interactive terminal.", file=sys.stderr)
                 return 2
             if input("Continue? [y/N] ").strip().lower() not in ("y", "yes"):
                 print("Nothing changed.")
@@ -40,6 +51,8 @@ def main(argv=None):
             result = codex_plugin.check(ROOT, args.area)
         elif args.command == "requirements":
             result = codex_plugin.requirements(args.area)
+        elif args.command == "updates":
+            result = codex_plugin.updates(ROOT, online=args.online)
         else:
             result = getattr(codex_plugin, args.command)(ROOT)
         print(json.dumps(result, indent=2))

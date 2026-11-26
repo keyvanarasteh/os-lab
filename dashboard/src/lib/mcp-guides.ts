@@ -35,7 +35,8 @@ export type McpGroupId =
   | "web"
   | "source"
   | "firewall"
-  | "plugin";
+  | "plugin"
+  | "codex-plugin";
 
 export interface McpGroup {
   id: McpGroupId;
@@ -460,6 +461,30 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "plugin_apply", safety: "confirm", summary: "Run a previewed plan. confirm: true; removals are terminal only.", engineUsage: pending(), widget: none(), app: none() },
       { name: "plugin_verify", safety: "read-only", summary: "Start the installed server and compare its tools.", engineUsage: pending(), widget: none(), app: none() }
     ]
+  },
+  {
+    id: "codex-plugin",
+    title: "Codex plugin",
+    platform: "all hosts",
+    docs: "lat.md/codex-plugin.md, console/mcp_codex_plugin.py",
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_codex_plugin.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_codex_plugin.py" },
+    apps: none(),
+    rules: [
+      "Install, update and uninstall are previewed, then run only from an interactive terminal.",
+      "MCP and console apply refuse writes; use scripts/codex-plugin.py.",
+      "Commands are fixed on the server; callers pick an action only."
+    ],
+    tools: [
+      { name: "codex_plugin_requirements", safety: "read-only", summary: "Codex plugin requirement catalog with sources.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "codex_plugin_doctor", safety: "read-only", summary: "Python, Codex CLI and checkout readiness.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "codex_plugin_status", safety: "read-only", summary: "Install state and duplicate manual MCP entries.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "codex_plugin_updates", safety: "read-only", summary: "Update check for the installed Codex plugin.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "codex_plugin_check", safety: "read-only", summary: "Check the plugin against every catalog rule.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "codex_plugin_plan", safety: "read-only", summary: "Preview install, update or uninstall commands.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "codex_plugin_apply", safety: "confirm", summary: "Refuses MCP writes; terminal helper applies plans.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "codex_plugin_verify", safety: "read-only", summary: "Start the installed server and compare its tools.", engineUsage: pending(), widget: none(), app: none() }
+    ]
   }
 ];
 
@@ -474,4 +499,9 @@ export const MCP_PLANNED_SECTIONS: { id: string; title: string; engineUsage: Ver
 /** Install the repo as a Claude Code plugin: server, lab skills and the setup check together. */
 export function claudePluginSnippet(root?: string): string {
   return `python3 ${root ?? "<repo>"}/scripts/claude-plugin.py install`;
+}
+
+/** Install the repo as a Codex plugin: marketplace add plus plugin add, interactive only. */
+export function codexPluginSnippet(root?: string): string {
+  return `python3 ${root ?? "<repo>"}/scripts/codex-plugin.py install`;
 }

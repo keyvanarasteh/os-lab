@@ -1,0 +1,67 @@
+name: codex-plugin
+
+# Codex plugin package checks and an install round trip with the real Codex CLI when
+# available. The focused pytest suite always runs; the CLI round trip is skipped when
+# the runner has no Codex binary.
+
+on:
+  pull_request:
+    paths: &paths
+      - '.agents/plugins/**'
+      - 'plugins/codex/**'
+      - 'console/codex_*'
+      - 'console/mcp_codex_plugin.py'
+      - 'console/mcp_*'
+      - 'scripts/codex-plugin.py'
+      - 'android-lab/lab/tests/test_codex_plugin.py'
+      - '.github/workflows/codex-plugin.yml'
+  push:
+    branches: [master]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Plugin tests
+        run: |
+          python -m pip install --quiet pytest requests cryptography
+          cd android-lab/lab && python -m pytest tests/test_codex_plugin.py -q
+      - name: Helper check and doctor
+        run: |
+          python scripts/codex-plugin.py build --check
+          python scripts/codex-plugin.py check
+          python scripts/codex-plugin.py doctor || true
+      - name: Isolated CLI install when Codex is available
+        run: |
+          if ! command -v codex >/dev/null 2>&1; then
+            echo "Codex CLI not installed on this runner; skipping live install."
+            exit 0
+          fi
+          export CODEX_HOME="$RUNNER_TEMP/codex-home"
+          mkdir -p "$CODEX_HOME"
+          python scripts/codex-plugin.py doctor
+          # Non-interactive install via fixed CLI verbs (helper itself needs a TTY).
+          codex plugin marketplace add "$PWD" --json
+          codex plugin add os-lab@os-lab-local --json
+          python scripts/codex-plugin.py verify

@@ -72,6 +72,10 @@ try:
 except ImportError:
     claude_plugin_api = None
 try:
+    import codex_plugin_api  # noqa: E402  (console/codex_plugin_api.py: the MCP page's Codex cards)
+except ImportError:
+    codex_plugin_api = None
+try:
     import winapps  # noqa: E402  (console/winapps.py: native Windows app mirror and guarded UIA control)
 except ImportError:
     winapps = None
@@ -281,6 +285,9 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/claude-plugin"):
             self._claude_plugin("GET", path)
+            return
+        if path.startswith("/api/codex-plugin"):
+            self._codex_plugin("GET", path)
             return
         if path == "/api/frida/inventory":
             self._frida_get(urllib.parse.parse_qs(parsed.query))
@@ -724,6 +731,9 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/claude-plugin"):
             self._claude_plugin("POST", path)
             return
+        if path.startswith("/api/codex-plugin"):
+            self._codex_plugin("POST", path)
+            return
         if path.startswith("/api/cleanup"):
             self._cleanup_post(path)
             return
@@ -754,6 +764,17 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(*claude_plugin_api.handle(REPO_ROOT, method, path, data))
         except (OSError, ValueError):
             self._json(400, {"error": "Invalid Claude plugin request"})
+
+    def _codex_plugin(self, method: str, path: str):
+        """The os-lab Codex plugin: state, update check, previewed terminal installs (console/codex_plugin_api.py)."""
+        if not codex_plugin_api:
+            self._json(501, {"error": "The Codex plugin module (console/codex_plugin_api.py) is not installed"})
+            return
+        try:
+            data = self._read_json() if method == "POST" else None
+            self._json(*codex_plugin_api.handle(REPO_ROOT, method, path, data))
+        except (OSError, ValueError):
+            self._json(400, {"error": "Invalid Codex plugin request"})
 
     def _content_get(self, path: str, query: dict):
         """Content packs: what is installed, the companies, and the data files (see console/content.py)."""

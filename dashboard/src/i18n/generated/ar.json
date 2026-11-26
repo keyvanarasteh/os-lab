@@ -3439,5 +3439,14 @@
   "Install extension": "تثبيت الامتداد",
   "Update extension": "تحديث الامتداد",
   "Enable": "تفعيل",
-  "Disable": "تعطيل"
+  "Disable": "تعطيل",
+  "Install as a Codex plugin": "التثبيت كإضافة Codex",
+  "Codex plugin": "إضافة Codex",
+  "Codex CLI not found": "لم يتم العثور على Codex CLI",
+  "Connect the local console to check the plugin from this page. Install runs in a terminal.": "اربط وحدة التحكم المحلية للتحقق من الإضافة من هذه الصفحة. التثبيت يعمل في الطرفية.",
+  "Server and lab skills for the Codex CLI and desktop app.": "الخادم ومهارات المختبر لـ Codex CLI وتطبيق سطح المكتب.",
+  "Preview install": "معاينة التثبيت",
+  "Preview update": "معاينة التحديث",
+  "Preview uninstall": "معاينة إلغاء التثبيت",
+  "Nothing has changed yet. Run the terminal command after you approve.": "لم يتغير شيء بعد. شغّل أمر الطرفية بعد الموافقة."
 }
