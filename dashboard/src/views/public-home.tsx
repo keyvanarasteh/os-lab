@@ -38,7 +38,11 @@ function CommandCard({ label, command }: { label: string; command: string }) {
 }
 
 export default function PublicHome() {
-  const firewallHref = localePath("/firewall/", localeFromPath(window.location.pathname));
+  const locale = localeFromPath(window.location.pathname);
+  const firewallHref = localePath("/firewall/", locale);
+  const cleanupHref = localePath("/cleanup/", locale);
+  const mcpHref = localePath("/mcp/", locale);
+  const sourceHref = localePath("/source/", locale);
   const [release, setRelease] = useState<Release | null>(null);
   const [releaseStatus, setReleaseStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   useEffect(() => {
@@ -55,8 +59,8 @@ export default function PublicHome() {
       <header className="rounded-2xl border border-(--iux-border) bg-(--iux-card) p-7 sm:p-10">
         <p className="text-sm font-semibold uppercase tracking-widest text-[#f36c21]">Open source security labs</p>
         <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Build, run, and study isolated security labs.</h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-(--iux-muted-foreground)">os-lab brings Android, iOS, Windows, Linux, macOS, and firewall exercises into one local console. Install it on your own machine, then choose a lab.</p>
-        <div className="mt-7 flex flex-wrap gap-3"><a className="iux-btn" data-variant="primary" href="#download">Download</a><a className="iux-btn" data-variant="outline" href={firewallHref}>Explore Firewall Lab</a><a className="iux-btn" data-variant="outline" href={REPO_URL}>Source code</a></div>
+        <p className="mt-4 max-w-2xl text-base leading-7 text-(--iux-muted-foreground)">os-lab brings Android, iOS, Windows, Linux, macOS, Cleanup, Web Sec, Source, and firewall exercises into one local console — with a guarded MCP server and plugins for Claude, Codex, Cursor, ZCode and Grok. Install it on your own machine, then choose a lab.</p>
+        <div className="mt-7 flex flex-wrap gap-3"><a className="iux-btn" data-variant="primary" href="#download">Download</a><a className="iux-btn" data-variant="outline" href={mcpHref}>MCP guides</a><a className="iux-btn" data-variant="outline" href={cleanupHref}>Cleanup Lab</a><a className="iux-btn" data-variant="outline" href={REPO_URL}>Source code</a></div>
       </header>
       <section id="download" className="space-y-4">
         <div><h2 className="text-2xl font-bold">Desktop downloads</h2><p role="status" className="mt-1 text-sm text-(--iux-muted-foreground)">{releaseStatus === "loading" ? <span>Checking latest release…</span> : releaseStatus === "unavailable" ? <span>Release details unavailable. Open the latest release page.</span> : <><span>Latest published release</span> · <span data-no-translate>{release?.tag_name}</span></>}</p></div>
@@ -69,7 +73,13 @@ export default function PublicHome() {
       <section className="space-y-4"><h2 className="text-2xl font-bold">One-line setup</h2><p className="text-sm text-(--iux-muted-foreground)">These commands install prerequisites, fetch the checkout, and launch the local web console. Review the script before running it.</p>
         {commands.map(({ label, command }) => <CommandCard key={label} label={label} command={command} />)}
       </section>
-      <section className="grid gap-3 sm:grid-cols-2"><a className="iux-card p-5 hover:border-[#f36c21]" href={firewallHref}><strong>Firewall Lab</strong><p className="mt-2 text-sm text-(--iux-muted-foreground)">Explore student company networks, firewalls, and rule sets.</p></a><a className="iux-card p-5 hover:border-[#f36c21]" href={`${REPO_URL}/blob/master/README.md`}><strong>Documentation</strong><p className="mt-2 text-sm text-(--iux-muted-foreground)">Requirements, installation, and lab guides.</p></a></section>
+      <section className="grid gap-3 sm:grid-cols-2">
+        <a className="iux-card p-5 hover:border-[#f36c21]" href={cleanupHref}><strong>Cleanup Lab</strong><p className="mt-2 text-sm text-(--iux-muted-foreground)">Scan, plan and confirm reclaimable disk space on the host.</p></a>
+        <a className="iux-card p-5 hover:border-[#f36c21]" href={mcpHref}><strong>MCP and agent plugins</strong><p className="mt-2 text-sm text-(--iux-muted-foreground)">Guarded tools, widgets and plugins for Claude, Codex, Cursor, ZCode and Grok.</p></a>
+        <a className="iux-card p-5 hover:border-[#f36c21]" href={firewallHref}><strong>Firewall Lab</strong><p className="mt-2 text-sm text-(--iux-muted-foreground)">Explore student company networks, firewalls, and rule sets.</p></a>
+        <a className="iux-card p-5 hover:border-[#f36c21]" href={sourceHref}><strong>Source Lab</strong><p className="mt-2 text-sm text-(--iux-muted-foreground)">Portable source and package analysis with signed evidence workflows.</p></a>
+        <a className="iux-card p-5 hover:border-[#f36c21] sm:col-span-2" href={`${REPO_URL}/blob/master/README.md`}><strong>Documentation</strong><p className="mt-2 text-sm text-(--iux-muted-foreground)">Requirements, installation, labs, MCP and plugin guides.</p></a>
+      </section>
     </main>
   </AppShell>;
 }
