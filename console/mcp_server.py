@@ -19,6 +19,9 @@ sit behind console/winapps_guard.py: an agent sees only apps on the allowlist
 (win-lab/winapps-policy.json, empty means none), restricted windows are never captured, and every
 call and refusal lands in the guard's audit log. There is no arm tool and no input tool.
 
+The plugin_* tools check and set up os-lab as a Claude plugin (console/claude_plugin.py): changes
+are previewed, need a one-use token and confirm:true, and removals run only from a terminal.
+
 Run: python3 console/mcp_server.py   (or `make -C ios-lab mac-mcp`)
 """
 
@@ -39,6 +42,7 @@ import mcp_linux  # noqa: E402
 import mcp_web  # noqa: E402
 import mcp_source  # noqa: E402
 import mcp_firewall  # noqa: E402
+import mcp_plugin  # noqa: E402
 import mcp_ui  # noqa: E402
 import mcp_prompts  # noqa: E402
 import winapps  # noqa: E402
@@ -47,6 +51,22 @@ import winapps_guard  # noqa: E402
 REPO_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 PROTOCOL_VERSION = "2024-11-05"
 MAX_TASK_STEPS = 25
+# Sent on initialize. Clients cut it at 4096 characters.
+INSTRUCTIONS = (
+    "os-lab: guarded tools for the security labs on this computer. Use them only on systems and apps "
+    "the user owns or is authorized to test.\n"
+    "- Names are grouped by lab: macos_, winapps_, cleanup_, websec_, android_, ios_, linux_, web_, "
+    "source_, firewall_. plugin_ manages the os-lab Claude plugin itself.\n"
+    "- Read-only tools are safe to call. Observe, act, then observe again to verify.\n"
+    "- Writes need the lab's own gate: a human arms macOS control from the dashboard (there is no arm "
+    "tool), and tools with a confirm argument need the user's approval first. Never set confirm: true "
+    "without it.\n"
+    "- Web Sec scans outside the declared scope are refused.\n"
+    "- For setup problems call plugin_doctor, then plugin_status. To change the installation call "
+    "plugin_plan, show its commands, and only after approval plugin_apply."
+)
+# Tools whose JSON can pass the 50,000 characters after which Claude Code saves results to a file.
+LARGE_RESULTS = ("macos_get_app_state", "macos_menubar", "websec_report", "cleanup_catalog")
 
 TOOLS = [
     {
@@ -321,6 +341,10 @@ TOOLS += mcp_linux.TOOLS
 TOOLS += mcp_web.TOOLS
 TOOLS += mcp_source.TOOLS
 TOOLS += mcp_firewall.TOOLS
+TOOLS += mcp_plugin.TOOLS
+for _tool in TOOLS:
+    if _tool["name"] in LARGE_RESULTS:
+        _tool["_meta"] = {**_tool.get("_meta", {}), "anthropic/maxResultSizeChars": 200000}
 
 
 def _window_point(window_id: int, args: dict) -> tuple[int, int, dict]:
@@ -466,6 +490,8 @@ def tool_call(name: str, args: dict) -> dict:
         return mcp_source.call(name, args, REPO_ROOT)
     if name in mcp_firewall.NAMES:
         return mcp_firewall.call(name, args, REPO_ROOT)
+    if name in mcp_plugin.NAMES:
+        return mcp_plugin.call(name, args, REPO_ROOT)
     if name == "macos_app_overview":
         if args:
             raise oslab.PlanError("Unexpected argument(s): {0}".format(", ".join(sorted(args))),
@@ -561,6 +587,7 @@ def run_task(args: dict) -> dict:
             for _mod, _label in (
                 (mcp_android, "android"), (mcp_ios, "ios"), (mcp_linux, "linux"),
                 (mcp_web, "web"), (mcp_source, "source"), (mcp_firewall, "firewall"),
+                (mcp_plugin, "plugin"),
             ):
                 if str(tool) in _mod.NAMES:
                     raise oslab.PlanError(f"{_label} tools are not available inside macos_task", code="INVALID_ARGS")
@@ -577,6 +604,11 @@ def run_task(args: dict) -> dict:
     return {"steps": len(transcript), "failures": failures, "transcript": transcript}
 
 
+def listed_tools() -> list[dict]:
+    """The tools this host offers: the Windows Apps tools exist only on Windows."""
+    return TOOLS + WIN_TOOLS if sys.platform == "win32" else TOOLS
+
+
 def handle(message: dict) -> dict | None:
     """One JSON-RPC message; notifications return None."""
     method = message.get("method")
@@ -591,19 +623,26 @@ def handle(message: dict) -> dict | None:
                 "extensions": {"io.modelcontextprotocol/ui": {"mimeTypes": [mcp_ui.RESOURCE_MIME]}},
             },
             "serverInfo": {"name": "os-lab-windows" if sys.platform == "win32" else "os-lab-macos",
-                           "version": "0.6.0"}}}
+                           "version": "0.7.0"},
+            "instructions": INSTRUCTIONS}}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":
-        tools = TOOLS + WIN_TOOLS if sys.platform == "win32" else TOOLS
-        return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": tools}}
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": listed_tools()}}
     if method == "resources/list":
-        return {"jsonrpc": "2.0", "id": message_id, "result": {"resources": mcp_ui.list_resources()}}
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"resources": mcp_ui.list_resources() + [{
+            "uri": mcp_plugin.RESOURCE_URI, "name": "Claude plugin requirements",
+            "description": "Every Claude plugin requirement os-lab checks, with sources.",
+            "mimeType": "application/json"}]}}
     if method == "resources/templates/list":
         return {"jsonrpc": "2.0", "id": message_id, "result": {"resourceTemplates": []}}
     if method == "resources/read":
         params = message.get("params") or {}
         uri = params.get("uri")
+        if uri == mcp_plugin.RESOURCE_URI:
+            return {"jsonrpc": "2.0", "id": message_id, "result": {"contents": [{
+                "uri": uri, "mimeType": "application/json",
+                "text": json.dumps(mcp_plugin.engine.requirements())}]}}
         try:
             return {"jsonrpc": "2.0", "id": message_id, "result": mcp_ui.read_resource(str(uri))}
         except KeyError:

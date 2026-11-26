@@ -3412,5 +3412,9 @@
   "widgets": "widgets",
   "· plugins:": "· plugins:",
   "· skills:": "· skills:",
-  "· verification registry:": "· registro de verificación:"
+  "· verification registry:": "· registro de verificación:",
+  "Install as a Claude plugin": "Instalar como plugin de Claude",
+  "One command previews the changes, asks, then adds the server, lab skills and a setup check to Claude Code. Use it instead of the Claude Code snippet, not with it.": "Un solo comando muestra los cambios, pide confirmación y añade a Claude Code el servidor, las habilidades de los laboratorios y una comprobación de la configuración. Úsalo en lugar del fragmento de Claude Code, no junto a él.",
+  "Claude Code plugin": "Plugin de Claude Code",
+  "Claude plugin": "Plugin de Claude"
 }

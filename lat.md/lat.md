@@ -16,6 +16,7 @@ This is the main project documentation; start here when changing behavior.
 - [[cleanup-lab]] — disk cleanup: readiness, catalog, scan jobs, guarded cleaning
 - [[web-lab]] — embedded in-app browser with JavaScript injection
 - [[web-sec]] — scope-guarded web posture assessment (engine-only)
+- [[ai-plugins]] — os-lab as a Claude plugin: package, requirement checks, install and setup
 - [[labctl]] — the cross-lab management CLI
 - [[setup]] — one-command installers for Linux, macOS and Windows
 - [[dashboard]] — the browser console: host overview, every lab, Android workbench

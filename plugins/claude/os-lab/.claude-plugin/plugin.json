@@ -1,0 +1,32 @@
+{
+  "name": "os-lab",
+  "displayName": "OS Lab",
+  "version": "0.1.0",
+  "description": "Guarded MCP tools and skills for the os-lab security labs on this computer.",
+  "author": { "name": "keyvanarasteh" },
+  "homepage": "https://github.com/keyvanarasteh/os-lab",
+  "repository": "https://github.com/keyvanarasteh/os-lab",
+  "license": "Apache-2.0",
+  "keywords": ["security", "mcp", "labs"],
+  "userConfig": {
+    "repo_path": {
+      "type": "directory",
+      "title": "os-lab checkout",
+      "description": "Folder of your os-lab checkout. Leave empty when the marketplace was added from that folder."
+    },
+    "console_port": {
+      "type": "number",
+      "title": "Console port",
+      "description": "Port of the local os-lab console.",
+      "default": 5050,
+      "min": 1,
+      "max": 65535
+    },
+    "python_command": {
+      "type": "string",
+      "title": "Python command",
+      "description": "Python 3 interpreter that starts the server. Windows often needs python instead of python3.",
+      "default": "python3"
+    }
+  }
+}

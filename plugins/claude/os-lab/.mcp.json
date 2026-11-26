@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "os-lab": {
+      "command": "${user_config.python_command}",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/launcher.py"],
+      "env": {
+        "OSLAB_PLUGIN_REPO": "${user_config.repo_path}",
+        "OSLAB_CONSOLE_PORT": "${user_config.console_port}"
+      }
+    }
+  }
+}

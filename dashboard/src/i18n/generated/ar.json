@@ -3412,5 +3412,9 @@
   "widgets": "ودجات",
   "· plugins:": "· الإضافات:",
   "· skills:": "· المهارات:",
-  "· verification registry:": "· سجل التحقق:"
+  "· verification registry:": "· سجل التحقق:",
+  "Install as a Claude plugin": "التثبيت كإضافة Claude",
+  "One command previews the changes, asks, then adds the server, lab skills and a setup check to Claude Code. Use it instead of the Claude Code snippet, not with it.": "أمر واحد يعرض التغييرات ويطلب الموافقة، ثم يضيف الخادم ومهارات المختبرات وفحص الإعداد إلى Claude Code. استخدمه بدلاً من مقتطف Claude Code وليس معه.",
+  "Claude Code plugin": "إضافة Claude Code",
+  "Claude plugin": "إضافة Claude"
 }

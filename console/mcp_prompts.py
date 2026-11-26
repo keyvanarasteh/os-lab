@@ -59,6 +59,14 @@ PROMPTS = [
 ]
 
 
+PROMPTS.append({
+    "name": "claude_plugin_setup_flow",
+    "description": "Check, preview and install the os-lab Claude plugin, applying only after approval.",
+    "arguments": [{"name": "action", "description": "install (default), update, configure, enable or disable",
+                   "required": False}],
+})
+
+
 def list_prompts() -> list[dict]:
     return [{"name": p["name"], "description": p["description"], "arguments": p.get("arguments") or []} for p in PROMPTS]
 
@@ -108,6 +116,16 @@ def get_prompt(name: str, arguments: dict | None = None) -> dict:
             "2. Passive: websec_scan without active.\n"
             "3. Intrusive only if active is true AND the user confirmed written authorization; then confirm: true.\n"
             "4. Prefer websec_report / websec_compare for results."
+        )
+    if name == "claude_plugin_setup_flow":
+        action = args.get("action") or "install"
+        return _messages(
+            f"Set up the os-lab Claude plugin ({action}).\n"
+            "1. plugin_doctor; stop and show the fixes if it is not ready.\n"
+            "2. plugin_status and plugin_check; report failures and duplicate MCP entries.\n"
+            f"3. plugin_plan with action {action!r}; show every command and warning.\n"
+            "4. Only after the user approves, plugin_apply with the token and confirm: true.\n"
+            "5. plugin_verify, and say whether a restart or /reload-plugins is needed."
         )
     if name == "mcp_coverage_status":
         data = _load_verification()

@@ -1,0 +1,13 @@
+{
+  "name": "os-lab",
+  "owner": { "name": "keyvanarasteh" },
+  "description": "os-lab security labs for AI agents.",
+  "plugins": [
+    {
+      "name": "os-lab",
+      "source": "./plugins/claude/os-lab",
+      "description": "Guarded MCP tools and skills for the os-lab security labs on this computer.",
+      "category": "security"
+    }
+  ]
+}

@@ -19,6 +19,7 @@ def test_all_ui_resources_list_and_read_with_bridge():
     expected |= set(mcp_ui.ANDROID_WIDGET.values()) | set(mcp_ui.IOS_WIDGET.values())
     expected |= set(mcp_ui.WEB_WIDGET.values()) | set(mcp_ui.SOURCE_WIDGET.values())
     expected |= set(mcp_ui.LINUX_WIDGET.values()) | set(mcp_ui.LAB_APP.values())
+    expected |= set(mcp_ui.PLUGIN_WIDGET.values())
     assert expected <= uris, sorted(expected - uris)
     for uri in sorted(expected):
         body = mcp_server.handle({

@@ -21,6 +21,8 @@ test("MCP guides page shows the four tool groups and fills the repo path", async
   await expect(page.locator("#mcp-websec")).toBeVisible();
   await expect(page.locator("#mcp-winapps")).toBeVisible();
   await expect(page.locator("#mcp-planned")).toBeVisible();
+  await expect(page.locator("#mcp-claude-plugin").getByText("python3 /Volumes/Projects/iQ/os-lab/scripts/claude-plugin.py install")).toBeVisible();
+  await expect(page.locator("#mcp-plugin").getByText("plugin_apply", { exact: true })).toBeVisible();
   await expect(page.getByText("macos_stop", { exact: true })).toBeVisible();
   await expect(page.getByText("macos_request_access", { exact: true })).toBeVisible();
   await expect(page.getByText("cleanup_clean", { exact: true })).toBeVisible();
