@@ -9,7 +9,11 @@ import plistlib
 import shutil
 import subprocess
 import sys
+import threading
+import urllib.error
+import urllib.request
 import zipfile
+from http.server import ThreadingHTTPServer
 
 import pytest
 
@@ -20,6 +24,7 @@ sys.path.insert(0, PLUGIN)
 sys.path.insert(0, os.path.join(PLUGIN, "hooks"))
 
 import claude_desktop as desktop  # noqa: E402
+import claude_plugin_api as api  # noqa: E402
 import claude_plugin as engine  # noqa: E402
 import launcher  # noqa: E402
 import mcp_server  # noqa: E402
@@ -504,3 +509,56 @@ def test_session_check_asks_once_a_day_and_only_when_switched_on(mac, monkeypatc
     assert "99.0.0" in session_check.message(env) and len(asked) == 1
     _extension(mac, "0.0.9")
     assert "extension-install" in session_check.message(env)
+
+
+# --- Console API (the MCP page's cards) ----------------------------------------
+
+def test_console_api_previews_then_applies_with_confirmation(fake):
+    status, body = api.handle(REPO_ROOT, "GET", "/api/claude-plugin")
+    assert status == 200 and body["code"]["installed"] == [] and body["desktop"]["extension"]
+    status, preview = api.handle(REPO_ROOT, "POST", "/api/claude-plugin/preview",
+                                 {"action": "install", "updateCheck": True})
+    assert status == 200 and "update_check=true" in preview["commands"][-1] and fake.changes() == []
+    status, body = api.handle(REPO_ROOT, "POST", "/api/claude-plugin/apply", {"token": preview["token"]})
+    assert status == 400 and body["code"] == "CONFIRM_REQUIRED"
+    token = api.handle(REPO_ROOT, "POST", "/api/claude-plugin/preview", {"action": "install"})[1]["token"]
+    status, body = api.handle(REPO_ROOT, "POST", "/api/claude-plugin/apply", {"token": token, "confirm": True})
+    assert status == 200 and body["ok"]
+
+
+@pytest.mark.parametrize("path, data, code", [
+    ("preview", {"action": "uninstall"}, 403),
+    ("preview", {"action": "remove-duplicate"}, 403),
+    ("preview", {"action": "install", "command": "rm"}, 400),
+    ("preview", {"action": "install", "updateCheck": "yes"}, 400),
+    ("preview", {"action": "update", "updateCheck": True}, 400),
+    ("preview", {"action": "update"}, 409),
+    ("apply", {"token": "made-up", "confirm": True}, 409),
+    ("nope", {}, 404),
+])
+def test_console_api_refusals(fake, path, data, code):
+    assert api.handle(REPO_ROOT, "POST", "/api/claude-plugin/" + path, data)[0] == code
+    assert fake.changes() == []
+
+
+def test_console_server_routes_the_cards(fake):
+    sys.path.insert(0, os.path.join(REPO_ROOT, "android-lab", "lab"))
+    import web_ui
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), web_ui.LabHttpHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = "http://127.0.0.1:{0}/api/claude-plugin".format(server.server_address[1])
+    try:
+        with urllib.request.urlopen(base, timeout=30) as reply:
+            assert json.load(reply)["checkoutVersion"]
+        body = json.dumps({"action": "install"}).encode()
+        with pytest.raises(urllib.error.HTTPError) as refused:
+            urllib.request.urlopen(urllib.request.Request(base + "/preview", data=body), timeout=30)
+        assert refused.value.code == 403  # no X-OSLab header
+        request = urllib.request.Request(base + "/preview", data=body, headers={"X-OSLab": "1"})
+        with urllib.request.urlopen(request, timeout=30) as reply:
+            assert json.load(reply)["token"]
+    finally:
+        server.shutdown()
+        server.server_close()

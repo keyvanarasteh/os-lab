@@ -7,6 +7,7 @@ import { AppShell } from "../shell/app-shell";
 import { TopBar } from "../shell/top-bar";
 import { Badge, CopyButton, PageHead, Section, Status } from "../components/ui";
 import { hostStore } from "../lib/api";
+import { McpPluginCards } from "./mcp-plugin-cards";
 import {
   MCP_GROUPS,
   MCP_PLAN,
@@ -18,7 +19,6 @@ import {
   antigravitySnippet,
   claudeCodeSnippet,
   claudeDesktopSnippet,
-  claudePluginSnippet,
   codexSnippet,
   cursorSnippet,
   genericSnippet,
@@ -124,9 +124,7 @@ export default function McpPage() {
           </div>
         </Section>
 
-        <Section id="mcp-claude-plugin" title="Install as a Claude plugin" description="One command previews the changes, asks, then adds the server, lab skills and a setup check to Claude Code. Use it instead of the Claude Code snippet, not with it.">
-          <Snippet label="Claude Code plugin" text={claudePluginSnippet(root)} />
-        </Section>
+        <McpPluginCards root={root} />
 
         {MCP_GROUPS.map((group) => (
           <Section

@@ -1,11 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+/** The app shell reads the host fields, so every mocked console reports them. */
+const HOST = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "t", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/Volumes/Projects/iQ/os-lab", tools: [], providers: [] }, labs: [] };
+
 test("MCP guides page shows the four tool groups and fills the repo path", async ({ page }) => {
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};
     if (path === "/api/host") {
-      body = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "t", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/Volumes/Projects/iQ/os-lab", tools: [], providers: [] }, labs: [] };
+      body = HOST;
     } else if (path === "/api/health") body = { status: "ok", version: "test", console: true };
     else if (path === "/api/jobs") body = { jobs: [] };
     else if (path === "/api/logs") body = { logs: [] };
@@ -31,4 +34,51 @@ test("MCP guides page shows the four tool groups and fills the repo path", async
   await expect(page.getByText("winapps_apps", { exact: true })).toBeVisible();
   await expect(setup.getByText("Codex", { exact: true })).toBeVisible();
   await expect(page.getByText("proof: —").first()).toBeVisible();
+});
+
+test("MCP plugin cards preview a change and run it only after Confirm", async ({ page }) => {
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  let installed: { scope: string; version: string; enabled: boolean }[] = [];
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (route.request().method() === "POST") posts.push({ path, body: route.request().postDataJSON() });
+    let body: unknown = {};
+    if (path === "/api/host") body = HOST;
+    else if (path === "/api/health") body = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") body = { jobs: [] };
+    else if (path === "/api/logs") body = { logs: [] };
+    else if (path === "/api/claude-plugin") body = {
+      checkoutVersion: "0.2.0",
+      doctor: { ready: true, checks: [] },
+      code: { cli: "2.1.332", installed, duplicates: [] },
+      desktop: { app: { installed: true }, extension: { installed: true, version: "0.1.0", updateAvailable: true, duplicates: [] } }
+    };
+    else if (path === "/api/claude-plugin/preview") body = { token: "t1", action: "install", commands: ["claude plugin install os-lab@os-lab"], manual: [], warnings: [] };
+    else if (path === "/api/claude-plugin/apply") {
+      installed = [{ scope: "user", version: "0.2.0", enabled: true }];
+      body = { ok: true, next: "Restart Claude Code or run /reload-plugins, then verify.", steps: [] };
+    } else if (path === "/api/claude-plugin/check") body = { updatesAvailable: ["claude-desktop"], published: { version: "0.2.0", updateAvailable: false } };
+    await route.fulfill({ json: body });
+  });
+  await page.goto("/mcp/");
+  const code = page.locator("#mcp-card-code");
+  await expect(code.getByText("Not installed")).toBeVisible();
+  await expect(page.locator("#mcp-card-desktop").getByRole("button", { name: "Update extension" })).toBeEnabled();
+  await code.getByRole("button", { name: "Install plugin" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("claude plugin install os-lab@os-lab")).toBeVisible();
+  expect(posts.map((post) => post.path)).not.toContain("/api/claude-plugin/apply");
+  await dialog.getByRole("button", { name: "Confirm and run" }).click();
+  await expect(code.getByText("Installed", { exact: true })).toBeVisible();
+  expect(posts.find((post) => post.path === "/api/claude-plugin/apply")?.body).toEqual({ token: "t1", confirm: true });
+  await page.locator("#mcp-card-updates").getByRole("button", { name: "Check for updates" }).click();
+  await expect(page.locator("#mcp-card-updates").getByText("claude-desktop")).toBeVisible();
+});
+
+test("MCP plugin cards fall back to the terminal command without the console", async ({ page }) => {
+  await page.route("**/api/**", (route) => route.fulfill({ status: 503, json: { error: "Console offline" } }));
+  await page.goto("/mcp/");
+  const section = page.locator("#mcp-claude-plugin");
+  await expect(section.getByText("scripts/claude-plugin.py install")).toBeVisible();
+  await expect(section.getByRole("button", { name: "Try again" })).toBeVisible();
 });

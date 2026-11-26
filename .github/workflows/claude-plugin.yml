@@ -1,0 +1,71 @@
+name: claude-plugin
+
+# AIP-63: the plugin's tests and an install round trip with the real Claude Code CLI on Linux,
+# macOS and Windows, in a throwaway CLAUDE_CONFIG_DIR. Needs no account or API key.
+
+on:
+  pull_request:
+    paths: &paths
+      - '.claude-plugin/**'
+      - 'plugins/claude/**'
+      - 'console/claude_*'
+      - 'console/mcp_*'
+      - 'scripts/claude-plugin.py'
+      - 'android-lab/lab/tests/test_mcp_plugin.py'
+      - '.github/workflows/claude-plugin.yml'
+  push:
+    branches: [master]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  roundtrip:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Plugin tests
+        run: |
+          python -m pip install --quiet pytest requests cryptography
+          cd android-lab/lab && python -m pytest tests/test_mcp_plugin.py -q
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code@2.1.332
+      - name: Check, install, verify and update with the real CLI
+        run: |
+          export CLAUDE_CONFIG_DIR="$RUNNER_TEMP/claude-config"
+          mkdir -p "$CLAUDE_CONFIG_DIR"
+          python scripts/claude-plugin.py doctor
+          python scripts/claude-plugin.py check
+          python scripts/claude-plugin.py install --yes
+          python scripts/claude-plugin.py verify
+          claude mcp list | tee "$RUNNER_TEMP/mcp.txt"
+          grep -q 'plugin:os-lab:os-lab.*Connected' "$RUNNER_TEMP/mcp.txt"
+          python scripts/claude-plugin.py update --yes
+          python scripts/claude-plugin.py disable --yes
+          python scripts/claude-plugin.py enable --yes
+      - name: Session check command
+        run: |
+          export CLAUDE_PLUGIN_ROOT="$PWD/plugins/claude/os-lab"
+          command="$(python -c 'import json;print(json.load(open("plugins/claude/os-lab/hooks/hooks.json"))["hooks"]["SessionStart"][0]["hooks"][0]["command"])')"
+          test -z "$(bash -c "$command")"
+          OSLAB_PLUGIN_REPO=/nowhere bash -c "$command" | grep -q '/os-lab:doctor'

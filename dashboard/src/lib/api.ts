@@ -975,7 +975,34 @@ export interface AppUpdateState {
 }
 export interface AppBusyWork { id: string; kind: "lab" | "cleanup"; label: string; lab: string | null; startedAt: number | null; progress: number | null }
 
+export type ClaudePluginAction = "install" | "update" | "configure" | "enable" | "disable" | "extension-install";
+export interface ClaudePluginState {
+  checkoutVersion: string;
+  doctor: { ready: boolean; checks: { name: string; ok: boolean; detail: string; fix?: string }[] };
+  code: {
+    cli: string | null;
+    error?: string;
+    installed: { scope: string; version: string; enabled: boolean }[];
+    duplicates: { name: string; scope: string }[];
+  };
+  desktop: {
+    app: { installed: boolean | null; version?: string };
+    extension: { installed: boolean; version: string | null; updateAvailable: boolean; duplicates: string[] };
+  };
+}
+export interface ClaudePluginUpdates {
+  updatesAvailable: string[];
+  published?: { version: string | null; updateAvailable: boolean | null; note?: string };
+}
+export interface ClaudePluginPlan { token: string; action: ClaudePluginAction; commands: string[]; manual: string[]; warnings: string[] }
+export interface ClaudePluginResult { ok: boolean; next: string; steps: { command: string; ok: boolean; message: string }[] }
+
 export const api = {
+  claudePlugin: () => call<ClaudePluginState>("/api/claude-plugin"),
+  claudePluginCheck: (online: boolean) => post<ClaudePluginUpdates>("/api/claude-plugin/check", { online }),
+  claudePluginPreview: (action: ClaudePluginAction, updateCheck?: boolean) =>
+    post<ClaudePluginPlan>("/api/claude-plugin/preview", updateCheck === undefined ? { action } : { action, updateCheck }),
+  claudePluginApply: (token: string) => post<ClaudePluginResult>("/api/claude-plugin/apply", { token, confirm: true }),
   cleanupStatus: () => call<CleanupStatus>("/api/cleanup/status"),
   cleanupCatalog: () => call<{ platform: string; entries: CleanupEntry[] }>("/api/cleanup/catalog"),
   cleanupHistory: () => call<CleanupHistory>("/api/cleanup/history"),
