@@ -51,9 +51,9 @@ This checklist includes every implemented Claude plugin feature inspected at `fe
 - [ ] Expand `codex_plugin_plan` beyond its tested install action when supported lifecycle operations are proven. Install currently has fixed commands, one-use token, expiration and root/state binding.
 - [ ] Prove the interactive-terminal-only `codex_plugin_apply` flow end to end, add audit and failure fixtures; MCP writes currently refuse.
 - [ ] Keep uninstall and duplicate removal interactive-terminal-only unless a separate human approval path is proven. Refuse a marketplace name collision pointing to another source and never start its code.
-- [ ] Audit plans, applied steps, failures and refusals without credentials, config secrets or environment values.
+- [x] Audit install previews, outcomes and refusals without tokens, credentials, config secrets or environment values — fake CLI tests.
 - [x] Add `scripts/codex-plugin.py` for build/check/doctor/status/requirements/install/verify before MCP connection exists — helper smoke and package checks.
-- [ ] Extend `codex_plugin_verify` beyond its current installed-source check, MCP handshake and name comparison to saved settings and annotation comparison; isolated CLI test proves the current path.
+- [ ] Extend `codex_plugin_verify` to read saved checkout settings and a copied desktop package. It now checks the installed local source, launch config, handshake, names, annotations, instructions, resource and prompt discovery in the isolated CLI test.
 - [ ] Test missing Python, bad root, symlink escape, malformed config, timeout, crash, stale/reused token, changed state, partial failure, duplicate MCP entry and wrong-source marketplace.
 - [ ] Test `codex_plugin_*` calls through the actual MCP server, including invalid arguments, read-only annotations, guarded refusal and no secrets in status/logs.
 

@@ -14,7 +14,7 @@ The plugin has setup and doctor skills plus ten lab skills generated from `conso
 
 [[console/codex_plugin.py]] checks package requirements and reads install state without returning config secrets. [[console/mcp_codex_plugin.py]] exposes seven management tools.
 
-Install plans name exact Codex CLI commands; MCP `apply` refuses installation. The terminal helper shows the plan, asks interactively, rechecks state and runs only fixed arguments. Other lifecycle actions remain unsupported until their Codex CLI behavior and approval path are proven.
+Install plans name exact Codex CLI commands; MCP `apply` refuses installation. The terminal helper shows the plan, asks interactively, rechecks state and runs only fixed arguments. Plans, outcomes and refusals are logged without tokens or settings values. Other lifecycle actions remain unsupported until their Codex CLI behavior and approval path are proven.
 
 The plugin tools are refused inside `macos_task`. They do not add an arm tool or bypass the existing lab scope and confirmation gates. The server also advertises a Codex requirement resource, guided setup prompt and initialize instructions. [[console/mcp_verification.json]] holds the proof slots; [[android-lab/lab/tests/test_codex_plugin.py]] tests the package, fallback protocol, isolated CLI install and MCP surface.
 

@@ -125,3 +125,85 @@ def test_management_tools_are_read_only_or_refuse_agent_apply():
     assert any(row["uri"] == "oslab://codex-plugin/requirements" for row in resources["resources"])
     prompts = mcp_server.handle({"jsonrpc": "2.0", "id": 4, "method": "prompts/list"})["result"]
     assert any(row["name"] == "codex_plugin_setup_flow" for row in prompts["prompts"])
+
+
+def test_install_preview_requires_terminal_and_rechecks_state(tmp_path, monkeypatch):
+    state = {"market": False, "installed": False, "fail": False, "calls": []}
+    package = os.path.join(str(tmp_path), engine.PLUGIN_REL)
+
+    def cli(*args):
+        if args[:2] == ("plugin", "list"):
+            rows = [] if not state["market"] else [{
+                "pluginId": engine.PLUGIN_ID, "name": "os-lab", "installed": state["installed"],
+                "enabled": state["installed"], "source": {"source": "local", "path": package}}]
+            return json.dumps({"available": rows, "installed": []})
+        state["calls"].append(args)
+        if args[:3] == ("plugin", "marketplace", "add"):
+            state["market"] = True
+            return json.dumps({"marketplaceName": "os-lab-local"})
+        if state["fail"]:
+            raise engine.PluginError("fake CLI failure", "CLI_FAILED")
+        state["installed"] = True
+        return json.dumps({"pluginId": engine.PLUGIN_ID})
+
+    monkeypatch.setattr(engine, "_codex", cli)
+    monkeypatch.setattr(engine, "_interactive", lambda: True)
+    preview = engine.plan(str(tmp_path), "install")
+    assert state["calls"] == [] and len(preview["commands"]) == 2
+    with pytest.raises(engine.PluginError) as denied:
+        engine.apply(str(tmp_path), preview["token"], False, audience="terminal")
+    assert denied.value.code == "CONFIRM_REQUIRED"
+    with pytest.raises(engine.PluginError) as denied:
+        engine.apply(str(tmp_path), preview["token"], True, audience="agent")
+    assert denied.value.code == "TERMINAL_ONLY"
+    result = engine.apply(str(tmp_path), preview["token"], True, audience="terminal")
+    assert result["ok"] and state["installed"] and len(state["calls"]) == 2
+    with pytest.raises(engine.PluginError) as stale:
+        engine.apply(str(tmp_path), preview["token"], True, audience="terminal")
+    assert stale.value.code == "STALE_PLAN"
+    audit = next((tmp_path / "artifacts").glob("codex-plugin-audit-*.jsonl")).read_text()
+    assert '"planned"' in audit and '"applied"' in audit and preview["token"] not in audit
+
+
+def test_install_plan_refuses_changed_state_and_partial_failure(tmp_path, monkeypatch):
+    state = {"market": False, "fail": False, "calls": []}
+    package = os.path.join(str(tmp_path), engine.PLUGIN_REL)
+
+    def cli(*args):
+        if args[:2] == ("plugin", "list"):
+            rows = [] if not state["market"] else [{"pluginId": engine.PLUGIN_ID,
+                "installed": False, "source": {"source": "local", "path": package}}]
+            return json.dumps({"available": rows, "installed": []})
+        state["calls"].append(args)
+        if args[:3] == ("plugin", "marketplace", "add"):
+            state["market"] = True
+            return json.dumps({"marketplaceName": "os-lab-local"})
+        if state["fail"]:
+            raise engine.PluginError("fake failure", "CLI_FAILED")
+        return json.dumps({"pluginId": engine.PLUGIN_ID})
+
+    monkeypatch.setattr(engine, "_codex", cli)
+    monkeypatch.setattr(engine, "_interactive", lambda: True)
+    preview = engine.plan(str(tmp_path), "install")
+    state["market"] = True
+    with pytest.raises(engine.PluginError) as stale:
+        engine.apply(str(tmp_path), preview["token"], True, audience="terminal")
+    assert stale.value.code == "STALE_PLAN" and state["calls"] == []
+    preview = engine.plan(str(tmp_path), "install")
+    state["fail"] = True
+    result = engine.apply(str(tmp_path), preview["token"], True, audience="terminal")
+    assert not result["ok"] and result["notRun"] == 0 and len(state["calls"]) == 1
+
+
+def test_duplicate_config_reports_names_without_secret_values(tmp_path, monkeypatch):
+    home = tmp_path / "isolated-codex"
+    home.mkdir()
+    (home / "config.toml").write_text(
+        '[mcp_servers.os-lab]\ncommand = "python3"\n'
+        'args = ["/x/console/mcp_server.py"]\n'
+        'secret_token = "do-not-report-this"\n')
+    monkeypatch.setenv("CODEX_HOME", str(home))
+    monkeypatch.setattr(engine, "_codex", lambda *args: json.dumps({"installed": [], "available": []}))
+    found = engine.status(ROOT)
+    assert found["duplicates"] == [{"name": "os-lab", "scope": "user"}]
+    assert "do-not-report-this" not in json.dumps(found)

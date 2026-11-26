@@ -277,6 +277,18 @@ def _install_steps(root, action):
     return state, steps
 
 
+def audit(root, event, detail):
+    """Record lifecycle outcomes without tokens, CLI output or config values."""
+    path = os.path.join(root, "artifacts", "codex-plugin-audit-" + time.strftime("%Y-%m-%d") + ".jsonl")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                                     "event": event, **detail}) + "\n")
+    except OSError:
+        pass
+
+
 def plan(root, action):
     """Preview a fixed local CLI install. The MCP tool cannot apply it."""
     state, steps = _install_steps(root, action)
@@ -284,24 +296,33 @@ def plan(root, action):
     with _LOCK:
         _PLANS[token] = {"root": os.path.realpath(root), "state": state, "steps": steps,
                          "expires": time.time() + PLAN_SECONDS}
+    audit(root, "planned", {"action": action, "steps": len(steps)})
     return {"action": action, "token": token, "expiresInSeconds": PLAN_SECONDS,
             "commands": ["codex " + " ".join(subprocess.list2cmdline([word]) for word in step) for step in steps],
             "terminalOnly": True, "note": "Run python3 scripts/codex-plugin.py install in an interactive terminal."}
 
 
+def _interactive():
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
 def apply(root, token, confirm, audience="agent"):
     """Only an interactive terminal may apply a preview, after state recheck."""
+    def refuse(message, code):
+        audit(root, "refused", {"code": code, "audience": audience})
+        raise PluginError(message, code)
+
     if not confirm:
-        raise PluginError("The preview needs explicit approval", "CONFIRM_REQUIRED")
-    if audience != "terminal" or not (sys.stdin.isatty() and sys.stdout.isatty()):
-        raise PluginError("Installation runs only in an interactive terminal", "TERMINAL_ONLY")
+        refuse("The preview needs explicit approval", "CONFIRM_REQUIRED")
+    if audience != "terminal" or not _interactive():
+        refuse("Installation runs only in an interactive terminal", "TERMINAL_ONLY")
     with _LOCK:
         held = _PLANS.pop(token, None)
     if not held or held["root"] != os.path.realpath(root) or held["expires"] < time.time():
-        raise PluginError("The preview expired or was already used", "STALE_PLAN")
+        refuse("The preview expired or was already used", "STALE_PLAN")
     current, steps = _install_steps(root, "install")
     if current != held["state"] or steps != held["steps"]:
-        raise PluginError("Codex installation state changed since the preview", "STALE_PLAN")
+        refuse("Codex installation state changed since the preview", "STALE_PLAN")
     results = []
     for step in steps:
         try:
@@ -311,8 +332,10 @@ def apply(root, token, confirm, audience="agent"):
         except (PluginError, ValueError) as exc:
             results.append({"command": "codex " + " ".join(step), "ok": False, "message": str(exc)[:500]})
             break
-    return {"ok": len(results) == len(steps) and all(row["ok"] for row in results),
-            "steps": results, "notRun": len(steps) - len(results)}
+    done = len(results) == len(steps) and all(row["ok"] for row in results)
+    audit(root, "applied" if done else "failed", {"action": "install", "completed": len(results),
+          "notRun": len(steps) - len(results)})
+    return {"ok": done, "steps": results, "notRun": len(steps) - len(results)}
 
 
 def verify(root):
@@ -322,7 +345,17 @@ def verify(root):
         return {"ok": False, "reason": "os-lab is not installed and enabled in Codex"}
     if not state.get("thisCheckout"):
         return {"ok": False, "reason": "The installed plugin is not from this checkout; nothing was started"}
-    launcher = os.path.join(plugin_dir(root), "launcher.py")
+    package = plugin_dir(root)
+    try:
+        configured = _json(os.path.join(package, "mcp.json"))["mcpServers"]["os-lab"]
+        if configured["type"] != "stdio" or configured["args"] != ["${PLUGIN_ROOT}/launcher.py"]:
+            return {"ok": False, "reason": "The installed MCP launch declaration changed"}
+        command = shutil.which(configured["command"])
+        if not command:
+            return {"ok": False, "reason": "The configured Python command is missing: " + configured["command"]}
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return {"ok": False, "reason": "Cannot read MCP launch configuration: " + str(exc)}
+    launcher = os.path.join(package, "launcher.py")
     messages = (
         {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}},
         {"jsonrpc": "2.0", "method": "notifications/initialized"},
@@ -332,20 +365,32 @@ def verify(root):
     )
     env = dict(os.environ, OSLAB_ROOT=os.path.realpath(root))
     try:
-        done = subprocess.run([sys.executable, launcher], input="".join(json.dumps(m)+"\n" for m in messages),
+        done = subprocess.run([command, launcher], cwd=package,
+                              input="".join(json.dumps(m)+"\n" for m in messages),
                               capture_output=True, text=True, timeout=30, env=env)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"ok": False, "reason": str(exc)}
     try:
         replies = {row["id"]: row for line in done.stdout.splitlines()
                    if (row := json.loads(line)).get("id") is not None}
-        listed = {tool["name"] for tool in replies[2]["result"]["tools"]}
+        listed_tools = {tool["name"]: tool for tool in replies[2]["result"]["tools"]}
+        listed = set(listed_tools)
         import mcp_server
-        expected = {tool["name"] for tool in mcp_server.TOOLS}
+        expected_tools = {tool["name"]: tool for tool in mcp_server.TOOLS}
+        expected = set(expected_tools)
         missing, extra = sorted(expected - listed), sorted(listed - expected)
-        return {"ok": done.returncode == 0 and not missing and not extra,
+        annotations_changed = sorted(name for name in listed & expected
+                                     if listed_tools[name].get("annotations") != expected_tools[name].get("annotations"))
+        resource_uris = {row["uri"] for row in replies[3]["result"]["resources"]}
+        prompt_names = {row["name"] for row in replies[4]["result"]["prompts"]}
+        instructions = replies[1]["result"].get("instructions") or ""
+        return {"ok": done.returncode == 0 and not missing and not extra and
+                not annotations_changed and bool(instructions) and
+                "oslab://codex-plugin/requirements" in resource_uris and
+                "codex_plugin_setup_flow" in prompt_names,
                 "tools": len(listed), "resources": len(replies[3]["result"]["resources"]),
                 "prompts": len(replies[4]["result"]["prompts"]),
-                "missing": missing, "extra": extra}
+                "missing": missing, "extra": extra, "annotationsChanged": annotations_changed,
+                "instructions": bool(instructions)}
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         return {"ok": False, "reason": "The installed server did not complete MCP discovery: " + str(exc)}
