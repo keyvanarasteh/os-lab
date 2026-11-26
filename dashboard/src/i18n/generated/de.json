@@ -3254,5 +3254,8 @@
   "Web Sec Lab bulk validation of up to 20 targets": "Web Sec Lab: Sammelprüfung von bis zu 20 Zielen",
   "Web Sec Lab history: stored runs, favourites and statistics": "Web-Sec-Lab-Verlauf: gespeicherte Läufe, Favoriten und Statistik",
   "Web Sec Lab monitor: recurring passive scans and regression alerts": "Web-Sec-Lab-Monitor: wiederkehrende passive Scans und Warnungen bei Verschlechterung",
-  "Web Sec Lab: compare two runs of a target": "Web Sec Lab: zwei Läufe eines Ziels vergleichen"
+  "Web Sec Lab: compare two runs of a target": "Web Sec Lab: zwei Läufe eines Ziels vergleichen",
+  "Review what will be removed before running.": "Prüfen Sie vor dem Ausführen, was entfernt wird.",
+  "Space to free": "Freizugebender Speicher",
+  "Items can be restored from the Trash.": "Objekte lassen sich aus dem Papierkorb wiederherstellen."
 }

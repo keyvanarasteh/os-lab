@@ -3254,5 +3254,8 @@
   "Web Sec Lab bulk validation of up to 20 targets": "Web Sec Lab ile en fazla 20 hedefin toplu doğrulaması",
   "Web Sec Lab history: stored runs, favourites and statistics": "Web Sec Lab geçmişi: kayıtlı çalıştırmalar, favoriler ve istatistikler",
   "Web Sec Lab monitor: recurring passive scans and regression alerts": "Web Sec Lab izleyicisi: yinelenen pasif taramalar ve gerileme uyarıları",
-  "Web Sec Lab: compare two runs of a target": "Web Sec Lab: bir hedefin iki çalıştırmasını karşılaştır"
+  "Web Sec Lab: compare two runs of a target": "Web Sec Lab: bir hedefin iki çalıştırmasını karşılaştır",
+  "Review what will be removed before running.": "Çalıştırmadan önce nelerin kaldırılacağını gözden geçirin.",
+  "Space to free": "Boşaltılacak alan",
+  "Items can be restored from the Trash.": "Öğeler Çöp Kutusu'ndan geri yüklenebilir."
 }
