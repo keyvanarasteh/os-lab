@@ -39,6 +39,7 @@
     { "paths": ["src/views/web-sec/**", "src/pages/web-sec/**"], "specs": ["web-sec.spec.ts"], "routes": ["/web-sec/"] },
     { "paths": ["src/views/winapps-app-mirror.tsx"], "specs": ["winapps.spec.ts"], "routes": ["/labs/winapps/"] },
     { "paths": ["src/views/how-to-use-page.tsx", "src/lib/how-to-use.ts", "src/pages/how-to-use.astro"], "specs": ["how-to-use.spec.ts"], "routes": ["/how-to-use/"] },
+    { "paths": ["src/views/mcp-page.tsx", "src/lib/mcp-guides.ts", "src/pages/mcp.astro"], "specs": ["mcp.spec.ts"], "routes": ["/mcp/"] },
     { "paths": ["src/views/feedback-page.tsx", "src/pages/feedback.astro"], "specs": ["how-to-use.spec.ts", "health-and-content.spec.ts"], "routes": ["/feedback/"] },
     { "paths": ["src/shell/lab-switcher.tsx", "src/shell/active-lab.ts"], "specs": ["lab-switcher.spec.ts"], "routes": ["/", "/labs/ios/"] },
 

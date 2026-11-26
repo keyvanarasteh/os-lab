@@ -8,7 +8,7 @@ import { test } from "@playwright/test";
 // server, so every /api call fails and pages show their offline state, as on GitHub Pages.
 
 const MAIN_ROUTES = [
-  "/", "/health/", "/jobs/", "/content/", "/contribute/", "/feedback/", "/how-to-use/",
+  "/", "/health/", "/jobs/", "/content/", "/contribute/", "/feedback/", "/how-to-use/", "/mcp/",
   "/android/", "/android/console/", "/cleanup/", "/cleanup/scan/", "/cleanup/settings/",
   "/firewall/", "/source/", "/source/analyzer/", "/web-lab/",
   "/labs/ios/", "/labs/macos/", "/labs/windows/", "/labs/winapps/", "/labs/linux/", "/labs/websec/", "/legal/privacy/"

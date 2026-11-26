@@ -42,6 +42,7 @@ const ROUTE_TO_SECTION: Record<string, string> = {
   content: "content",
   feedback: "feedback",
   "how-to-use": "how-to-use",
+  mcp: "mcp",
   firewall: "firewall",
   "web-lab": "web-lab",
   "web-sec": "web-sec",

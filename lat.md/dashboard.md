@@ -286,6 +286,18 @@ Make target, PowerShell parameter and configuration-name references from an
 explicit source allowlist without executing code or reading private state.
 Regenerate it after those sources change; `--check` detects stale output.
 
+## MCP servers
+
+[[dashboard/src/views/mcp-page.tsx]] is Help → MCP servers (`/mcp/`, including locale
+routes).
+
+It describes the one stdio server `console/mcp_server.py` (`os-lab-macos`, or
+`os-lab-windows` on Windows), fills setup snippets for Claude Code, Claude
+Desktop and `make -C ios-lab mac-mcp` from `GET /api/host` `host.root`
+(placeholder `<repo>` when the console is offline), and lists the four tool
+groups with their safety rules. Cleanup and Web Sec tools stay refused inside
+`macos_task`. [[scripts/deploy-page.sh]] keeps the route on public Pages.
+
 ## Lab navigation icons
 
 Every lab in the full OS Lab list and the ⌘L switcher, including Web Sec Lab, has its own icon, and a focused lab's pages each have their own.
