@@ -722,7 +722,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           {page === "settings" && !PUBLIC && status?.state === "ready" && <>
             <BookmarksSection bookmarks={bookmarks} reload={reloadBookmarks}
               onQuickClean={(job) => { setActive(job); setJobs((old) => [job, ...old.filter((row) => row.id !== job.id)]); setBookmarkConfirm(true); }}
-              onCatalogChanged={() => { void api.cleanupCatalog().then((catalog) => setEntries(catalog.entries ?? [])).catch(() => {}); }} />
+              onCatalogChanged={() => { void api.cleanupCatalog().then((catalog) => setEntries((current) => catalog.entries ?? current)).catch(() => {}); }} />
             <PermissionsCard permissions={permissions} />
             <MonitorCard monitor={monitor} volumes={volumes} reload={monitorReload} />
             <WidgetsCard snapshot={widget} reload={reloadWidget} />
