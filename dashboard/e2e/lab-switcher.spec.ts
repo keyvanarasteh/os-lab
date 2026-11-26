@@ -75,7 +75,9 @@ test("the sidebar card opens the switcher and keyboard picks a lab", async ({ pa
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/cleanup\/$/);
   await expect(page.getByRole("heading", { name: "Cleanup Lab" }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Cleanup Lab" }).first()).toBeVisible();
+  // Focused cleanup replaces the OS Lab list with its own pages (Dashboard, Space Explorer, …).
+  await expect(page.getByRole("button", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Space Explorer" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Android Lab" })).toHaveCount(0);
 });
 
