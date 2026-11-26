@@ -39,6 +39,26 @@ else
   xcrun simctl list runtimes 2>/dev/null | grep '^iOS ' | sed 's/^/    /'
 fi
 
+# CLS-02: report where simulator devices live (read-only). Moving them is the Cleanup Lab's
+# Relocation > Simulator storage, which copies, verifies and links behind a confirm dialog.
+say "simulator storage"
+devices="$HOME/Library/Developer/CoreSimulator/Devices"
+if [ -d "$devices" ]; then
+  devices_mount="$(df -P "$devices" | awk 'NR==2 {print $NF}')"
+  home_mount="$(df -P "$HOME" | awk 'NR==2 {print $NF}')"
+  free_kb="$(df -Pk "$devices" | awk 'NR==2 {print $4}')"
+  if [ "$devices_mount" != "$home_mount" ]; then
+    echo "    devices: on $devices_mount ($(( ${free_kb:-0} / 1048576 )) GiB free), not the system disk"
+  else
+    echo "    devices: on the system disk ($(( ${free_kb:-0} / 1048576 )) GiB free)"
+    echo "    to keep simulators on another disk: Cleanup Lab > Relocation > Simulator storage"
+  fi
+elif [ -L "$devices" ] || [ -L "$(dirname "$devices")" ]; then
+  warn "simulator devices point to a disk that is not connected; connect it before opening Simulator"
+else
+  echo "    devices: none yet"
+fi
+
 # The native AX helper (MIR-09) is what makes element reads fast and rich; build it as part of
 # setup instead of waiting for a manual "Build AX helper" click. Needs only swiftc.
 say "native AX helper"

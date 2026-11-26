@@ -1328,3 +1328,30 @@ def test_simulator_cleanup_requires_single_use_preview_and_audits(tmp_path, monk
     with pytest.raises(cleanup_api.CleanupError) as reused:
         api.post("/api/cleanup/simulators/run", {"previewId": preview["previewId"]})
     assert reused.value.status == 409
+
+
+def test_simulator_storage_settings_accept_only_offered_volumes(tmp_path, monkeypatch):
+    """CLS-02: a saved destination from the offered volumes and a suggestion; nothing moves."""
+    from cleanup_lab import simulator_storage
+    gib = 1024 ** 3
+    (tmp_path / "Library/Developer/CoreSimulator/Devices").mkdir(parents=True)
+    external = tmp_path / "Volumes" / "Fast"
+    external.mkdir(parents=True)
+    rows = [{"mountPoint": "/", "kind": "root", "isHome": True, "freeBytes": 3 * gib, "totalBytes": 500 * gib},
+            {"mountPoint": str(external), "name": "Fast", "kind": "internal", "isHome": False,
+             "freeBytes": 800 * gib, "totalBytes": 1000 * gib}]
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(simulator_storage.paths, "platform_id", lambda: "macos")
+    monkeypatch.setattr(simulator_storage.volumes, "inventory", lambda *args, **kwargs: {"volumes": rows})
+    api = cleanup_api.CleanupAPI(REPO_ROOT)
+    report = api.get("/api/cleanup/simulator-storage", {})
+    assert report["state"] == "local"
+    assert [item["mountPoint"] for item in report["destinations"]] == [str(external)]
+    for body in ({"destination": "/"}, {"destination": "/Volumes/Nope"}, {"floorBytes": 5}, {"argv": ["sh"]}):
+        with pytest.raises(cleanup_api.CleanupError) as refused:
+            api.post("/api/cleanup/simulator-storage", body)
+        assert refused.value.status == 400
+    saved = api.post("/api/cleanup/simulator-storage", {"destination": str(external), "floorBytes": 20 * gib})
+    assert saved["config"]["destination"] == str(external)
+    assert saved["suggestion"]["action"] == "move"
+    assert (tmp_path / "Library/Developer/CoreSimulator/Devices").is_dir()

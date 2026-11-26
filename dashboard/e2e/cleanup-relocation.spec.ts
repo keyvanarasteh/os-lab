@@ -113,3 +113,50 @@ test("an interrupted move shows the resume-first banner", async ({ page }) => {
   await expect(page.getByText("A previous move was interrupted; resume it before starting a new one.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Resume interrupted move" })).toBeVisible();
 });
+
+test("CLS-02 simulator storage saves a disk and Move now plans the relocation, nothing more", async ({ page }) => {
+  const GIB = 1024 ** 3;
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  let config = { destination: null as string | null, suggest: true, floorBytes: 20 * GIB };
+  const storage = () => ({
+    available: true, reason: "", entryId: "simulators.coresimulator-devices",
+    folder: "/Users/test/Library/Developer/CoreSimulator/Devices", state: "local", target: "/Users/test/Library/Developer/CoreSimulator/Devices",
+    volume: { mountPoint: "/", kind: "root" }, home: { mountPoint: "/", freeBytes: 3 * GIB, totalBytes: 500 * GIB },
+    config, configError: null,
+    destinations: [{ mountPoint: "/Volumes/Ext", name: "Ext", kind: "removable", freeBytes: 900 * GIB, totalBytes: 1000 * GIB }],
+    suggestion: config.destination ? { action: "move", reason: "" } : { action: null, reason: "" }
+  });
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().postDataJSON?.() ?? {};
+    if (route.request().method() === "POST") posts.push({ path, body });
+    let data: unknown = {};
+    if (path === "/api/cleanup/simulator-storage" && route.request().method() === "POST") { config = { ...config, ...body }; data = storage(); }
+    else if (path === "/api/cleanup/simulator-storage") data = storage();
+    else if (path === "/api/cleanup/relocation") data = { ...STATUS, entries: [{ entryId: "simulators.coresimulator-devices", name: "iOS Simulator devices", path: "/Users/test/Library/Developer/CoreSimulator/Devices", relocatable: true, interrupted: false }] };
+    else if (path === "/api/cleanup/relocation/plan") data = runningJob("p1", "relocation-plan");
+    else if (path === "/api/cleanup/jobs/p1") data = doneJob("p1", "relocation-plan", { ...PLAN, entryId: "simulators.coresimulator-devices", entryName: "iOS Simulator devices" });
+    else if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "macos", entries: [] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+    else if (path === "/api/cleanup/permissions") data = { platform: "macos", permissions: [] };
+    else if (path === "/api/host") data = { host: { os: "macos", osPretty: "macOS", arch: "arm64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: false, usable: false }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/relocation/");
+  const card = page.locator("#simulator-storage");
+  await expect(card.getByText("On the system disk", { exact: true })).toBeVisible();
+  await expect(card.getByText("This disk can be unplugged.", { exact: false })).toBeVisible();
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(card.getByText("Saved on this computer")).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/simulator-storage")?.body).toEqual({ destination: "/Volumes/Ext", suggest: true, floorBytes: 20 * GIB });
+  await expect(card.getByText("The system disk is below your free-space floor.", { exact: false })).toBeVisible();
+  // Move now only plans; the relocation's own confirm dialog is the gate.
+  await card.getByRole("button", { name: "Move now" }).click();
+  await expect(page.getByRole("dialog").getByText("Confirm relocation")).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/relocation/plan")?.body).toEqual({ action: "move", entryId: "simulators.coresimulator-devices", destination: "/Volumes/Ext" });
+  expect(posts.filter((call) => call.path === "/api/cleanup/relocation/run")).toHaveLength(0);
+});

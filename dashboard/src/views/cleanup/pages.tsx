@@ -16,7 +16,8 @@ import { MonitorBanner, MonitorCard, MonitorStatsCard } from "./monitor-card";
 import { BookmarkToggle, BookmarksSection } from "./bookmarks-card";
 import { OverviewCards, StorageHero, type OverviewCard } from "./overview";
 import { SpaceExplorer } from "./space-explorer";
-import { RelocationCard } from "./relocation-card";
+import { RelocationCard, type RelocationRequest } from "./relocation-card";
+import { SimulatorStorageCard, SimulatorStorageNotice } from "./simulator-storage-card";
 import { WidgetsCard } from "./widgets-card";
 import { CareList, CareRow } from "./care-sections";
 import { SuggestionSettings } from "./suggestion-settings";
@@ -252,6 +253,9 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
   const [bookmarkConfirm, setBookmarkConfirm] = useState(false);
   const [quickRefusals, setQuickRefusals] = useState("");
   /** CUX-01: set by "Scan & review"; the finished scan then builds the recommended Trash plan by itself. */
+  // CLS-02: Simulator storage asks the Relocation card to plan a move; a finished run refreshes the storage card.
+  const [relocationRequest, setRelocationRequest] = useState<RelocationRequest | null>(null);
+  const [storageKey, setStorageKey] = useState(0);
   const autoReview = useRef(false);
   const [reviewNote, setReviewNote] = useState("");
   const [prefsSummary, setPrefsSummary] = useState("auto");
@@ -670,6 +674,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           </span>}
         </>} />
       {!PUBLIC && <MonitorBanner monitor={monitor} scanHref={link("scan/")} />}
+      {!PUBLIC && page === "" && <SimulatorStorageNotice href={link("relocation/#simulator-storage")} />}
       {(page !== "" || PUBLIC) && <nav aria-label="Cleanup pages" className="flex flex-wrap gap-2">{tabs.map((tab) =>
         <a key={tab.id} href={link(tab.path)} aria-current={page === tab.id ? "page" : undefined} className="iux-btn" data-variant={page === tab.id ? "primary" : "outline"}>{tab.label}</a>)}</nav>}
       {PUBLIC ? <Section title="Local app required"><p>The Cleanup Lab runs in the local app. Install and open os-lab on your computer to scan and clean.</p></Section> :
@@ -933,7 +938,11 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
           {(status?.platform?.id === "linux" || status?.platform?.id === "windows") && <CrossPlatformLeftovers />}
           </>}
           {page === "space" && <SpaceExplorer scanHref={link("scan/")} />}
-          {page === "relocation" && <RelocationCard now={now} />}
+          {page === "relocation" && <>
+            {!PUBLIC && <SimulatorStorageCard refreshKey={storageKey}
+              onMove={(entryId, destination) => setRelocationRequest({ entryId, destination, nonce: Date.now() })} />}
+            <RelocationCard now={now} request={relocationRequest} onChanged={() => setStorageKey((key) => key + 1)} />
+          </>}
           {page === "history" && <Section title="Audit history" description="Verified cleanup runs stored on this computer.">
             {!history?.entries.length ? <Empty>No cleanup runs recorded yet.</Empty> : history.entries.map((entry) =>
               "totals" in entry.result ?

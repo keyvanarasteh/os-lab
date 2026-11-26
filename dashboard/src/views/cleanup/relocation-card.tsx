@@ -74,7 +74,10 @@ function RelocationConfirmDialog({
   </dialog>;
 }
 
-export function RelocationCard({ now }: { now: number }) {
+/** CLS-02: a move asked for elsewhere (Simulator storage); a new nonce plans it once. */
+export interface RelocationRequest { entryId: string; destination: string; nonce: number }
+
+export function RelocationCard({ now, request, onChanged }: { now: number; request?: RelocationRequest | null; onChanged?: () => void }) {
   const { data: status, error: statusError, reload: reloadStatus } = usePoll<CleanupRelocationStatus>(
     () => PUBLIC ? Promise.reject(new Error("local")) : api.cleanupRelocation(), 0
   );
@@ -125,6 +128,7 @@ export function RelocationCard({ now }: { now: number }) {
           if (job.state !== "running" && job.state !== "failed") {
             setResult(job.result);
             void reloadStatus();
+            onChanged?.();
           }
         })
         .catch(() => { /* the next tick retries; a vanished job keeps its last state */ });
@@ -132,13 +136,21 @@ export function RelocationCard({ now }: { now: number }) {
     return () => { alive = false; window.clearInterval(timer); };
   }, [runJob?.id, runJob?.state, reloadStatus]);
 
-  async function plan(entryId: string, action: RelocationAction) {
-    if (!destination) { setActionError("Destination: choose a volume first."); return; }
+  async function plan(entryId: string, action: RelocationAction, target = destination) {
+    if (!target) { setActionError("Destination: choose a volume first."); return; }
     setActionError(""); setResult(null); setPending(null); setConfirmOpen(false);
     setPlanningFor(entryId);
-    try { setPlanJob(await api.cleanupRelocationPlan(action, entryId, destination)); }
+    try { setPlanJob(await api.cleanupRelocationPlan(action, entryId, target)); }
     catch (error) { setActionError(errorText(error)); setPlanningFor(null); }
   }
+
+  const handled = useRef(0);
+  useEffect(() => {
+    if (!request || handled.current === request.nonce) return;
+    handled.current = request.nonce;
+    setDestination(request.destination);
+    void plan(request.entryId, "move", request.destination);
+  }, [request?.nonce]);
 
   async function run() {
     if (!pending) return;
