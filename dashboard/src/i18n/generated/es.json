@@ -3366,5 +3366,19 @@
   "Wipe selected data": "Borrar datos seleccionados",
   "Wipes userdata, cache and snapshots. The AVD definition stays.": "Borra userdata, caché e instantáneas. La definición AVD se conserva.",
   "emulators": "emuladores",
-  "unavailable emulators": "emuladores no disponibles"
+  "unavailable emulators": "emuladores no disponibles",
+  "Keep Android Virtual Devices on another disk. The emulator still opens them from the original path.": "Mantén los dispositivos virtuales de Android en otro disco. El emulador sigue abriéndolos desde la ruta original.",
+  "Emulator storage": "Almacenamiento del emulador",
+  "Checking emulator storage…": "Comprobando el almacenamiento del emulador…",
+  "Connect the disk that holds your emulators before opening Android Studio.": "Conecta el disco que guarda los emuladores antes de abrir Android Studio.",
+  "The system disk is below your free-space floor. Move the emulators to free space.": "El disco del sistema está por debajo del umbral de espacio libre. Mueve los emuladores para liberar espacio.",
+  "Disk for emulators": "Disco para emuladores",
+  "This disk can be unplugged. The emulator cannot start while it is disconnected.": "Este disco se puede desconectar. El emulador no arranca mientras esté desconectado.",
+  "Android Virtual Devices should live on a non-system disk. Unavailable AVDs can be deleted through a previewed avdmanager action.": "Los dispositivos virtuales de Android deben estar fuera del disco del sistema. Los AVD no disponibles se pueden borrar con una acción avdmanager previsualizada.",
+  "Android Virtual Devices are still on the system disk. Move them to another disk; Android Studio still opens them from the original path.": "Los dispositivos virtuales de Android siguen en el disco del sistema. Muévelos; Android Studio los abre desde la ruta original.",
+  "Connect another disk to move emulators off the system disk.": "Conecta otro disco para sacar los emuladores del disco del sistema.",
+  "Move emulators off the system disk": "Sacar los emuladores del disco del sistema",
+  "Moving emulators…": "Moviendo emuladores…",
+  "Studio still opens these AVDs through a junction at the original path.": "Studio sigue abriendo estos AVD mediante una unión en la ruta original.",
+  "Studio still opens these AVDs through a symlink at the original path.": "Studio sigue abriendo estos AVD mediante un enlace simbólico en la ruta original."
 }

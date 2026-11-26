@@ -160,3 +160,51 @@ test("CLS-02 simulator storage saves a disk and Move now plans the relocation, n
   expect(posts.find((call) => call.path === "/api/cleanup/relocation/plan")?.body).toEqual({ action: "move", entryId: "simulators.coresimulator-devices", destination: "/Volumes/Ext" });
   expect(posts.filter((call) => call.path === "/api/cleanup/relocation/run")).toHaveLength(0);
 });
+
+test("CLA-02 emulator storage saves a disk and Move now plans the relocation, nothing more", async ({ page }) => {
+  const GIB = 1024 ** 3;
+  const posts: { path: string; body: Record<string, unknown> }[] = [];
+  let config = { destination: null as string | null, suggest: true, floorBytes: 20 * GIB };
+  const storage = () => ({
+    available: true, reason: "", entryId: "simulators.android-avd",
+    folder: "/home/test/.android/avd", state: "local", target: "/home/test/.android/avd",
+    volume: { mountPoint: "/", kind: "root" }, home: { mountPoint: "/", freeBytes: 3 * GIB, totalBytes: 500 * GIB },
+    config, configError: null, hasSdk: true, linkKind: "symlink",
+    destinations: [{ mountPoint: "/Volumes/Ext", name: "Ext", kind: "removable", freeBytes: 900 * GIB, totalBytes: 1000 * GIB }],
+    suggestion: config.destination ? { action: "move", reason: "" } : { action: null, reason: "" }
+  });
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().postDataJSON?.() ?? {};
+    if (route.request().method() === "POST") posts.push({ path, body });
+    let data: unknown = {};
+    if (path === "/api/cleanup/emulator-storage" && route.request().method() === "POST") { config = { ...config, ...body }; data = storage(); }
+    else if (path === "/api/cleanup/emulator-storage") data = storage();
+    else if (path === "/api/cleanup/simulator-storage") data = { available: false, reason: "iOS Simulator storage is macOS only" };
+    else if (path === "/api/cleanup/relocation") data = { ...STATUS, platform: "linux", entries: [{ entryId: "simulators.android-avd", name: "Android emulator images", path: "/home/test/.android/avd", relocatable: true, interrupted: false }] };
+    else if (path === "/api/cleanup/relocation/plan") data = runningJob("p1", "relocation-plan");
+    else if (path === "/api/cleanup/jobs/p1") data = doneJob("p1", "relocation-plan", { ...PLAN, entryId: "simulators.android-avd", entryName: "Android emulator images", linkKind: "symlink" });
+    else if (path === "/api/cleanup/status") data = { state: "ready", reasons: [], requirements: [], capabilities: [] };
+    else if (path === "/api/cleanup/catalog") data = { platform: "linux", entries: [] };
+    else if (path === "/api/cleanup/jobs") data = { jobs: [] };
+    else if (path === "/api/cleanup/permissions") data = { platform: "linux", permissions: [] };
+    else if (path === "/api/host") data = { host: { os: "linux", osPretty: "Linux", arch: "x64", hostname: "test", cpus: 8, memory: 0, disk: null, kvm: { present: true, usable: true }, wsl: { guest: false, distributions: [] }, runtime: null, xcode: null, python: "3.12", root: "/tmp", tools: [], providers: [] }, labs: [] };
+    else if (path === "/api/health") data = { status: "ok", version: "test", console: true };
+    else if (path === "/api/jobs") data = { jobs: [] };
+    else if (path === "/api/logs") data = { logs: [] };
+    await route.fulfill({ json: data });
+  });
+  await page.goto("/cleanup/relocation/");
+  const card = page.locator("#emulator-storage");
+  await expect(card.getByRole("heading", { name: "Emulator storage" })).toBeVisible();
+  await expect(card.getByText("On the system disk", { exact: true })).toBeVisible();
+  await expect(card.getByText("This disk can be unplugged.", { exact: false })).toBeVisible();
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(card.getByText("Saved on this computer")).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/emulator-storage")?.body).toEqual({ destination: "/Volumes/Ext", suggest: true, floorBytes: 20 * GIB });
+  await expect(card.getByText("The system disk is below your free-space floor.", { exact: false })).toBeVisible();
+  await card.getByRole("button", { name: "Move now" }).click();
+  await expect(page.getByRole("dialog").getByText("Confirm relocation")).toBeVisible();
+  expect(posts.find((call) => call.path === "/api/cleanup/relocation/plan")?.body).toEqual({ action: "move", entryId: "simulators.android-avd", destination: "/Volumes/Ext" });
+  expect(posts.filter((call) => call.path === "/api/cleanup/relocation/run")).toHaveLength(0);
+});

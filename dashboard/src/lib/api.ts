@@ -616,6 +616,10 @@ export interface CleanupSimulatorStorage {
   destinations?: { mountPoint: string; name?: string | null; kind: string; freeBytes: number; totalBytes: number | null }[];
   suggestion?: { action: "move" | "reconnect" | "setup" | null; reason: string };
 }
+/** CLA-02: where the Android AVD folder lives and what to suggest next. */
+export type CleanupEmulatorStorage = CleanupSimulatorStorage & {
+  sdkRoot?: string | null; hasSdk?: boolean; linkKind?: "symlink" | "junction";
+}
 export interface CleanupAuxJob<T> {
   id: string; kind: "container-prune" | "vm-scan" | "leftovers" | "relocation-plan" | "relocation-run" | "simulator-run" | "emulator-run"; state: "running" | "done" | "cancelled" | "failed";
   progress: Record<string, string | number> | null;
@@ -733,6 +737,7 @@ export interface CleanupRelocationRun {
   status: string; error?: string;
   bytesRelocated?: number | null; bytesRemoved?: number | null;
   cancelled?: boolean; stepsDone?: number; stepsTotal?: number;
+  linkKind?: "symlink" | "junction";
 }
 /** CLNP-14: one bookmark — a catalog-entry reference with its behaviours. */
 export interface BookmarkRecord {
@@ -996,6 +1001,9 @@ export const api = {
   cleanupSimulatorStorage: () => call<CleanupSimulatorStorage>("/api/cleanup/simulator-storage"),
   cleanupSimulatorStorageSave: (config: Partial<CleanupSimulatorStorageConfig>) =>
     post<CleanupSimulatorStorage>("/api/cleanup/simulator-storage", config),
+  cleanupEmulatorStorage: () => call<CleanupEmulatorStorage>("/api/cleanup/emulator-storage"),
+  cleanupEmulatorStorageSave: (config: Partial<CleanupSimulatorStorageConfig>) =>
+    post<CleanupEmulatorStorage>("/api/cleanup/emulator-storage", config),
   cleanupRelocationRun: (previewId: string) =>
     post<CleanupAuxJob<CleanupRelocationRun>>("/api/cleanup/relocation/run", { previewId }),
   /** CLW-02: the widget snapshot — builds and publishes in one call. */

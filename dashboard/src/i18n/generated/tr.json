@@ -3366,5 +3366,19 @@
   "Wipe selected data": "Seçilen veriyi sil",
   "Wipes userdata, cache and snapshots. The AVD definition stays.": "Kullanıcı verisini, önbelleği ve anlık görüntüleri siler. AVD tanımı kalır.",
   "emulators": "emülatör",
-  "unavailable emulators": "kullanılamayan emülatörler"
+  "unavailable emulators": "kullanılamayan emülatörler",
+  "Keep Android Virtual Devices on another disk. The emulator still opens them from the original path.": "Android sanal aygıtlarını başka bir diskte tutun. Emülatör onları hâlâ özgün yoldan açar.",
+  "Emulator storage": "Emülatör depolama",
+  "Checking emulator storage…": "Emülatör depolaması denetleniyor…",
+  "Connect the disk that holds your emulators before opening Android Studio.": "Android Studio’yu açmadan önce emülatörlerin bulunduğu diski bağlayın.",
+  "The system disk is below your free-space floor. Move the emulators to free space.": "Sistem diski boş alan tabanının altında. Yer açmak için emülatörleri taşıyın.",
+  "Disk for emulators": "Emülatör diski",
+  "This disk can be unplugged. The emulator cannot start while it is disconnected.": "Bu disk çıkarılabilir. Bağlı değilken emülatör başlayamaz.",
+  "Android Virtual Devices should live on a non-system disk. Unavailable AVDs can be deleted through a previewed avdmanager action.": "Android sanal aygıtları sistem dışı bir diskte durmalı. Kullanılamayan AVD’ler önizlemeli bir avdmanager eylemiyle silinebilir.",
+  "Android Virtual Devices are still on the system disk. Move them to another disk; Android Studio still opens them from the original path.": "Android sanal aygıtları hâlâ sistem diskinde. Başka bir diske taşıyın; Android Studio onları özgün yoldan açmaya devam eder.",
+  "Connect another disk to move emulators off the system disk.": "Emülatörleri sistem diskinden taşımak için başka bir disk bağlayın.",
+  "Move emulators off the system disk": "Emülatörleri sistem diskinden taşı",
+  "Moving emulators…": "Emülatörler taşınıyor…",
+  "Studio still opens these AVDs through a junction at the original path.": "Studio bu AVD’leri özgün yoldaki bir junction üzerinden açmaya devam eder.",
+  "Studio still opens these AVDs through a symlink at the original path.": "Studio bu AVD’leri özgün yoldaki bir sembolik bağ üzerinden açmaya devam eder."
 }

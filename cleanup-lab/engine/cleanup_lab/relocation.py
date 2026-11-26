@@ -12,8 +12,9 @@ The order here is the fix:
 
 so at every step either the original or a verified copy exists, and a failed
 step stops the job with the original still on disk. There is no elevated
-fallback: on Windows a symlink needs Developer Mode or a privilege, and that
-fails with a reason (CLN-20 decides whether a privileged plan is offered).
+fallback. On Windows the link step creates a **directory junction**
+(``mklink /J``) so Developer Mode is not required; POSIX hosts keep a
+symlink. A junction failure reports that reason.
 
 The seven link states of :func:`classify` are ``local_only``, ``linked_ok``,
 ``missing_link``, ``broken_link``, ``wrong_target``, ``conflict`` and
@@ -33,6 +34,7 @@ import enum
 import os
 import shutil
 import stat
+import subprocess
 import time
 from dataclasses import dataclass
 
@@ -69,10 +71,22 @@ def _lexists(path):
 
 
 def _is_link(path):
+    """True for a POSIX symlink or a Windows junction / directory symlink."""
     try:
-        return stat.S_ISLNK(os.lstat(path).st_mode)
+        st = os.lstat(path)
     except OSError:
         return False
+    if stat.S_ISLNK(st.st_mode):
+        return True
+    isjunction = getattr(os.path, "isjunction", None)
+    if isjunction is not None:
+        try:
+            return bool(isjunction(path))
+        except OSError:
+            return False
+    attrs = getattr(st, "st_file_attributes", 0) or 0
+    flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(attrs & flag)
 
 
 def _link_target(link):
@@ -233,6 +247,38 @@ def _remove_tree(path):
         raise RelocationError("Could not remove {0}: {1}".format(path, exc.strerror or exc)) from exc
 
 
+def _windows_junction(link, target):
+    """Create a directory junction with fixed ``cmd /c mklink /J`` argv."""
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        result = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", link, target],
+            shell=False, capture_output=True, text=True, timeout=30,
+            stdin=subprocess.DEVNULL, check=False, creationflags=flags)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise OSError(str(exc)) from exc
+    if result.returncode != 0:
+        raise OSError((result.stderr or result.stdout or "mklink /J failed").strip()[:400])
+
+
+def _dir_link(target, link, *, platform=None):
+    """POSIX symlink; Windows directory junction (no Developer Mode)."""
+    if platform == "windows" or (platform is None and os.name == "nt"):
+        if os.name == "nt":
+            try:
+                _windows_junction(link, os.path.abspath(target))
+            except OSError as exc:
+                raise RelocationError(
+                    "Could not create a directory junction at {0}: {1}. "
+                    "Junctions do not need Developer Mode; the path may be in use."
+                    .format(link, exc)
+                ) from exc
+            return
+        os.symlink(target, link)
+        return
+    os.symlink(target, link)
+
+
 def copy_tree(src, dst):
     try:
         shutil.copytree(src, dst, symlinks=True)
@@ -251,7 +297,7 @@ def verify_copy(src, dst):
         )
 
 
-def execute_steps(steps, *, progress_callback=None, cancel=None):
+def execute_steps(steps, *, progress_callback=None, cancel=None, platform=None):
     """Run typed steps in order; a failure stops with the original still in place."""
     results = []
     total = len(steps)
@@ -269,7 +315,7 @@ def execute_steps(steps, *, progress_callback=None, cancel=None):
                     raise RelocationError("Refusing to replace an existing path at {0}.".format(step.dst))
                 os.rename(step.src, step.dst)
             elif step.op == "symlink":
-                os.symlink(step.dst, step.src)
+                _dir_link(step.dst, step.src, platform=platform)
             elif step.op == "verify_link":
                 if not _is_link(step.src) or not _same(_link_target(step.src), step.dst):
                     raise RelocationError(
@@ -390,6 +436,8 @@ def build_plan(root, entry_id, destination, action, *, platform=None, env=None,
         "state": classify(home, store).value,
         "steps": [{"op": step.op, "src": step.src, "dst": step.dst} for step in steps],
         "fingerprint": {"files": files, "bytes": size} if action == "move" else None,
+        "platform": platform,
+        "linkKind": "junction" if platform == "windows" else "symlink",
     }
 
 
@@ -404,7 +452,8 @@ def execute(record, *, cancel=None, progress_callback=None, fingerprint=None):
         if files != expected["files"] or size != expected["bytes"]:
             raise RelocationError("The folder changed since the preview; preview again.")
     steps = [Step(**item) for item in record["steps"]]
-    outcome = execute_steps(steps, cancel=cancel, progress_callback=progress_callback)
+    platform = record.get("platform")
+    outcome = execute_steps(steps, cancel=cancel, progress_callback=progress_callback, platform=platform)
     return {
         "entryId": record["entryId"],
         "action": action,
@@ -416,4 +465,5 @@ def execute(record, *, cancel=None, progress_callback=None, fingerprint=None):
         "cancelled": outcome["cancelled"],
         "stepsDone": outcome["stepsDone"],
         "stepsTotal": outcome["stepsTotal"],
+        "linkKind": record.get("linkKind") or ("junction" if platform == "windows" else "symlink"),
     }

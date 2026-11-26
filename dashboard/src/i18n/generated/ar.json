@@ -3366,5 +3366,19 @@
   "Wipe selected data": "مسح البيانات المحددة",
   "Wipes userdata, cache and snapshots. The AVD definition stays.": "يمسح بيانات المستخدم والذاكرة المؤقتة واللقطات. يبقى تعريف AVD.",
   "emulators": "محاكيات",
-  "unavailable emulators": "محاكيات غير متاحة"
+  "unavailable emulators": "محاكيات غير متاحة",
+  "Keep Android Virtual Devices on another disk. The emulator still opens them from the original path.": "أبقِ أجهزة أندرويد الافتراضية على قرص آخر. ما زال المحاكي يفتحها من المسار الأصلي.",
+  "Emulator storage": "تخزين المحاكي",
+  "Checking emulator storage…": "جارٍ التحقق من تخزين المحاكي…",
+  "Connect the disk that holds your emulators before opening Android Studio.": "وصّل القرص الذي يحمل المحاكيات قبل فتح Android Studio.",
+  "The system disk is below your free-space floor. Move the emulators to free space.": "قرص النظام دون حد المساحة الحرة. انقل المحاكيات لتحرير مساحة.",
+  "Disk for emulators": "قرص المحاكيات",
+  "This disk can be unplugged. The emulator cannot start while it is disconnected.": "يمكن فصل هذا القرص. لا يبدأ المحاكي وهو غير متصل.",
+  "Android Virtual Devices should live on a non-system disk. Unavailable AVDs can be deleted through a previewed avdmanager action.": "يجب أن تعيش أجهزة أندرويد الافتراضية خارج قرص النظام. يمكن حذف أجهزة AVD غير المتاحة بإجراء avdmanager معاين.",
+  "Android Virtual Devices are still on the system disk. Move them to another disk; Android Studio still opens them from the original path.": "ما زالت أجهزة أندرويد الافتراضية على قرص النظام. انقلها؛ يفتحها Android Studio من المسار الأصلي.",
+  "Connect another disk to move emulators off the system disk.": "وصّل قرصًا آخر لنقل المحاكيات عن قرص النظام.",
+  "Move emulators off the system disk": "انقل المحاكيات عن قرص النظام",
+  "Moving emulators…": "جارٍ نقل المحاكيات…",
+  "Studio still opens these AVDs through a junction at the original path.": "ما زال Studio يفتح أجهزة AVD هذه عبر وصلة junction في المسار الأصلي.",
+  "Studio still opens these AVDs through a symlink at the original path.": "ما زال Studio يفتح أجهزة AVD هذه عبر رابط رمزي في المسار الأصلي."
 }
