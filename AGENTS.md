@@ -27,7 +27,6 @@ These failed master e2e (and release follow-up) after 0.4.9 and will fail the ne
 
 Several agents work on os-lab at once, each in its own worktree. These rules keep them from overloading the machine or breaking each other's runs ([plan](docs/PLAN-parallel-agents.md), [landing steps](CONTRIBUTING.md#landing-a-branch)).
 
-- Label every draft with one activity label (`ACTIVE` while working, `ON-HOLD` when parked) and one priority (`CRITICAL`, `PRIORITY-LEVEL-HIGH`, `MID`, or `LOW`). See [docs/plans/pr-labels.md](docs/plans/pr-labels.md).
 - Start every worktree with `scripts/worktree.sh new <branch>`. It links the shared `node_modules`, test virtualenv and browser caches and configures the locale merge driver. Run `scripts/worktree.sh doctor` after a rebase that changed `package-lock.json` or a requirements file, and remove the worktree with `scripts/worktree.sh rm <branch>`.
 - Run tests for what you changed: `scripts/run-tests.sh --changed` for the unit suites, `scripts/e2e.sh --changed` for e2e. Before any `scripts/e2e.sh` run, ask the user which mode to use: suggest one that fits the change and show its `--dry-run` output.
   - one view: `scripts/e2e.sh --changed`;
@@ -40,3 +39,4 @@ Several agents work on os-lab at once, each in its own worktree. These rules kee
 - Rebase on `origin/master` at the start of each work phase, not only at the end. Only one agent lands work on master at a time, in the order the user chooses.
 - Check `reservations/` and the remote branches before choosing a task ID.
 - Run at most two or three heavy agents at once on a laptop.
+- In addition to the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and [landing steps](CONTRIBUTING.md#landing-a-branch), add one activity label (`ACTIVE` / `ON-HOLD`) and one priority (`CRITICAL` / `PRIORITY-LEVEL-HIGH` / `MID` / `LOW`) for triage — see [docs/plans/pr-labels.md](docs/plans/pr-labels.md). This does not replace reservations, checks, or template sections.

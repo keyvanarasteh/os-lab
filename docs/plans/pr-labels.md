@@ -1,6 +1,17 @@
 # Pull request labels
 
-Canonical labels for open PRs on `keyvanarasteh/os-lab`. Agents apply them when opening or updating a draft ([AGENTS.md](../../AGENTS.md#parallel-agents), [CONTRIBUTING.md](../../CONTRIBUTING.md#landing-a-branch)).
+Optional **activity** and **priority** labels for open PRs on `keyvanarasteh/os-lab`. They help agents and maintainers triage parked vs in-rotation work. They do **not** replace os-lab's existing PR standards.
+
+## What these labels do not change
+
+Keep following the repo as written:
+
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) — one logical change per PR, reservations, checks, [landing a branch](../../CONTRIBUTING.md#landing-a-branch), Conventional Commits
+- [.github/PULL_REQUEST_TEMPLATE.md](../../.github/PULL_REQUEST_TEMPLATE.md) — Summary, Type of change, Component, How was this tested, Proof, Checklist
+- [AGENTS.md](../../AGENTS.md) — worktrees, test limits, no `dashboard/dist` in PRs, rebase/landing order
+- Existing GitHub labels such as `bug`, `enhancement`, `documentation`, `good first issue`, `help wanted` — keep using them
+
+Do not add qLar-only body sections (`## Plan`, `## Todo`, `## Deploy`) to os-lab PRs unless a separate os-lab rule says so.
 
 ## Activity (pick one)
 
@@ -24,19 +35,19 @@ Do not stack multiple priority labels on one PR. If priority changes, replace th
 
 ## Agents
 
-When opening a draft PR:
+When opening a PR (still fill the os-lab template and run the usual checks):
 
-1. Add `ACTIVE` and a priority (`MID` unless the plan says otherwise).
-2. Switch to `ON-HOLD` when the Todo stops and the branch is parked.
+1. Add `ACTIVE` and a priority (`MID` unless the task or user says otherwise).
+2. Switch to `ON-HOLD` when work stops and the branch is parked.
 3. Raise or lower priority with a single replace — never leave two priority labels.
 
 ## Migration from older labels
 
-| Old (optional) | Replace with |
+| Old | Replace with |
 | --- | --- |
 | `critical` | `CRITICAL` |
 | `important` | `PRIORITY-LEVEL-HIGH` |
 
-Remove the old label after adding the new one. Keep issue-oriented labels (`bug`, `enhancement`, `documentation`, …) as needed.
+Remove the old label after adding the new one.
 
-Same label names as qLar (`keyvanarasteh/qLar` → `agents-app/docs/plans/pr-labels.md`) and aQ (`docs/plans/pr-labels.md`) so the three repos stay aligned.
+Same activity/priority **names** as qLar and aQ for cross-repo triage; process and PR body rules stay os-lab's own.
