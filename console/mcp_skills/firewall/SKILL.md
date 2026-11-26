@@ -1,13 +1,13 @@
 ---
 name: os-lab-mcp-firewall
-description: Use the os-lab MCP Firewall Lab MCP (planned) tools (firewall_* (not shipped)). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
+description: Use the os-lab MCP Firewall Lab tools (firewall_status, firewall_catalog, firewall_company, firewall_guides). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
 ---
 
-# Firewall Lab MCP (planned)
+# Firewall Lab MCP
 
-Related MCP tools: `firewall_* (not shipped)`.
+Related MCP tools: `firewall_status, firewall_catalog, firewall_company, firewall_guides`.
 
-Gap: content-only; no network mutation tools.
+See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
 
 ## Rules
 

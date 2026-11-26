@@ -75,7 +75,8 @@ def test_prompts_and_verification_registry_are_advertised():
     from pathlib import Path
     registry = json.loads(Path(mcp_server.REPO_ROOT, "console", "mcp_verification.json").read_text())
     assert registry["tools"]["cleanup_review"]["engineUsage"]["status"] in ("none", "pending", "verified", "n/a")
-    assert registry["sections"]["android"]["engineUsage"]["status"] == "none"
+    assert registry["sections"]["android"]["engineUsage"]["status"] in ("pending", "verified")
+    assert "android_status" in registry["tools"]
 
 
 def test_review_scans_suggests_and_plans_but_never_cleans(tmp_path, monkeypatch):

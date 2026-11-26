@@ -24,8 +24,20 @@ export interface McpTool {
   app?: VerifySlot;
 }
 
+export type McpGroupId =
+  | "macos"
+  | "cleanup"
+  | "websec"
+  | "winapps"
+  | "android"
+  | "ios"
+  | "linux"
+  | "web"
+  | "source"
+  | "firewall";
+
 export interface McpGroup {
-  id: "macos" | "cleanup" | "websec" | "winapps";
+  id: McpGroupId;
   title: string;
   platform: string;
   docs: string;
@@ -145,6 +157,9 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "macos_capabilities", safety: "read-only", summary: "Engine, input kinds, keys, safety limits.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_permissions", safety: "read-only", summary: "Accessibility and Screen Recording state.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_request_access", safety: "write", summary: "Open privacy pane / consent prompt for a grant.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "macos_focused", safety: "read-only", summary: "Focused AX element of one app (pid).", engineUsage: pending(), widget: none(), app: none() },
+      { name: "macos_audit", safety: "read-only", summary: "Recent macOS Lab audit rows (no thumbnails).", engineUsage: pending(), widget: none(), app: none() },
+      { name: "macos_sessions", safety: "read-only", summary: "Open deep-inspect sessions and Appium reachability.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_control_state", safety: "read-only", summary: "Whether control mode is armed, owner, remaining seconds.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_click", safety: "armed", summary: "One click at a point or element path.", engineUsage: pending(), widget: none(), app: none() },
       { name: "macos_type", safety: "armed", summary: "Type text; newlines are refused.", engineUsage: pending(), widget: none(), app: none() },
@@ -202,7 +217,33 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "cleanup_widget_refresh", safety: "write", summary: "Rebuild and publish the desktop widget snapshot.", engineUsage: pending(), widget: pending(), app: none() },
       { name: "cleanup_app_overview", safety: "read-only", summary: "Overview MCP App (storage hero + readiness).", engineUsage: pending(), widget: none(), app: pending() },
       { name: "cleanup_app_review", safety: "read-only", summary: "Review MCP App (scan → plan → confirm affordance).", engineUsage: pending(), widget: none(), app: pending() },
-      { name: "cleanup_app_settings", safety: "read-only", summary: "Settings MCP App (permissions, bookmarks, monitor).", engineUsage: pending(), widget: none(), app: pending() }
+      { name: "cleanup_app_settings", safety: "read-only", summary: "Settings MCP App (permissions, bookmarks, monitor).", engineUsage: pending(), widget: none(), app: pending() },
+      { name: "cleanup_explorer_roots", safety: "read-only", summary: "Space Explorer root folders.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_explorer_scan", safety: "read-only", summary: "Measure a Space Explorer root or subtree.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_deep_roots", safety: "read-only", summary: "Deep-scan root registry.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_deep_scan", safety: "read-only", summary: "Deep-scan configured roots.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_containers", safety: "read-only", summary: "Container engine capabilities and prune actions.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_containers_preview", safety: "read-only", summary: "Preview a container prune. Never prunes.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_containers_prune", safety: "confirm", summary: "Run a container prune. confirm: true.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_simulators", safety: "read-only", summary: "iOS Simulator inventory and clean actions.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_simulators_preview", safety: "read-only", summary: "Preview a simulator clean.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_simulators_run", safety: "confirm", summary: "Run a simulator clean. confirm: true.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_emulators", safety: "read-only", summary: "Android emulator inventory and clean actions.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_emulators_preview", safety: "read-only", summary: "Preview an emulator clean.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_emulators_run", safety: "confirm", summary: "Run an emulator clean. confirm: true.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_vms_scan", safety: "read-only", summary: "Scan VM disk usage.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_packages_scan", safety: "read-only", summary: "Scan package-manager caches.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_leftovers_scan", safety: "read-only", summary: "Scan leftover app support files.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_relocation", safety: "read-only", summary: "Relocation status and destinations.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_relocation_plan", safety: "read-only", summary: "Build a relocation preview. Never moves.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_relocation_run", safety: "confirm", summary: "Run a relocation. confirm: true.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_privileged", safety: "read-only", summary: "Privileged cleanup capabilities.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_privileged_preview", safety: "read-only", summary: "Preview a privileged cleanup.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_privileged_run", safety: "confirm", summary: "Run a privileged cleanup. confirm: true.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_simulator_storage", safety: "read-only", summary: "Simulator storage relocation config.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_simulator_storage_save", safety: "write", summary: "Save simulator storage config.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_custom_entries_add", safety: "write", summary: "Add a custom catalog folder (path once).", engineUsage: pending(), widget: none(), app: none() },
+      { name: "cleanup_custom_entries_remove", safety: "confirm", summary: "Remove a custom.<slug> entry. confirm: true.", engineUsage: pending(), widget: none(), app: none() }
     ]
   },
   {
@@ -262,15 +303,129 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "winapps_doctor", safety: "windows-only", summary: "Desktop session, elevation, one capture probe.", engineUsage: pending(), widget: none(), app: none() },
       { name: "winapps_audit", safety: "windows-only", summary: "Newest agent calls and refusals, without titles.", engineUsage: pending(), widget: none(), app: none() }
     ]
+  },
+  {
+    id: "android",
+    title: "Android Lab",
+    platform: "all hosts",
+    docs: "lat.md/android-lab.md, console/mcp_android.py",
+    engineUsage: pending(),
+    widgets: none(),
+    apps: none(),
+    rules: [
+      "Status, Frida inventory and plan preview only.",
+      "Frida inventory never attaches or injects.",
+      "Scripted lab actions still go through labctl plan/start — not macos_task."
+    ],
+    tools: [
+      { name: "android_status", safety: "read-only", summary: "Lab readiness, provider, reasons, actions.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "android_frida_inventory", safety: "read-only", summary: "Frida devices/processes (list only).", engineUsage: pending(), widget: none(), app: none() },
+      { name: "android_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() }
+    ]
+  },
+  {
+    id: "ios",
+    title: "iOS Lab",
+    platform: "macOS",
+    docs: "lat.md/ios-lab.md, console/mcp_ios.py",
+    engineUsage: pending(),
+    widgets: none(),
+    apps: none(),
+    rules: [
+      "Observe only: devices, simulator, resources, screenshot.",
+      "No agent arm or WebDriverAgent start — drive devices from the dashboard."
+    ],
+    tools: [
+      { name: "ios_status", safety: "read-only", summary: "Lab readiness and actions.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "ios_simulator", safety: "read-only", summary: "Installed simulators and runtimes.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "ios_devices", safety: "read-only", summary: "Paired/connected real devices.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "ios_device_check", safety: "read-only", summary: "Reachability probe for one UDID.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "ios_resources", safety: "read-only", summary: "Resource tips for this Mac.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "ios_screenshot", safety: "read-only", summary: "PNG of a booted simulator or real device.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "ios_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() }
+    ]
+  },
+  {
+    id: "linux",
+    title: "Linux Lab",
+    platform: "all hosts",
+    docs: "lat.md/linux-lab.md, console/mcp_linux.py",
+    engineUsage: pending(),
+    widgets: none(),
+    apps: none(),
+    rules: [
+      "Status and plan preview first.",
+      "Scripted actions only through existing plan/start — not from MCP mutate tools."
+    ],
+    tools: [
+      { name: "linux_status", safety: "read-only", summary: "Lab readiness, KVM/WSL hints, actions.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "linux_plan", safety: "read-only", summary: "Guarded labctl plan preview.", engineUsage: pending(), widget: none(), app: none() }
+    ]
+  },
+  {
+    id: "web",
+    title: "Web Lab",
+    platform: "all hosts",
+    docs: "lat.md/web-lab.md, console/mcp_web.py",
+    engineUsage: pending(),
+    widgets: none(),
+    apps: none(),
+    rules: [
+      "Status/overview/windows are read-only.",
+      "Engine start/stop talk to the local loopback engine only."
+    ],
+    tools: [
+      { name: "web_status", safety: "read-only", summary: "Lab readiness and engine health.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "web_overview", safety: "read-only", summary: "Engine overview when running.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "web_windows", safety: "read-only", summary: "Open Web Lab browser windows.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "web_engine_start", safety: "write", summary: "Start the local Web Lab engine.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "web_engine_stop", safety: "write", summary: "Stop the local Web Lab engine.", engineUsage: pending(), widget: none(), app: none() }
+    ]
+  },
+  {
+    id: "source",
+    title: "Source Lab",
+    platform: "all hosts",
+    docs: "lat.md/source-lab.md, console/mcp_source.py",
+    engineUsage: pending(),
+    widgets: none(),
+    apps: none(),
+    rules: [
+      "Readiness, candidates and plan preview only.",
+      "Detection/crawl jobs still start from the dashboard or labctl."
+    ],
+    tools: [
+      { name: "source_status", safety: "read-only", summary: "Lab readiness and actions.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "source_readiness", safety: "read-only", summary: "Raw engine readiness JSON.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "source_candidates", safety: "read-only", summary: "Local detection candidates.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "source_runtime", safety: "read-only", summary: "Saved runtime settings.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "source_plan", safety: "read-only", summary: "Guarded plan preview.", engineUsage: pending(), widget: none(), app: none() }
+    ]
+  },
+  {
+    id: "firewall",
+    title: "Firewall Lab",
+    platform: "all hosts",
+    docs: "lat.md/firewall-lab.md, console/mcp_firewall.py",
+    engineUsage: pending(),
+    widgets: none(),
+    apps: none(),
+    rules: [
+      "Content browse only — catalog, company packs, guides.",
+      "No live firewall control and no network mutation."
+    ],
+    tools: [
+      { name: "firewall_status", safety: "read-only", summary: "Catalog presence and company count.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "firewall_catalog", safety: "read-only", summary: "Firewall Lab catalog.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "firewall_company", safety: "read-only", summary: "One company pack by slug.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "firewall_guides", safety: "read-only", summary: "Knowledge guide filenames.", engineUsage: pending(), widget: none(), app: none() }
+    ]
   }
 ];
 
-/** Planned MCP sections with no tools yet (gap inventory). */
+/** Remaining gaps (widgets/apps for newer labs, deliberate non-goals). See docs/PLAN-mcp-coverage.md. */
 export const MCP_PLANNED_SECTIONS: { id: string; title: string; engineUsage: VerifySlot; widgets: VerifySlot; apps: VerifySlot; note: string }[] = [
-  { id: "android", title: "Android Lab", engineUsage: none(), widgets: none(), apps: none(), note: "Frida inventory and lab jobs exist; no android_* MCP tools yet." },
-  { id: "ios", title: "iOS Lab", engineUsage: none(), widgets: none(), apps: none(), note: "Devices/simulator/screenshot APIs exist; no ios_* MCP tools yet." },
-  { id: "linux", title: "Linux Lab", engineUsage: none(), widgets: none(), apps: none(), note: "Status/doctor first when implemented." },
-  { id: "web", title: "Web Lab", engineUsage: none(), widgets: none(), apps: none(), note: "console/web_api.py has no MCP module yet." },
-  { id: "source", title: "Source Lab", engineUsage: none(), widgets: none(), apps: none(), note: "/api/source/* not exposed via MCP." },
-  { id: "firewall", title: "Firewall Lab", engineUsage: none(), widgets: none(), apps: none(), note: "Content-only; no network mutation tools planned." }
+  { id: "websec-ui", title: "Web Sec widgets/apps", engineUsage: pending(), widgets: none(), apps: none(), note: "Tools shipped; status/review/report widgets still none." },
+  { id: "macos-ui", title: "macOS observe widgets", engineUsage: pending(), widgets: none(), apps: none(), note: "Optional apps-list / control-state widgets still none. No arm tool (n/a)." },
+  { id: "lab-apps", title: "Lab MCP Apps", engineUsage: pending(), widgets: none(), apps: none(), note: "android / ios / web / source lab apps once host UX is adapted." }
 ];

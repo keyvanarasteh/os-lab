@@ -1,13 +1,13 @@
 ---
 name: os-lab-mcp-ios
-description: Use the os-lab MCP iOS Lab MCP (planned) tools (ios_* (not shipped)). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
+description: Use the os-lab MCP iOS Lab tools (ios_status, ios_simulator, ios_devices, ios_device_check, ios_resources, ios_screenshot, ios_plan). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
 ---
 
-# iOS Lab MCP (planned)
+# iOS Lab MCP
 
-Related MCP tools: `ios_* (not shipped)`.
+Related MCP tools: `ios_status, ios_simulator, ios_devices, ios_device_check, ios_resources, ios_screenshot, ios_plan`.
 
-Gap: devices/simulator/screenshot APIs exist but have no MCP tools yet.
+See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
 
 ## Rules
 

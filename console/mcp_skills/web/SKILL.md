@@ -1,13 +1,13 @@
 ---
 name: os-lab-mcp-web
-description: Use the os-lab MCP Web Lab MCP (planned) tools (web_* (not shipped)). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
+description: Use the os-lab MCP Web Lab tools (web_status, web_overview, web_windows, web_engine_start, web_engine_stop). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
 ---
 
-# Web Lab MCP (planned)
+# Web Lab MCP
 
-Related MCP tools: `web_* (not shipped)`.
+Related MCP tools: `web_status, web_overview, web_windows, web_engine_start, web_engine_stop`.
 
-Gap: console/web_api.py has no MCP module yet.
+See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
 
 ## Rules
 

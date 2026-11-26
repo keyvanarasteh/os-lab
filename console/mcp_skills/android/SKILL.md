@@ -1,13 +1,13 @@
 ---
 name: os-lab-mcp-android
-description: Use the os-lab MCP Android Lab MCP (planned) tools (android_* (not shipped)). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
+description: Use the os-lab MCP Android Lab tools (android_status, android_frida_inventory, android_plan). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
 ---
 
-# Android Lab MCP (planned)
+# Android Lab MCP
 
-Related MCP tools: `android_* (not shipped)`.
+Related MCP tools: `android_status, android_frida_inventory, android_plan`.
 
-Gap: see docs/PLAN-mcp-coverage.md. Do not invent tools — track the plan.
+See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
 
 ## Rules
 

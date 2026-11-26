@@ -1,13 +1,13 @@
 ---
 name: os-lab-mcp-source
-description: Use the os-lab MCP Source Lab MCP (planned) tools (source_* (not shipped)). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
+description: Use the os-lab MCP Source Lab tools (source_status, source_readiness, source_candidates, source_runtime, source_plan). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
 ---
 
-# Source Lab MCP (planned)
+# Source Lab MCP
 
-Related MCP tools: `source_* (not shipped)`.
+Related MCP tools: `source_status, source_readiness, source_candidates, source_runtime, source_plan`.
 
-Gap: /api/source/* not exposed via MCP.
+See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
 
 ## Rules
 

@@ -247,6 +247,26 @@ TOOLS = [
         "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
     },
     {
+        "name": "macos_focused",
+        "description": "The focused accessibility element of one app (pid), with attributes (read-only observe; MIR-08).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"pid": {"type": "integer"}},
+            "required": ["pid"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "macos_audit",
+        "description": "Recent macOS Lab audit rows for this process (agent calls, refusals, panic stop). Read-only; thumbnails omitted.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "macos_sessions",
+        "description": "Open deep-inspect (Appium mac2) sessions and whether Appium answers. Read-only; opening a session stays on the armed dashboard.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
         "name": "macos_control_state",
         "description": "Whether armed control mode is active, its owner and remaining seconds (read-only). Input tools refuse while it is off; there is no arm tool — the human arms from the dashboard.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
@@ -364,6 +384,7 @@ _STOP = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True
 _RO_NAMES = {
     "macos_apps", "macos_get_app_state", "macos_screenshot", "macos_windows", "macos_menubar",
     "macos_search", "macos_displays", "macos_capabilities", "macos_control_state",
+    "macos_focused", "macos_audit", "macos_sessions", "macos_permissions",
     "winapps_apps", "winapps_screenshot", "winapps_capabilities", "winapps_doctor", "winapps_audit",
 }
 _WR_NAMES = {
@@ -483,6 +504,12 @@ def tool_call(name: str, args: dict) -> dict:
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_permissions(REPO_ROOT))}]}
     if name == "macos_request_access":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_request_access(REPO_ROOT, args))}]}
+    if name == "macos_focused":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_ax_focused(REPO_ROOT, args))}]}
+    if name == "macos_audit":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_audit_rows())}]}
+    if name == "macos_sessions":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_session_state(REPO_ROOT))}]}
     if name == "macos_control_state":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_control_state())}]}
     if name == "macos_stop":

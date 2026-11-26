@@ -1,13 +1,13 @@
 ---
 name: os-lab-mcp-linux
-description: Use the os-lab MCP Linux Lab MCP (planned) tools (linux_* (not shipped)). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
+description: Use the os-lab MCP Linux Lab tools (linux_status, linux_plan). Prefer guarded review→confirm flows; fill verification proofs in console/mcp_verification.json.
 ---
 
-# Linux Lab MCP (planned)
+# Linux Lab MCP
 
-Related MCP tools: `linux_* (not shipped)`.
+Related MCP tools: `linux_status, linux_plan`.
 
-Gap: start with status/doctor when implemented.
+See docs/PLAN-mcp-coverage.md for remaining widget/app gaps.
 
 ## Rules
 
