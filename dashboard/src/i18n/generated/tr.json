@@ -3257,5 +3257,6 @@
   "Web Sec Lab: compare two runs of a target": "Web Sec Lab: bir hedefin iki çalıştırmasını karşılaştır",
   "Review what will be removed before running.": "Çalıştırmadan önce nelerin kaldırılacağını gözden geçirin.",
   "Space to free": "Boşaltılacak alan",
-  "Items can be restored from the Trash.": "Öğeler Çöp Kutusu'ndan geri yüklenebilir."
+  "Items can be restored from the Trash.": "Öğeler Çöp Kutusu'ndan geri yüklenebilir.",
+  "Size to move to Trash": "Çöp Kutusu'na taşınacak boyut"
 }

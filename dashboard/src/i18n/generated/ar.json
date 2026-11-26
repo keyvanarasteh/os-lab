@@ -3257,5 +3257,6 @@
   "Web Sec Lab: compare two runs of a target": "Web Sec Lab: مقارنة تشغيلين لهدف",
   "Review what will be removed before running.": "راجع ما سيُزال قبل التشغيل.",
   "Space to free": "المساحة التي ستُحرَّر",
-  "Items can be restored from the Trash.": "يمكن استعادة العناصر من سلة المهملات."
+  "Items can be restored from the Trash.": "يمكن استعادة العناصر من سلة المهملات.",
+  "Size to move to Trash": "الحجم الذي سيُنقل إلى سلة المهملات"
 }

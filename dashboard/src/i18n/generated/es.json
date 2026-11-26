@@ -3257,5 +3257,6 @@
   "Web Sec Lab: compare two runs of a target": "Web Sec Lab: comparar dos ejecuciones de un objetivo",
   "Review what will be removed before running.": "Revisa lo que se eliminará antes de ejecutar.",
   "Space to free": "Espacio a liberar",
-  "Items can be restored from the Trash.": "Los elementos se pueden restaurar desde la Papelera."
+  "Items can be restored from the Trash.": "Los elementos se pueden restaurar desde la Papelera.",
+  "Size to move to Trash": "Tamaño a mover a la Papelera"
 }

@@ -65,7 +65,7 @@ export function ConfirmDialog({
   const trash = plan.mode === "trash";
 
   return <dialog ref={box} tabIndex={-1} aria-labelledby="cleanup-confirm-title"
-    className="iux-dialog m-auto h-dvh w-full flex-col overflow-hidden open:flex sm:h-[calc(100dvh-3rem)] sm:w-[calc(100%-3rem)] sm:max-w-6xl sm:rounded-2xl"
+    className="iux-dialog m-auto h-dvh w-full flex-col overflow-y-auto open:flex sm:h-[calc(100dvh-3rem)] sm:w-[calc(100%-3rem)] sm:max-w-6xl sm:rounded-2xl"
     onClose={onClose} onKeyDown={keepModalFocus}
     onMouseDown={(event) => {
       const rect = event.currentTarget.getBoundingClientRect();
@@ -84,10 +84,10 @@ export function ConfirmDialog({
       </button>
     </header>
 
-    <div className="iux-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
+    <div className="iux-scroll min-h-32 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Tile className="col-span-2 justify-between md:row-span-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-(--iux-muted-foreground)">Space to free</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-(--iux-muted-foreground)">{trash ? "Size to move to Trash" : "Space to free"}</p>
           <p dir="ltr" className="mt-3 text-4xl font-semibold tabular-nums sm:text-5xl">{bytes(plan.totals.bytes)}</p>
           <p className="mt-3 text-sm"><span dir="ltr" className="font-semibold tabular-nums">{plan.totals.ready}</span> <span>items</span></p>
         </Tile>

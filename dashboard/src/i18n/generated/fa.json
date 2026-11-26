@@ -3257,5 +3257,6 @@
   "Web Sec Lab: compare two runs of a target": "Web Sec Lab: مقایسهٔ دو اجرای یک هدف",
   "Review what will be removed before running.": "پیش از اجرا، مواردی را که حذف می‌شوند بررسی کنید.",
   "Space to free": "فضای قابل آزادسازی",
-  "Items can be restored from the Trash.": "موارد را می‌توان از سطل زباله بازگرداند."
+  "Items can be restored from the Trash.": "موارد را می‌توان از سطل زباله بازگرداند.",
+  "Size to move to Trash": "حجم انتقال به سطل زباله"
 }
