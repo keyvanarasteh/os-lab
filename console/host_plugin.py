@@ -445,23 +445,29 @@ def doctor(root, host):
     from importlib.util import spec_from_file_location, module_from_spec
     path = os.path.join(plugin_dir(root, host), "launcher.py")
     spec = spec_from_file_location("os_lab_{0}_launcher".format(host), path)
+    checks = [
+        {"name": "python", "ok": sys.version_info >= (3, 8), "detail": sys.version.split()[0],
+         "fix": None if sys.version_info >= (3, 8) else "Install Python 3.8 or newer"},
+        {"name": "cli", "ok": True, "detail": _which_cli(host) or "optional (file-based install)",
+         "fix": None},
+    ]
     if not os.path.isfile(path) or not spec or not spec.loader:
-        raise PluginError("The plugin launcher is missing", "PACKAGE_MISSING")
+        checks.append({
+            "name": "package", "ok": False, "detail": path,
+            "fix": "Rebuild or reinstall the app so plugins/{0}/os-lab/launcher.py ships with the runtime"
+            .format(host),
+        })
+        return {"ready": False, "platform": sys.platform, "host": host, "checks": checks}
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
     checkout, source, problem = module.find_checkout(here=path)
     package_ok = check(root, host)["ok"]
-    cli = _which_cli(host)
-    checks = [
-        {"name": "python", "ok": sys.version_info >= (3, 8), "detail": sys.version.split()[0],
-         "fix": None if sys.version_info >= (3, 8) else "Install Python 3.8 or newer"},
-        {"name": "cli", "ok": True, "detail": cli or "optional (file-based install)",
-         "fix": None},
+    checks.extend([
         {"name": "checkout", "ok": bool(checkout), "detail": checkout or problem, "source": source,
          "fix": None if checkout else "Set OSLAB_ROOT to this repository"},
         {"name": "package", "ok": package_ok, "detail": "package checks",
          "fix": None if package_ok else "Run python3 scripts/{0}-plugin.py check".format(host)},
-    ]
+    ])
     return {"ready": all(row["ok"] for row in checks), "platform": sys.platform, "host": host, "checks": checks}
 
 

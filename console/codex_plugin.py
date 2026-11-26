@@ -339,23 +339,29 @@ def doctor(root):
     from importlib.util import spec_from_file_location, module_from_spec
     path = os.path.join(plugin_dir(root), "launcher.py")
     spec = spec_from_file_location("os_lab_codex_launcher", path)
-    if not os.path.isfile(path) or not spec or not spec.loader:
-        raise PluginError("The plugin launcher is missing", "PACKAGE_MISSING")
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)
-    checkout, source, problem = module.find_checkout(here=path)
-    package_ok = check(root)["ok"]
     cli = shutil.which("codex")
     checks = [
         {"name": "python", "ok": sys.version_info >= (3, 8), "detail": sys.version.split()[0],
          "fix": None if sys.version_info >= (3, 8) else "Install Python 3.8 or newer"},
         {"name": "cli", "ok": bool(cli), "detail": cli or "missing",
          "fix": None if cli else "Install the Codex CLI and put it on PATH"},
+    ]
+    if not os.path.isfile(path) or not spec or not spec.loader:
+        checks.append({
+            "name": "package", "ok": False, "detail": path,
+            "fix": "Rebuild or reinstall the app so plugins/codex/os-lab/launcher.py ships with the runtime",
+        })
+        return {"ready": False, "platform": sys.platform, "checks": checks}
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    checkout, source, problem = module.find_checkout(here=path)
+    package_ok = check(root)["ok"]
+    checks.extend([
         {"name": "checkout", "ok": bool(checkout), "detail": checkout or problem, "source": source,
          "fix": None if checkout else "Set OSLAB_ROOT to this repository"},
         {"name": "package", "ok": package_ok, "detail": "package checks",
          "fix": None if package_ok else "Run python3 scripts/codex-plugin.py check"},
-    ]
+    ])
     return {"ready": all(row["ok"] for row in checks), "platform": sys.platform, "checks": checks}
 
 
