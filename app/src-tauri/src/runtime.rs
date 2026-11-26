@@ -72,6 +72,19 @@ const BUNDLE_FILES: &[&str] = &[
     "ios-lab/mac/appium.sh",
     "web-lab/Makefile",
     "web-lab/browser/Cargo.toml",
+    "plugins/claude/os-lab/launcher.py",
+    "plugins/codex/os-lab/launcher.py",
+    "plugins/cursor/os-lab/launcher.py",
+    "plugins/zcode/os-lab/launcher.py",
+    "plugins/grok/os-lab/launcher.py",
+    "scripts/claude-plugin.py",
+    "scripts/codex-plugin.py",
+    "scripts/cursor-plugin.py",
+    "scripts/zcode-plugin.py",
+    "scripts/grok-plugin.py",
+    ".agents/plugins/marketplace.json",
+    ".claude-plugin/marketplace.json",
+    ".grok-plugin/marketplace.json",
 ];
 
 /// A staged installer must contain the console, dashboard, legal baseline and lab entry points.

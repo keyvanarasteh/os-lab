@@ -19,7 +19,15 @@ const repo = resolve(here, "..", "..");
 const out = resolve(here, "..", "src-tauri", "resources", "os-lab");
 
 // Tracked top-level paths the console and the labs need at run time.
-export const INCLUDE = ["labctl", "console", "source-lab", "cleanup-lab", "android-lab", "linux-lab", "win-lab", "ios-lab", "firewall-lab", "web-lab", "docs/legal", "LICENSE"];
+// plugins/ + host marketplaces + *-plugin.py helpers are required by the /mcp/ cards:
+// doctor looks for plugins/<host>/os-lab/launcher.py relative to the bundled root.
+export const INCLUDE = [
+  "labctl", "console", "source-lab", "cleanup-lab", "android-lab", "linux-lab", "win-lab",
+  "ios-lab", "firewall-lab", "web-lab", "docs/legal", "LICENSE", "plugins",
+  ".agents/plugins/marketplace.json", ".claude-plugin/marketplace.json", ".grok-plugin/marketplace.json",
+  "scripts/claude-plugin.py", "scripts/codex-plugin.py", "scripts/cursor-plugin.py",
+  "scripts/zcode-plugin.py", "scripts/grok-plugin.py",
+];
 
 // These are the entry points used by the installed console and every supported lab path.
 export const REQUIRED = [
@@ -52,6 +60,11 @@ export const REQUIRED = [
   "ios-lab/mac/stop-simulator.sh", "ios-lab/mac/appium.sh", "ios-lab/mac/config.env.example",
   "web-lab/Makefile", "web-lab/browser/Cargo.toml", "web-lab/browser/src/main.rs", "console/web_api.py",
   "docs/legal/PRIVACY.md",
+  "plugins/claude/os-lab/launcher.py", "plugins/codex/os-lab/launcher.py",
+  "plugins/cursor/os-lab/launcher.py", "plugins/zcode/os-lab/launcher.py", "plugins/grok/os-lab/launcher.py",
+  ".agents/plugins/marketplace.json", ".claude-plugin/marketplace.json", ".grok-plugin/marketplace.json",
+  "scripts/claude-plugin.py", "scripts/codex-plugin.py", "scripts/cursor-plugin.py",
+  "scripts/zcode-plugin.py", "scripts/grok-plugin.py",
 ];
 
 // Even tracked, these never ship: credentials, private notes, VM guest data.

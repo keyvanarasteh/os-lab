@@ -52,9 +52,13 @@ or `OSLAB_DASHBOARD_BUILD=0`, the committed `dashboard/dist` is used.
 
 ## Source Lab distribution
 
-[[app/scripts/stage-runtime.mjs]] includes Source engine/adapters, the Cleanup
-Lab engine/catalog, and the Web Lab engine manifest and binary. It refuses private resource/storage/archive inputs. Desktop
-updates preserve private state.
+[[app/scripts/stage-runtime.mjs]] includes Source, Cleanup and Web Lab runtimes
+plus the MCP host plugin packages under `plugins/` so `/mcp/` cards can doctor
+and install from a bundled app.
+
+It also ships the host marketplace manifests and `scripts/*-plugin.py` helpers.
+It refuses private resource/storage/archive inputs. Desktop updates preserve
+private state.
 
 On first launch and after an app update, the native launcher prepares bundled files on a blocking
 worker and reports file progress before starting the console. It shows a slow or stalled disk hint

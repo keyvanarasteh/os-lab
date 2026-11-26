@@ -14,8 +14,32 @@ test("secrets and local state never ship, even when tracked", () => {
 });
 
 test("only the runtime roots are selected", () => {
-  const got = select(["labctl", "console/oslab.py", "dashboard/src/x.ts", "README.md", "firewall-lab/catalog.json", "docs/legal/PRIVACY.md", "android-lab/lab/.env", "app/package.json", "labctl-other"]);
-  assert.deepEqual(got, ["labctl", "console/oslab.py", "firewall-lab/catalog.json", "docs/legal/PRIVACY.md"]);
+  const got = select([
+    "labctl", "console/oslab.py", "dashboard/src/x.ts", "README.md", "firewall-lab/catalog.json",
+    "docs/legal/PRIVACY.md", "android-lab/lab/.env", "app/package.json", "labctl-other",
+    "plugins/cursor/os-lab/launcher.py", "scripts/cursor-plugin.py", "scripts/analysis/dropper_lab/x.py",
+    ".agents/plugins/marketplace.json", ".claude-plugin/marketplace.json", ".grok-plugin/marketplace.json",
+  ]);
+  assert.deepEqual(got, [
+    "labctl", "console/oslab.py", "firewall-lab/catalog.json", "docs/legal/PRIVACY.md",
+    "plugins/cursor/os-lab/launcher.py", "scripts/cursor-plugin.py",
+    ".agents/plugins/marketplace.json", ".claude-plugin/marketplace.json", ".grok-plugin/marketplace.json",
+  ]);
+});
+
+test("MCP host plugin launchers and install helpers ship with the desktop runtime", () => {
+  for (const path of [
+    "plugins/claude/os-lab/launcher.py",
+    "plugins/codex/os-lab/launcher.py",
+    "plugins/cursor/os-lab/launcher.py",
+    "plugins/zcode/os-lab/launcher.py",
+    "plugins/grok/os-lab/launcher.py",
+    "scripts/cursor-plugin.py",
+    ".agents/plugins/marketplace.json",
+  ]) {
+    assert.ok(REQUIRED.includes(path), path);
+    assert.deepEqual(select([path]), [path]);
+  }
 });
 
 test("the bundle includes every console and lab entry point", () => {
