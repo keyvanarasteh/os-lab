@@ -42,7 +42,7 @@ function Terminal({ command }: { command: string }) {
   );
 }
 
-export function McpPluginCards({ root }: { root?: string }) {
+export function McpPluginCards({ root, python }: { root?: string; python?: string | null }) {
   const [state, setState] = useState<ClaudePluginState | null>(null);
   const [updates, setUpdates] = useState<ClaudePluginUpdates | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export function McpPluginCards({ root }: { root?: string }) {
   if (loadError) {
     return (
       <Section id="mcp-claude-plugin" title="Install as a Claude plugin" description="Connect the local console to check, install and update from this page. You can also run this in a terminal.">
-        <Terminal command={claudePluginSnippet(root)} />
+        <Terminal command={claudePluginSnippet(root, python)} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Action label="Try again" onClick={() => void refresh()} />
           <span className="text-xs text-(--iux-muted-foreground)">{loadError}</span>

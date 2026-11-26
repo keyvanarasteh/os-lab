@@ -2047,6 +2047,9 @@ def host_info(root: str) -> dict:
         "runtime": container_runtime(),
         "xcode": xcode_status() if os_name == "macos" else None,
         "python": platform.python_version(),
+        # The interpreter running the console (os-lab.app's own one when it set one up): what the
+        # dashboard puts in its copyable client commands.
+        "pythonExecutable": sys.executable or None,
         "root": root,
         "tools": [{"id": t, "label": label, "found": bool(_which(t)), "path": _which(t)} for t, label in tools_for_host(os_name)],
         "providers": [p for p in provider_report(os_name, arch) if p["candidate"]],

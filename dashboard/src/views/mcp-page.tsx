@@ -82,6 +82,7 @@ function VerifyBadges({ label, slot }: { label: string; slot: VerifySlot }) {
 export default function McpPage() {
   const { data, error } = hostStore.use();
   const root = data?.host?.root;
+  const python = data?.host?.pythonExecutable;
   const os = data?.host?.os;
   const toolCount = MCP_GROUPS.reduce((n, g) => n + g.tools.length, 0);
 
@@ -115,20 +116,20 @@ export default function McpPage() {
           {!root && !error && <p className="mb-3 text-sm text-(--iux-muted-foreground)">Connect the local console to fill this computer's repo path. Until then the snippets use {"<repo>"}.</p>}
           {root && <p className="mb-3 text-sm text-(--iux-muted-foreground)">Repo path: <code translate="no">{root}</code></p>}
           <div className="grid gap-3">
-            <Snippet label="Claude Code" text={claudeCodeSnippet(root, os)} />
-            <Snippet label="Claude Desktop" text={claudeDesktopSnippet(root, os)} />
-            <Snippet label="Codex" text={codexSnippet(root)} />
-            <Snippet label="Cursor" text={cursorSnippet(root)} />
-            <Snippet label="OpenCode" text={openCodeSnippet(root)} />
-            <Snippet label="Zcode" text={zcodeSnippet(root)} />
-            <Snippet label="Antigravity" text={antigravitySnippet(root)} />
+            <Snippet label="Claude Code" text={claudeCodeSnippet(root, os, python)} />
+            <Snippet label="Claude Desktop" text={claudeDesktopSnippet(root, os, python)} />
+            <Snippet label="Codex" text={codexSnippet(root, python)} />
+            <Snippet label="Cursor" text={cursorSnippet(root, python)} />
+            <Snippet label="OpenCode" text={openCodeSnippet(root, python)} />
+            <Snippet label="Zcode" text={zcodeSnippet(root, python)} />
+            <Snippet label="Antigravity" text={antigravitySnippet(root, python)} />
             <Snippet label="Generic stdio" text={genericSnippet()} />
           </div>
         </Section>
 
-        <McpPluginCards root={root} />
-        <McpCodexPluginCards root={root} />
-        <McpHostPluginCards root={root} />
+        <McpPluginCards root={root} python={python} />
+        <McpCodexPluginCards root={root} python={python} />
+        <McpHostPluginCards root={root} python={python} />
 
         {MCP_GROUPS.map((group) => (
           <Section

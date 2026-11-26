@@ -73,45 +73,68 @@ export function snippetPath(root: string | undefined): string {
   return `${base}/${MCP_SERVER_FILE}`;
 }
 
-export function claudeCodeSnippet(root: string | undefined, os?: string): string {
-  return `claude mcp add ${serverName(os)} -- python3 ${snippetPath(root)}`;
+/** One argument of a copyable command, quoted only when a shell would split or expand it. */
+export function shellArg(text: string): string {
+  const windows = /^[A-Za-z]:[\\/]/.test(text);
+  if ((windows ? /^[\w@%+=:,.\\/-]+$/ : /^[\w@%+=:,./-]+$/).test(text)) return text;
+  return windows ? `"${text}"` : `'${text.replaceAll("'", "'\\''")}'`;
 }
 
-export function claudeDesktopSnippet(root: string | undefined, os?: string): string {
+/** The interpreter that starts a command: the console's own, so none has to be on PATH. */
+function interpreter(python?: string | null): string {
+  if (!python) return "python3";
+  const arg = shellArg(python);
+  // PowerShell only runs a quoted path through the call operator
+  return arg.startsWith('"') ? `& ${arg}` : arg;
+}
+
+/** A `python3 scripts/…` command run with the console's interpreter on the checkout at `root`. */
+export function scriptCommand(command: string, root?: string, python?: string | null): string {
+  return command.replace(/^python3 (?:<repo>\/)?scripts\/(\S+)/, (_, file: string) =>
+    `${interpreter(python)} ${root && root !== "<repo>" ? shellArg(`${root}/scripts/${file}`) : `<repo>/scripts/${file}`}`);
+}
+
+export function claudeCodeSnippet(root: string | undefined, os?: string, python?: string | null): string {
+  const path = root ? shellArg(snippetPath(root)) : snippetPath(root);
+  return `claude mcp add ${serverName(os)} -- ${python ? shellArg(python) : "python3"} ${path}`;
+}
+
+export function claudeDesktopSnippet(root: string | undefined, os?: string, python?: string | null): string {
   const name = serverName(os);
   return JSON.stringify({
     mcpServers: {
-      [name]: { command: "python3", args: [snippetPath(root)] }
+      [name]: { command: python || "python3", args: [snippetPath(root)] }
     }
   }, null, 2);
 }
 
-export function codexSnippet(root: string | undefined): string {
-  return `[mcp_servers.os-lab]\ncommand = "python3"\nargs = ["${snippetPath(root)}"]`;
+export function codexSnippet(root: string | undefined, python?: string | null): string {
+  // A JSON string is a valid TOML basic string, backslashes included
+  return `[mcp_servers.os-lab]\ncommand = ${JSON.stringify(python || "python3")}\nargs = [${JSON.stringify(snippetPath(root))}]`;
 }
 
-export function cursorSnippet(root: string | undefined): string {
+export function cursorSnippet(root: string | undefined, python?: string | null): string {
   return JSON.stringify({
     mcpServers: {
-      "os-lab": { command: "python3", args: [snippetPath(root)] }
+      "os-lab": { command: python || "python3", args: [snippetPath(root)] }
     }
   }, null, 2);
 }
 
-export function openCodeSnippet(root: string | undefined): string {
+export function openCodeSnippet(root: string | undefined, python?: string | null): string {
   return JSON.stringify({
     mcp: {
-      "os-lab": { command: "python3", args: [snippetPath(root)] }
+      "os-lab": { command: python || "python3", args: [snippetPath(root)] }
     }
   }, null, 2);
 }
 
-export function zcodeSnippet(root: string | undefined): string {
+export function zcodeSnippet(root: string | undefined, python?: string | null): string {
   return JSON.stringify({
     servers: {
       "os-lab": {
         transport: "stdio",
-        command: "python3",
+        command: python || "python3",
         args: [snippetPath(root)],
         skills: [`${(root || "<repo>").replace(/[/\\]+$/, "")}/${MCP_SKILLS}`]
       }
@@ -119,11 +142,11 @@ export function zcodeSnippet(root: string | undefined): string {
   }, null, 2);
 }
 
-export function antigravitySnippet(root: string | undefined): string {
+export function antigravitySnippet(root: string | undefined, python?: string | null): string {
   return JSON.stringify({
     name: "os-lab",
     transport: "stdio",
-    command: "python3",
+    command: python || "python3",
     args: [snippetPath(root)],
     capabilities: ["tools", "resources", "prompts"],
     ui: { mimeTypes: ["text/html;profile=mcp-app"] }
@@ -528,16 +551,16 @@ export const MCP_PLANNED_SECTIONS: { id: string; title: string; engineUsage: Ver
 ];
 
 /** Install the repo as a Claude Code plugin: server, lab skills and the setup check together. */
-export function claudePluginSnippet(root?: string): string {
-  return `python3 ${root ?? "<repo>"}/scripts/claude-plugin.py install`;
+export function claudePluginSnippet(root?: string, python?: string | null): string {
+  return scriptCommand("python3 scripts/claude-plugin.py install", root ?? "<repo>", python);
 }
 
 /** Install the repo as a Codex plugin: marketplace add plus plugin add, interactive only. */
-export function codexPluginSnippet(root?: string): string {
-  return `python3 ${root ?? "<repo>"}/scripts/codex-plugin.py install`;
+export function codexPluginSnippet(root?: string, python?: string | null): string {
+  return scriptCommand("python3 scripts/codex-plugin.py install", root ?? "<repo>", python);
 }
 
 /** Install the repo as a Cursor / ZCode / Grok Build plugin via project MCP config. */
-export function hostPluginSnippet(host: "cursor" | "zcode" | "grok", root?: string): string {
-  return `python3 ${root ?? "<repo>"}/scripts/${host}-plugin.py install`;
+export function hostPluginSnippet(host: "cursor" | "zcode" | "grok", root?: string, python?: string | null): string {
+  return scriptCommand(`python3 scripts/${host}-plugin.py install`, root ?? "<repo>", python);
 }
