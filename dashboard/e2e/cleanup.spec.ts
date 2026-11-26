@@ -84,7 +84,7 @@ test("quick cleanup dashboard: scan all, suggested plan, confirm, report and his
   await expect(page.getByRole("dialog")).toContainText("Move to Trash");
   await page.getByRole("button", { name: "Run clean" }).click();
   await expect(page.getByRole("dialog")).toContainText("moved to Trash, not yet freed.");
-  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog").locator("footer").getByRole("button", { name: "Close" }).click();
   await expect(page.getByText("moved to Trash, not yet freed.", { exact: false })).toBeVisible();
   expect(calls.filter((call) => call.path === "/api/cleanup/clean")[0].body).toEqual({ planId: "plan-1" });
   // CLNP-21: the Space Explorer capability card moved to Settings and still navigates its tab in place.
@@ -165,7 +165,7 @@ test("advanced scan sorts by size, reviews a plan and cleans typed", async ({ pa
   await expect(page.getByRole("dialog")).toContainText("Move to Trash");
   await page.getByRole("button", { name: "Run clean" }).click();
   await expect(page.getByRole("dialog")).toContainText("moved to Trash, not yet freed.");
-  await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog").locator("footer").getByRole("button", { name: "Close" }).click();
   expect(calls.filter((call) => call.path === "/api/cleanup/clean")[0].body).toEqual({ planId: "plan-1" });
   await expect(page.getByText("Trashed 1")).toBeVisible();
 });

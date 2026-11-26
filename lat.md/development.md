@@ -78,6 +78,6 @@ A change is done when typecheck, translations, graph and a real browser run agre
 2. Engine changes: `python3 -m unittest discover -s tests -t .` in `cleanup-lab/engine`.
 3. `lat check`; each node's first paragraph stays under 250 characters. `lat.md/tooling.md` has one older too-long paragraph that is not from this work.
 4. `scripts/ux/dev-stack.sh dev`, then `node scripts/ux/run.mjs` and look at the screenshots.
-5. Run mode (`run`) for anything that must work from the built app; the Playwright suite (`scripts/e2e.sh`) is a separate, heavier step; ask the user before running it. New specs go in `dashboard/e2e/affected.json`. Heading locators that match TopBar and PageHead fail strict mode; a white screenshot after navigation is an island throw on a partial mock.
+5. Run mode (`run`) for anything that must work from the built app; the Playwright suite (`scripts/e2e.sh`) is a separate, heavier step; ask the user before running it. New specs go in `dashboard/e2e/affected.json`. Heading locators that match TopBar and PageHead fail strict mode; a stay-open confirm has two Close controls so scope to `dialog.locator("footer")`; a white screenshot after navigation is an island throw on a partial mock.
 
 Parallel agents each take a task with disjoint files, run the same checks without e2e, and report files changed, checks and what is left; the lead re-runs the browser suite because agents cannot see the page.
