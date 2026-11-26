@@ -1,0 +1,11 @@
+{
+  "name": "os-lab",
+  "transport": "stdio",
+  "command": "python3",
+  "args": ["<REPO>/console/mcp_server.py"],
+  "capabilities": ["tools", "resources", "prompts"],
+  "ui": {
+    "mimeTypes": ["text/html;profile=mcp-app"]
+  },
+  "docs": "<REPO>/docs/PLAN-mcp-coverage.md"
+}

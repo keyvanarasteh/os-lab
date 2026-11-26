@@ -1,0 +1,8 @@
+{
+  "mcp": {
+    "os-lab": {
+      "command": "python3",
+      "args": ["<REPO>/console/mcp_server.py"]
+    }
+  }
+}

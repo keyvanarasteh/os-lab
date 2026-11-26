@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Cleanup settings</title>
+<style>*{box-sizing:border-box}body{margin:0;font:14px/1.45 var(--font-sans,system-ui,sans-serif);color:var(--color-text-primary,#1c1c1a);background:var(--color-background-primary,#f7f6f2);padding:12px}h1{font-size:16px;margin:0 0 8px}h2{font-size:13px;margin:12px 0 6px;color:var(--color-text-secondary,#5c5c56)}.muted{color:var(--color-text-secondary,#5c5c56);font-size:12px}.row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--color-border-tertiary,#e6e4dc)}.bar{height:8px;border-radius:999px;background:var(--color-background-secondary,#ebe9e2);overflow:hidden;margin-top:4px}.bar>span{display:block;height:100%;background:#f36c21}.chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--color-background-secondary,#ebe9e2);font-size:12px}.ok{background:#d9f0df}.warn{background:#fde8c8}.bad{background:#f8d4d4}button{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--color-border-primary,#cfcabf);background:var(--color-background-primary,#fff);cursor:pointer}button.primary{background:#1c1c1a;color:#fff;border-color:#1c1c1a}ul{margin:0;padding-left:18px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--color-border-tertiary,#e6e4dc)}.empty{padding:16px;color:var(--color-text-secondary,#5c5c56)}
+.hero{padding:8px 0 16px}.hero .free{font-size:28px;font-weight:700;letter-spacing:-0.02em}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:480px){.grid{grid-template-columns:1fr}}.card{padding:10px;border:1px solid var(--color-border-tertiary,#e6e4dc);border-radius:12px}
+</style>
+</head>
+<body>
+<main id="root"><p class="muted">Loading Cleanup Lab app…</p></main>
+<!-- MCP_BRIDGE -->
+<script>
+
+window.__oslabUi.onUpdate(function (s) {
+  var d = s.output || {};
+  var perms = d.permissions && (d.permissions.permissions || d.permissions.records || d.permissions) || [];
+  if (!Array.isArray(perms)) perms = [];
+  var marks = d.bookmarks && (d.bookmarks.bookmarks || d.bookmarks) || [];
+  if (!Array.isArray(marks)) marks = [];
+  var mon = d.monitor || {};
+  var pref = (d.preferences && d.preferences.suggestion) || {};
+  document.getElementById("root").innerHTML = "<h1>Cleanup settings</h1>"
+    + "<h2>Permissions</h2>"+(perms.slice(0,8).map(function(p){var id=p.id||p.permissionId||"?";return "<div class=\"row\"><span>"+id+"</span><button data-id=\""+id+"\">Open</button></div>";}).join("")||"<p class=\"muted\">See cleanup_permissions.</p>")
+    + "<h2>Bookmarks</h2>"+(marks.slice(0,8).map(function(b){return "<div class=\"row\"><span>"+(b.entry&&b.entry.name||b.entryId)+"</span><span class=\"chip\">"+(b.quickClean?"quick":"")+"</span></div>";}).join("")||"<p class=\"muted\">None</p>")
+    + "<h2>Monitor</h2><div class=\"row\"><span>Enabled</span><span>"+String(!!(mon.config&&mon.config.enabled))+"</span></div>"
+    + "<h2>Preferences</h2><div class=\"row\"><span>Mode</span><span class=\"chip\">"+(pref.mode||"—")+"</span></div>";
+  document.querySelectorAll("button[data-id]").forEach(function(btn){
+    btn.onclick = function(){ window.__oslabUi.callTool("cleanup_permissions_open", {permissionId: btn.getAttribute("data-id")}); };
+  });
+});
+
+</script>
+</body>
+</html>

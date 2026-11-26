@@ -1,0 +1,2259 @@
+{
+  "version": 1,
+  "schema": {
+    "status": [
+      "none",
+      "pending",
+      "verified",
+      "n/a"
+    ],
+    "fields": [
+      "engineUsage",
+      "widget|widgets",
+      "app|apps"
+    ],
+    "proof": "PR link, test name, or artifact path that proves the status"
+  },
+  "sections": {
+    "macos": {
+      "title": "macOS Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widgets": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (apps/control shipped)"
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      },
+      "nonGoals": {
+        "armTool": {
+          "status": "n/a",
+          "proof": "Deliberate: human arms from the dashboard; no macos_arm MCP tool."
+        }
+      }
+    },
+    "cleanup": {
+      "title": "Cleanup Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widgets": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py"
+      },
+      "apps": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py"
+      }
+    },
+    "websec": {
+      "title": "Web Sec Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widgets": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (status/review/report shipped)"
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps": {
+      "title": "Windows Apps Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      },
+      "nonGoals": {
+        "inputTools": {
+          "status": "n/a",
+          "proof": "Deliberate: Windows Apps stays read-only for agents until a human-arm story exists."
+        }
+      }
+    },
+    "android": {
+      "title": "Android Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py"
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (overview app shipped)"
+      }
+    },
+    "ios": {
+      "title": "iOS Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py"
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (overview app shipped)"
+      }
+    },
+    "linux": {
+      "title": "Linux Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py"
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "web": {
+      "title": "Web Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py"
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (overview app shipped)"
+      }
+    },
+    "source": {
+      "title": "Source Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py"
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py (overview app shipped)"
+      }
+    },
+    "firewall": {
+      "title": "Firewall Lab",
+      "engineUsage": {
+        "status": "pending",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py"
+      },
+      "widgets": {
+        "status": "none",
+        "proof": null
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
+    }
+  },
+  "tools": {
+    "cleanup_app_overview": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_cleanup_apps_return_structured_ui_meta"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/apps/overview.html"
+      }
+    },
+    "cleanup_app_review": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/apps/review.html"
+      }
+    },
+    "cleanup_app_settings": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_cleanup_apps_return_structured_ui_meta"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/apps/settings.html"
+      }
+    },
+    "cleanup_bookmark_add": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_bookmark_remove": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_bookmark_update": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_bookmarks": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/bookmarks.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_catalog": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup.py"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/catalog.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_clean": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup.py::test_review_scans_suggests_and_plans_but_never_cleans"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_history": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/history.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_job": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/job.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_job_cancel": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_monitor": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_monitor_config": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_monitor_evaluate": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/monitor.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_permissions": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_permissions_open": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_permissions_reset": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_permissions_reveal_app": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/permissions.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_plan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_preferences": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/preferences.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_preferences_save": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/preferences.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_quick_clean_plan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_reveal": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_review": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup.py::test_review_scans_suggests_and_plans_but_never_cleans"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/review.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_scan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_status": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_cleanup_widget_tools_return_structured_ui_meta"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/status.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_suggest": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/suggest.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_volumes": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/volumes.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_widget": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/widget.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_widget_refresh": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/cleanup/widgets/widget.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_apps": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/macos/widgets/apps.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_capabilities": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_click": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_control_state": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/macos/widgets/control.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_displays": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_get_app_state": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_key": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_menubar": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_paste": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_perform": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_permissions": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_request_access": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup.py::test_every_cleanup_tool_is_listed_with_a_schema"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_screenshot": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_scroll": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_search": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_set_value": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_stop": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_task": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_type": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_windows": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_bulk": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_catalogue": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_clear_history": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_compare": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_delete_runs": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_favourite": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_guides": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_history": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_job": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_monitor": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_monitor_config": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_monitor_run": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_preferences": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_preferences_save": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_report": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/websec/widgets/report.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_reports": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_review": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/websec/widgets/review.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_scan": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_scan_cancel": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_stats": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "websec_status": {
+      "section": "websec",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_websec_and_macos_widgets_are_linked"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/websec/widgets/status.html"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_apps": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_audit": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_capabilities": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_doctor": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "winapps_screenshot": {
+      "section": "winapps",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_focused": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_verification.py::test_macos_observe_extras_are_listed_and_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_audit": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_verification.py::test_macos_observe_extras_are_listed_and_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "macos_sessions": {
+      "section": "macos",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_verification.py::test_macos_observe_extras_are_listed_and_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_explorer_roots": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_aux_inventory_tools_return_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_explorer_scan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_deep_roots": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_aux_inventory_tools_return_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_deep_scan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_containers": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_aux_inventory_tools_return_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_containers_preview": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_containers_prune": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_destructive_aux_tools_require_confirm"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_simulators": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_aux_inventory_tools_return_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_simulators_preview": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_simulators_run": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_destructive_aux_tools_require_confirm"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_emulators": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_aux_inventory_tools_return_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_emulators_preview": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_emulators_run": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_destructive_aux_tools_require_confirm"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_vms_scan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_packages_scan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_leftovers_scan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_relocation": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_aux_inventory_tools_return_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_relocation_plan": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_relocation_run": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_destructive_aux_tools_require_confirm"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_privileged": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_aux_inventory_tools_return_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_privileged_preview": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_privileged_run": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_destructive_aux_tools_require_confirm"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_simulator_storage": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_aux_inventory_tools_return_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_simulator_storage_save": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_custom_entries_add": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "cleanup_custom_entries_remove": {
+      "section": "cleanup",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_cleanup_aux.py::test_destructive_aux_tools_require_confirm"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "android_status": {
+      "section": "android",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_status_tools_return_lab_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "android_frida_inventory": {
+      "section": "android",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "android_plan": {
+      "section": "android",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "ios_status": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_status_tools_return_lab_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "ios_simulator": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "ios_devices": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "ios_device_check": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "ios_resources": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "ios_screenshot": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "pending",
+        "proof": null
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "ios_plan": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "linux_status": {
+      "section": "linux",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_status_tools_return_lab_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "linux_plan": {
+      "section": "linux",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "web_status": {
+      "section": "web",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_status_tools_return_lab_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "web_overview": {
+      "section": "web",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "web_windows": {
+      "section": "web",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "web_engine_start": {
+      "section": "web",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "web_engine_stop": {
+      "section": "web",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "source_status": {
+      "section": "source",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_status_tools_return_lab_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "source_readiness": {
+      "section": "source",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "source_candidates": {
+      "section": "source",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "source_runtime": {
+      "section": "source",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "source_plan": {
+      "section": "source",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "firewall_status": {
+      "section": "firewall",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_status_tools_return_lab_payloads"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "firewall_catalog": {
+      "section": "firewall",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_firewall_catalog_and_company_round_trip"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "firewall_company": {
+      "section": "firewall",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_firewall_catalog_and_company_round_trip"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "firewall_guides": {
+      "section": "firewall",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_labs.py::test_new_lab_tools_are_listed"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "android_app_overview": {
+      "section": "android",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_lab_overview_apps_are_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/android/apps/overview.html"
+      }
+    },
+    "ios_app_overview": {
+      "section": "ios",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_lab_overview_apps_are_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/ios/apps/overview.html"
+      }
+    },
+    "web_app_overview": {
+      "section": "web",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_lab_overview_apps_are_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/web/apps/overview.html"
+      }
+    },
+    "source_app_overview": {
+      "section": "source",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_lab_overview_apps_are_callable"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py::test_all_ui_resources_list_and_read_with_bridge",
+        "resourceUri": "ui://os-lab/source/apps/overview.html"
+      }
+    }
+  }
+}

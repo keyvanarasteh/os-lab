@@ -33,6 +33,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import oslab  # noqa: E402
 import mcp_cleanup  # noqa: E402
 import mcp_websec  # noqa: E402
+import mcp_android  # noqa: E402
+import mcp_ios  # noqa: E402
+import mcp_linux  # noqa: E402
+import mcp_web  # noqa: E402
+import mcp_source  # noqa: E402
+import mcp_firewall  # noqa: E402
+import mcp_ui  # noqa: E402
+import mcp_prompts  # noqa: E402
 import winapps  # noqa: E402
 import winapps_guard  # noqa: E402
 
@@ -45,6 +53,7 @@ TOOLS = [
         "name": "macos_apps",
         "description": "List the visible app windows on this Mac: id, pid, app, title, rect and the display scale of each (read-only).",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "_meta": mcp_ui.ui_meta(mcp_ui.MACOS_WIDGET["apps"]),
     },
     {
         "name": "macos_get_app_state",
@@ -223,13 +232,46 @@ TOOLS = [
     },
     {
         "name": "macos_permissions",
-        "description": "Accessibility and Screen Recording state and the app each grant belongs to (read-only). Requesting a grant is a human step in the dashboard.",
+        "description": "Accessibility and Screen Recording state and the app each grant belongs to (read-only).",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "macos_request_access",
+        "description": "Ask macOS for Accessibility or Screen Recording: open the privacy pane and, when possible, fire the consent prompt (write counterpart to macos_permissions). The human still grants in System Settings; there is no silent grant.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"pane": {"type": "string", "enum": ["accessibility", "screen-recording"]}},
+            "required": ["pane"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+    },
+    {
+        "name": "macos_focused",
+        "description": "The focused accessibility element of one app (pid), with attributes (read-only observe; MIR-08).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"pid": {"type": "integer"}},
+            "required": ["pid"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "macos_audit",
+        "description": "Recent macOS Lab audit rows for this process (agent calls, refusals, panic stop). Read-only; thumbnails omitted.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "macos_sessions",
+        "description": "Open deep-inspect (Appium mac2) sessions and whether Appium answers. Read-only; opening a session stays on the armed dashboard.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "macos_control_state",
         "description": "Whether armed control mode is active, its owner and remaining seconds (read-only). Input tools refuse while it is off; there is no arm tool — the human arms from the dashboard.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "_meta": mcp_ui.ui_meta(mcp_ui.MACOS_WIDGET["control"]),
     },
     {
         "name": "macos_stop",
@@ -266,6 +308,12 @@ TOOLS = [
 
 TOOLS += mcp_cleanup.TOOLS  # CUX-10: the Cleanup Lab tools share this server and its error shape
 TOOLS += mcp_websec.TOOLS  # the Web Sec Lab workbench, on the same console API and scope guard
+TOOLS += mcp_android.TOOLS
+TOOLS += mcp_ios.TOOLS
+TOOLS += mcp_linux.TOOLS
+TOOLS += mcp_web.TOOLS
+TOOLS += mcp_source.TOOLS
+TOOLS += mcp_firewall.TOOLS
 
 
 def _window_point(window_id: int, args: dict) -> tuple[int, int, dict]:
@@ -328,6 +376,35 @@ WIN_TOOLS = [
 ]
 
 
+
+
+# Annotate core macos / winapps tools that were declared without annotations above.
+_RO = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+_WR = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False}
+_WR_OPEN = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
+_STOP = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+_RO_NAMES = {
+    "macos_apps", "macos_get_app_state", "macos_screenshot", "macos_windows", "macos_menubar",
+    "macos_search", "macos_displays", "macos_capabilities", "macos_control_state",
+    "macos_focused", "macos_audit", "macos_sessions", "macos_permissions",
+    "winapps_apps", "winapps_screenshot", "winapps_capabilities", "winapps_doctor", "winapps_audit",
+}
+_WR_NAMES = {
+    "macos_click", "macos_type", "macos_key", "macos_paste", "macos_scroll",
+    "macos_set_value", "macos_perform", "macos_task",
+}
+for _tool in TOOLS + WIN_TOOLS:
+    if "annotations" in _tool:
+        continue
+    name = _tool["name"]
+    if name in _RO_NAMES:
+        _tool["annotations"] = dict(_RO)
+    elif name == "macos_stop":
+        _tool["annotations"] = dict(_STOP)
+    elif name in _WR_NAMES:
+        _tool["annotations"] = dict(_WR)
+
+
 def _text(value: dict) -> dict:
     return {"content": [{"type": "text", "text": json.dumps(value)}]}
 
@@ -370,8 +447,20 @@ def tool_call(name: str, args: dict) -> dict:
         return mcp_cleanup.call(name, args, REPO_ROOT)
     if name in mcp_websec.NAMES:
         return mcp_websec.call(name, args, REPO_ROOT)
+    if name in mcp_android.NAMES:
+        return mcp_android.call(name, args, REPO_ROOT)
+    if name in mcp_ios.NAMES:
+        return mcp_ios.call(name, args, REPO_ROOT)
+    if name in mcp_linux.NAMES:
+        return mcp_linux.call(name, args, REPO_ROOT)
+    if name in mcp_web.NAMES:
+        return mcp_web.call(name, args, REPO_ROOT)
+    if name in mcp_source.NAMES:
+        return mcp_source.call(name, args, REPO_ROOT)
+    if name in mcp_firewall.NAMES:
+        return mcp_firewall.call(name, args, REPO_ROOT)
     if name == "macos_apps":
-        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_windows())}]}
+        return mcp_ui.result(oslab.macos_windows(), resource_uri=mcp_ui.MACOS_WIDGET["apps"])
     if name == "macos_get_app_state":
         state = oslab.macos_window_elements(REPO_ROOT, args.get("windowId"), args.get("revision"))
         content: list[dict] = [{"type": "text", "text": json.dumps(state)}]
@@ -415,8 +504,16 @@ def tool_call(name: str, args: dict) -> dict:
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_capabilities(REPO_ROOT))}]}
     if name == "macos_permissions":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_permissions(REPO_ROOT))}]}
+    if name == "macos_request_access":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_request_access(REPO_ROOT, args))}]}
+    if name == "macos_focused":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_ax_focused(REPO_ROOT, args))}]}
+    if name == "macos_audit":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_audit_rows())}]}
+    if name == "macos_sessions":
+        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_session_state(REPO_ROOT))}]}
     if name == "macos_control_state":
-        return {"content": [{"type": "text", "text": json.dumps(oslab.macos_control_state())}]}
+        return mcp_ui.result(oslab.macos_control_state(), resource_uri=mcp_ui.MACOS_WIDGET["control"])
     if name == "macos_stop":
         return {"content": [{"type": "text", "text": json.dumps(oslab.macos_panic_stop(REPO_ROOT))}]}
     if name == "macos_task":
@@ -444,6 +541,12 @@ def run_task(args: dict) -> dict:
                 raise oslab.PlanError("cleanup tools are not available inside macos_task", code="INVALID_ARGS")
             if str(tool) in mcp_websec.NAMES:
                 raise oslab.PlanError("web sec tools are not available inside macos_task", code="INVALID_ARGS")
+            for _mod, _label in (
+                (mcp_android, "android"), (mcp_ios, "ios"), (mcp_linux, "linux"),
+                (mcp_web, "web"), (mcp_source, "source"), (mcp_firewall, "firewall"),
+            ):
+                if str(tool) in _mod.NAMES:
+                    raise oslab.PlanError(f"{_label} tools are not available inside macos_task", code="INVALID_ARGS")
             result = tool_call(str(tool), step_args if isinstance(step_args, dict) else {})
             row["ok"] = True
             row["result"] = result["content"][0]["text"][:2000]
@@ -464,14 +567,38 @@ def handle(message: dict) -> dict | None:
     if method == "initialize":
         return {"jsonrpc": "2.0", "id": message_id, "result": {
             "protocolVersion": PROTOCOL_VERSION,
-            "capabilities": {"tools": {}},
+            "capabilities": {
+                "tools": {"listChanged": False},
+                "resources": {"listChanged": False, "subscribe": False},
+                "prompts": {"listChanged": False},
+                "extensions": {"io.modelcontextprotocol/ui": {"mimeTypes": [mcp_ui.RESOURCE_MIME]}},
+            },
             "serverInfo": {"name": "os-lab-windows" if sys.platform == "win32" else "os-lab-macos",
-                           "version": "0.2.0"}}}
+                           "version": "0.5.0"}}}
     if method == "notifications/initialized":
         return None
     if method == "tools/list":
         tools = TOOLS + WIN_TOOLS if sys.platform == "win32" else TOOLS
         return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": tools}}
+    if method == "resources/list":
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"resources": mcp_ui.list_resources()}}
+    if method == "resources/templates/list":
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"resourceTemplates": []}}
+    if method == "resources/read":
+        params = message.get("params") or {}
+        uri = params.get("uri")
+        try:
+            return {"jsonrpc": "2.0", "id": message_id, "result": mcp_ui.read_resource(str(uri))}
+        except KeyError:
+            return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32002, "message": f"Resource not found: {uri}"}}
+    if method == "prompts/list":
+        return {"jsonrpc": "2.0", "id": message_id, "result": {"prompts": mcp_prompts.list_prompts()}}
+    if method == "prompts/get":
+        params = message.get("params") or {}
+        try:
+            return {"jsonrpc": "2.0", "id": message_id, "result": mcp_prompts.get_prompt(str(params.get("name")), params.get("arguments") or {})}
+        except KeyError:
+            return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32602, "message": f"Unknown prompt {params.get('name')}"}}
     if method == "tools/call":
         params = message.get("params") or {}
         try:

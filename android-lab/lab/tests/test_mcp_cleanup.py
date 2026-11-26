@@ -25,11 +25,58 @@ def test_every_cleanup_tool_is_listed_with_a_schema():
     names = {tool["name"] for tool in listed}
     expected = {"cleanup_status", "cleanup_catalog", "cleanup_volumes", "cleanup_monitor", "cleanup_permissions", "cleanup_bookmarks",
                 "cleanup_history", "cleanup_widget", "cleanup_preferences", "cleanup_job", "cleanup_scan", "cleanup_suggest",
-                "cleanup_review", "cleanup_quick_clean_plan", "cleanup_clean", "cleanup_preferences_save", "cleanup_monitor_config",
-                "cleanup_monitor_evaluate", "cleanup_bookmark_add", "cleanup_bookmark_remove", "cleanup_reveal"}
+                "cleanup_review", "cleanup_quick_clean_plan", "cleanup_plan", "cleanup_clean", "cleanup_job_cancel",
+                "cleanup_preferences_save", "cleanup_monitor_config", "cleanup_monitor_evaluate", "cleanup_bookmark_add",
+                "cleanup_bookmark_update", "cleanup_bookmark_remove", "cleanup_reveal", "cleanup_permissions_open",
+                "cleanup_permissions_reveal_app", "cleanup_permissions_reset", "cleanup_widget_refresh",
+                "cleanup_app_overview", "cleanup_app_review", "cleanup_app_settings"}
     assert expected <= names
     assert "macos_stop" in names  # the macOS tools are still there
+    assert "macos_request_access" in names
     assert all(tool["inputSchema"]["type"] == "object" for tool in listed)
+    cleanup = [tool for tool in listed if tool["name"].startswith("cleanup_")]
+    assert all("annotations" in tool for tool in cleanup)
+    assert any(tool.get("_meta", {}).get("ui", {}).get("resourceUri", "").startswith("ui://os-lab/cleanup/")
+               for tool in cleanup)
+
+
+def test_cleanup_widgets_and_apps_are_declared_resources():
+    caps = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})["result"]["capabilities"]
+    assert "resources" in caps
+    assert "io.modelcontextprotocol/ui" in caps.get("extensions", {})
+    resources = mcp_server.handle({"jsonrpc": "2.0", "id": 2, "method": "resources/list"})["result"]["resources"]
+    uris = {item["uri"] for item in resources}
+    assert "ui://os-lab/cleanup/widgets/review.html" in uris
+    assert "ui://os-lab/cleanup/apps/overview.html" in uris
+    body = mcp_server.handle({"jsonrpc": "2.0", "id": 3, "method": "resources/read",
+                              "params": {"uri": "ui://os-lab/cleanup/widgets/status.html"}})
+    html = body["result"]["contents"][0]["text"]
+    assert "html" in body["result"]["contents"][0]["mimeType"]
+    assert "__oslabUi" in html
+
+
+def test_permissions_reset_needs_confirm(tmp_path, monkeypatch):
+    catalog_cache_target(tmp_path, monkeypatch)
+    failed, payload = rpc("cleanup_permissions_reset", {"confirm": False})
+    assert failed and payload["code"] == "CONFIRM_REQUIRED"
+
+
+def test_prompts_and_verification_registry_are_advertised():
+    caps = mcp_server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})["result"]["capabilities"]
+    assert "prompts" in caps
+    prompts = mcp_server.handle({"jsonrpc": "2.0", "id": 2, "method": "prompts/list"})["result"]["prompts"]
+    names = {item["name"] for item in prompts}
+    assert {"cleanup_review_flow", "mcp_coverage_status", "mcp_gap_plan", "mcp_verify_tool"} <= names
+    got = mcp_server.handle({"jsonrpc": "2.0", "id": 3, "method": "prompts/get",
+                             "params": {"name": "mcp_coverage_status", "arguments": {"section": "cleanup"}}})
+    text = got["result"]["messages"][0]["content"]["text"]
+    assert "cleanup" in text.lower()
+    import mcp_ui  # noqa: F401
+    from pathlib import Path
+    registry = json.loads(Path(mcp_server.REPO_ROOT, "console", "mcp_verification.json").read_text())
+    assert registry["tools"]["cleanup_review"]["engineUsage"]["status"] in ("none", "pending", "verified", "n/a")
+    assert registry["sections"]["android"]["engineUsage"]["status"] in ("pending", "verified")
+    assert "android_status" in registry["tools"]
 
 
 def test_review_scans_suggests_and_plans_but_never_cleans(tmp_path, monkeypatch):

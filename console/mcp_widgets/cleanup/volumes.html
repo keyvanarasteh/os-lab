@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Cleanup volumes</title>
+<style>*{box-sizing:border-box}body{margin:0;font:14px/1.45 var(--font-sans,system-ui,sans-serif);color:var(--color-text-primary,#1c1c1a);background:var(--color-background-primary,#f7f6f2);padding:12px}h1{font-size:16px;margin:0 0 8px}h2{font-size:13px;margin:12px 0 6px;color:var(--color-text-secondary,#5c5c56)}.muted{color:var(--color-text-secondary,#5c5c56);font-size:12px}.row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--color-border-tertiary,#e6e4dc)}.bar{height:8px;border-radius:999px;background:var(--color-background-secondary,#ebe9e2);overflow:hidden;margin-top:4px}.bar>span{display:block;height:100%;background:#f36c21}.chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--color-background-secondary,#ebe9e2);font-size:12px}.ok{background:#d9f0df}.warn{background:#fde8c8}.bad{background:#f8d4d4}button{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--color-border-primary,#cfcabf);background:var(--color-background-primary,#fff);cursor:pointer}button.primary{background:#1c1c1a;color:#fff;border-color:#1c1c1a}ul{margin:0;padding-left:18px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--color-border-tertiary,#e6e4dc)}.empty{padding:16px;color:var(--color-text-secondary,#5c5c56)}</style>
+</head>
+<body>
+<main id="root"><p class="muted">Waiting for Cleanup Lab data…</p></main>
+<!-- MCP_BRIDGE -->
+<script>
+
+window.__oslabUi.onUpdate(function (s) {
+  var volumes = (s.output && (s.output.volumes || s.output)) || [];
+  if (!Array.isArray(volumes)) volumes = [];
+  var root = document.getElementById("root");
+  if (!volumes.length) { root.innerHTML = "<div class=\"empty\">No volumes reported.</div>"; return; }
+  root.innerHTML = "<h1>Storage</h1>" + volumes.map(function (v) {
+    var total = v.totalBytes || 0, free = v.freeBytes || 0, used = total ? Math.max(0, total-free) : 0;
+    var pct = total ? Math.round(used/total*100) : 0;
+    return "<div class=\"row\" style=\"flex-direction:column;align-items:stretch\">"
+      + "<div style=\"display:flex;justify-content:space-between\"><strong>"+(v.mountPoint||v.name||"?")+"</strong>"
+      + "<span class=\"chip\">"+(v.pressure||"ok")+"</span></div>"
+      + "<div class=\"muted\">"+window.__oslabUi.bytes(free)+" free of "+window.__oslabUi.bytes(total)+"</div>"
+      + "<div class=\"bar\"><span style=\"width:"+pct+"%\"></span></div></div>";
+  }).join("");
+});
+
+</script>
+</body>
+</html>

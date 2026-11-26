@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Cleanup history</title>
+<style>*{box-sizing:border-box}body{margin:0;font:14px/1.45 var(--font-sans,system-ui,sans-serif);color:var(--color-text-primary,#1c1c1a);background:var(--color-background-primary,#f7f6f2);padding:12px}h1{font-size:16px;margin:0 0 8px}h2{font-size:13px;margin:12px 0 6px;color:var(--color-text-secondary,#5c5c56)}.muted{color:var(--color-text-secondary,#5c5c56);font-size:12px}.row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--color-border-tertiary,#e6e4dc)}.bar{height:8px;border-radius:999px;background:var(--color-background-secondary,#ebe9e2);overflow:hidden;margin-top:4px}.bar>span{display:block;height:100%;background:#f36c21}.chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--color-background-secondary,#ebe9e2);font-size:12px}.ok{background:#d9f0df}.warn{background:#fde8c8}.bad{background:#f8d4d4}button{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--color-border-primary,#cfcabf);background:var(--color-background-primary,#fff);cursor:pointer}button.primary{background:#1c1c1a;color:#fff;border-color:#1c1c1a}ul{margin:0;padding-left:18px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--color-border-tertiary,#e6e4dc)}.empty{padding:16px;color:var(--color-text-secondary,#5c5c56)}</style>
+</head>
+<body>
+<main id="root"><p class="muted">Waiting for Cleanup Lab data…</p></main>
+<!-- MCP_BRIDGE -->
+<script>
+
+window.__oslabUi.onUpdate(function (s) {
+  var rows = (s.output && (s.output.history || s.output.records || s.output)) || [];
+  if (!Array.isArray(rows)) rows = [];
+  document.getElementById("root").innerHTML = "<h1>Cleanup history</h1>" + (rows.length ? ("<table><thead><tr><th>When</th><th>Mode</th><th>Freed</th></tr></thead><tbody>"
+    + rows.slice(0,40).map(function(r){return "<tr><td>"+(r.at||r.time||r.timestamp||"")+"</td><td>"+(r.mode||"")+"</td><td>"+window.__oslabUi.bytes(r.freedBytes||r.bytes||0)+"</td></tr>";}).join("")
+    + "</tbody></table>") : "<p class=\"muted\">No verified cleanups yet.</p>");
+});
+
+</script>
+</body>
+</html>

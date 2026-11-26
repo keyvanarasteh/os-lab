@@ -203,9 +203,13 @@ the computer-use runtimes share, with the guardrails intact:
   `make -C ios-lab mac-mcp`) exposes observe/act/verify/stop tools to
   computer-use agents. Read-only tools are always available; every input
   rides armed control, the audit log and the confirm gates, and there is
-  deliberately no arm tool — the human arms from the dashboard. `macos_task`
-  runs a scripted sequence (max 25 steps) with one audit row per step for
-  reproducible security reports.
+  deliberately no arm tool — the human arms from the dashboard.
+  `macos_request_access` is the write counterpart to `macos_permissions`
+  (opens the privacy pane / consent prompt; the human still grants). The
+  server also advertises MCP Apps UI resources (Cleanup Lab widgets/apps
+  first) via `resources/list`. `macos_task` runs a scripted sequence
+  (max 25 steps) with one audit row per step for reproducible security
+  reports.
 - **App Intents** — the macOS widget extension publishes three narrow system
   actions to Shortcuts, Siri and Spotlight: open the live macOS Lab, open its
   guarded submission-review workflow, or run its idempotent panic stop. The
