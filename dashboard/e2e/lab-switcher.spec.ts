@@ -49,12 +49,14 @@ test("⌘L opens the switcher and focusing a lab narrows the sidebar to it", asy
   await expect(page.getByRole("button", { name: "iOS Lab" })).toBeVisible();
   await expect(page.getByRole("button", { name: "macOS Lab" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Windows Lab" })).toHaveCount(0);
+  // Web Sec Lab is a sidebar lab like the others
+  await expect(page.getByRole("button", { name: /Web Sec Lab/ })).toBeVisible();
 
   await page.keyboard.press("Meta+l");
   const switcher = page.getByRole("dialog", { name: "Switch lab" });
   await expect(switcher).toBeVisible();
   // A compact card per lab, including the ones the sidebar hides, with its live availability
-  for (const label of ["iOS Lab", "macOS Lab", "Cleanup Lab", "Windows Lab"]) {
+  for (const label of ["iOS Lab", "macOS Lab", "Cleanup Lab", "Web Sec Lab", "Windows Lab"]) {
     await expect(switcher.getByRole("option", { name: new RegExp(label) })).toBeVisible();
   }
   await switcher.getByRole("option", { name: /iOS Lab/ }).click();

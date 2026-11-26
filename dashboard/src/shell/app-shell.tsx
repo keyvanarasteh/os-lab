@@ -9,6 +9,30 @@
  */
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  AppWindowIcon,
+  ArrowsLeftRightIcon,
+  BooksIcon,
+  BrainIcon,
+  BrowserIcon,
+  BugIcon,
+  BuildingsIcon,
+  ChartBarIcon,
+  ChartPieSliceIcon,
+  ClockCounterClockwiseIcon,
+  CodeIcon,
+  CrosshairIcon,
+  DatabaseIcon,
+  FilesIcon,
+  FlowArrowIcon,
+  GearIcon,
+  GitDiffIcon,
+  LinuxLogoIcon,
+  MicroscopeIcon,
+  PlugsIcon,
+  PlusCircleIcon,
+  PulseIcon,
+  TreeStructureIcon,
+  WrenchIcon,
   AndroidLogoIcon,
   AppleLogoIcon,
   BookOpenIcon,
@@ -55,10 +79,10 @@ const PUBLIC_PAGES = import.meta.env.PUBLIC_SITE_MODE === "pages";
 export const LAB_ICON: Record<LabId, (size?: number) => ReactNode> = {
   android: (s = 16) => <AndroidLogoIcon size={s} />,
   windows: (s = 16) => <WindowsLogoIcon size={s} />,
-  winapps: (s = 16) => <TerminalWindowIcon size={s} />,
-  linux: (s = 16) => <TerminalWindowIcon size={s} />,
+  winapps: (s = 16) => <AppWindowIcon size={s} />,
+  linux: (s = 16) => <LinuxLogoIcon size={s} />,
   ios: (s = 16) => <AppleLogoIcon size={s} />,
-  source: (s = 16) => <TerminalWindowIcon size={s} />,
+  source: (s = 16) => <CodeIcon size={s} />,
   macos: (s = 16) => <LaptopIcon size={s} />,
   websec: (s = 16) => <ShieldCheckIcon size={s} />,
   web: (s = 16) => <GlobeIcon size={s} />
@@ -120,6 +144,29 @@ function labShown(labs: LabStatus[] | undefined, id: LabId, activeId: string): b
   return !lab || lab.state !== "unavailable" || activeId === `lab-${id}`;
 }
 
+/**
+ * One icon per lab page, used when the sidebar focuses on a lab and lists its pages as top-level
+ * items. Without it every page repeated the lab's own icon.
+ */
+const PAGE_ICON: Record<string, ReactNode> = {
+  "android-overview": <SquaresFourIcon size={16} />, "lab-android": <WrenchIcon size={16} />,
+  "android-providers": <PlugsIcon size={16} />, "android-workflows": <FlowArrowIcon size={16} />,
+  "android-console": <TerminalWindowIcon size={16} />, "android-analytics": <ChartBarIcon size={16} />,
+  "android-sitemap": <TreeStructureIcon size={16} />,
+  "source-overview": <SquaresFourIcon size={16} />, "lab-source": <WrenchIcon size={16} />,
+  "source-analyzer": <MagnifyingGlassIcon size={16} />, "source-evidence": <FilesIcon size={16} />,
+  "source-deep-analysis": <MicroscopeIcon size={16} />, "source-pipeline": <FlowArrowIcon size={16} />,
+  "source-brain": <BrainIcon size={16} />, "source-sources": <DatabaseIcon size={16} />,
+  "source-settings/runtime": <GearIcon size={16} />, "source-docs": <BookOpenIcon size={16} />,
+  "web-sec": <CrosshairIcon size={16} />, "web-sec#websec-monitor": <PulseIcon size={16} />,
+  "web-sec#websec-compare": <GitDiffIcon size={16} />, "web-sec#websec-history": <ClockCounterClockwiseIcon size={16} />,
+  "web-sec#websec-bulk": <ListChecksIcon size={16} />, "web-sec#websec-guides": <BookOpenIcon size={16} />,
+  "lab-websec": <WrenchIcon size={16} />,
+  "web-lab": <BrowserIcon size={16} />, "lab-web": <WrenchIcon size={16} />,
+  firewall: <SquaresFourIcon size={16} />, "firewall-companies": <BuildingsIcon size={16} />,
+  "firewall-add": <PlusCircleIcon size={16} />
+};
+
 /** "How to use" sits at the bottom of Help as a collapsible guide; the child opens the prompt builder. */
 const HOW_TO_USE_ITEM: SidebarItem = {
   id: "how-to-use-guide",
@@ -130,31 +177,30 @@ const HOW_TO_USE_ITEM: SidebarItem = {
 
 /** Cleanup Lab pages with their cards as collapsible sub-navs (closed until their page is open); Settings stays last. */
 function cleanupNavItems(groupBytes: Record<string, number> = {}): SidebarItem[] {
-  const icon = <BroomIcon size={16} />;
-  const group = (page: string, label: string, sections: [string, string][]): SidebarItem => ({
+  const group = (page: string, label: string, icon: ReactNode, sections: [string, string][]): SidebarItem => ({
     id: `cleanup-group-${page}`,
     label,
     icon,
     children: [{ id: `cleanup-${page}`, label: "Overview" }, ...sections.map(([anchor, text]) => ({ id: `cleanup-${page}#${anchor}`, label: text }))]
   });
   return [
-    group("dashboard", "Dashboard", [["overview-storage", "Storage"], ["overview-quick-clean", "Quick clean"], ["overview-review", "Clean"], ["cleanup-monitor", "Monitor stats"]]),
-    { id: "cleanup-space", label: "Space Explorer", icon },
-    group("scan", "Advanced scan", [["scan-entries", "Catalog entries"], ["scan-plan", "Plan & confirm"], ["scan-containers", "Containers"], ["scan-vms", "Virtual machines"]]),
+    group("dashboard", "Dashboard", <SquaresFourIcon size={16} />, [["overview-storage", "Storage"], ["overview-quick-clean", "Quick clean"], ["overview-review", "Clean"], ["cleanup-monitor", "Monitor stats"]]),
+    { id: "cleanup-space", label: "Space Explorer", icon: <ChartPieSliceIcon size={16} /> },
+    group("scan", "Advanced scan", <MagnifyingGlassIcon size={16} />, [["scan-entries", "Catalog entries"], ["scan-plan", "Plan & confirm"], ["scan-containers", "Containers"], ["scan-vms", "Virtual machines"]]),
     {
       id: "cleanup-group-catalog",
       label: "Catalogs",
-      icon,
+      icon: <BooksIcon size={16} />,
       children: [{ id: "cleanup-catalog", label: "All catalogs" }, ...CATALOG_GROUPS.filter((g) => g.id !== "other").map((g) => ({
         id: `cleanup-catalog#${g.id}`, label: g.label, icon: <GroupGlyph groupId={g.id} size={14} />,
         badge: groupBytes[g.id] ? <span dir="ltr" className="ml-auto shrink-0 rounded-md bg-(--iux-muted) px-1.5 py-px text-[10px] tabular-nums text-(--iux-muted-foreground)">{formatBytes(groupBytes[g.id]!)}</span> : undefined
       }))]
     },
-    group("results", "Results", [["results-categories", "By category"], ["results-clean", "Clean result"]]),
-    { id: "cleanup-leftovers", label: "Leftovers", icon },
-    { id: "cleanup-history", label: "History", icon },
-    { id: "cleanup-relocation", label: "Relocation", icon },
-    group("settings", "Settings", [["cleanup-bookmarks", "Bookmarks"], ["cleanup-permissions", "Permissions"], ["cleanup-monitor", "Background monitor"], ["cleanup-widgets", "Desktop widgets"], ["cleanup-tools", "Tools & advanced"]])
+    group("results", "Results", <ChartBarIcon size={16} />, [["results-categories", "By category"], ["results-clean", "Clean result"]]),
+    { id: "cleanup-leftovers", label: "Leftovers", icon: <BugIcon size={16} /> },
+    { id: "cleanup-history", label: "History", icon: <ClockCounterClockwiseIcon size={16} /> },
+    { id: "cleanup-relocation", label: "Relocation", icon: <ArrowsLeftRightIcon size={16} /> },
+    group("settings", "Settings", <GearIcon size={16} />, [["cleanup-bookmarks", "Bookmarks"], ["cleanup-permissions", "Permissions"], ["cleanup-monitor", "Background monitor"], ["cleanup-widgets", "Desktop widgets"], ["cleanup-tools", "Tools & advanced"]])
   ];
 }
 
@@ -186,7 +232,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
     android: {
       id: "android",
       label: "Android Lab",
-      icon: <ShieldCheckIcon size={16} />,
+      icon: LAB_ICON.android(),
       badge: androidRunning || running.has("android") ? <RunningDot /> : <StatePill lab={lab("android")} />,
       children: [
         { id: "android-overview", label: "Overview" },
@@ -274,7 +320,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
     ? activeLab === "cleanup"
       ? cleanupNavItems(groupBytes)
       : focusedItem.children?.length
-      ? focusedItem.children.map((leaf) => ({ id: leaf.id, label: leaf.label, icon: focusedItem.icon, badge: leaf.badge }))
+      ? focusedItem.children.map((leaf) => ({ id: leaf.id, label: leaf.label, icon: leaf.icon ?? PAGE_ICON[leaf.id] ?? focusedItem.icon, badge: leaf.badge }))
       : [focusedItem]
     : [];
   const osLabItems = activeLab
@@ -284,6 +330,7 @@ function buildGroups(labs: LabStatus[] | undefined, running: Set<string>, androi
         labNav.source,
         labNav.cleanup,
         labNav.web,
+        labNav.websec,
         labNav.firewall,
         ...(labShown(labs, "ios", activeId) ? [labNav.ios] : []),
         ...(labShown(labs, "windows", activeId) ? [labNav.windows] : []),
@@ -526,7 +573,7 @@ export function AppShell({
       {
         id: "android",
         label: status("android")?.label ?? "Android Lab",
-        icon: <ShieldCheckIcon size={18} />,
+        icon: LAB_ICON.android(18),
         summary: status("android")?.summary,
         badge: androidRunning || running.has("android") ? <RunningDot /> : <StatePill lab={status("android")} />
       },
@@ -556,6 +603,13 @@ export function AppShell({
         icon: LAB_ICON.web(18),
         summary: status("web")?.summary,
         badge: running.has("web") ? <RunningDot /> : <StatePill lab={status("web")} />
+      },
+      {
+        id: "websec",
+        label: status("websec")?.label ?? "Web Sec Lab",
+        icon: LAB_ICON.websec(18),
+        summary: status("websec")?.summary,
+        badge: running.has("websec") ? <RunningDot /> : <StatePill lab={status("websec")} />
       },
       {
         id: "ios",

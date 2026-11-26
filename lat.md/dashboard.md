@@ -285,3 +285,9 @@ for every lab. [[scripts/build-how-to-use-reference.py]] extracts exact parser,
 Make target, PowerShell parameter and configuration-name references from an
 explicit source allowlist without executing code or reading private state.
 Regenerate it after those sources change; `--check` detects stale output.
+
+## Lab navigation icons
+
+Every lab in the full OS Lab list and the ⌘L switcher, including Web Sec Lab, has its own icon, and a focused lab's pages each have their own.
+
+[[dashboard/src/shell/app-shell.tsx]] keeps lab icons in `LAB_ICON` (Android logo, code for Source, app window for Windows Apps, Linux logo, shield for Web Sec) and page icons in `PAGE_ICON`; Cleanup Lab pages set theirs in `cleanupNavItems`. A child's own icon wins, then `PAGE_ICON`, then the lab's icon.
