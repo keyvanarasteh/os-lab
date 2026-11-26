@@ -1,29 +1,33 @@
-# TODO: Zcode, Grok and Cursor plugins (ON-HOLD)
+# TODO: Zcode, Grok and Cursor plugins
 
-Companion to [PLAN-agent-plugins-zcode-grok-cursor.md](PLAN-agent-plugins-zcode-grok-cursor.md).
-Parked behind Claude (#385/#388/#390) and Codex (#386). Uncheck nothing until Stage 0 for that host is written up.
+Companion to [PLAN-agent-plugins-zcode-grok-cursor.md](PLAN-agent-plugins-zcode-grok-cursor.md). OL-15 / PR #392.
 
 ## Shared
 
-- [ ] Confirm Claude and Codex patterns on master before starting any host implementation.
-- [ ] Reserve tool-name prefixes `zcode_plugin_*`, `grok_plugin_*`, `cursor_plugin_*`.
-- [ ] Keep Cleanup Lab and unrelated MCP coverage work in separate PRs.
+- [x] Confirm Claude and Codex patterns on master before starting any host implementation.
+- [x] Reserve tool-name prefixes `zcode_plugin_*`, `grok_plugin_*`, `cursor_plugin_*`.
+- [x] Keep Cleanup Lab and unrelated MCP coverage work in separate PRs.
 
 ## Zcode
 
-- [ ] Stage 0: record client version, MCP registration, plugin/marketplace support, copied-install paths, hooks/UI.
-- [ ] Package or extend `plugins/mcp/zcode/`; launcher + checkout discovery.
-- [ ] Requirement catalog + `zcode_plugin_*` tools; terminal-safe apply.
-- [ ] `/mcp/` cards + API; CI; lat.md; verification proofs.
+- [x] Stage 0: file-based MCP via project `.zcode/mcp.json` (`servers` shape); plugin package under `plugins/zcode/os-lab/`; CLI optional.
+- [x] Package + launcher + checkout discovery.
+- [x] Requirement catalog + `zcode_plugin_*` tools; terminal-safe apply.
+- [x] `/mcp/` cards + API; CI; lat.md; verification proofs.
 
 ## Grok
 
-- [ ] Stage 0: define which Grok surface is in scope and whether stdio MCP exists.
-- [ ] Add `plugins/mcp/grok/` scaffold + README once transport is known.
-- [ ] Only then: package, catalog, `grok_plugin_*`, cards, CI.
+- [x] Stage 0: Grok Build local stdio package + `.grok-plugin` marketplace; project `.grok/mcp.json`.
+- [x] Add `plugins/mcp/grok/` scaffold + README.
+- [x] Package, catalog, `grok_plugin_*`, cards, CI.
 
 ## Cursor
 
-- [ ] Stage 0: project vs user MCP config, skills support, settings mutation gates.
-- [ ] Helper to preview/apply `.cursor/mcp.json` (or proven Cursor plugin format).
-- [ ] Requirement catalog + `cursor_plugin_*`; `/mcp/` cards; CI; lat.md.
+- [x] Stage 0: project `.cursor/mcp.json`; `.cursor-plugin/plugin.json` package format (qLar-aligned).
+- [x] Helper to preview/apply `.cursor/mcp.json`.
+- [x] Requirement catalog + `cursor_plugin_*`; `/mcp/` cards; CI; lat.md.
+
+## Follow-ups (optional)
+
+- [ ] Live desktop install proofs when each host CLI is available on CI runners.
+- [ ] Host-native marketplace/plugin-browser verbs if/when documented.

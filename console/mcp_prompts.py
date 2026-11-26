@@ -71,6 +71,13 @@ PROMPTS.append({
                    "required": False}],
 })
 
+for _host, _title in (("cursor", "Cursor"), ("zcode", "ZCode"), ("grok", "Grok Build")):
+    PROMPTS.append({
+        "name": "{0}_plugin_setup_flow".format(_host),
+        "description": "Diagnose and preview local os-lab {0} plugin installation; installation runs only in a terminal.".format(_title),
+        "arguments": [],
+    })
+
 
 def list_prompts() -> list[dict]:
     return [{"name": p["name"], "description": p["description"], "arguments": p.get("arguments") or []} for p in PROMPTS]
@@ -141,6 +148,17 @@ def get_prompt(name: str, arguments: dict | None = None) -> dict:
             "4. Only after the user approves, plugin_apply with the token and confirm: true.\n"
             "5. plugin_verify, and say whether a restart or /reload-plugins is needed."
         )
+    for host, title in (("cursor", "Cursor"), ("zcode", "ZCode"), ("grok", "Grok Build")):
+        if name == "{0}_plugin_setup_flow".format(host):
+            return _messages(
+                "Set up the os-lab {0} plugin.\n"
+                "1. Call {1}_plugin_doctor, {1}_plugin_status and {1}_plugin_check.\n"
+                "2. Call {1}_plugin_plan with action install; show its commands and warnings.\n"
+                "3. The user runs python3 scripts/{1}-plugin.py install in an interactive terminal. "
+                "Do not call {1}_plugin_apply to mutate installation state.\n"
+                "4. After installation, call {1}_plugin_verify and report missing tools."
+                .format(title, host)
+            )
     if name == "mcp_coverage_status":
         data = _load_verification()
         section = (args.get("section") or "all").lower()

@@ -9,6 +9,7 @@ import { Badge, CopyButton, PageHead, Section, Status } from "../components/ui";
 import { hostStore } from "../lib/api";
 import { McpPluginCards } from "./mcp-plugin-cards";
 import { McpCodexPluginCards } from "./mcp-codex-plugin-cards";
+import { McpHostPluginCards } from "./mcp-host-plugin-cards";
 import {
   MCP_GROUPS,
   MCP_PLAN,
@@ -127,6 +128,7 @@ export default function McpPage() {
 
         <McpPluginCards root={root} />
         <McpCodexPluginCards root={root} />
+        <McpHostPluginCards root={root} />
 
         {MCP_GROUPS.map((group) => (
           <Section

@@ -25,5 +25,8 @@ This is the main project documentation; start here when changing behavior.
 - [[legal]] — terms, acceptable use, privacy and third-party notices
 - [[tooling]] — CI, tests and community process
 - [[codex-plugin]] — local Codex package, checkout discovery, skills and MCP setup checks
+- [[cursor-plugin]] — local Cursor package, project MCP config install and MCP setup checks
+- [[zcode-plugin]] — local ZCode package, project MCP config install and MCP setup checks
+- [[grok-plugin]] — local Grok Build package, marketplace entry and MCP setup checks
 - [[development]] — running, watching and proving a change: dev stack, UX check library, screenshots
 - [[brand]] — the QS-Lab identity: marks, app icon and where they appear

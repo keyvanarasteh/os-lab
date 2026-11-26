@@ -3448,5 +3448,16 @@
   "Preview install": "پیش‌نمایش نصب",
   "Preview update": "پیش‌نمایش به‌روزرسانی",
   "Preview uninstall": "پیش‌نمایش حذف",
-  "Nothing has changed yet. Run the terminal command after you approve.": "هنوز چیزی تغییر نکرده. پس از تأیید، دستور ترمینال را اجرا کنید."
+  "Nothing has changed yet. Run the terminal command after you approve.": "هنوز چیزی تغییر نکرده. پس از تأیید، دستور ترمینال را اجرا کنید.",
+  "ZCode": "ZCode",
+  "Grok Build": "Grok Build",
+  "Project .cursor/mcp.json plus the Cursor plugin package.": "فایل .cursor/mcp.json پروژه به‌همراه بسته افزونه Cursor.",
+  "Project .zcode/mcp.json plus the ZCode plugin package.": "فایل .zcode/mcp.json پروژه به‌همراه بسته افزونه ZCode.",
+  "Marketplace entry and project .grok/mcp.json.": "ورودی marketplace و فایل .grok/mcp.json پروژه.",
+  "Install as a Cursor plugin": "نصب به‌عنوان افزونه Cursor",
+  "Install as a ZCode plugin": "نصب به‌عنوان افزونه ZCode",
+  "Install as a Grok Build plugin": "نصب به‌عنوان افزونه Grok Build",
+  "Cursor plugin": "افزونه Cursor",
+  "ZCode plugin": "افزونه ZCode",
+  "Grok Build plugin": "افزونه Grok Build"
 }

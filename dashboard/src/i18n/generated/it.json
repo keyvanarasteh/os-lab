@@ -3448,5 +3448,16 @@
   "Preview install": "Anteprima installazione",
   "Preview update": "Anteprima aggiornamento",
   "Preview uninstall": "Anteprima disinstallazione",
-  "Nothing has changed yet. Run the terminal command after you approve.": "Non è cambiato ancora nulla. Esegui il comando del terminale dopo l’approvazione."
+  "Nothing has changed yet. Run the terminal command after you approve.": "Non è cambiato ancora nulla. Esegui il comando del terminale dopo l’approvazione.",
+  "ZCode": "ZCode",
+  "Grok Build": "Grok Build",
+  "Project .cursor/mcp.json plus the Cursor plugin package.": "File .cursor/mcp.json del progetto più il pacchetto plugin Cursor.",
+  "Project .zcode/mcp.json plus the ZCode plugin package.": "File .zcode/mcp.json del progetto più il pacchetto plugin ZCode.",
+  "Marketplace entry and project .grok/mcp.json.": "Voce marketplace e file .grok/mcp.json del progetto.",
+  "Install as a Cursor plugin": "Installa come plugin di Cursor",
+  "Install as a ZCode plugin": "Installa come plugin di ZCode",
+  "Install as a Grok Build plugin": "Installa come plugin di Grok Build",
+  "Cursor plugin": "Plugin di Cursor",
+  "ZCode plugin": "Plugin di ZCode",
+  "Grok Build plugin": "Plugin di Grok Build"
 }

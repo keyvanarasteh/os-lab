@@ -22,7 +22,8 @@ call and refusal lands in the guard's audit log. There is no arm tool and no inp
 The plugin_* tools check and set up os-lab as a Claude plugin (console/claude_plugin.py): changes
 are previewed, need a one-use token and confirm:true, and removals run only from a terminal. The
 codex_plugin_* tools do the same for the Codex plugin (console/codex_plugin.py); install previews
-are terminal-only and MCP apply refuses agent writes.
+are terminal-only and MCP apply refuses agent writes. cursor_plugin_*, zcode_plugin_* and
+grok_plugin_* cover the Cursor, ZCode and Grok Build packages the same way (console/host_plugin.py).
 
 Run: python3 console/mcp_server.py   (or `make -C ios-lab mac-mcp`)
 """
@@ -48,6 +49,7 @@ import mcp_plugin  # noqa: E402
 import mcp_ui  # noqa: E402
 import mcp_prompts  # noqa: E402
 import mcp_codex_plugin  # noqa: E402
+import mcp_host_plugins  # noqa: E402
 import winapps  # noqa: E402
 import winapps_guard  # noqa: E402
 
@@ -69,7 +71,16 @@ INSTRUCTIONS = (
     "call plugin_plan, show its commands, and only after approval plugin_apply.\n"
     "- For Codex plugin setup call codex_plugin_doctor and codex_plugin_status, preview with "
     "codex_plugin_plan, then run the shown installation in an interactive terminal. "
-    "codex_plugin_apply refuses agent writes."
+    "codex_plugin_apply refuses agent writes.\n"
+    "- For Cursor plugin setup call cursor_plugin_doctor and cursor_plugin_status, preview with "
+    "cursor_plugin_plan, then run python3 scripts/cursor-plugin.py install in a terminal; "
+    "cursor_plugin_apply refuses agent writes.\n"
+    "- For ZCode plugin setup call zcode_plugin_doctor and zcode_plugin_status, preview with "
+    "zcode_plugin_plan, then run python3 scripts/zcode-plugin.py install in a terminal; "
+    "zcode_plugin_apply refuses agent writes.\n"
+    "- For Grok Build plugin setup call grok_plugin_doctor and grok_plugin_status, preview with "
+    "grok_plugin_plan, then run python3 scripts/grok-plugin.py install in a terminal; "
+    "grok_plugin_apply refuses agent writes."
 )
 # Tools whose JSON can pass the 50,000 characters after which Claude Code saves results to a file.
 LARGE_RESULTS = ("macos_get_app_state", "macos_menubar", "websec_report", "cleanup_catalog")
@@ -349,6 +360,7 @@ TOOLS += mcp_source.TOOLS
 TOOLS += mcp_firewall.TOOLS
 TOOLS += mcp_plugin.TOOLS
 TOOLS += mcp_codex_plugin.TOOLS
+TOOLS += mcp_host_plugins.TOOLS
 for _tool in TOOLS:
     if _tool["name"] in LARGE_RESULTS:
         _tool["_meta"] = {**_tool.get("_meta", {}), "anthropic/maxResultSizeChars": 200000}
@@ -483,6 +495,8 @@ def tool_call(name: str, args: dict) -> dict:
         return win_tool_call(name, args)
     if name in mcp_codex_plugin.NAMES:
         return mcp_codex_plugin.call(name, args, REPO_ROOT)
+    if name in mcp_host_plugins.NAMES:
+        return mcp_host_plugins.call(name, args, REPO_ROOT)
     if name in mcp_cleanup.NAMES:
         return mcp_cleanup.call(name, args, REPO_ROOT)
     if name in mcp_websec.NAMES:
@@ -598,6 +612,7 @@ def run_task(args: dict) -> dict:
                 (mcp_web, "web"), (mcp_source, "source"), (mcp_firewall, "firewall"),
                 (mcp_plugin, "plugin"),
                 (mcp_codex_plugin, "Codex plugin"),
+                (mcp_host_plugins, "host plugin"),
             ):
                 if str(tool) in _mod.NAMES:
                     raise oslab.PlanError(f"{_label} tools are not available inside macos_task", code="INVALID_ARGS")
@@ -647,6 +662,11 @@ def handle(message: dict) -> dict | None:
             {"uri": mcp_codex_plugin.RESOURCE_URI, "name": "Codex plugin requirements",
              "description": "Every Codex plugin requirement os-lab checks, with sources.",
              "mimeType": "application/json"},
+        ] + [
+            {"uri": uri, "name": "{0} plugin requirements".format(host.title()),
+             "description": "Every {0} plugin requirement os-lab checks, with sources.".format(host),
+             "mimeType": "application/json"}
+            for host, uri in mcp_host_plugins.RESOURCES.items()
         ]}}
     if method == "resources/templates/list":
         return {"jsonrpc": "2.0", "id": message_id, "result": {"resourceTemplates": []}}
@@ -662,6 +682,11 @@ def handle(message: dict) -> dict | None:
                 return {"jsonrpc": "2.0", "id": message_id, "result": {"contents": [{
                     "uri": uri, "mimeType": "application/json",
                     "text": json.dumps(mcp_codex_plugin.engine.requirements())}]}}
+            for host, resource_uri in mcp_host_plugins.RESOURCES.items():
+                if uri == resource_uri:
+                    return {"jsonrpc": "2.0", "id": message_id, "result": {"contents": [{
+                        "uri": uri, "mimeType": "application/json",
+                        "text": json.dumps(mcp_host_plugins.engine.requirements(host))}]}}
             return {"jsonrpc": "2.0", "id": message_id, "result": mcp_ui.read_resource(str(uri))}
         except KeyError:
             return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32002, "message": f"Resource not found: {uri}"}}

@@ -76,6 +76,10 @@ try:
 except ImportError:
     codex_plugin_api = None
 try:
+    import host_plugin_api  # noqa: E402  (console/host_plugin_api.py: Cursor/ZCode/Grok cards)
+except ImportError:
+    host_plugin_api = None
+try:
     import winapps  # noqa: E402  (console/winapps.py: native Windows app mirror and guarded UIA control)
 except ImportError:
     winapps = None
@@ -289,6 +293,10 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/codex-plugin"):
             self._codex_plugin("GET", path)
             return
+        for _host in ("cursor", "zcode", "grok"):
+            if path.startswith("/api/{0}-plugin".format(_host)):
+                self._host_plugin("GET", path, _host)
+                return
         if path == "/api/frida/inventory":
             self._frida_get(urllib.parse.parse_qs(parsed.query))
             return
@@ -734,6 +742,10 @@ class LabHttpHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/codex-plugin"):
             self._codex_plugin("POST", path)
             return
+        for _host in ("cursor", "zcode", "grok"):
+            if path.startswith("/api/{0}-plugin".format(_host)):
+                self._host_plugin("POST", path, _host)
+                return
         if path.startswith("/api/cleanup"):
             self._cleanup_post(path)
             return
@@ -775,6 +787,17 @@ class LabHttpHandler(BaseHTTPRequestHandler):
             self._json(*codex_plugin_api.handle(REPO_ROOT, method, path, data))
         except (OSError, ValueError):
             self._json(400, {"error": "Invalid Codex plugin request"})
+
+    def _host_plugin(self, method: str, path: str, host: str):
+        """Cursor / ZCode / Grok Build plugins: state and terminal-only install previews."""
+        if not host_plugin_api:
+            self._json(501, {"error": "The host plugin module (console/host_plugin_api.py) is not installed"})
+            return
+        try:
+            data = self._read_json() if method == "POST" else None
+            self._json(*host_plugin_api.handle(REPO_ROOT, host, method, path, data))
+        except (OSError, ValueError):
+            self._json(400, {"error": "Invalid {0} plugin request".format(host)})
 
     def _content_get(self, path: str, query: dict):
         """Content packs: what is installed, the companies, and the data files (see console/content.py)."""

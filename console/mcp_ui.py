@@ -120,6 +120,9 @@ _UI_SECTIONS = (
     ("linux", "widgets", WIDGET_ROOT),
     ("plugin", "widgets", WIDGET_ROOT),
     ("codex-plugin", "widgets", WIDGET_ROOT),
+    ("cursor-plugin", "widgets", WIDGET_ROOT),
+    ("zcode-plugin", "widgets", WIDGET_ROOT),
+    ("grok-plugin", "widgets", WIDGET_ROOT),
 )
 
 
@@ -236,6 +239,11 @@ PLUGIN_WIDGET = {
 }
 CODEX_PLUGIN_WIDGET = {
     "status": "ui://os-lab/codex-plugin/widgets/status.html",
+}
+HOST_PLUGIN_WIDGET = {
+    "cursor": {"status": "ui://os-lab/cursor-plugin/widgets/status.html"},
+    "zcode": {"status": "ui://os-lab/zcode-plugin/widgets/status.html"},
+    "grok": {"status": "ui://os-lab/grok-plugin/widgets/status.html"},
 }
 LAB_APP = {
     "android": "ui://os-lab/android/apps/overview.html",

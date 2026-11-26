@@ -1,0 +1,16 @@
+{
+  "name": "os-lab-local",
+  "plugins": [
+    {
+      "name": "os-lab",
+      "source": {
+        "source": "local",
+        "path": "./plugins/grok/os-lab"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "none"
+      }
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "reviewedOn": "2026-11-26",
+  "note": "Cursor plugin package (.cursor-plugin) plus project .cursor/mcp.json install. Sources reviewed against Cursor docs.",
+  "sources": {
+    "package": "https://cursor.com/docs/reference/plugins",
+    "mcp": "https://cursor.com/docs/mcp",
+    "skills": "https://cursor.com/docs/plugins",
+    "desktop": "https://cursor.com/docs"
+  },
+  "requirements": [
+    {
+      "id": "cursor.manifest.dir",
+      "area": "manifest",
+      "severity": "error",
+      "usage": "used",
+      "check": "cursor_manifest_dir",
+      "source": "package",
+      "rule": ".cursor-plugin/plugin.json is present."
+    },
+    {
+      "id": "manifest.identity",
+      "area": "manifest",
+      "severity": "error",
+      "usage": "used",
+      "check": "manifest_identity",
+      "source": "package",
+      "rule": "Plugin manifest has name os-lab and a semver version."
+    },
+    {
+      "id": "manifest.metadata",
+      "area": "manifest",
+      "severity": "warning",
+      "usage": "used",
+      "check": "manifest_metadata",
+      "source": "package",
+      "rule": "description, author.name, homepage, repository and license are set."
+    },
+    {
+      "id": "mcp.stdio",
+      "area": "mcp",
+      "severity": "error",
+      "usage": "used",
+      "check": "mcp_stdio",
+      "source": "mcp",
+      "rule": "Package MCP JSON declares one stdio server with python3 and ${PLUGIN_ROOT}/launcher.py."
+    },
+    {
+      "id": "mcp.annotations",
+      "area": "mcp",
+      "severity": "warning",
+      "usage": "used",
+      "check": "mcp_annotations",
+      "source": "mcp",
+      "rule": "Every cursor_plugin_* tool declares readOnlyHint."
+    },
+    {
+      "id": "mcp.instructions",
+      "area": "mcp",
+      "severity": "warning",
+      "usage": "used",
+      "check": "mcp_instructions",
+      "source": "mcp",
+      "rule": "The shared server initialize instructions mention this host's plugin tools."
+    },
+    {
+      "id": "skills.frontmatter",
+      "area": "skills",
+      "severity": "error",
+      "usage": "used",
+      "check": "skills_frontmatter",
+      "source": "skills",
+      "rule": "Every skill has name and description in its first frontmatter block."
+    },
+    {
+      "id": "skills.length",
+      "area": "skills",
+      "severity": "warning",
+      "usage": "used",
+      "check": "skills_length",
+      "source": "skills",
+      "rule": "Each SKILL.md stays under 500 lines."
+    },
+    {
+      "id": "skills.generated",
+      "area": "skills",
+      "severity": "error",
+      "usage": "used",
+      "check": "skills_generated",
+      "source": "skills",
+      "rule": "The ten packaged lab skills match console/mcp_skills/ (run scripts/cursor-plugin.py build)."
+    },
+    {
+      "id": "cache.contained",
+      "area": "cache",
+      "severity": "error",
+      "usage": "used",
+      "check": "cache_contained",
+      "source": "package",
+      "rule": "No packaged symlink escapes the plugin root."
+    },
+    {
+      "id": "cli.available",
+      "area": "cli",
+      "severity": "info",
+      "usage": "used",
+      "check": "cli_available",
+      "source": "package",
+      "rule": "Host CLI is optional; install is file-based when absent."
+    },
+    {
+      "id": "distribution.readme",
+      "area": "distribution",
+      "severity": "warning",
+      "usage": "used",
+      "check": "readme",
+      "source": "package",
+      "rule": "The package has a README of at least 40 words and a LICENSE."
+    },
+    {
+      "id": "scaffold.present",
+      "area": "scaffold",
+      "severity": "warning",
+      "usage": "used",
+      "check": "scaffold_present",
+      "source": "package",
+      "rule": "Legacy plugins/mcp/<host>/ scaffold remains for docs."
+    },
+    {
+      "id": "desktop.local",
+      "area": "desktop",
+      "severity": "info",
+      "usage": "used",
+      "check": "manual",
+      "source": "desktop",
+      "rule": "Local stdio plugin is tested in a desktop client."
+    },
+    {
+      "id": "hooks.lifecycle",
+      "area": "hooks",
+      "severity": "info",
+      "usage": "n/a",
+      "check": "n/a",
+      "source": "package",
+      "rule": "No host lifecycle hooks until a live client proves support."
+    },
+    {
+      "id": "claude.mcpb",
+      "area": "desktop",
+      "severity": "info",
+      "usage": "n/a",
+      "check": "n/a",
+      "source": "desktop",
+      "rule": "Claude Desktop .mcpb is not used for this host."
+    },
+    {
+      "id": "marketplace",
+      "area": "marketplace",
+      "severity": "info",
+      "usage": "n/a",
+      "check": "n/a",
+      "source": "package",
+      "rule": "Cursor install uses project MCP config; no local marketplace file."
+    }
+  ]
+}

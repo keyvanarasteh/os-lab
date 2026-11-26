@@ -1024,6 +1024,33 @@ export interface CodexPluginPlan {
   terminalCommand?: string;
 }
 
+export type HostPluginHost = "cursor" | "zcode" | "grok";
+export type HostPluginAction = "install" | "update" | "uninstall";
+export interface HostPluginState {
+  host: HostPluginHost;
+  checkoutVersion: string;
+  terminalCommand?: string;
+  doctor: { ready: boolean; checks: { name: string; ok: boolean; detail: string; fix?: string | null }[] };
+  install: {
+    cli: string | null;
+    error?: string;
+    installed: boolean;
+    duplicates: { name: string; scope: string }[];
+  };
+}
+export interface HostPluginUpdates {
+  updatesAvailable: string[];
+  published?: { version: string | null; updateAvailable: boolean | null; note?: string };
+}
+export interface HostPluginPlan {
+  token: string;
+  action: HostPluginAction;
+  commands: string[];
+  manual?: string[];
+  warnings?: string[];
+  terminalCommand?: string;
+}
+
 export const api = {
   claudePlugin: () => call<ClaudePluginState>("/api/claude-plugin"),
   claudePluginCheck: (online: boolean) => post<ClaudePluginUpdates>("/api/claude-plugin/check", { online }),
@@ -1033,6 +1060,11 @@ export const api = {
   codexPlugin: () => call<CodexPluginState>("/api/codex-plugin"),
   codexPluginCheck: (online: boolean) => post<CodexPluginUpdates>("/api/codex-plugin/check", { online }),
   codexPluginPreview: (action: CodexPluginAction) => post<CodexPluginPlan>("/api/codex-plugin/preview", { action }),
+  hostPlugin: (host: HostPluginHost) => call<HostPluginState>(`/api/${host}-plugin`),
+  hostPluginCheck: (host: HostPluginHost, online: boolean) =>
+    post<HostPluginUpdates>(`/api/${host}-plugin/check`, { online }),
+  hostPluginPreview: (host: HostPluginHost, action: HostPluginAction) =>
+    post<HostPluginPlan>(`/api/${host}-plugin/preview`, { action }),
   cleanupStatus: () => call<CleanupStatus>("/api/cleanup/status"),
   cleanupCatalog: () => call<{ platform: string; entries: CleanupEntry[] }>("/api/cleanup/catalog"),
   cleanupHistory: () => call<CleanupHistory>("/api/cleanup/history"),
