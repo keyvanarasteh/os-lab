@@ -27,6 +27,29 @@ the Android workbench in [[dashboard/src/views/android/pages.tsx]].
 [[dashboard/src/lib/api.ts]] is the typed client; it mirrors qLar's
 `shared/os-lab.ts` contract.
 
+## Focused lab navigation
+
+A focused lab replaces the OS Lab sidebar group with that lab's own items
+([[dashboard/src/shell/app-shell.tsx]]).
+
+Cleanup uses `cleanupNavItems()` (Dashboard, Space Explorer, and the other
+leaves). iOS keeps a single "iOS Lab" button. After a switch, tests look
+for those leaves. The Switch lab footer unmounts while the sidebar is
+collapsed (`footer && !collapsed`).
+
+## Page titles and islands
+
+TopBar and PageHead both render the page title as `h1`; Playwright heading
+locators are strict.
+
+Scope to `main` or use `.first()` ([[dashboard/e2e/mcp.spec.ts]],
+[[dashboard/src/shell/top-bar.tsx]]). Lab pages are `client:only` React
+islands; a throw during fetch unmounts the whole island (a white
+screenshot). Guard array reads (`reasons ?? []`, `activeWarnings?.length`).
+E2e `mockApi` catch-alls that return `{ logs: [] }` stub every
+`/api/<lab>/` path the island loads; [[dashboard/e2e/lab-switcher.spec.ts]]
+is the Cleanup pattern. New specs go in [[dashboard/e2e/affected.json]].
+
 ## iOS Simulator panel
 
 When the iOS Lab is ready through the native-macos provider,

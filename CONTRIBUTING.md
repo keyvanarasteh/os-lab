@@ -369,9 +369,13 @@ When several people or agents work at the same time, land one branch at a time:
 4. `scripts/e2e.sh --changed`; the CI run on the pull request is the full-suite check.
 5. `git fetch origin`. If `origin/master` moved since step 2, go back to step 2.
 6. Push and open the pull request with the test results and the failures that
-   already exist on master. Wait for CI.
-7. After the merge, check that it is on `origin/master`, then remove the worktree
-   with `scripts/worktree.sh rm <branch>`.
+   already exist on master. Wait for CI. Local `npm run check` typecheck can
+   fail on Vite `ImportMeta.env` / `glob` / `?raw` while GitHub's typecheck
+   job passes; list that as a known local failure.
+7. Merge with `gh pr merge --merge --delete-branch` from a checkout that is
+   not the worktree still using the branch (the main clone). Then check that
+   the merge is on `origin/master` and remove the worktree with
+   `scripts/worktree.sh rm <branch>`.
 
 Conflict rules:
 
