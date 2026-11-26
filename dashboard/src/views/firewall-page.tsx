@@ -12,6 +12,7 @@ import {
   FireIcon,
   GitPullRequestIcon,
   ListNumbersIcon,
+  MagnifyingGlassIcon,
   MapPinIcon,
   PlusIcon,
   ShieldCheckIcon,
@@ -27,6 +28,7 @@ import type { Branch, Company, Firewall, Rule } from "../firewall/types";
 import { branchRole, copy, cveStatus, firewallPath, ruleAction, ruleDirection, type FirewallLocale } from "../firewall/locale";
 import { FirewallLanguageSwitch } from "../firewall/language-switch";
 import { numberLocale } from "../firewall/locale";
+import { devicesCopy } from "../firewall/devices-copy";
 
 const ACCENT = "#f36c21";
 const REPO = "https://github.com/keyvanarasteh/os-lab";
@@ -66,7 +68,7 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function RuleRow({ rule, locale }: { rule: Rule; locale: FirewallLocale }) {
+export function RuleRow({ rule, locale }: { rule: Rule; locale: FirewallLocale }) {
   const t = copy[locale];
   const target = [rule.from && `${t.from} ${rule.from}`, rule.to && `→ ${rule.to}`].filter(Boolean).join(" ");
   const portText =
@@ -313,6 +315,9 @@ export function FirewallPage({ locale = "en" }: { locale?: FirewallLocale }) {
               {t.intro}
             </p>
             <div className="mt-3"><FirewallLanguageSwitch locale={locale} /></div>
+            <a href={firewallPath(locale, "devices")} className="fw-cta mt-4">
+              <MagnifyingGlassIcon size={16} weight="bold" /> {devicesCopy[locale].browse}
+            </a>
           </header>
 
           <div id="add" className="flex scroll-mt-20 flex-wrap items-center gap-3 rounded-xl border border-dashed border-[#f36c21]/50 bg-[#f36c21]/5 p-4">

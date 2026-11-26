@@ -3461,5 +3461,6 @@
   "ZCode plugin": "افزونه ZCode",
   "Grok Build plugin": "افزونه Grok Build",
   "Apps keep writing here. Whatever is inside when the clean runs is removed.": "برنامه‌ها پیوسته در اینجا می‌نویسند. هر چه هنگام اجرای پاک‌سازی داخل آن باشد حذف می‌شود.",
-  "Build a new plan": "ساخت طرح جدید"
+  "Build a new plan": "ساخت طرح جدید",
+  "Firewall Lab: search and filter every seeded firewall, its specs, alternatives and rules": "آزمایشگاه دیوار آتش: جست‌وجو و فیلتر همه دیوارهای آتش ثبت‌شده، مشخصات، جایگزین‌ها و قواعد آن‌ها"
 }

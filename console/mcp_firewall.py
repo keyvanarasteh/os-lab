@@ -84,12 +84,13 @@ SCHEMAS = {
                         "minItems": 1},
     }, ["productKeys"]),
     "firewall_recommend": common.obj({
-        "linkMbps": _number("The internet link or traffic to inspect, in Mbps.", exclusiveMinimum=0),
+        "linkMbps": _number("The internet link or traffic to inspect, in Mbps.", exclusiveMinimum=0,
+                            maximum=10_000_000),
         "headroom": _number("Multiplier over linkMbps for peaks and growth (default 1.5).",
                             minimum=1, maximum=10),
         "requiredThroughputGbps": _number("Required throughput in Gbps; replaces linkMbps x headroom.",
-                                          exclusiveMinimum=0),
-        "budgetUsd": _number("Most to spend in USD (the pair when haRequired).", minimum=0),
+                                          exclusiveMinimum=0, maximum=100_000),
+        "budgetUsd": _number("Most to spend in USD (the pair when haRequired).", minimum=0, maximum=1e12),
         "category": _choice(CATEGORIES, "firewall (default) or waf."),
         "role": _FILTERS["role"],
         "segment": _FILTERS["segment"],
@@ -208,7 +209,7 @@ def _sorted(rows, value, descending):
 def _load(root):
     try:
         return catalog_engine.Catalog.load(root)
-    except (OSError, ValueError, KeyError, TypeError) as exc:
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         raise oslab.PlanError("Firewall Lab companies could not be read: {0}".format(exc),
                               code="FIREWALL_DATA") from exc
 

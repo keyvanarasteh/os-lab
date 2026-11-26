@@ -1,0 +1,7 @@
+---
+import Base from "../../layouts/Base.astro";
+import { FirewallDevicesPage } from "../../views/firewall-devices-page";
+import { devicesCopy } from "../../firewall/devices-copy";
+import "../../styles/firewall-contribute.css";
+---
+<Base title={devicesCopy.en.title} description={devicesCopy.en.intro}><FirewallDevicesPage client:only="react" /></Base>

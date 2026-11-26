@@ -3461,5 +3461,6 @@
   "ZCode plugin": "Plugin ZCode",
   "Grok Build plugin": "Plugin Grok Build",
   "Apps keep writing here. Whatever is inside when the clean runs is removed.": "Des applications écrivent ici en continu. Tout ce qui s’y trouve au moment du nettoyage est supprimé.",
-  "Build a new plan": "Créer un nouveau plan"
+  "Build a new plan": "Créer un nouveau plan",
+  "Firewall Lab: search and filter every seeded firewall, its specs, alternatives and rules": "Firewall Lab : rechercher et filtrer chaque pare-feu enregistré, ses caractéristiques, alternatives et règles"
 }

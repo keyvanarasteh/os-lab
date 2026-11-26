@@ -10,7 +10,7 @@ import { test } from "@playwright/test";
 const MAIN_ROUTES = [
   "/", "/health/", "/jobs/", "/content/", "/contribute/", "/feedback/", "/how-to-use/", "/mcp/",
   "/android/", "/android/console/", "/cleanup/", "/cleanup/scan/", "/cleanup/settings/",
-  "/firewall/", "/source/", "/source/analyzer/", "/web-lab/",
+  "/firewall/", "/firewall/devices/", "/source/", "/source/analyzer/", "/web-lab/",
   "/labs/ios/", "/labs/macos/", "/labs/windows/", "/labs/winapps/", "/labs/linux/", "/labs/websec/", "/legal/privacy/"
 ];
 const LOCALES = ["en", "ar", "de", "es", "fa", "fr", "it", "tr"];

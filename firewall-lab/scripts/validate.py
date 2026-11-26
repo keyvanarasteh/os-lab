@@ -20,6 +20,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schema" / "company.schema.json"
 COMPANIES = ROOT / "companies"
+# /firewall/<slug>/ is a company page; these paths are the dashboard's own.
+RESERVED_SLUGS = ("device", "devices")
 
 
 def load(path: Path):
@@ -139,6 +141,8 @@ def validate_company(folder: Path, schema: dict) -> list[str]:
     errors = list(v.errors)
 
     # Cross-checks the schema cannot express.
+    if folder.name in RESERVED_SLUGS:
+        errors.append(f"folder name {folder.name!r} is taken by a Firewall Lab page; pick another slug")
     if data.get("slug") != folder.name:
         errors.append(f"slug {data.get('slug')!r} must equal folder name {folder.name!r}")
     for b in data.get("branches", []) if isinstance(data.get("branches"), list) else []:

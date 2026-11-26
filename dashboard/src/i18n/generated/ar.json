@@ -3461,5 +3461,6 @@
   "ZCode plugin": "إضافة ZCode",
   "Grok Build plugin": "إضافة Grok Build",
   "Apps keep writing here. Whatever is inside when the clean runs is removed.": "تكتب التطبيقات هنا باستمرار. يُحذف كل ما بداخله عند تشغيل التنظيف.",
-  "Build a new plan": "إنشاء خطة جديدة"
+  "Build a new plan": "إنشاء خطة جديدة",
+  "Firewall Lab: search and filter every seeded firewall, its specs, alternatives and rules": "مختبر جدار الحماية: البحث والتصفية في كل جدران الحماية المسجلة ومواصفاتها وبدائلها وقواعدها"
 }

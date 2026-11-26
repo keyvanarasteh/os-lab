@@ -312,8 +312,9 @@ class Catalog:
         priority = need.get("priority") or "balanced"
         required = need.get("requiredThroughputGbps")
         link = need.get("linkMbps")
-        headroom = need.get("headroom", 1.5)
+        headroom = None
         if required is None and link is not None:
+            headroom = need.get("headroom", 1.5)
             required = round(link * headroom / 1000, 3)
         budget = need.get("budgetUsd")
         ha = bool(need.get("haRequired"))
@@ -419,7 +420,7 @@ class Catalog:
         answer = {
             "requirement": {
                 "category": category, "priority": priority, "requiredThroughputGbps": required,
-                "linkMbps": link, "headroom": headroom if link is not None else None,
+                "linkMbps": link, "headroom": headroom,
                 "budgetUsd": budget, "haRequired": ha, "role": role, "segment": segment,
             },
             "considered": len(pool), "eligible": len(eligible), "excluded": dict(excluded),

@@ -449,19 +449,25 @@ export const MCP_GROUPS: McpGroup[] = [
     id: "firewall",
     title: "Firewall Lab",
     platform: "all hosts",
-    docs: "lat.md/firewall-lab.md, console/mcp_firewall.py",
+    docs: "lat.md/firewall-lab.md, console/mcp_firewall.py, console/mcp_firewall_server.py",
     engineUsage: pending(),
     widgets: none(),
     apps: none(),
     rules: [
-      "Content browse only — catalog, company packs, guides.",
+      "Read-only content: search, compare and recommend firewalls; catalog, company packs, guides.",
+      "Throughput and prices are student-quoted, not vendor datasheets.",
       "No live firewall control and no network mutation."
     ],
     tools: [
       { name: "firewall_status", safety: "read-only", summary: "Catalog presence and company count.", engineUsage: pending(), widget: none(), app: none() },
       { name: "firewall_catalog", safety: "read-only", summary: "Firewall Lab catalog.", engineUsage: pending(), widget: none(), app: none() },
       { name: "firewall_company", safety: "read-only", summary: "One company pack by slug.", engineUsage: pending(), widget: none(), app: none() },
-      { name: "firewall_guides", safety: "read-only", summary: "Knowledge guide filenames.", engineUsage: pending(), widget: none(), app: none() }
+      { name: "firewall_guides", safety: "read-only", summary: "Knowledge guide filenames.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "firewall_devices", safety: "read-only", summary: "Search deployed firewalls.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "firewall_device", safety: "read-only", summary: "One firewall with alternatives and rules.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "firewall_products", safety: "read-only", summary: "Search products and quoted specs.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "firewall_compare", safety: "read-only", summary: "Compare up to five products.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "firewall_recommend", safety: "read-only", summary: "Rank firewalls for a context.", engineUsage: pending(), widget: none(), app: none() }
     ]
   },
   {
