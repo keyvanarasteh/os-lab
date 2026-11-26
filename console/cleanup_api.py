@@ -1106,11 +1106,10 @@ class CleanupAPI:
         if path == "/api/cleanup/simulators":
             _query(query)
             inventory = _module(self.root, "deep").simulators(self.root)
-            if not inventory["available"]:
-                return {**inventory, "actions": [], "runtimes": [], "runtimeReason": inventory["reason"]}
             simulators = _module(self.root, "simulators")
-            listed = simulators.runtimes()  # CLS-03: downloaded runtimes, read-only
-            return {**inventory, "actions": simulators.actions(), "runtimes": listed["runtimes"],
+            listed = simulators.runtimes()  # CLS-03: downloaded runtimes, independent of devices
+            actions = simulators.actions() if inventory["available"] or listed["available"] else []
+            return {**inventory, "actions": actions, "runtimes": listed["runtimes"],
                     "runtimeReason": listed["reason"]}
         if path == "/api/cleanup/history":
             _query(query)

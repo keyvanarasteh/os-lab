@@ -58,6 +58,16 @@ def actions():
             for key, value in ACTIONS.items()]
 
 
+def _runtime_items(data):
+    """``simctl runtime list -j`` is a UUID-keyed map; also accept a ``runtimes`` array."""
+    if not isinstance(data, dict):
+        return []
+    listed = data.get("runtimes")
+    if isinstance(listed, list):
+        return [(item.get("identifier") if isinstance(item, dict) else None, item) for item in listed]
+    return list(data.items())
+
+
 def runtimes(*, platform=None, run=None):
     """Downloaded simulator runtimes from ``simctl runtime list -j``; read-only."""
     run = run or subprocess.run
@@ -75,7 +85,7 @@ def runtimes(*, platform=None, run=None):
     except json.JSONDecodeError:
         return {"available": False, "reason": "simctl returned invalid JSON", "runtimes": []}
     rows = []
-    for key, item in (data.items() if isinstance(data, dict) else []):
+    for key, item in _runtime_items(data):
         if not isinstance(item, dict):
             continue
         ident = item.get("identifier") or key
@@ -152,8 +162,13 @@ def _preview_runtime(root, action_id, action, runtime_ids, *, platform, env, run
         raise SimulatorError("Unknown simulator runtime: {0}".format(runtime_ids[0]))
     if not runtime["deletable"]:
         raise SimulatorError("{0} is managed by Xcode and cannot be deleted here".format(runtime["name"]))
+    if not runtime["runtime"]:
+        raise SimulatorError("This runtime has no runtime identifier; cannot check which simulators use it")
     inventory = deep.simulators(root, platform=platform, env=env, run=run)
-    users = [d for d in inventory.get("devices", []) if runtime["runtime"] and d.get("runtime") == runtime["runtime"]]
+    if not inventory["available"]:
+        raise SimulatorError("Cannot check which simulators use this runtime: {0}".format(
+            inventory["reason"] or "device inventory unavailable"))
+    users = [d for d in inventory.get("devices", []) if d.get("runtime") == runtime["runtime"]]
     booted = [d for d in users if d.get("state") != "Shutdown"]
     if booted:
         raise SimulatorError("Shut down {0} first; it uses {1}".format(booted[0].get("name") or booted[0].get("id"), runtime["name"]))

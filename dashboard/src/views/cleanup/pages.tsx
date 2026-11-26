@@ -972,7 +972,7 @@ export default function CleanupPage({ page: initialPage = "" }: { page?: Cleanup
                   <Badge>Simulators</Badge>
                   <span dir="ltr" className="ms-auto tabular-nums">{bytes(entry.result.bytesFreed)}</span>
                 </div>
-                <p className="mt-1 text-xs text-(--iux-muted-foreground)">{simulatorActionLabel(entry.result.actionId)} · {entry.result.candidateCount} <span>simulators</span> · {entry.result.status === "completed" ? "completed" : "failed"}</p>
+                <p className="mt-1 text-xs text-(--iux-muted-foreground)">{simulatorActionLabel(entry.result.actionId)} · {entry.result.candidateCount} <span>{entry.result.actionId === "simulators.delete-runtime" ? "runtime" : "simulators"}</span> · {entry.result.status === "completed" ? "completed" : "failed"}</p>
                 <p className="mt-0.5 break-all text-xs text-(--iux-muted-foreground)">{entry.result.devices.map((device) => device.name ?? device.id).join(", ")}</p>
               </div> :
               <div key={entry.id} className="border-b border-(--iux-border) py-3 text-sm">

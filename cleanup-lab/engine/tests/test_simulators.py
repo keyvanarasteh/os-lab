@@ -110,13 +110,51 @@ class SimulatorCleanupTests(unittest.TestCase):
         listed = simulators.runtimes(platform='macos', run=self.fake)
         self.assertEqual({r['name'] for r in listed['runtimes']}, {'iOS 15.0', 'iOS 18.0'})
         self.fake.devices['com.apple.CoreSimulator.SimRuntime.iOS-15-0'] = [
-            {'udid': 'F1B2C3D4-1111-2222-3333-444455556666', 'name': 'Old phone', 'state': 'Shutdown', 'isAvailable': True}]
+            {'udid': 'F1B2C3D4-1111-2222-3333-444455556666', 'name': 'Old phone', 'state': 'Shutdown', 'isAvailable': True},
+            {'udid': 'F2B2C3D4-1111-2222-3333-444455556666', 'name': 'Old pad', 'state': 'Shutdown', 'isAvailable': True}]
         plan = simulators.preview(ROOT, 'simulators.delete-runtime', [RT_OLD], **self.kw)
         self.assertEqual(plan.argv, ('xcrun', 'simctl', 'runtime', 'delete', RT_OLD))
         self.assertEqual(plan.bytes, 6_000_000_000)
-        self.assertEqual(plan.devices[0]['devicesUsing'], 1)
+        self.assertEqual(plan.devices[0]['devicesUsing'], 2)
         simulators.execute(ROOT, plan, **self.kw)
         self.assertEqual(self.fake.calls, [['xcrun', 'simctl', 'runtime', 'delete', RT_OLD]])
+
+    def test_runtime_list_accepts_runtimes_array(self):
+        payload = {'runtimes': [self.fake.runtimes[RT_OLD]]}
+
+        def run(argv, **kwargs):
+            self.assertEqual(argv, ['xcrun', 'simctl', 'runtime', 'list', '-j'])
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr='')
+
+        listed = simulators.runtimes(platform='macos', run=run)
+        self.assertEqual([r['id'] for r in listed['runtimes']], [RT_OLD])
+
+    def test_runtime_list_skips_coresimulator_ids(self):
+        payload = {'runtimes': [{'identifier': 'com.apple.CoreSimulator.SimRuntime.iOS-15-0',
+                                 'runtimeIdentifier': 'com.apple.CoreSimulator.SimRuntime.iOS-15-0',
+                                 'version': '15.0', 'deletable': True}]}
+
+        def run(argv, **kwargs):
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr='')
+
+        listed = simulators.runtimes(platform='macos', run=run)
+        self.assertEqual(listed['runtimes'], [])
+
+    def test_runtime_delete_refuses_when_devices_unavailable(self):
+        def run(argv, **kwargs):
+            if argv == ['xcrun', 'simctl', 'runtime', 'list', '-j']:
+                return SimpleNamespace(returncode=0, stdout=json.dumps(self.fake.runtimes), stderr='')
+            if argv == ['xcrun', 'simctl', 'list', '-j', 'devices']:
+                return SimpleNamespace(returncode=1, stdout='', stderr='simctl failed')
+            raise AssertionError(argv)
+
+        with self.assertRaisesRegex(simulators.SimulatorError, 'Cannot check which simulators use this runtime'):
+            simulators.preview(ROOT, 'simulators.delete-runtime', [RT_OLD], platform='macos', env=self.env, run=run)
+
+    def test_runtime_delete_refuses_missing_runtime_identifier(self):
+        self.fake.runtimes[RT_OLD].pop('runtimeIdentifier')
+        with self.assertRaisesRegex(simulators.SimulatorError, 'no runtime identifier'):
+            simulators.preview(ROOT, 'simulators.delete-runtime', [RT_OLD], **self.kw)
 
     def test_runtime_refusals(self):
         with self.assertRaisesRegex(simulators.SimulatorError, 'managed by Xcode'):

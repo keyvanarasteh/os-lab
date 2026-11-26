@@ -91,7 +91,8 @@ export function SimulatorsCard({ now }: { now: number }) {
     {loadError && <><Status value={{ ok: false, text: loadError }} /><button type="button" className="iux-btn mt-2" onClick={load}>Retry</button></>}
     {!inventory && !loadError && <p role="status">Checking simulators…</p>}
     {inventory && !inventory.available && <p>{inventory.reason || "Simulator tooling is unavailable."}</p>}
-    {inventory?.available && <>
+    {inventory && (inventory.available || runtimes.length > 0 || Boolean(inventory.runtimeReason)) && <>
+      {inventory.available && <>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span><span dir="ltr" className="font-semibold tabular-nums">{devices.length}</span> <span>simulators</span></span>
         <span className="text-(--iux-muted-foreground)">·</span>
@@ -127,6 +128,7 @@ export function SimulatorsCard({ now }: { now: number }) {
             </li>;
           })}
         </ul>}
+      </>}
 
       {runtimes.length > 0 && <div className="mt-4">
         <h3 className="text-xs font-medium uppercase tracking-wide text-(--iux-muted-foreground)">Runtimes</h3>
@@ -135,7 +137,7 @@ export function SimulatorsCard({ now }: { now: number }) {
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium" translate="no">{runtime.name}</span>
               <span className="block truncate text-xs text-(--iux-muted-foreground)">
-                <span translate="no">{runtime.build ?? ""}</span> · {usedBy(runtime.runtime)} <span>simulators</span>
+                <span translate="no">{runtime.build ?? ""}</span> · {inventory.available ? <>{usedBy(runtime.runtime)} <span>simulators</span></> : <span>usage unknown</span>}
               </span>
             </span>
             {!runtime.deletable && <Badge>Managed by Xcode</Badge>}
