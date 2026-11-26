@@ -3412,5 +3412,9 @@
   "widgets": "widget’lar",
   "· plugins:": "· eklentiler:",
   "· skills:": "· beceriler:",
-  "· verification registry:": "· doğrulama kaydı:"
+  "· verification registry:": "· doğrulama kaydı:",
+  "Install as a Claude plugin": "Claude eklentisi olarak kur",
+  "One command previews the changes, asks, then adds the server, lab skills and a setup check to Claude Code. Use it instead of the Claude Code snippet, not with it.": "Tek komut değişiklikleri önizler, onay ister, ardından sunucuyu, laboratuvar becerilerini ve kurulum denetimini Claude Code'a ekler. Claude Code parçasıyla birlikte değil, onun yerine kullanın.",
+  "Claude Code plugin": "Claude Code eklentisi",
+  "Claude plugin": "Claude eklentisi"
 }

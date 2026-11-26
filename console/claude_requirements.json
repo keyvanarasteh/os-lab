@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "reviewedOn": "2026-11-26",
+  "sources": {
+    "manifest": "https://code.claude.com/docs/en/plugins-reference",
+    "cli": "https://code.claude.com/docs/en/plugins/cli-reference",
+    "marketplace": "https://code.claude.com/docs/en/plugins/marketplace-reference",
+    "loading": "https://code.claude.com/docs/en/plugins/loading",
+    "mcp": "https://code.claude.com/docs/en/mcp",
+    "skills": "https://code.claude.com/docs/en/skills",
+    "hooks": "https://code.claude.com/docs/en/hooks",
+    "mcpb": "https://github.com/anthropics/mcpb/blob/main/MANIFEST.md"
+  },
+  "requirements": [
+    {"id": "manifest.name", "area": "manifest", "severity": "error", "usage": "used", "check": "manifest_name", "source": "manifest", "rule": "plugin.json has a name without spaces, '@', ':' or path separators."},
+    {"id": "manifest.reserved-name", "area": "manifest", "severity": "error", "usage": "used", "check": "manifest_reserved", "source": "manifest", "rule": "The name does not impersonate Anthropic (claude-, anthropic-, cc-plugin- prefixes)."},
+    {"id": "manifest.metadata", "area": "manifest", "severity": "warning", "usage": "used", "check": "manifest_metadata", "source": "manifest", "rule": "description, author.name, version and license are set."},
+    {"id": "manifest.paths", "area": "manifest", "severity": "error", "usage": "used", "check": "manifest_paths", "source": "manifest", "rule": "Component paths start with './', stay inside the plugin, contain no '..' and exist."},
+    {"id": "manifest.keys", "area": "manifest", "severity": "warning", "usage": "used", "check": "manifest_keys", "source": "manifest", "rule": "No unknown top-level keys."},
+
+    {"id": "config.options", "area": "userConfig", "severity": "error", "usage": "used", "check": "config_options", "source": "manifest", "rule": "Each option has a valid key, a type (string, number, boolean, directory, file), a title and a description."},
+    {"id": "config.references", "area": "userConfig", "severity": "error", "usage": "used", "check": "config_references", "source": "manifest", "rule": "Every ${user_config.KEY} names a declared option; other variables are ones Claude Code provides."},
+
+    {"id": "marketplace.required", "area": "marketplace", "severity": "error", "usage": "used", "check": "market_required", "source": "marketplace", "rule": "marketplace.json has name, owner.name and a plugins array."},
+    {"id": "marketplace.reserved-name", "area": "marketplace", "severity": "error", "usage": "used", "check": "market_reserved", "source": "marketplace", "rule": "The marketplace name is not reserved."},
+    {"id": "marketplace.entry", "area": "marketplace", "severity": "error", "usage": "used", "check": "market_entry", "source": "marketplace", "rule": "The entry name matches the manifest name and its relative source starts with './' without '..'."},
+    {"id": "marketplace.version", "area": "marketplace", "severity": "warning", "usage": "used", "check": "market_version", "source": "marketplace", "rule": "The version is set in one place; the manifest wins over the entry."},
+
+    {"id": "mcp.config", "area": "mcp", "severity": "error", "usage": "used", "check": "mcp_config", "source": "manifest", "rule": ".mcp.json declares servers with a command, and bundled files are referenced through ${CLAUDE_PLUGIN_ROOT}."},
+    {"id": "mcp.tool-name", "area": "mcp", "severity": "error", "usage": "used", "check": "mcp_tool_names", "source": "mcp", "rule": "mcp__plugin_<plugin>_<server>__<tool> is at most 128 characters."},
+    {"id": "mcp.schema-names", "area": "mcp", "severity": "error", "usage": "used", "check": "mcp_schema_names", "source": "mcp", "rule": "Top-level input property names are 1-64 letters, digits, '_', '.' or '-'."},
+    {"id": "mcp.description-length", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_descriptions", "source": "mcp", "rule": "Tool descriptions and server instructions fit 4096 characters."},
+    {"id": "mcp.instructions", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_instructions", "source": "mcp", "rule": "The server sends instructions."},
+    {"id": "mcp.result-size", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_result_size", "source": "mcp", "rule": "anthropic/maxResultSizeChars is at most 500000; larger text results are saved to a file after 50000 characters."},
+    {"id": "mcp.annotations", "area": "mcp", "severity": "warning", "usage": "used", "check": "mcp_annotations", "source": "mcp", "rule": "Every tool declares readOnlyHint."},
+
+    {"id": "skills.frontmatter", "area": "skills", "severity": "error", "usage": "used", "check": "skills_frontmatter", "source": "skills", "rule": "Each SKILL.md starts with frontmatter on line 1."},
+    {"id": "skills.fields", "area": "skills", "severity": "warning", "usage": "used", "check": "skills_fields", "source": "skills", "rule": "Only documented frontmatter fields; claude.ai uploads accept a smaller set."},
+    {"id": "skills.description", "area": "skills", "severity": "warning", "usage": "used", "check": "skills_description", "source": "skills", "rule": "A description is set and fits the 1536 character listing limit."},
+    {"id": "skills.length", "area": "skills", "severity": "warning", "usage": "used", "check": "skills_length", "source": "skills", "rule": "SKILL.md stays under 500 lines."},
+    {"id": "skills.generated", "area": "skills", "severity": "error", "usage": "used", "check": "skills_generated", "source": "loading", "rule": "The committed lab skills match console/mcp_skills/ (run scripts/claude-plugin.py build)."},
+
+    {"id": "hooks.shape", "area": "hooks", "severity": "error", "usage": "used", "check": "hooks_shape", "source": "hooks", "rule": "hooks/hooks.json maps known events to matcher groups with typed hooks."},
+    {"id": "hooks.timeout", "area": "hooks", "severity": "warning", "usage": "used", "check": "hooks_timeout", "source": "hooks", "rule": "Command hooks set a short timeout."},
+    {"id": "hooks.exit-codes", "area": "hooks", "severity": "info", "usage": "used", "check": "manual", "source": "hooks", "rule": "Exit 0 succeeds, exit 2 blocks, other codes are non-blocking errors; SessionStart cannot block."},
+
+    {"id": "cache.contained", "area": "cache", "severity": "error", "usage": "used", "check": "cache_contained", "source": "loading", "rule": "No symlink leaves the plugin folder; files outside it are not copied."},
+    {"id": "cache.state", "area": "cache", "severity": "info", "usage": "used", "check": "manual", "source": "loading", "rule": "Nothing is written to CLAUDE_PLUGIN_ROOT; lasting state belongs in CLAUDE_PLUGIN_DATA."},
+
+    {"id": "cli.available", "area": "cli", "severity": "warning", "usage": "used", "check": "cli_available", "source": "cli", "rule": "Claude Code 2.1.285 or newer is on PATH (--json results and plugin configure)."},
+    {"id": "cli.validate", "area": "cli", "severity": "error", "usage": "used", "check": "cli_validate", "source": "cli", "minVersion": "2.1.259", "rule": "claude plugin validate --strict --json passes for the plugin and the marketplace."},
+    {"id": "settings.managed", "area": "settings", "severity": "info", "usage": "used", "check": "manual", "source": "marketplace", "rule": "enabledPlugins, extraKnownMarketplaces and managed allow or block lists decide what loads; os-lab never edits them."},
+    {"id": "distribution.readme", "area": "distribution", "severity": "warning", "usage": "used", "check": "readme", "source": "cli", "rule": "The plugin has a README of at least 40 words."},
+    {"id": "desktop.mcpb", "area": "desktop", "severity": "error", "usage": "used", "check": "mcpb_manifest", "source": "mcpb", "rule": "The .mcpb manifest has manifest_version, name, semver version, description, author.name and a server."},
+
+    {"id": "component.bin", "area": "components", "severity": "error", "usage": "n/a", "check": "no_bin", "source": "manifest", "rule": "No bin/ folder: claude.ai and Cowork do not install plugins that have one."},
+    {"id": "component.agents", "area": "components", "severity": "info", "usage": "n/a", "check": "manual", "source": "manifest", "rule": "agents/*.md: nothing to ship."},
+    {"id": "component.commands", "area": "components", "severity": "info", "usage": "n/a", "check": "manual", "source": "manifest", "rule": "commands/: superseded by skills."},
+    {"id": "component.lsp", "area": "components", "severity": "info", "usage": "n/a", "check": "manual", "source": "manifest", "rule": ".lsp.json: no language server."},
+    {"id": "component.monitors", "area": "components", "severity": "info", "usage": "n/a", "check": "manual", "source": "manifest", "rule": "monitors/monitors.json: the console owns monitoring."},
+    {"id": "component.themes", "area": "components", "severity": "info", "usage": "n/a", "check": "manual", "source": "manifest", "rule": "themes/ and output-styles/: nothing to ship."},
+    {"id": "component.workflows", "area": "components", "severity": "info", "usage": "n/a", "check": "manual", "source": "manifest", "rule": "workflows/ and mods: nothing to ship."},
+    {"id": "component.channels", "area": "components", "severity": "info", "usage": "n/a", "check": "manual", "source": "manifest", "rule": "channels: no message channel."},
+    {"id": "component.dependencies", "area": "components", "severity": "info", "usage": "n/a", "check": "manual", "source": "manifest", "rule": "dependencies: the plugin needs no other plugin."}
+  ]
+}

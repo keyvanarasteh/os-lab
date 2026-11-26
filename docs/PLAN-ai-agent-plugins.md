@@ -1,7 +1,8 @@
 # AI agent plugins — plan (Claude first)
 
 Branch `feat/ai-agent-plugins`. Checklist: [TODO](TODO-ai-agent-plugins.md).
-Status: proposed, nothing implemented yet.
+Status: implemented (AIP). Open items are listed in the TODO. Behavior is described in
+[`lat.md/ai-plugins.md`](../lat.md/ai-plugins.md).
 
 ## Goal
 
@@ -157,7 +158,7 @@ Nothing installs or changes configuration without a confirmation.
 
 ## Phases
 
-One reviewable PR each, in order. Each ends with tests and `lat check`.
+Planned as one PR each; delivered together in one PR.
 
 | Phase | Delivers | Done when |
 | --- | --- | --- |
@@ -168,23 +169,25 @@ One reviewable PR each, in order. Each ends with tests and `lat check`.
 | 4 | SessionStart hook, server instructions, widget, `/mcp/` page, docs | Healthy start adds no text; e2e and i18n pass |
 | 5 | `.mcpb` bundle for Claude Desktop | Bundle validates and installs by hand on macOS |
 
-## Open questions (Phase 0)
+## Phase 0 answers
 
-1. Does `claude plugin install` work from a server that Claude Code itself
-   started? The docs say `-y` is ignored inside a session. If it refuses,
-   `plugin_apply` returns the command for the user to run instead.
-2. What reaches the server when an optional `userConfig` value is unset: an empty
-   string, the literal placeholder, or a load error?
-3. `.mcp.json` takes one `command`. Windows often has no `python3`. Which
-   launcher works on all three systems?
-4. Does `CLAUDE_CONFIG_DIR` isolate plugin installs well enough for tests?
-5. `confirm: true` is set by the model, so the real human gate is the client's
-   permission prompt, which a user can turn off. Is that enough for
-   `plugin_apply`, or should it also need arming from the dashboard? Proposed:
-   the token flow alone for install, update and enable; the terminal script only
-   for uninstall.
-6. Which tool packs and validates `.mcpb`? The manifest specification does not
-   say, and none is installed here.
+Measured on 2026-11-26 with Claude Code 2.1.332 on macOS, in a temporary `CLAUDE_CONFIG_DIR`.
+
+1. `claude plugin install` works from a process started inside a Claude Code session (no
+   terminal, no `-y`) for a local-path marketplace.
+2. An unset `userConfig` value without a default arrives as an empty string; one with a default
+   arrives as the default.
+3. `command: "${user_config.python_command}"` with default `python3` works, so Windows users set
+   the option. The session check uses `python3 … || python …`. Windows itself is untested.
+4. A temporary `CLAUDE_CONFIG_DIR` keeps installs out of the real configuration. A local-path
+   marketplace plugin loads in place.
+5. Decided: token plus `confirm: true` for install, update, configure, enable and disable;
+   uninstall and duplicate removal only from an interactive terminal.
+6. Still open: no official `.mcpb` validator was run and no manual install was done.
+
+Decided on merge order: this did not wait for #317 or #306 (#317 conflicts with master). The
+plugin registers the server as `os-lab`; #317 uses `os-lab-macos`, which `plugin_status`
+reports as a duplicate. Merging the two plan-and-token implementations is follow-up work.
 
 ## Out of scope
 

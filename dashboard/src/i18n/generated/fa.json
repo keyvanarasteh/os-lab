@@ -3412,5 +3412,9 @@
   "widgets": "ویجت‌ها",
   "· plugins:": "· افزونه‌ها:",
   "· skills:": "· مهارت‌ها:",
-  "· verification registry:": "· رجیستری تأیید:"
+  "· verification registry:": "· رجیستری تأیید:",
+  "Install as a Claude plugin": "نصب به‌عنوان افزونه Claude",
+  "One command previews the changes, asks, then adds the server, lab skills and a setup check to Claude Code. Use it instead of the Claude Code snippet, not with it.": "یک فرمان تغییرات را پیش‌نمایش می‌دهد، تأیید می‌گیرد و سپس سرور، مهارت‌های آزمایشگاه و بررسی راه‌اندازی را به Claude Code اضافه می‌کند. آن را به‌جای قطعه Claude Code به‌کار ببرید، نه همراه آن.",
+  "Claude Code plugin": "افزونه Claude Code",
+  "Claude plugin": "افزونه Claude"
 }

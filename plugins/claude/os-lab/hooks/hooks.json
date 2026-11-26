@@ -1,0 +1,17 @@
+{
+  "description": "Read-only os-lab setup check at session start. Silent when healthy.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session_check.py\" || python \"${CLAUDE_PLUGIN_ROOT}/hooks/session_check.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

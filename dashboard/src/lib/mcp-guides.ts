@@ -34,7 +34,8 @@ export type McpGroupId =
   | "linux"
   | "web"
   | "source"
-  | "firewall";
+  | "firewall"
+  | "plugin";
 
 export interface McpGroup {
   id: McpGroupId;
@@ -435,6 +436,29 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "firewall_company", safety: "read-only", summary: "One company pack by slug.", engineUsage: pending(), widget: none(), app: none() },
       { name: "firewall_guides", safety: "read-only", summary: "Knowledge guide filenames.", engineUsage: pending(), widget: none(), app: none() }
     ]
+  },
+  {
+    id: "plugin",
+    title: "Claude plugin",
+    platform: "all hosts",
+    docs: "lat.md/ai-plugins.md, console/mcp_plugin.py",
+    engineUsage: { status: "verified", proof: "android-lab/lab/tests/test_mcp_plugin.py" },
+    widgets: { status: "verified", proof: "android-lab/lab/tests/test_mcp_ui_hosts.py" },
+    apps: none(),
+    rules: [
+      "Changes are previewed first and need the plan token plus confirm: true.",
+      "Uninstall and duplicate removal run only from a terminal.",
+      "Commands are fixed on the server; callers pick an action and a scope."
+    ],
+    tools: [
+      { name: "plugin_requirements", safety: "read-only", summary: "Claude plugin requirement catalog with sources.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "plugin_doctor", safety: "read-only", summary: "Claude Code, Python and checkout readiness.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "plugin_status", safety: "read-only", summary: "Marketplace, install state and duplicate entries.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "plugin_check", safety: "read-only", summary: "Check the plugin against every catalog rule.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "plugin_plan", safety: "read-only", summary: "Preview install or setup commands with a one-use token.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "plugin_apply", safety: "confirm", summary: "Run a previewed plan. confirm: true; removals are terminal only.", engineUsage: pending(), widget: none(), app: none() },
+      { name: "plugin_verify", safety: "read-only", summary: "Start the installed server and compare its tools.", engineUsage: pending(), widget: none(), app: none() }
+    ]
   }
 ];
 
@@ -445,3 +469,8 @@ export const MCP_PLANNED_SECTIONS: { id: string; title: string; engineUsage: Ver
   { id: "lab-widgets", title: "Lab MCP widgets", engineUsage: pending(), widgets: pending(), apps: pending(), note: "Per-tool widgets + lab depth tools shipped; Firewall widgets left none." },
   { id: "verification-flips", title: "Verification proofs", engineUsage: pending(), widgets: pending(), apps: pending(), note: "Section/tool proofs flipped in console/mcp_verification.json for this PR." }
 ];
+
+/** Install the repo as a Claude Code plugin: server, lab skills and the setup check together. */
+export function claudePluginSnippet(root?: string): string {
+  return `python3 ${root ?? "<repo>"}/scripts/claude-plugin.py install`;
+}

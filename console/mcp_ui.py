@@ -118,6 +118,7 @@ _UI_SECTIONS = (
     ("source", "widgets", WIDGET_ROOT),
     ("source", "apps", APP_ROOT),
     ("linux", "widgets", WIDGET_ROOT),
+    ("plugin", "widgets", WIDGET_ROOT),
 )
 
 
@@ -228,6 +229,9 @@ SOURCE_WIDGET = {
 LINUX_WIDGET = {
     "status": "ui://os-lab/linux/widgets/status.html",
     "doctor": "ui://os-lab/linux/widgets/doctor.html",
+}
+PLUGIN_WIDGET = {
+    "status": "ui://os-lab/plugin/widgets/status.html",
 }
 LAB_APP = {
     "android": "ui://os-lab/android/apps/overview.html",

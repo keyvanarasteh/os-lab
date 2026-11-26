@@ -176,6 +176,21 @@
         "status": "none",
         "proof": null
       }
+    },
+    "plugin": {
+      "title": "Claude plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widgets": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py"
+      },
+      "apps": {
+        "status": "none",
+        "proof": null
+      }
     }
   },
   "tools": {
@@ -2373,6 +2388,111 @@
       "engineUsage": {
         "status": "verified",
         "proof": "android-lab/lab/tests/test_mcp_winapps.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "plugin_requirements": {
+      "section": "plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "plugin_doctor": {
+      "section": "plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "plugin_status": {
+      "section": "plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widget": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_ui_hosts.py"
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "plugin_check": {
+      "section": "plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "plugin_plan": {
+      "section": "plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "plugin_apply": {
+      "section": "plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
+    },
+    "plugin_verify": {
+      "section": "plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
       },
       "widget": {
         "status": "none",

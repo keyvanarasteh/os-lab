@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Plugin status</title>
+<style>*{box-sizing:border-box}body{margin:0;font:14px/1.45 var(--font-sans,system-ui,sans-serif);color:var(--color-text-primary,#1c1c1a);background:var(--color-background-primary,#f7f6f2);padding:12px}h2{font-size:13px;margin:12px 0 6px;color:var(--color-text-secondary,#5c5c56)}.muted{color:var(--color-text-secondary,#5c5c56);font-size:12px}.chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--color-background-secondary,#ebe9e2);font-size:12px}.ok{background:#d9f0df;color:#1c1c1a}.warn{background:#fde8c8;color:#1c1c1a}.card{padding:10px;border:1px solid var(--color-border-tertiary,#e6e4dc);border-radius:12px}ul{margin:0;padding-left:18px}button{font:inherit;padding:6px 10px;margin-top:10px;border-radius:8px;border:1px solid var(--color-border-primary,#cfcabf);background:var(--color-background-primary,#fff);color:inherit;cursor:pointer}</style>
+</head>
+<body>
+<main id="root"><p class="muted">Waiting for data…</p></main>
+<!-- MCP_BRIDGE -->
+<script>
+
+window.__oslabUi.onUpdate(function (s) {
+  var d = s.output || {};
+  var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return "&#" + c.charCodeAt(0) + ";"; }); };
+  var installed = Array.isArray(d.installed) ? d.installed : [];
+  var state = !d.cli ? "Claude Code not found" : !installed.length ? "Not installed" : installed.some(function (r) { return r.enabled; }) ? "Installed" : "Disabled";
+  var list = function (rows, empty) { return "<ul>" + (rows.join("") || "<li class=\"muted\">" + empty + "</li>") + "</ul>"; };
+  document.getElementById("root").innerHTML = "<div class=\"card\"><div class=\"muted\">os-lab Claude plugin</div>"
+    + "<span class=\"chip " + (state === "Installed" ? "ok" : "warn") + "\">" + state + "</span>"
+    + "<h2>Installations</h2>" + list(installed.map(function (r) { return "<li>" + esc(r.scope) + " · " + esc(r.version) + (r.enabled ? "" : " · disabled") + "</li>"; }), "None")
+    + "<h2>Duplicate MCP entries</h2>" + list((d.duplicates || []).map(function (r) { return "<li>" + esc(r.name) + " · " + esc(r.scope) + "</li>"; }), "None")
+    + "<button id=\"refresh\">Refresh</button></div>";
+  document.getElementById("refresh").onclick = function () { window.__oslabUi.callTool("plugin_status", {}); };
+});
+
+</script>
+</body>
+</html>

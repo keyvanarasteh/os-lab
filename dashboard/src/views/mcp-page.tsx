@@ -18,6 +18,7 @@ import {
   antigravitySnippet,
   claudeCodeSnippet,
   claudeDesktopSnippet,
+  claudePluginSnippet,
   codexSnippet,
   cursorSnippet,
   genericSnippet,
@@ -121,6 +122,10 @@ export default function McpPage() {
             <Snippet label="Antigravity" text={antigravitySnippet(root)} />
             <Snippet label="Generic stdio" text={genericSnippet()} />
           </div>
+        </Section>
+
+        <Section id="mcp-claude-plugin" title="Install as a Claude plugin" description="One command previews the changes, asks, then adds the server, lab skills and a setup check to Claude Code. Use it instead of the Claude Code snippet, not with it.">
+          <Snippet label="Claude Code plugin" text={claudePluginSnippet(root)} />
         </Section>
 
         {MCP_GROUPS.map((group) => (
