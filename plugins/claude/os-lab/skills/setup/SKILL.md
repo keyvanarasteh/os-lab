@@ -2,7 +2,7 @@
 name: setup
 description: Install or reconfigure the os-lab Claude plugin with a preview and the user's approval.
 disable-model-invocation: true
-argument-hint: "[install|update|configure|enable|disable]"
+argument-hint: "[install|update|configure|enable|disable|extension-install]"
 ---
 
 # os-lab plugin setup
@@ -16,4 +16,8 @@ argument-hint: "[install|update|configure|enable|disable]"
 
 `plugin_apply` refuses `uninstall` and `remove-duplicate`. Give the user the terminal command
 from the plan and let them run it; do not run it for them.
+`extension-install` installs or updates os-lab in Claude Desktop. Claude Desktop then shows its
+own dialog, which the user confirms. When the plan lists manual steps instead of commands, show
+them. Check the result with `plugin_updates`.
+
 Never edit Claude settings files by hand.

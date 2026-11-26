@@ -56,6 +56,14 @@ name, PR or command output).
 - [x] AIP-41 Catalog rules and `plugin_check` support for the bundle — proof: `test_mcp_plugin.py`
 - [ ] AIP-42 Proof: manual install on macOS
 
+## Phase 6 — plugin in Claude Desktop and update checks
+
+- [x] AIP-50 Detect Claude Desktop, the installed os-lab extension and duplicate entries — proof: `test_mcp_plugin.py`
+- [x] AIP-51 `extension-install` plan: build the bundle and open it in Claude Desktop — proof: `test_mcp_plugin.py` (command faked)
+- [x] AIP-52 `plugin_updates` for Claude Code, Claude Desktop and the published version — proof: `test_mcp_plugin.py`
+- [x] AIP-53 Session check: older extension, and an opt-in daily published-version check — proof: `test_mcp_plugin.py`
+- [ ] AIP-54 Proof: install and update the extension in a real Claude Desktop
+
 ## Follow-ups
 
 - [ ] Share one plan-and-token implementation with #317 once it lands

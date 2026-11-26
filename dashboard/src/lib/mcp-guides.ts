@@ -454,6 +454,7 @@ export const MCP_GROUPS: McpGroup[] = [
       { name: "plugin_requirements", safety: "read-only", summary: "Claude plugin requirement catalog with sources.", engineUsage: pending(), widget: none(), app: none() },
       { name: "plugin_doctor", safety: "read-only", summary: "Claude Code, Python and checkout readiness.", engineUsage: pending(), widget: none(), app: none() },
       { name: "plugin_status", safety: "read-only", summary: "Marketplace, install state and duplicate entries.", engineUsage: pending(), widget: pending(), app: none() },
+      { name: "plugin_updates", safety: "read-only", summary: "Update check for Claude Code and Claude Desktop.", engineUsage: pending(), widget: none(), app: none() },
       { name: "plugin_check", safety: "read-only", summary: "Check the plugin against every catalog rule.", engineUsage: pending(), widget: none(), app: none() },
       { name: "plugin_plan", safety: "read-only", summary: "Preview install or setup commands with a one-use token.", engineUsage: pending(), widget: none(), app: none() },
       { name: "plugin_apply", safety: "confirm", summary: "Run a previewed plan. confirm: true; removals are terminal only.", engineUsage: pending(), widget: none(), app: none() },

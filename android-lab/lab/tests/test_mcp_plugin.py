@@ -5,6 +5,7 @@ A fake `claude` command stands in for Claude Code, so nothing here touches a rea
 import io
 import json
 import os
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,7 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "console"))
 sys.path.insert(0, PLUGIN)
 sys.path.insert(0, os.path.join(PLUGIN, "hooks"))
 
+import claude_desktop as desktop  # noqa: E402
 import claude_plugin as engine  # noqa: E402
 import launcher  # noqa: E402
 import mcp_server  # noqa: E402
@@ -91,6 +93,7 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setenv("FAKE_STATE", str(state_path))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setattr(engine, "audit", lambda *args: None)
+    monkeypatch.setenv("OSLAB_CLAUDE_DESKTOP_DIR", str(tmp_path / "desktop"))
     return instance
 
 
@@ -268,7 +271,8 @@ def test_launcher_runs_the_server_and_explains_a_missing_checkout(tmp_path):
     assert "repo_path" in json.loads(replies[2]["result"]["content"][0]["text"])["fix"]
 
 
-def test_session_check_is_silent_when_healthy(tmp_path):
+def test_session_check_is_silent_when_healthy(tmp_path, monkeypatch):
+    monkeypatch.setenv("OSLAB_CLAUDE_DESKTOP_DIR", str(tmp_path / "desktop"))
     assert session_check.message({"OSLAB_PLUGIN_REPO": REPO_ROOT}) == ""
     assert "/os-lab:doctor" in session_check.message({"CLAUDE_PLUGIN_OPTION_REPO_PATH": str(tmp_path)})
 
@@ -414,3 +418,89 @@ def test_resource_prompt_instructions_and_annotations():
     assert tools["plugin_apply"]["annotations"]["readOnlyHint"] is False
     assert tools["cleanup_catalog"]["_meta"]["anthropic/maxResultSizeChars"] == 200000
     assert tools["cleanup_catalog"]["_meta"]["ui"]
+
+
+# --- Claude Desktop and updates ------------------------------------------------
+
+@pytest.fixture
+def mac(tmp_path, monkeypatch):
+    """A fake macOS with Claude Desktop and an empty settings folder."""
+    app = tmp_path / "Claude.app" / "Contents"
+    app.mkdir(parents=True)
+    (app / "Info.plist").write_bytes(plistlib.dumps(
+        {"CFBundleIdentifier": desktop.DESKTOP_ID, "CFBundleShortVersionString": "1.2.3"}))
+    monkeypatch.setattr(desktop, "_platform", lambda: "darwin")
+    monkeypatch.setenv("OSLAB_CLAUDE_APP", str(tmp_path / "Claude.app"))
+    monkeypatch.setenv("OSLAB_CLAUDE_DESKTOP_DIR", str(tmp_path / "desktop"))
+    monkeypatch.setattr(desktop, "published_version", lambda timeout=5: pytest.fail("network used"))
+    return tmp_path / "desktop"
+
+
+def _extension(base, version):
+    _write(str(base / "Claude Extensions" / "local.mcpb.os-lab" / "manifest.json"),
+           json.dumps({"name": "os-lab", "version": version}))
+
+
+def test_desktop_extension_state_and_duplicates(mac):
+    assert desktop.status(REPO_ROOT)["app"]["version"] == "1.2.3"
+    assert desktop.extension_info(REPO_ROOT)["installed"] is False
+    _extension(mac, "0.0.9")
+    _write(str(mac / "claude_desktop_config.json"),
+           json.dumps({"mcpServers": {"os-lab-macos": {"env": {"T": "s3cret"}}, "other": {}}}))
+    info = desktop.extension_info(REPO_ROOT)
+    assert info["version"] == "0.0.9" and info["updateAvailable"]
+    assert info["duplicates"] == ["os-lab-macos"] and "s3cret" not in json.dumps(info)
+    _extension(mac, "99.0.0")
+    assert desktop.extension_info(REPO_ROOT)["updateAvailable"] is False
+
+
+def test_extension_install_builds_the_bundle_and_opens_it(mac, monkeypatch, tmp_path):
+    target = tmp_path / "out" / "os-lab.mcpb"
+    ran = []
+    monkeypatch.setattr(desktop, "bundle_path", lambda root: str(target))
+    monkeypatch.setattr(engine, "_run", lambda argv, cwd, **kw: ran.append(argv) or
+                        {"code": 0, "stdout": "", "stderr": ""})
+    monkeypatch.setattr(engine, "audit", lambda *args: None)
+    preview = engine.plan(REPO_ROOT, "extension-install")
+    assert not target.exists() and not ran
+    assert preview["commands"][0].startswith("open -a ")
+    result = engine.apply(REPO_ROOT, preview["token"], True)
+    assert result["ok"] and "Confirm the install" in result["next"]
+    assert target.read_bytes() == engine.build_mcpb(REPO_ROOT)
+    assert ran == [["open", "-a", str(tmp_path / "Claude.app"), str(target)]]
+
+
+def test_extension_install_without_desktop_or_without_a_command(mac, monkeypatch):
+    monkeypatch.setenv("OSLAB_CLAUDE_APP", "")
+    assert _code(lambda: engine.plan(REPO_ROOT, "extension-install")) == "NOT_INSTALLED"
+    assert _code(lambda: engine.plan(REPO_ROOT, "extension-install", "project")) == "INVALID_ARGS"
+    monkeypatch.setattr(desktop, "_platform", lambda: "linux")
+    monkeypatch.setattr(engine, "audit", lambda *args: None)
+    preview = engine.plan(REPO_ROOT, "extension-install")
+    assert preview["commands"] == [] and preview["manual"]
+    assert _code(lambda: engine.apply(REPO_ROOT, preview["token"], True)) == "MANUAL"
+
+
+def test_updates_compare_both_apps_and_the_published_version(fake, mac, monkeypatch):
+    fake.write(installed=[{"id": "os-lab@os-lab", "version": "0.0.1", "scope": "user", "enabled": True}])
+    _extension(mac, "0.0.9")
+    offline = desktop.updates(REPO_ROOT)
+    assert offline["updatesAvailable"] == ["claude-code", "claude-desktop"] and "published" not in offline
+    monkeypatch.setattr(desktop, "published_version", lambda timeout=5: ("99.0.0", None))
+    assert desktop.updates(REPO_ROOT, online=True)["updatesAvailable"][0] == "checkout"
+    monkeypatch.setattr(desktop, "published_version", lambda timeout=5: (None, "offline"))
+    report = desktop.updates(REPO_ROOT, online=True)
+    assert report["published"] == {"version": None, "updateAvailable": None, "note": "offline"}
+
+
+def test_session_check_asks_once_a_day_and_only_when_switched_on(mac, monkeypatch, tmp_path):
+    env = {"OSLAB_PLUGIN_REPO": REPO_ROOT, "CLAUDE_PLUGIN_DATA": str(tmp_path / "data")}
+    assert session_check.message(env) == ""  # off: the network guard in `mac` would fail
+    asked = []
+    monkeypatch.setattr(desktop, "published_version",
+                        lambda timeout=5: asked.append(1) or ("99.0.0", None))
+    env["CLAUDE_PLUGIN_OPTION_UPDATE_CHECK"] = "true"
+    assert "99.0.0 is published" in session_check.message(env)
+    assert "99.0.0" in session_check.message(env) and len(asked) == 1
+    _extension(mac, "0.0.9")
+    assert "extension-install" in session_check.message(env)

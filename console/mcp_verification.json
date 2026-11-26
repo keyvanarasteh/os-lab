@@ -2502,6 +2502,21 @@
         "status": "none",
         "proof": null
       }
+    },
+    "plugin_updates": {
+      "section": "plugin",
+      "engineUsage": {
+        "status": "verified",
+        "proof": "android-lab/lab/tests/test_mcp_plugin.py"
+      },
+      "widget": {
+        "status": "none",
+        "proof": null
+      },
+      "app": {
+        "status": "none",
+        "proof": null
+      }
     }
   }
 }

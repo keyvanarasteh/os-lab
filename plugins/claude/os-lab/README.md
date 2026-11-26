@@ -25,6 +25,18 @@ claude plugin install os-lab@os-lab
 | `repo_path` | Your os-lab checkout. Empty works when the marketplace was added from it. |
 | `console_port` | Local console port, default 5050. |
 | `python_command` | Interpreter that starts the server, default `python3`. |
+| `update_check` | Daily check at session start for a newer published plugin. Off by default. |
+
+## Claude Desktop
+
+```bash
+python3 scripts/claude-plugin.py extension-install   # build, preview, open in Claude Desktop
+python3 scripts/claude-plugin.py updates --online    # Claude Code and Claude Desktop
+```
+
+Claude Desktop asks you to confirm the install and to choose your checkout folder. Run
+`extension-install` again to update. Turn the daily check on with
+`python3 scripts/claude-plugin.py configure --auto-check on`.
 
 ## Use
 
@@ -32,5 +44,5 @@ claude plugin install os-lab@os-lab
 - `/os-lab:setup` previews and applies changes.
 - `/os-lab:<lab>` loads guidance for one lab.
 
-The session start check reads files only and prints nothing when healthy. It needs `python3`
+The session start check prints nothing when healthy; it uses the network only with `update_check`. It needs `python3`
 or `python` on `PATH`. Licensed under Apache 2.0.

@@ -11,5 +11,7 @@ Read-only. Change nothing.
 2. Call `plugin_status` for the marketplace, the installed plugin and duplicate MCP entries.
 3. Call `plugin_check` and list only `fail` and `warn` results, each with its fix.
 4. Call `plugin_verify` when the plugin is installed.
+5. Call `plugin_updates` and report anything in `updatesAvailable`. Use `online: true` only
+   when the user wants to know about newer published versions.
 
 Report what is healthy in one line, then the problems in order of severity.

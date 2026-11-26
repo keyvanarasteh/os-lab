@@ -1,7 +1,7 @@
 {
   "name": "os-lab",
   "displayName": "OS Lab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Guarded MCP tools and skills for the os-lab security labs on this computer.",
   "author": { "name": "keyvanarasteh" },
   "homepage": "https://github.com/keyvanarasteh/os-lab",
@@ -21,6 +21,12 @@
       "default": 5050,
       "min": 1,
       "max": 65535
+    },
+    "update_check": {
+      "type": "boolean",
+      "title": "Check for plugin updates",
+      "description": "At session start, ask GitHub at most once a day whether a newer os-lab plugin is published.",
+      "default": false
     },
     "python_command": {
       "type": "string",
