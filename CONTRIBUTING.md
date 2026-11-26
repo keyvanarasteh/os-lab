@@ -165,12 +165,13 @@ Course midterm reservations add a `course` (and an option number in `note`) — 
 | **OS-38** | **Multi-Resolver nslookup/dig Comparator** | Queries a name against campus / `8.8.8.8` / `1.1.1.1`, compares answers and latency over N tries → report (the 02.11 homework). (Teached 02.11) | **High** · Small |
 | **OS-39** | **netplan DNS Configurator (approval-gated)** | Persistent DNS via `/etc/netplan/*.yaml` with a shown diff, `netplan try`/apply and a verify query; static vs DHCP. (Teached 02.11) | **Medium** · Small |
 | **OS-40** | **Wi-Fi / Interface DNS Troubleshooter** | Reproduces the 02.11 fault (DHCP `ignore-auto-dns`, empty resolver on Wi-Fi) and offers the `nmcli` fix; cache + AP/router/switch primer. (Teached 02.11) | **High** · Small |
+| **OS-41** | **Session-Drop & Memory-Stall Doctor** | Read-only `stall_doctor.py`: one timeline of reboots, OOM kills, planned restarts, swap/PSI stalls, IDE heartbeat drops, half-open SSH sessions and tunnel health; labels each disruption (S1–S15) with evidence and offers approval-gated fixes. [Plan](docs/PLAN-OS-41-stall-detector.md) · [guide](linux-lab/docs/OS-41/DETECTION-GUIDE.md) | **High** · Medium |
 
 #### Bonus — shipped reference tools (not reservable)
 
 These are already implemented and merged under
 [`linux-lab/scripts/bonus/`](linux-lab/scripts/bonus/). They close recurring
-gaps that are not covered by OS-01…OS-40 and are **not** vize tasks — reserve an
+gaps that are not covered by OS-01…OS-41 and are **not** vize tasks — reserve an
 `OS-…` row above instead. Read them as worked examples of the lab's script style:
 read-only, `set -euo pipefail`, clear exit codes (`0` clean / `1` problem /
 `2` usage), portable between macOS and Linux, no external tools required.
