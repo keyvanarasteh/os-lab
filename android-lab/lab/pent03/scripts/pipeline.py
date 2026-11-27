@@ -17,6 +17,7 @@ the exact commands without touching a device.
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
@@ -104,9 +105,19 @@ def run_pipeline(
     frida_version: str = deploy_frida.DEFAULT_FRIDA_VERSION,
     ca_path: str | None = None,
     skip: tuple[str, ...] = (),
+    hold: float = 0,
+    readiness: float = 2.0,
+    popen=subprocess.Popen,
     sleep=time.sleep,
 ) -> PipelineReport:
-    """Execute the pipeline against a device. Returns a :class:`PipelineReport`."""
+    """Execute the pipeline against a device. Returns a :class:`PipelineReport`.
+
+    The ``unpin`` step starts the objection/frida unpinning tool in the
+    background (it only neutralises pins while its session is alive), holds the
+    session open for ``hold`` seconds — the analysis/capture window during which
+    mitmproxy records flows — and then terminates it. ``popen`` is injectable so
+    tests never spawn a real process.
+    """
     report = PipelineReport(package=package, serial=serial)
     steps = plan(skip=skip)
     # parse_proxy validates host:port up front (and raises on anything unsafe).
@@ -157,12 +168,32 @@ def run_pipeline(
             return report
 
     if "unpin" in steps:
+        # Start the unpinning tool in the BACKGROUND and keep it alive. A clean
+        # "exit" is NOT success — the hooks only hold while the session lives.
+        proc = None
+
         def _unpin():
-            code = sslpinning_bypass.bypass(package, serial=serial)
-            if code != 0:
-                raise sslpinning_bypass.BypassError(f"objection exit={code}")
-            return "objection exit=0"
-        _step("unpin", _unpin)
+            nonlocal proc
+            proc = sslpinning_bypass.start_bypass(package, serial=serial, popen=popen)
+            sleep(readiness)  # give it a moment; if it died, the tool failed
+            if not sslpinning_bypass.is_alive(proc):
+                raise sslpinning_bypass.BypassError(
+                    "unpinning tool exited immediately; hooks are not active"
+                )
+            return f"unpinning active in background (pid={proc.pid})"
+
+        try:
+            if not _step("unpin", _unpin):
+                return report
+            # Analysis/capture window: pins stay neutralised while mitmproxy
+            # records flows. Sustain the session until the report, as required.
+            if hold:
+                sleep(hold)
+                report.add("analysis", True, f"held unpinning session {hold}s for capture")
+        finally:
+            if sslpinning_bypass.is_alive(proc):
+                sslpinning_bypass.stop_bypass(proc)
+                report.add("teardown", True, f"stopped unpinning session (pid={proc.pid})")
 
     return report
 
@@ -179,6 +210,7 @@ def _print_dry_run(package: str, serial: str, proxy: str, skip: tuple[str, ...])
     if "proxy" in steps:
         print(f"    adb -s {serial} shell {' '.join(set_proxy_command(proxy))}")
     if "unpin" in steps:
+        print("    # started in the background (subprocess.Popen), held for --hold s, then stopped:")
         print("    " + " ".join(sslpinning_bypass.objection_argv(package, serial=serial)))
 
 
@@ -193,6 +225,10 @@ def main(argv: list[str] | None = None) -> int:
         "--skip", default="", help="comma-separated steps to skip (boot,frida,ca,proxy,unpin)"
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--hold", type=float, default=30,
+        help="seconds to keep the unpinning session + capture window open (default: 30)",
+    )
     parser.add_argument(
         "--report",
         nargs="?",
@@ -233,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         frida_version=args.frida_version,
         ca_path=args.ca,
         skip=skip,
+        hold=args.hold,
     )
 
     # Always write the report (even a partial one on failure) before returning.

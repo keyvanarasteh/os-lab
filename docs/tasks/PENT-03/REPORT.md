@@ -75,7 +75,7 @@ writable-system apex-tmpfs
 **Tam offline test takımı:**
 ```
 $ ./run-tests.sh                # (veya: cd tests && python3 -m pytest -q)
-75 passed in ~0.8s
+79 passed in ~0.5s
 ```
 
 Statik analiz (`pyflakes`) temiz; Bash scriptleri `bash -n` ile doğrulandı.
@@ -106,7 +106,26 @@ PR üzerindeki otomatik inceleme (Sourcery) 30 bulgu üretti ve tamamı ele alı
 - **Dayanıklılık:** ağ hataları `FridaDeployError`'a sarmalanıyor; başarısızlıkta
   bile kısmi denetim raporu yazılıyor; rapor dosya adlarına benzersiz ek eklendi.
 
-Düzeltmelerden sonra offline test takımı **75 test** ile yeşil.
+Düzeltmelerden sonra offline test takımı **79 test** ile yeşil.
+
+## 7. Eğitmen Notu — Arka Plan Oturum Modeli (yüksek öncelik)
+
+Eğitmen incelemesinde belirtilen en önemli nokta ele alındı: **SSL unpinning adımı
+yalnızca oturum açık kaldıkça etkilidir**, bu yüzden aracı çalıştırıp "temiz çıkış"
+beklemek yanlıştır (çıkışta hook'lar kaybolur). Yeni akış:
+
+1. `sslpinning_bypass.start_bypass()` aracı **arka planda `subprocess.Popen`** ile
+   başlatır ve işleyici (handle) döndürür.
+2. Pipeline kısa bir hazır-olma kontrolü yapar; süreç hemen öldüyse adım **başarısız**
+   sayılır (hook'lar aktif değil demektir).
+3. `--hold <saniye>` boyunca oturum **açık tutulur** — mitmproxy'nin akışları
+   yakaladığı analiz penceresi; pins bu süre boyunca devre dışı kalır.
+4. Analiz bitince `stop_bypass()` ile süreç **sonlandırılır** (SIGTERM→SIGKILL);
+   `bypass_session()` context-manager'ı hata durumunda da teardown'ı garanti eder.
+
+Rapor artık `unpin (arka planda, pid=…)` → `analysis (held Ns)` → `teardown` adımlarını
+kaydeder. Doğrulama adımları `VERIFY.md`'de; cihaz/emülatör üzerindeki uçtan uca
+çalıştırma kanıt videosunda gösterilmiştir.
 
 ## 4. Mimari ve Çalışma Akışı
 
